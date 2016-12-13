@@ -8,7 +8,7 @@ As name suggest, it act as the Multi plugin in the Kubernetes and provides the M
 
 It is generic to run with other plugins like ptp, local-host, with flannel, with different IPAM and networks. 
 
-It contact between the container runtime and other plugins, and it not having any of it own net configuration, it call other plugins like flannel/calico to do real net conf job. Multus reuse the concept of invoking the delegates in the flannel, it group the multi plugins into delegates and invoke each other in the sequential order, according to the JSON scheme in the cni configuration.
+It contact between the container runtime and other plugins, and it isn't having any of it own net configuration, it call other plugins like flannel/calico to do the real net conf job. Multus reuse the concept of invoking the delegates in the flannel, it group the multi plugins into delegates and invoke each other in the sequential order, according to the JSON scheme in the cni configuration.
 
 ## Build
 
@@ -79,4 +79,5 @@ Given the following network configuration:
 EOF
 
 ```
-Testing the Multus CNI with docker, and make sure that the multus, sriov and flannel binaries are in the /opt/cni/bin directories and follow the steps as mention in the [CNI](https://github.com/containernetworking/cni)
+## Testing the Multus CNI with docker
+Make sure that the multus, [sriov](https://github.com/Intel-Corp/sriov-cni) and [flannel](https://github.com/containernetworking/cni/blob/master/Documentation/flannel.md) binaries are in the /opt/cni/bin directories and follow the steps as mention in the [CNI](https://github.com/containernetworking/cni)
