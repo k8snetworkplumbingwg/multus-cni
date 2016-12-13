@@ -4,12 +4,15 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 
 - *Multus* is the latin word for “Multi”
 
-- As name suggest, it act as the Multi plugin in the Kubernetes and provides the Multi interface support in pod
+- As the name suggests, it acts as the Multi plugin in the Kubernetes and provides the Multi interface support in a pod
 
 - It is generic to run with other plugins like ptp, local-host, calico and flannel, with different IPAM and networks. 
 
-- It contact between the container runtime and other plugins, and it isn't having any of it own net configuration, it call other plugins like flannel/calico to do the real net conf job. 
+- It contact between the container runtime and other plugins, and it isn't having any of it own net configuration, it calls other plugins like flannel/calico to do the real net conf job. 
+
 - Multus reuse the concept of invoking the delegates in the flannel, it group the multi plugins into delegates and invoke each other in the sequential order, according to the JSON scheme in the cni configuration.
+
+- No of plugins support is depending upon the number of delegates in the conf file.
 
 ## Build
 
@@ -25,7 +28,7 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 * `name` (string, required): the name of the network
 * `type` (string, required): "multus"
 * `delegate` (([]map,required): number of delegate details in the Multus
-* `masterplugin` (bool,required): master plugin to report back to container
+* `masterplugin` (bool,required): master plugin to report back the IP address and DNS to the container
 
 ## Usage
 
