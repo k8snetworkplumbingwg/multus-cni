@@ -2,13 +2,14 @@
 
 Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
 
-Multus is the latin word for “Multi”
+- *Multus* is the latin word for “Multi”
 
-As name suggest, it act as the Multi plugin in the Kubernetes and provides the Multi interface support in pod
+- As name suggest, it act as the Multi plugin in the Kubernetes and provides the Multi interface support in pod
 
-It is generic to run with other plugins like ptp, local-host, with flannel, with different IPAM and networks. 
+- It is generic to run with other plugins like ptp, local-host, calico and flannel, with different IPAM and networks. 
 
-It contact between the container runtime and other plugins, and it isn't having any of it own net configuration, it call other plugins like flannel/calico to do the real net conf job. Multus reuse the concept of invoking the delegates in the flannel, it group the multi plugins into delegates and invoke each other in the sequential order, according to the JSON scheme in the cni configuration.
+- It contact between the container runtime and other plugins, and it isn't having any of it own net configuration, it call other plugins like flannel/calico to do the real net conf job. 
+- Multus reuse the concept of invoking the delegates in the flannel, it group the multi plugins into delegates and invoke each other in the sequential order, according to the JSON scheme in the cni configuration.
 
 ## Build
 
