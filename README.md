@@ -27,7 +27,7 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "multus"
-* `delegate` (([]map,required): number of delegate details in the Multus
+* `delegates` (([]map,required): number of delegate details in the Multus
 * `masterplugin` (bool,required): master plugin to report back the IP address and DNS to the container
 
 ## Usage
