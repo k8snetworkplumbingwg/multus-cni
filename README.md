@@ -31,7 +31,7 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 Given the following network configuration:
 
 ```
-# # tee /etc/cni/net.d/multus-cni.conf <<-'EOF'
+# tee /etc/cni/net.d/multus-cni.conf <<-'EOF'
 {
     "name": "minion1-multus-demo-network",
     "type": "multus",
