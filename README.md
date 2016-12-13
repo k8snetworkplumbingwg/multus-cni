@@ -1,6 +1,6 @@
 # MULTUS CNI plugin
 
-Please read [CNI](https://github.com/containernetworking/cni) for more information on CNI.
+Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
 
 Multus is the latin word for “Multi”
 
