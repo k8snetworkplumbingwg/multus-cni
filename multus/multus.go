@@ -30,7 +30,8 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 )
 
-const defaultCNIDir="/var/lib/cni/multus"
+const defaultCNIDir = "/var/lib/cni/multus"
+
 var masterpluginEnabled bool
 
 type NetConf struct {
@@ -97,7 +98,7 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
 func getifname() (f func() string) {
 	var interfaceIndex int
 	f = func() string {
-		ifname := fmt.Sprintf("net%d",interfaceIndex)
+		ifname := fmt.Sprintf("net%d", interfaceIndex)
 		interfaceIndex++
 		return ifname
 	}
@@ -155,7 +156,6 @@ func isMasterplugin(netconf map[string]interface{}) bool {
 	return false
 }
 
-
 func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (bool, error) {
 	netconfBytes, err := json.Marshal(netconf)
 	if err != nil {
@@ -212,6 +212,28 @@ func delegateDel(podif func() string, argif string, netconf map[string]interface
 	return err
 }
 
+func clearPlugins(mIdx int, pIdx int, argIfname string, delegates []map[string]interface{}) error {
+
+	if os.Setenv("CNI_COMMAND", "DEL") != nil {
+		return fmt.Errorf("Multus: error in setting CNI_COMMAND to DEL")
+	}
+
+	podifName := getifname()
+	r := delegateDel(podifName, argIfname, delegates[mIdx])
+	if r != nil {
+		return r
+	}
+
+	for idx := 0; idx < pIdx && idx != mIdx; idx++ {
+		r := delegateDel(podifName, argIfname, delegates[idx])
+		if r != nil {
+			return r
+		}
+	}
+
+	return nil
+}
+
 func cmdAdd(args *skel.CmdArgs) error {
 	var result error
 	n, err := loadNetConf(args.StdinData)
@@ -230,20 +252,26 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	podifName := getifname()
-	for _, delegate := range n.Delegates {
-		err,r := delegateAdd(podifName, args.IfName, delegate, true)
-		if(err != true) {
+	var mIndex int
+	for index, delegate := range n.Delegates {
+		err, r := delegateAdd(podifName, args.IfName, delegate, true)
+		if err != true {
 			result = r
-		} else if (err != false) && r !=nil {
+			mIndex = index
+		} else if (err != false) && r != nil {
 			return r
 		}
 	}
 
-	for _, delegate := range n.Delegates {
-		err,r := delegateAdd(podifName, args.IfName, delegate, false)
-		if(err != true) {
+	for index, delegate := range n.Delegates {
+		err, r := delegateAdd(podifName, args.IfName, delegate, false)
+		if err != true {
 			result = r
-		} else if (err != false) && r !=nil {
+		} else if (err != false) && r != nil {
+			perr := clearPlugins(mIndex, index, args.IfName, n.Delegates)
+			if perr != nil {
+				return perr
+			}
 			return r
 		}
 	}
