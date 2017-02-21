@@ -14,6 +14,11 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 
 - No of plugins support is depending upon the number of delegates in the conf file.
 
+- Master plugin invokes "eth0" interface in the pod, rest of plugins(Mininon plugins eg: sriov,ipam) invoke interfaces as "net0", "net1".. "netn"
+
+- The "masterplugin" is the only net conf option of multus cni, it identifies the primary network. The default route will point to the primary network 
+
+
 ## Build
 
 This plugin requires Go 1.5+ to build.
@@ -42,9 +47,8 @@ Given the following network configuration:
     "delegates": [
         {
                 "type": "sriov",
-                "if0": "enp12s0f0",
-                "if0name": "north0",
-                "createmac": true,
+                #part of sriov plugin conf
+                "if0": "enp12s0f0", 
                 "ipam": {
                         "type": "host-local",
                         "subnet": "10.56.217.0/24",
@@ -57,18 +61,16 @@ Given the following network configuration:
                 }
         },
         {
-                "type": "sriov",
-                "if0": "enp12s0f1",
-                "if0name": "south0",
+                "type": "ptp",
                 "ipam": {
                         "type": "host-local",
-                        "subnet": "10.56.217.0/24",
-                        "rangeStart": "10.56.217.100",
-                        "rangeEnd": "10.56.217.130",
+                        "subnet": "10.168.1.0/24",
+                        "rangeStart": "10.168.1.11",
+                        "rangeEnd": "10.168.1.20",
                         "routes": [
                                 { "dst": "0.0.0.0/0" }
                         ],
-                        "gateway": "10.56.217.1"
+                        "gateway": "10.168.1.1"
                 }
         },
         {
