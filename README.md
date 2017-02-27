@@ -19,6 +19,11 @@
 
 Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
 
+## Multi-Homed pod
+<p align="center">
+   <img src="doc/images/multus_cni_pod.png" width="1008" />
+</p>
+
 ## Build
 
 This plugin requires Go 1.5+ to build.
