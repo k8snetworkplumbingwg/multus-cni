@@ -159,7 +159,5 @@ net0 | VF assigned to the container by [SR_IOV CNI](https://github.com/Intel-Cor
 net1 | ptp localhost interface
 
 ### Contacts
-For any questions about Multus CNI, please reach out on github issue or contact the developer
+For any questions about Multus CNI, please reach out on github issue or feel free to contact the developer @kural and @dmzoneill in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
 
-- Kuralamudhan Ramakrishnan <kuralamudhan.ramakrishnan@intel.com>
-- David M O Neill <david.m.oneill@intel.com>
