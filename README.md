@@ -1,4 +1,4 @@
-![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/dev/doc/doc/images/Multus.png)
+![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
 # MULTUS CNI plugin
 
 - *Multus* is the latin word for “Multi”
