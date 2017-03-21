@@ -149,8 +149,9 @@ pod "multus-test" created
 20: net0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
     link/ether f6:fb:21:4f:1d:63 brd ff:ff:ff:ff:ff:ff
 21: net1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
-    link/ether 76:13:b1:60:00:00 brd ff:ff:ff:ff:ff:ff As seen in the above output 3 interfaces are created.
+    link/ether 76:13:b1:60:00:00 brd ff:ff:ff:ff:ff:ff 
 ```
+
 Interface name | Description
 ------------ | -------------
 lo | loopback
