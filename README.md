@@ -94,6 +94,9 @@ Given the following network configuration:
 EOF
 
 ```
+## Testing the Multus CNI with Multiple Flannel Network
+Github user [YYGCui](https://github.com/YYGCui) has used Multiple flannel network to work with Multus CNI plugin. Please refer this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for Multiple overlay network support with Multus CNI.
+
 ## Testing the Multus CNI with docker
 Make sure that the multus, [sriov](https://github.com/Intel-Corp/sriov-cni), [flannel](https://github.com/containernetworking/cni/blob/master/Documentation/flannel.md), and [ptp](https://github.com/containernetworking/cni/blob/master/Documentation/ptp.md) binaries are in the `/opt/cni/bin` directories and follow the steps as mention in the [CNI](https://github.com/containernetworking/cni/#running-a-docker-container-with-network-namespace-set-up-by-cni-plugins)
 
