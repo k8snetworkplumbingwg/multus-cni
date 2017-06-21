@@ -5,7 +5,7 @@
 
 - As the name suggests, it acts as the Multi plugin in Kubernetes and provides the Multi interface support in a pod
 
-- It is generic to run with other plugins like ptp, local-host, calico and flannel, with different IPAM and networks. 
+- It is generic to run with any plugins like Calico, Weave, SRIOV, Ciliuim, Canal and Flannel, with different IPAM and networks. 
 
 - It is a contact between the container runtime and other plugins, and it doesn't have any of its own net configuration, it calls other plugins like flannel/calico to do the real net conf job. 
 
