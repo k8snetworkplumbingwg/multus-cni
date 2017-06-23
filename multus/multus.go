@@ -89,7 +89,9 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", path, err)
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read container data in the path(%q): %v", path, err)
+		}
 	}
 
 	return data, err
@@ -288,6 +290,10 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Per spec should ignore error if resources are missing / already removed
+			return nil
+		}
 		return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
 	}
 
