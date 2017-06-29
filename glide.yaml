@@ -1,0 +1,18 @@
+package: github.com/Intel-Corp/multus-cni
+import:
+- package: github.com/containernetworking/cni
+  version: v0.5.2
+  subpackages:
+  - pkg/ip
+  - pkg/ipam
+  - pkg/ns
+  - pkg/skel
+  - pkg/types
+  - pkg/version
+- package: github.com/golang/glog
+- package: github.com/vishvananda/netlink
+- package: k8s.io/client-go
+  version: 4a3ab2f5be5177366f8206fd79ce55ca80e417fa
+  subpackages:
+  - kubernetes
+  - tools/clientcmd
