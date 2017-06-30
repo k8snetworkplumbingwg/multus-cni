@@ -26,7 +26,7 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 
 ## Build
 
-This plugin requires Go 1.5+ to build.
+This plugin requires Go 1.7 to build.
 
 Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
 
@@ -41,10 +41,232 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "multus"
-* `delegates` (([]map,required): number of delegate details in the Multus
+* `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver, Refer the doc
+* `delegates` (([]map,required): number of delegate details in the Multus, ignored in case kubeconfig is added.
 * `masterplugin` (bool,required): master plugin to report back the IP address and DNS to the container
 
-## Usage
+## Usage with Kubernetes TPR based Network Objects
+
+Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more details refer the link - [K8s Multiple Network proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
+
+### Creating “Network” third party resource in kubernetes
+1. Create a Third party resource “tprnetwork.yaml” for the network object as shown below
+```
+apiVersion: extensions/v1beta1
+kind: ThirdPartyResource
+metadata:
+  name: network.kubernetes.com
+description: "A specification of a Network obj in the kubernetes"
+versions:
+- name: v1
+```
+2. Run kubectl create command for the Third Party Resource
+```
+# kubectl create -f ./tprnetwork.yaml
+thirdpartyresource "network.kubernetes.com" created
+```
+3. Run kubectl get command to check the Network TPR creation
+```
+# kubectl get thirdpartyresource
+NAME                     DESCRIPTION                                          VERSION(S)
+network.kubernetes.com   A specification of a Network obj in the kubernetes   v1
+```
+### Creating “Custom Network objects” third party resource in kubernetes
+1. After the ThirdPartyResource object has been created you can create network objects. Network objects should contain network fields. These fields are in JSON format. In the following example, a plugin and args fields are set to the object of kind Network. The kind Network is derived from the metadata.name of the ThirdPartyResource object we created above.
+
+2. Save the below following YAML to flannel-network.yaml
+```
+apiVersion: "kubernetes.com/v1"
+kind: Network
+metadata:
+  name: flannel-conf
+plugin: flannel
+args: '[
+        {
+                "delegate": {
+                        "isDefaultGateway": true
+                }
+        }
+]'
+```
+2. Run kubectl create command for the TPR - Network object
+```
+# kubectl create -f ./flannel-network.yaml 
+network "flannel-conf" created
+```
+3. Manage the Network objects using kubectl.
+```
+# kubectl get network
+NAME                         KIND
+flannel-conf                 Network.v1.kubernetes.com
+```
+4. You can also view the raw JSON data. Here you can see that it contains the custom plugin and args fields from the yaml you used to create it:
+```
+# kubectl get network flannel-conf -o yaml
+apiVersion: kubernetes.com/v1
+args: '[ { "delegate": { "isDefaultGateway": true } } ]'
+kind: Network
+metadata:
+  creationTimestamp: 2017-06-28T14:20:52Z
+  name: flannel-conf
+  namespace: default
+  resourceVersion: "5422876"
+  selfLink: /apis/kubernetes.com/v1/namespaces/default/networks/flannel-conf
+  uid: fdcb94a2-5c0c-11e7-bbeb-408d5c537d27
+plugin: flannel
+```
+4. The plugin field should be the name of the CNI plugin and args should have the flannel args, it should be in the the JSON format as shown above. **User can create network objects for Calico, Weave, Romana, & Cilium and test the multus.** 
+5. Save the below following YAML to sriov-network.yaml. Refer [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes
+```
+apiVersion: "kubernetes.com/v1"
+kind: Network
+metadata:
+  name: sriov-conf
+plugin: sriov
+args: '[
+       {
+                "if0": "enp12s0f1",
+                "ipam": {
+                        "type": "host-local",
+                        "subnet": "10.56.217.0/24",
+                        "rangeStart": "10.56.217.171",
+                        "rangeEnd": "10.56.217.181",
+                        "routes": [
+                                { "dst": "0.0.0.0/0" }
+                        ],
+                        "gateway": "10.56.217.1"
+                }
+        }
+]'
+```
+6. Save the below following YAML to sriov-vlanid-l2enable-network.yaml
+```
+apiVersion: "kubernetes.com/v1"
+kind: Network
+metadata:
+  name: sriov-vlanid-l2enable-conf
+plugin: sriov
+args: '[
+       {
+                "if0": "enp2s0",
+                "vlan": 210,
+                "if0name": "north",
+                "l2enable": true
+        }
+]'
+```
+7. Follows the step 2 to create the network object “sriov-vlanid-l2enable-conf” and “sriov-conf”
+8.	Manage the Network objects using kubectl.
+```
+# kubectl get network
+NAME                         KIND
+flannel-conf                 Network.v1.kubernetes.com
+sriov-vlanid-l2enable-conf   Network.v1.kubernetes.com
+sriov-conf                   Network.v1.kubernetes.com
+```
+### Configuring Multus to use the kubeconfig
+1.	Create Multus CNI configuration file /etc/cni/net.d/multus-cni.conf with below content in minions. Use only the absolute path to point to the kubeconfig file (it may change depending upon your cluster env) and make sure all CNI binary files are in `\opt\cni\bin` dir
+```
+{
+    "name": "minion-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml"
+}
+```
+2.	Restart kubelet service
+```
+# systemctl restart kubelet
+```
+### Configuring Pod to use the TPR Network objects
+1. 	Save the below following YAML to pod-multi-network.yaml. In this case flannel-conf network object act as the primary network. 
+```
+# cat pod-multi-network.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multus-multi-net-poc
+  annotations:
+    networks: '[  
+        { "name": "flannel-conf" },
+        { "name": "sriov-conf"},
+        { "name": "sriov-vlanid-l2enable-conf" } 
+    ]'
+spec:  # specification of the pod's contents
+  containers:
+  - name: multus-multi-net-poc
+    image: "busybox"
+    command: ["top"]
+    stdin: true
+    tty: true
+```
+3.	Create Multiple network based pod from the master node
+```
+# kubectl create -f ./pod-multi-network.yaml
+pod "multus-multi-net-poc" created
+```
+4.	Get the details of the running pod from the master
+```
+# kubectl get pods
+NAME                   READY     STATUS    RESTARTS   AGE
+multus-multi-net-poc   1/1       Running   0          30s
+```
+### Verifying Pod network
+1.	Run “ifconfig” command inside the container:
+```
+# kubectl exec -it multus-multi-net-poc -- ifconfig
+eth0      Link encap:Ethernet  HWaddr 06:21:91:2D:74:B9  
+          inet addr:192.168.42.3  Bcast:0.0.0.0  Mask:255.255.255.0
+          inet6 addr: fe80::421:91ff:fe2d:74b9/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:648 (648.0 B)
+
+lo        Link encap:Local Loopback  
+          inet addr:127.0.0.1  Mask:255.0.0.0
+          inet6 addr: ::1/128 Scope:Host
+          UP LOOPBACK RUNNING  MTU:65536  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1 
+          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+
+net0      Link encap:Ethernet  HWaddr D2:94:98:82:00:00  
+          inet addr:10.56.217.171  Bcast:0.0.0.0  Mask:255.255.255.0
+          inet6 addr: fe80::d094:98ff:fe82:0/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:2 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:120 (120.0 B)  TX bytes:648 (648.0 B)
+
+north     Link encap:Ethernet  HWaddr BE:F2:48:42:83:12  
+          inet6 addr: fe80::bcf2:48ff:fe42:8312/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:1420 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1276 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:1000 
+          RX bytes:95956 (93.7 KiB)  TX bytes:82200 (80.2 KiB)
+```
+Interface name | Description
+------------ | -------------
+lo | loopback
+eth0@if41 | Flannel network tap interface
+net0 | VF0 of NIC 1 assigned to the container by [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
+north | 	VF0 of NIC 2 assigned with VLAN ID 210 to the container by SR-IOV CNI plugin
+2.	Check the vlan ID of the NIC 2 VFs
+```
+# ip link show enp2s0
+20: enp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 24:8a:07:e8:7d:40 brd ff:ff:ff:ff:ff:ff
+    vf 0 MAC 00:00:00:00:00:00, vlan 210, spoof checking off, link-state auto
+    vf 1 MAC 00:00:00:00:00:00, vlan 4095, spoof checking off, link-state auto
+    vf 2 MAC 00:00:00:00:00:00, vlan 4095, spoof checking off, link-state auto
+    vf 3 MAC 00:00:00:00:00:00, vlan 4095, spoof checking off, link-state auto
+```
+
+## Using Multus Conf file
 
 Given the following network configuration:
 
@@ -159,9 +381,9 @@ Interface name | Description
 ------------ | -------------
 lo | loopback
 eth0@if41 | Flannel network tap interface
-net0 | VF assigned to the container by [SR_IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
+net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
 net1 | ptp localhost interface
 
 ### Contacts
-For any questions about Multus CNI, please reach out on github issue or feel free to contact the developer @kural and @dmzoneill in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
+For any questions about Multus CNI, please reach out on github issue or feel free to contact the developer @kural in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
 
