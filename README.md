@@ -26,7 +26,7 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 
 ## Build
 
-This plugin requires Go 1.7 to build.
+**This plugin requires Go 1.8 to build.**
 
 Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
 
