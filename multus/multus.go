@@ -1,4 +1,4 @@
-// Copyright 2015 CNI authors
+// Copyright (c) 2017 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a "Multi-plugin".It is a fork of flannel CNI
+// This is a "Multi-plugin".The delegate concept refered from CNI project
 // It reads other plugin netconf, and then invoke them, e.g.
 // flannel or sriov plugin.
 
