@@ -41,6 +41,7 @@ import (
 const defaultCNIDir = "/var/lib/cni/multus"
 
 var masterpluginEnabled bool
+var defaultcninetwork bool
 
 type NetConf struct {
 	types.NetConf
@@ -86,12 +87,16 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
 
-	if netconf.Kubeconfig != "" {
+	if netconf.Kubeconfig != "" && netconf.Delegates != nil {
+		defaultcninetwork = true
+	}
+
+	if netconf.Kubeconfig != "" && !defaultcninetwork {
 		return netconf, nil
 	}
 
-	if netconf.Delegates == nil {
-		return nil, fmt.Errorf(`"delegates" is must, refer README.md`)
+	if len(netconf.Delegates) == 0 && !defaultcninetwork {
+		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
 
 	if netconf.CNIDir == "" {
@@ -424,6 +429,10 @@ func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interfac
 		return podNet, err
 	}
 
+	if len(netAnnot) == 0 {
+		return podNet, fmt.Errorf(`nonet`)
+	}
+
 	netObjs, err := parsePodNetworkObject(netAnnot)
 	if err != nil {
 		return podNet, err
@@ -444,18 +453,28 @@ func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interfac
 
 func cmdAdd(args *skel.CmdArgs) error {
 	var result error
+	var nopodnet bool
 	n, err := loadNetConf(args.StdinData)
 	if err != nil {
-		return err
+		return fmt.Errorf("err in loading netconf: %v", err)
 	}
 
 	if n.Kubeconfig != "" {
 		podDelegate, r := getK8sNetwork(args, n.Kubeconfig)
-		if r != nil {
+		if r != nil && r.Error() == "nonet" {
+			nopodnet = true
+			if !defaultcninetwork {
+				return fmt.Errorf("Multus: Err in getting k8s network from the pod spec annotation, check the pod spec or set delegate for the default network, Refer the README.md: %v", r)
+			}
+		}
+
+		if r != nil && !defaultcninetwork {
 			return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
 		}
 
-		n.Delegates = podDelegate
+		if len(podDelegate) != 0 {
+			n.Delegates = podDelegate
+		}
 	}
 
 	for _, delegate := range n.Delegates {
@@ -464,7 +483,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
-	if n.Kubeconfig == "" {
+	if n.Kubeconfig == "" || nopodnet {
 		if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
 			return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
 		}
@@ -500,6 +519,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 func cmdDel(args *skel.CmdArgs) error {
 	var result error
+	var nopodnet bool
+
 	var Delegates []map[string]interface{}
 
 	in, err := loadNetConf(args.StdinData)
@@ -509,13 +530,23 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	if in.Kubeconfig != "" {
 		podDelegate, r := getK8sNetwork(args, in.Kubeconfig)
-		if r != nil {
-			return r
+		if r != nil && r.Error() == "nonet" {
+			nopodnet = true
+			if !defaultcninetwork {
+				return fmt.Errorf("Multus: Err in getting k8s network from the poc spec, check the pod spec or set delegate for the default network, Refer the README.md: %v", r)
+			}
 		}
 
-		Delegates = podDelegate
-	} else {
+		if r != nil && !defaultcninetwork {
+			return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
+		}
 
+		if len(podDelegate) != 0 {
+			in.Delegates = podDelegate
+		}
+	}
+
+	if in.Kubeconfig == "" || nopodnet {
 		netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 		if err != nil {
 			return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
