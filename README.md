@@ -50,6 +50,104 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more details refer the link - [K8s Multiple Network proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
 
 ### Creating “Network” third party resource in kubernetes
+
+Multus is compatible to work with both CDR/TPR. Both CDR/TPR based network object api self link is same.
+
+#### CDR based Network objects
+
+1. Create a Third party resource “crdnetwork.yaml” for the network object as shown below
+
+```
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: networks.kubernetes.com
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: kubernetes.com
+  # version name to use for REST API: /apis/<group>/<version>
+  version: v1
+  # either Namespaced or Cluster
+  scope: Namespaced
+  names:
+    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+    plural: networks
+    # singular name to be used as an alias on the CLI and for display
+    singular: network
+    # kind is normally the CamelCased singular type. Your resource manifests use this.
+    kind: Network
+    # shortNames allow shorter string to match your resource on the CLI
+    shortNames:
+    - net
+```
+
+2. kubectl create command for the Custom Resource Definition
+
+```
+# kubectl create -f ./crdnetwork.yaml
+customresourcedefinition "network.kubernetes.com" created
+```
+
+3. kubectl get command to check the Network CRD creation
+
+```
+# kubectl get CustomResourceDefinition
+NAME                      KIND
+networks.kubernetes.com   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
+```
+
+4. Save the below following YAML to flannel-network.yaml
+
+```
+apiVersion: "kubernetes.com/v1"
+kind: Network
+metadata:
+  name: flannel-networkobj
+plugin: flannel
+args: '[
+        {
+                "delegate": {
+                        "isDefaultGateway": true
+                }
+        }
+]'
+```
+5. create the custom resource definition 
+```
+# kubectl create -f customCRD/flannel-network.yaml
+network "flannel-networkobj" created
+```
+```
+# kubectl get network
+NAME                 KIND                        ARGS                                               PLUGIN
+flannel-networkobj   Network.v1.kubernetes.com   [ { "delegate": { "isDefaultGateway": true } } ]   flannel
+```
+6. Get the custom network object details
+```
+# kubectl get network flannel-networkobj -o yaml
+apiVersion: kubernetes.com/v1
+args: '[ { "delegate": { "isDefaultGateway": true } } ]'
+kind: Network
+metadata:
+  clusterName: ""
+  creationTimestamp: 2017-07-11T21:46:52Z
+  deletionGracePeriodSeconds: null
+  deletionTimestamp: null
+  name: flannel-networkobj
+  namespace: default
+  resourceVersion: "6848829"
+  **selfLink: /apis/kubernetes.com/v1/namespaces/default/networks/flannel-networkobj**
+  uid: 7311c965-6682-11e7-b0b9-408d5c537d27
+plugin: flannel
+```
+
+Both TPR and CRD will have same selfLink : **/apis/kubernetes.com/v1/namespaces/default/networks/<netobjname>**
+
+if you are using 1.7 or planning to use 1.8 kubernetes, you can use CRD itself. There is no need to change any thing in Multus. For Kubernetes user < 1.7 use TPR based network objects as follows
+
+#### TPR based Network objects
+
 1. Create a Third party resource “tprnetwork.yaml” for the network object as shown below
 ```
 apiVersion: extensions/v1beta1
@@ -71,7 +169,7 @@ thirdpartyresource "network.kubernetes.com" created
 NAME                     DESCRIPTION                                          VERSION(S)
 network.kubernetes.com   A specification of a Network obj in the kubernetes   v1
 ```
-### Creating “Custom Network objects” third party resource in kubernetes
+##### Creating “Custom Network objects” third party resource in kubernetes
 1. After the ThirdPartyResource object has been created you can create network objects. Network objects should contain network fields. These fields are in JSON format. In the following example, a plugin and args fields are set to the object of kind Network. The kind Network is derived from the metadata.name of the ThirdPartyResource object we created above.
 
 2. Save the below following YAML to flannel-network.yaml
@@ -177,6 +275,26 @@ sriov-conf                   Network.v1.kubernetes.com
 ```
 # systemctl restart kubelet
 ```
+### Configuring Multus to use the kubeconfig and also default networks
+1.	Many user want default networking feature along with Network object. Refer [#14](https://github.com/Intel-Corp/multus-cni/issues/14) & [#17](https://github.com/Intel-Corp/multus-cni/issues/17) issues for more information. In this following config, Weave act as the default network in the absence of network field in the pod metadata annotation.
+```
+{
+    "name": "minion-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yam",
+    "delegates": [{
+        "type": "weave-net",
+        "hairpinMode": true,
+        "masterplugin": true
+    }]
+}
+```
+2.	Restart kubelet service
+```
+# systemctl restart kubelet
+```
+
+
 ### Configuring Pod to use the TPR Network objects
 1. 	Save the below following YAML to pod-multi-network.yaml. In this case flannel-conf network object act as the primary network. 
 ```
