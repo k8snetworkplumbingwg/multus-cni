@@ -45,7 +45,7 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 * `delegates` (([]map,required): number of delegate details in the Multus, ignored in case kubeconfig is added.
 * `masterplugin` (bool,required): master plugin to report back the IP address and DNS to the container
 
-## Usage with Kubernetes TPR based Network Objects
+## Usage with Kubernetes CRD/TPR based Network Objects
 
 Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more details refer the link - [K8s Multiple Network proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
 
