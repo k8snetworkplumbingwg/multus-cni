@@ -137,7 +137,7 @@ metadata:
   name: flannel-networkobj
   namespace: default
   resourceVersion: "6848829"
-  **selfLink: /apis/kubernetes.com/v1/namespaces/default/networks/flannel-networkobj**
+  selfLink: /apis/kubernetes.com/v1/namespaces/default/networks/flannel-networkobj
   uid: 7311c965-6682-11e7-b0b9-408d5c537d27
 plugin: flannel
 ```
