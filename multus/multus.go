@@ -521,8 +521,6 @@ func cmdDel(args *skel.CmdArgs) error {
 	var result error
 	var nopodnet bool
 
-	var Delegates []map[string]interface{}
-
 	in, err := loadNetConf(args.StdinData)
 	if err != nil {
 		return err
@@ -552,13 +550,13 @@ func cmdDel(args *skel.CmdArgs) error {
 			return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
 		}
 
-		if err := json.Unmarshal(netconfBytes, &Delegates); err != nil {
+		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return fmt.Errorf("Multus: failed to load netconf: %v", err)
 		}
 	}
 
 	podifName := getifname()
-	for _, delegate := range Delegates {
+	for _, delegate := range in.Delegates {
 		r := delegateDel(podifName, args.IfName, delegate)
 		if r != nil {
 			return r
