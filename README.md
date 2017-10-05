@@ -19,6 +19,10 @@
 
 Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
 
+## Multus additional plugins
+- [DPDK -SR-IOV CNI](https://github.com/hustcat/sriov-cni)
+- [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
+
 ## Multi-Homed pod
 <p align="center">
    <img src="doc/images/multus_cni_pod.png" width="1008" />
