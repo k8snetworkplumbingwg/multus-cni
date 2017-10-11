@@ -285,7 +285,7 @@ sriov-conf                   Network.v1.kubernetes.com
 {
     "name": "minion-cni-network",
     "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yam",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
     "delegates": [{
         "type": "weave-net",
         "hairpinMode": true,
