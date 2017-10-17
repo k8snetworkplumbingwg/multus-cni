@@ -23,6 +23,10 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 - [DPDK -SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni)
 - [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
 
+## NFV based Networking in Kubernetes
+- Feature Brief -[Multiple Network Interface Support in Kubernetes](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-support-in-kubernetes-feature-brief.pdf)
+- White Paper - [Enabling New Features with Kubernetes for NFV](https://builders.intel.com/docs/networkbuilders/enabling_new_features_in_kubernetes_for_NFV.pdf)
+
 ## Multi-Homed pod
 <p align="center">
    <img src="doc/images/multus_cni_pod.png" width="1008" />
