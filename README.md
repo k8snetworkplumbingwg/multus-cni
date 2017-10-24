@@ -1,4 +1,32 @@
 ![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
+
+Table of Contents
+=================
+
+   * [MULTUS CNI plugin](#multus-cni-plugin)
+      * [Multus additional plugins](#multus-additional-plugins)
+      * [NFV based Networking in Kubernetes](#nfv-based-networking-in-kubernetes)
+      * [Multi-Homed pod](#multi-homed-pod)
+      * [Build](#build)
+      * [Work flow](#work-flow)
+      * [Usage with Kubernetes CRD/TPR based Network Objects](#usage-with-kubernetes-crdtpr-based-network-objects)
+         * [Creating “Network” third party resource in kubernetes](#creating-network-third-party-resource-in-kubernetes)
+            * [CDR based Network objects](#cdr-based-network-objects)
+            * [TPR based Network objects](#tpr-based-network-objects)
+               * [Creating “Custom Network objects” third party resource in kubernetes](#creating-custom-network-objects-third-party-resource-in-kubernetes)
+         * [Configuring Multus to use the kubeconfig](#configuring-multus-to-use-the-kubeconfig)
+         * [Configuring Multus to use the kubeconfig and also default networks](#configuring-multus-to-use-the-kubeconfig-and-also-default-networks)
+         * [Configuring Pod to use the TPR Network objects](#configuring-pod-to-use-the-tpr-network-objects)
+         * [Verifying Pod network](#verifying-pod-network)
+      * [Using Multus Conf file](#using-multus-conf-file)
+      * [Testing the Multus CNI with Multiple Flannel Network](#testing-the-multus-cni-with-multiple-flannel-network)
+      * [Testing the Multus CNI with docker](#testing-the-multus-cni-with-docker)
+      * [Testing the Multus CNI with Kubernetes](#testing-the-multus-cni-with-kubernetes)
+         * [Launching workloads in Kubernetes](#launching-workloads-in-kubernetes)
+         * [Contacts](#contacts)
+
+Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
+
 # MULTUS CNI plugin
 
 - *Multus* is the latin word for “Multi”
