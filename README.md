@@ -470,13 +470,14 @@ Given the following network configuration:
 EOF
 
 ```
-## Testing the Multus CNI with Multiple Flannel Network
+## Testing ##
+### Testing the Multus CNI with Multiple Flannel Network
 Github user [YYGCui](https://github.com/YYGCui) has used Multiple flannel network to work with Multus CNI plugin. Please refer this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for Multiple overlay network support with Multus CNI.
 
-## Testing the Multus CNI with docker
+### Testing the Multus CNI with docker
 Make sure that the multus, [sriov](https://github.com/Intel-Corp/sriov-cni), [flannel](https://github.com/containernetworking/cni/blob/master/Documentation/flannel.md), and [ptp](https://github.com/containernetworking/cni/blob/master/Documentation/ptp.md) binaries are in the `/opt/cni/bin` directories and follow the steps as mention in the [CNI](https://github.com/containernetworking/cni/#running-a-docker-container-with-network-namespace-set-up-by-cni-plugins)
 
-## Testing the Multus CNI with Kubernetes
+### Testing the Multus CNI with Kubernetes
 Refer the Kubernetes User Guide and network plugin
 * [Single Node](https://kubernetes.io/docs/getting-started-guides/fedora/fedora_manual_config/)
 * [Multi Node](https://kubernetes.io/docs/getting-started-guides/fedora/flannel_multi_node_cluster/)
@@ -494,7 +495,7 @@ Restart the kubelet
 ```
 # systemctl restart kubelet.service
 ```
-### Launching workloads in Kubernetes
+#### Launching workloads in Kubernetes
 Launch the workload using yaml file in the kubernetes master, with above configuration in the multus CNI, each pod should have multiple interfaces.
 > Note:	To verify whether Multus CNI plugin is working fine create a pod containing one “busybox” container and execute “ip link” command to check if interfaces management follows configuration.
 
@@ -538,6 +539,6 @@ eth0@if41 | Flannel network tap interface
 net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
 net1 | ptp localhost interface
 
-### Contacts
+## Contacts
 For any questions about Multus CNI, please reach out on github issue or feel free to contact the developer @kural in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
 
