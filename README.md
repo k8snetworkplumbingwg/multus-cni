@@ -1,5 +1,6 @@
 ![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
 
+
 Table of Contents
 =================
 
@@ -19,13 +20,15 @@ Table of Contents
          * [Configuring Pod to use the TPR Network objects](#configuring-pod-to-use-the-tpr-network-objects)
          * [Verifying Pod network](#verifying-pod-network)
       * [Using Multus Conf file](#using-multus-conf-file)
-      * [Testing the Multus CNI with Multiple Flannel Network](#testing-the-multus-cni-with-multiple-flannel-network)
-      * [Testing the Multus CNI with docker](#testing-the-multus-cni-with-docker)
-      * [Testing the Multus CNI with Kubernetes](#testing-the-multus-cni-with-kubernetes)
-         * [Launching workloads in Kubernetes](#launching-workloads-in-kubernetes)
-         * [Contacts](#contacts)
+      * [Testing the Multus CNI](#testing-the-multus-cni)
+         * [Multiple Flannel Network](#multiple-flannel-network)
+         * [docker](#docker)
+         * [Kubernetes](#kubernetes)
+            * [Launching workloads in Kubernetes](#launching-workloads-in-kubernetes)
+      * [Contacts](#contacts)
 
 Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
+
 
 # MULTUS CNI plugin
 
@@ -470,14 +473,14 @@ Given the following network configuration:
 EOF
 
 ```
-## Testing ##
-### Testing the Multus CNI with Multiple Flannel Network
+## Testing the Multus CNI ##
+### Multiple Flannel Network
 Github user [YYGCui](https://github.com/YYGCui) has used Multiple flannel network to work with Multus CNI plugin. Please refer this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for Multiple overlay network support with Multus CNI.
 
-### Testing the Multus CNI with docker
+### docker
 Make sure that the multus, [sriov](https://github.com/Intel-Corp/sriov-cni), [flannel](https://github.com/containernetworking/cni/blob/master/Documentation/flannel.md), and [ptp](https://github.com/containernetworking/cni/blob/master/Documentation/ptp.md) binaries are in the `/opt/cni/bin` directories and follow the steps as mention in the [CNI](https://github.com/containernetworking/cni/#running-a-docker-container-with-network-namespace-set-up-by-cni-plugins)
 
-### Testing the Multus CNI with Kubernetes
+### Kubernetes
 Refer the Kubernetes User Guide and network plugin
 * [Single Node](https://kubernetes.io/docs/getting-started-guides/fedora/fedora_manual_config/)
 * [Multi Node](https://kubernetes.io/docs/getting-started-guides/fedora/flannel_multi_node_cluster/)
