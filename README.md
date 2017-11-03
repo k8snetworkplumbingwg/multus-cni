@@ -12,7 +12,7 @@ Table of Contents
       * [Work flow](#work-flow)
       * [Usage with Kubernetes CRD/TPR based Network Objects](#usage-with-kubernetes-crdtpr-based-network-objects)
          * [Creating “Network” third party resource in kubernetes](#creating-network-third-party-resource-in-kubernetes)
-            * [CDR based Network objects](#cdr-based-network-objects)
+            * [CRD based Network objects](#crd-based-network-objects)
             * [TPR based Network objects](#tpr-based-network-objects)
                * [Creating “Custom Network objects” third party resource in kubernetes](#creating-custom-network-objects-third-party-resource-in-kubernetes)
          * [Configuring Multus to use the kubeconfig](#configuring-multus-to-use-the-kubeconfig)
@@ -96,9 +96,9 @@ Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more
 
 ### Creating “Network” third party resource in kubernetes
 
-Multus is compatible to work with both CDR/TPR. Both CDR/TPR based network object api self link is same.
+Multus is compatible to work with both CRD/TPR. Both CRD/TPR based network object api self link is same.
 
-#### CDR based Network objects
+#### CRD based Network objects
 
 1. Create a Third party resource “crdnetwork.yaml” for the network object as shown below
 
