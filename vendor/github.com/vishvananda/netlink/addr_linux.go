@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
+	"github.com/vishvananda/netns"
 )
 
 // IFA_FLAGS is a u32 attribute.
@@ -23,6 +24,19 @@ func AddrAdd(link Link, addr *Addr) error {
 // Equivalent to: `ip addr add $addr dev $link`
 func (h *Handle) AddrAdd(link Link, addr *Addr) error {
 	req := h.newNetlinkRequest(syscall.RTM_NEWADDR, syscall.NLM_F_CREATE|syscall.NLM_F_EXCL|syscall.NLM_F_ACK)
+	return h.addrHandle(link, addr, req)
+}
+
+// AddrReplace will replace (or, if not present, add) an IP address on a link device.
+// Equivalent to: `ip addr replace $addr dev $link`
+func AddrReplace(link Link, addr *Addr) error {
+	return pkgHandle.AddrReplace(link, addr)
+}
+
+// AddrReplace will replace (or, if not present, add) an IP address on a link device.
+// Equivalent to: `ip addr replace $addr dev $link`
+func (h *Handle) AddrReplace(link Link, addr *Addr) error {
+	req := h.newNetlinkRequest(syscall.RTM_NEWADDR, syscall.NLM_F_CREATE|syscall.NLM_F_REPLACE|syscall.NLM_F_ACK)
 	return h.addrHandle(link, addr, req)
 }
 
@@ -55,17 +69,27 @@ func (h *Handle) addrHandle(link Link, addr *Addr, req *nl.NetlinkRequest) error
 	msg.Prefixlen = uint8(prefixlen)
 	req.AddData(msg)
 
-	var addrData []byte
+	var localAddrData []byte
 	if family == FAMILY_V4 {
-		addrData = addr.IP.To4()
+		localAddrData = addr.IP.To4()
 	} else {
-		addrData = addr.IP.To16()
+		localAddrData = addr.IP.To16()
 	}
 
-	localData := nl.NewRtAttr(syscall.IFA_LOCAL, addrData)
+	localData := nl.NewRtAttr(syscall.IFA_LOCAL, localAddrData)
 	req.AddData(localData)
+	var peerAddrData []byte
+	if addr.Peer != nil {
+		if family == FAMILY_V4 {
+			peerAddrData = addr.Peer.IP.To4()
+		} else {
+			peerAddrData = addr.Peer.IP.To16()
+		}
+	} else {
+		peerAddrData = localAddrData
+	}
 
-	addressData := nl.NewRtAttr(syscall.IFA_ADDRESS, addrData)
+	addressData := nl.NewRtAttr(syscall.IFA_ADDRESS, peerAddrData)
 	req.AddData(addressData)
 
 	if addr.Flags != 0 {
@@ -77,6 +101,10 @@ func (h *Handle) addrHandle(link Link, addr *Addr, req *nl.NetlinkRequest) error
 			flagsData := nl.NewRtAttr(IFA_FLAGS, b)
 			req.AddData(flagsData)
 		}
+	}
+
+	if addr.Broadcast != nil {
+		req.AddData(nl.NewRtAttr(syscall.IFA_BROADCAST, addr.Broadcast))
 	}
 
 	if addr.Label != "" {
@@ -160,15 +188,23 @@ func parseAddr(m []byte) (addr Addr, family, index int, err error) {
 				IP:   attr.Value,
 				Mask: net.CIDRMask(int(msg.Prefixlen), 8*len(attr.Value)),
 			}
+			addr.Peer = dst
 		case syscall.IFA_LOCAL:
 			local = &net.IPNet{
 				IP:   attr.Value,
 				Mask: net.CIDRMask(int(msg.Prefixlen), 8*len(attr.Value)),
 			}
+			addr.IPNet = local
+		case syscall.IFA_BROADCAST:
+			addr.Broadcast = attr.Value
 		case syscall.IFA_LABEL:
 			addr.Label = string(attr.Value[:len(attr.Value)-1])
 		case IFA_FLAGS:
 			addr.Flags = int(native.Uint32(attr.Value[0:4]))
+		case nl.IFA_CACHEINFO:
+			ci := nl.DeserializeIfaCacheInfo(attr.Value)
+			addr.PreferedLft = int(ci.IfaPrefered)
+			addr.ValidLft = int(ci.IfaValid)
 		}
 	}
 
@@ -186,13 +222,27 @@ func parseAddr(m []byte) (addr Addr, family, index int, err error) {
 type AddrUpdate struct {
 	LinkAddress net.IPNet
 	LinkIndex   int
+	Flags       int
+	Scope       int
+	PreferedLft int
+	ValidLft    int
 	NewAddr     bool // true=added false=deleted
 }
 
 // AddrSubscribe takes a chan down which notifications will be sent
 // when addresses change.  Close the 'done' chan to stop subscription.
 func AddrSubscribe(ch chan<- AddrUpdate, done <-chan struct{}) error {
-	s, err := nl.Subscribe(syscall.NETLINK_ROUTE, syscall.RTNLGRP_IPV4_IFADDR, syscall.RTNLGRP_IPV6_IFADDR)
+	return addrSubscribe(netns.None(), netns.None(), ch, done)
+}
+
+// AddrSubscribeAt works like AddrSubscribe plus it allows the caller
+// to choose the network namespace in which to subscribe (ns).
+func AddrSubscribeAt(ns netns.NsHandle, ch chan<- AddrUpdate, done <-chan struct{}) error {
+	return addrSubscribe(ns, netns.None(), ch, done)
+}
+
+func addrSubscribe(newNs, curNs netns.NsHandle, ch chan<- AddrUpdate, done <-chan struct{}) error {
+	s, err := nl.SubscribeAt(newNs, curNs, syscall.NETLINK_ROUTE, syscall.RTNLGRP_IPV4_IFADDR, syscall.RTNLGRP_IPV6_IFADDR)
 	if err != nil {
 		return err
 	}
@@ -223,7 +273,13 @@ func AddrSubscribe(ch chan<- AddrUpdate, done <-chan struct{}) error {
 					continue
 				}
 
-				ch <- AddrUpdate{LinkAddress: *addr.IPNet, LinkIndex: ifindex, NewAddr: msgType == syscall.RTM_NEWADDR}
+				ch <- AddrUpdate{LinkAddress: *addr.IPNet,
+					LinkIndex:   ifindex,
+					NewAddr:     msgType == syscall.RTM_NEWADDR,
+					Flags:       addr.Flags,
+					Scope:       addr.Scope,
+					PreferedLft: addr.PreferedLft,
+					ValidLft:    addr.ValidLft}
 			}
 		}
 	}()

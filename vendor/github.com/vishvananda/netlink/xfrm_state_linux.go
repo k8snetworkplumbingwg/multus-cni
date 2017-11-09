@@ -35,6 +35,20 @@ func writeStateAlgoAuth(a *XfrmStateAlgo) []byte {
 	return algo.Serialize()
 }
 
+func writeStateAlgoAead(a *XfrmStateAlgo) []byte {
+	algo := nl.XfrmAlgoAEAD{
+		AlgKeyLen: uint32(len(a.Key) * 8),
+		AlgICVLen: uint32(a.ICVLen),
+		AlgKey:    a.Key,
+	}
+	end := len(a.Name)
+	if end > 64 {
+		end = 64
+	}
+	copy(algo.AlgName[:end], a.Name)
+	return algo.Serialize()
+}
+
 func writeMark(m *XfrmMark) []byte {
 	mark := &nl.XfrmMark{
 		Value: m.Value,
@@ -44,6 +58,21 @@ func writeMark(m *XfrmMark) []byte {
 		mark.Mask = ^uint32(0)
 	}
 	return mark.Serialize()
+}
+
+func writeReplayEsn(replayWindow int) []byte {
+	replayEsn := &nl.XfrmReplayStateEsn{
+		OSeq:         0,
+		Seq:          0,
+		OSeqHi:       0,
+		SeqHi:        0,
+		ReplayWindow: uint32(replayWindow),
+	}
+
+	// taken from iproute2/ip/xfrm_state.c:
+	replayEsn.BmpLen = uint32((replayWindow + (4 * 8) - 1) / (4 * 8))
+
+	return replayEsn.Serialize()
 }
 
 // XfrmStateAdd will add an xfrm state to the system.
@@ -56,6 +85,12 @@ func XfrmStateAdd(state *XfrmState) error {
 // Equivalent to: `ip xfrm state add $state`
 func (h *Handle) XfrmStateAdd(state *XfrmState) error {
 	return h.xfrmStateAddOrUpdate(state, nl.XFRM_MSG_NEWSA)
+}
+
+// XfrmStateAllocSpi will allocate an xfrm state in the system.
+// Equivalent to: `ip xfrm state allocspi`
+func XfrmStateAllocSpi(state *XfrmState) (*XfrmState, error) {
+	return pkgHandle.xfrmStateAllocSpi(state)
 }
 
 // XfrmStateUpdate will update an xfrm state to the system.
@@ -71,21 +106,23 @@ func (h *Handle) XfrmStateUpdate(state *XfrmState) error {
 }
 
 func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
+
 	// A state with spi 0 can't be deleted so don't allow it to be set
 	if state.Spi == 0 {
 		return fmt.Errorf("Spi must be set when adding xfrm state.")
 	}
 	req := h.newNetlinkRequest(nlProto, syscall.NLM_F_CREATE|syscall.NLM_F_EXCL|syscall.NLM_F_ACK)
 
-	msg := &nl.XfrmUsersaInfo{}
-	msg.Family = uint16(nl.GetIPFamily(state.Dst))
-	msg.Id.Daddr.FromIP(state.Dst)
-	msg.Saddr.FromIP(state.Src)
-	msg.Id.Proto = uint8(state.Proto)
-	msg.Mode = uint8(state.Mode)
-	msg.Id.Spi = nl.Swap32(uint32(state.Spi))
-	msg.Reqid = uint32(state.Reqid)
-	msg.ReplayWindow = uint8(state.ReplayWindow)
+	msg := xfrmUsersaInfoFromXfrmState(state)
+
+	if state.ESN {
+		if state.ReplayWindow == 0 {
+			return fmt.Errorf("ESN flag set without ReplayWindow")
+		}
+		msg.Flags |= nl.XFRM_STATE_ESN
+		msg.ReplayWindow = 0
+	}
+
 	limitsToLft(state.Limits, &msg.Lft)
 	req.AddData(msg)
 
@@ -95,6 +132,10 @@ func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
 	}
 	if state.Crypt != nil {
 		out := nl.NewRtAttr(nl.XFRMA_ALG_CRYPT, writeStateAlgo(state.Crypt))
+		req.AddData(out)
+	}
+	if state.Aead != nil {
+		out := nl.NewRtAttr(nl.XFRMA_ALG_AEAD, writeStateAlgoAead(state.Aead))
 		req.AddData(out)
 	}
 	if state.Encap != nil {
@@ -111,9 +152,42 @@ func (h *Handle) xfrmStateAddOrUpdate(state *XfrmState, nlProto int) error {
 		out := nl.NewRtAttr(nl.XFRMA_MARK, writeMark(state.Mark))
 		req.AddData(out)
 	}
+	if state.ESN {
+		out := nl.NewRtAttr(nl.XFRMA_REPLAY_ESN_VAL, writeReplayEsn(state.ReplayWindow))
+		req.AddData(out)
+	}
 
 	_, err := req.Execute(syscall.NETLINK_XFRM, 0)
 	return err
+}
+
+func (h *Handle) xfrmStateAllocSpi(state *XfrmState) (*XfrmState, error) {
+	req := h.newNetlinkRequest(nl.XFRM_MSG_ALLOCSPI,
+		syscall.NLM_F_CREATE|syscall.NLM_F_EXCL|syscall.NLM_F_ACK)
+
+	msg := &nl.XfrmUserSpiInfo{}
+	msg.XfrmUsersaInfo = *(xfrmUsersaInfoFromXfrmState(state))
+	// 1-255 is reserved by IANA for future use
+	msg.Min = 0x100
+	msg.Max = 0xffffffff
+	req.AddData(msg)
+
+	if state.Mark != nil {
+		out := nl.NewRtAttr(nl.XFRMA_MARK, writeMark(state.Mark))
+		req.AddData(out)
+	}
+
+	msgs, err := req.Execute(syscall.NETLINK_XFRM, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	s, err := parseXfrmState(msgs[0], FAMILY_ALL)
+	if err != nil {
+		return nil, err
+	}
+
+	return s, err
 }
 
 // XfrmStateDel will delete an xfrm state from the system. Note that
@@ -195,7 +269,7 @@ func (h *Handle) xfrmStateGetOrDelete(state *XfrmState, nlProto int) (*XfrmState
 		req.AddData(out)
 	}
 	if state.Src != nil {
-		out := nl.NewRtAttr(nl.XFRMA_SRCADDR, state.Src)
+		out := nl.NewRtAttr(nl.XFRMA_SRCADDR, state.Src.To16())
 		req.AddData(out)
 	}
 
@@ -223,14 +297,7 @@ func (h *Handle) xfrmStateGetOrDelete(state *XfrmState, nlProto int) (*XfrmState
 
 var familyError = fmt.Errorf("family error")
 
-func parseXfrmState(m []byte, family int) (*XfrmState, error) {
-	msg := nl.DeserializeXfrmUsersaInfo(m)
-
-	// This is mainly for the state dump
-	if family != FAMILY_ALL && family != int(msg.Family) {
-		return nil, familyError
-	}
-
+func xfrmStateFromXfrmUsersaInfo(msg *nl.XfrmUsersaInfo) *XfrmState {
 	var state XfrmState
 
 	state.Dst = msg.Id.Daddr.ToIP()
@@ -241,6 +308,19 @@ func parseXfrmState(m []byte, family int) (*XfrmState, error) {
 	state.Reqid = int(msg.Reqid)
 	state.ReplayWindow = int(msg.ReplayWindow)
 	lftToLimits(&msg.Lft, &state.Limits)
+
+	return &state
+}
+
+func parseXfrmState(m []byte, family int) (*XfrmState, error) {
+	msg := nl.DeserializeXfrmUsersaInfo(m)
+
+	// This is mainly for the state dump
+	if family != FAMILY_ALL && family != int(msg.Family) {
+		return nil, familyError
+	}
+
+	state := xfrmStateFromXfrmUsersaInfo(msg)
 
 	attrs, err := nl.ParseRouteAttr(m[nl.SizeofXfrmUsersaInfo:])
 	if err != nil {
@@ -271,6 +351,12 @@ func parseXfrmState(m []byte, family int) (*XfrmState, error) {
 			state.Auth.Name = nl.BytesToString(algo.AlgName[:])
 			state.Auth.Key = algo.AlgKey
 			state.Auth.TruncateLen = int(algo.AlgTruncLen)
+		case nl.XFRMA_ALG_AEAD:
+			state.Aead = new(XfrmStateAlgo)
+			algo := nl.DeserializeXfrmAlgoAEAD(attr.Value[:])
+			state.Aead.Name = nl.BytesToString(algo.AlgName[:])
+			state.Aead.Key = algo.AlgKey
+			state.Aead.ICVLen = int(algo.AlgICVLen)
 		case nl.XFRMA_ENCAP:
 			encap := nl.DeserializeXfrmEncapTmpl(attr.Value[:])
 			state.Encap = new(XfrmStateEncap)
@@ -286,7 +372,7 @@ func parseXfrmState(m []byte, family int) (*XfrmState, error) {
 		}
 	}
 
-	return &state, nil
+	return state, nil
 }
 
 // XfrmStateFlush will flush the xfrm state on the system.
@@ -341,4 +427,18 @@ func limitsToLft(lmts XfrmStateLimits, lft *nl.XfrmLifetimeCfg) {
 
 func lftToLimits(lft *nl.XfrmLifetimeCfg, lmts *XfrmStateLimits) {
 	*lmts = *(*XfrmStateLimits)(unsafe.Pointer(lft))
+}
+
+func xfrmUsersaInfoFromXfrmState(state *XfrmState) *nl.XfrmUsersaInfo {
+	msg := &nl.XfrmUsersaInfo{}
+	msg.Family = uint16(nl.GetIPFamily(state.Dst))
+	msg.Id.Daddr.FromIP(state.Dst)
+	msg.Saddr.FromIP(state.Src)
+	msg.Id.Proto = uint8(state.Proto)
+	msg.Mode = uint8(state.Mode)
+	msg.Id.Spi = nl.Swap32(uint32(state.Spi))
+	msg.Reqid = uint32(state.Reqid)
+	msg.ReplayWindow = uint8(state.ReplayWindow)
+
+	return msg
 }
