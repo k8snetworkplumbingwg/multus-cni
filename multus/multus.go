@@ -125,12 +125,7 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
 	path := filepath.Join(dataDir, containerID)
 	defer os.Remove(path)
 
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read container data in the path(%q): %v", path, err)
-	}
-
-	return data, err
+	return ioutil.ReadFile(path)
 }
 
 func getifname() (f func() string) {
@@ -547,6 +542,10 @@ func cmdDel(args *skel.CmdArgs) error {
 	if in.Kubeconfig == "" || nopodnet {
 		netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 		if err != nil {
+			if os.IsNotExist(err) {
+				// Per spec should ignore error if resources are missing / already removed
+				return nil
+			}
 			return fmt.Errorf("Multus: Err in  reading the delegates: %v", err)
 		}
 
