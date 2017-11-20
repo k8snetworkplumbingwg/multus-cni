@@ -1,6 +1,5 @@
 ![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
 
-
 Table of Contents
 =================
 
@@ -29,6 +28,7 @@ Table of Contents
 
 Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
 
+### For more info on Multus - Sign In for KubeCon 2017 Salon: [Enabling NFV Features in Kubernetes. ](https://kccncna17.sched.com/event/Cvnw/enabling-nfv-features-in-kubernetes-hosted-by-kuralamudhan-ramakrishnan-ivan-coughlan-intel)
 
 # MULTUS CNI plugin
 
