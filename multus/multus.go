@@ -405,6 +405,9 @@ func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
 	return tmpNetconf.Delegates, nil
 }
 
+type NoK8sNetworkError string
+func (e NoK8sNetworkError) Error() string  { return string(e) }
+
 func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interface{}, error) {
 	k8sArgs := K8sArgs{}
 	var podNet []map[string]interface{}
@@ -425,7 +428,7 @@ func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interfac
 	}
 
 	if len(netAnnot) == 0 {
-		return podNet, fmt.Errorf(`nonet`)
+		return podNet, NoK8sNetworkError("no kubernetes network found")
 	}
 
 	netObjs, err := parsePodNetworkObject(netAnnot)
@@ -455,16 +458,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if n.Kubeconfig != "" {
-		podDelegate, r := getK8sNetwork(args, n.Kubeconfig)
-		if r != nil && r.Error() == "nonet" {
-			nopodnet = true
-			if !defaultcninetwork {
-				return fmt.Errorf("Multus: Err in getting k8s network from the pod spec annotation, check the pod spec or set delegate for the default network, Refer the README.md: %v", r)
+		podDelegate, err := getK8sNetwork(args, n.Kubeconfig)
+		if err != nil {
+			if _, ok := err.(*NoK8sNetworkError); ok {
+				nopodnet = true
+				if !defaultcninetwork {
+					return fmt.Errorf("Multus: Err in getting k8s network from the pod spec annotation, check the pod spec or set delegate for the default network, Refer the README.md: %v", err)
+				}
+			} else if !defaultcninetwork {
+				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
 			}
-		}
-
-		if r != nil && !defaultcninetwork {
-			return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
 		}
 
 		if len(podDelegate) != 0 {
