@@ -258,7 +258,7 @@ metadata:
   uid: fdcb94a2-5c0c-11e7-bbeb-408d5c537d27
 plugin: flannel
 ```
-4. The plugin field should be the name of the CNI plugin and args should have the flannel args, it should be in the the JSON format as shown above. **User can create network objects for Calico, Weave, Romana, & Cilium and test the multus.** 
+4. The plugin field should be the name of the CNI plugin and args should have the flannel args, it should be in the JSON format as shown above. **User can create network objects for Calico, Weave, Romana, & Cilium and test the multus.** 
 5. Save the below following YAML to sriov-network.yaml. Refer [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes
 ```
 apiVersion: "kubernetes.com/v1"
