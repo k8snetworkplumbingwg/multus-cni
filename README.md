@@ -63,15 +63,40 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
    <img src="doc/images/multus_cni_pod.png" width="1008" />
 </p>
 
-## Build
+## Getting Started
 
-**This plugin requires Go 1.8 to build.**
+### Requirements to build
 
-Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependencies. This flag is set by default in 1.6.
+ * [go 1.8](https://golang.org)
 
-```
-#./build
-```
+### Setup the environment
+
+ 1. Define GOPATH
+
+   ```bash
+   $ export GOPATH=$HOME/go
+   ```
+
+ 2. Create GOPATH directory
+
+   ```bash
+    $ mkdir -p $GOPATH
+   ```
+
+ 3. Get the code
+
+   ```bash
+   $ go get -d github.com/intel-corp/multus-cni
+   ```
+
+### Build and install plugin
+
+   ```bash
+    $ cd $GOPATH/src/github.com/intel-corp/multus-cni
+    $ ./build
+    $ sudo cp ./bin/multus /opt/cni/bin/
+   ```
+
 ## Work flow
 <p align="center">
    <img src="doc/images/workflow.png" width="1008" />
