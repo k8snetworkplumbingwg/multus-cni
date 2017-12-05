@@ -244,7 +244,8 @@ for a given network.  Making use of this, multiple networks could be created wit
 plugins.  Pods can then be created to make use of one or multiple of these network CRDs.  
 
 Multus is also compatible with Third Party Resources (TPR), which became deprecated in Kubernetets
-1.7 and removed in version 1.8.  Details on TPR support can be found on the [Multus TPR readme](https://github.com/egernst/multus-cni/blob/readme-updates/doc/tpr-overview.md).                                                                                        
+1.7 and removed in version 1.8.  Details on TPR support can be found on the [Multus TPR readme](https://github.com/egernst/multus-cni/blob/readme-updates/doc/tpr-overview.md).
+                                                                                        
 When Multus is invoked by Kubelet, it recovers custom pod annotations and uses these to obtain
 the relevant CRD.  This CRD tells Multus which CNI plugin to invoke and what networking configuration
 should be used.             
@@ -261,26 +262,12 @@ For more details, please refer to the [Kubernetes Network SIG Multiple Network P
    <img src="doc/images/multus_crd_usage_diagram.JPG" width="1008" />
 </p>    
     
-### Try it out
+### Usage with Kubernetes CRD based Network Objects
 
 
-```
-curl <> file
-```
+#### Create CRD based Network objects in Kubernetes
 
-
-
-
-
-## Usage with Kubernetes CRD based Network Objects
-
-### Creating “Network” CRDs in Kubernetes
-
-Multus is compatible to work with both CRD.
-
-#### CRD based Network objects
-
-1. Create a Third party resource “crdnetwork.yaml” for the network object as shown below
+1. Create a CRD resource “crdnetwork.yaml” for the network object as shown below
 
 ```
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -322,50 +309,145 @@ NAME                      KIND
 networks.kubernetes.com   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 ```
 
-4. Save the below following YAML to flannel-network.yaml
+4. Save the following to example-networks.yaml to create network definitions:
 
 ```
-apiVersion: "kubernetes.com/v1"
-kind: Network
-metadata:
-  name: flannel-networkobj
-plugin: flannel
-args: '[
-        {
-                "delegate": {
-                        "isDefaultGateway": true
-                }
-        }
+---- 
+apiVersion: "kubernetes.com/v1" 
+kind: Network 
+metadata: 
+  name: ptp-net 
+plugin: ptp 
+args: '[ 
+    { 
+        "name": "ptp-net", 
+        "type": "ptp", 
+        "ipam": { 
+                  "type": "host-local", 
+                  "subnet": "10.248.246.144/28", 
+                  "routes": [ { "dst": "0.0.0.0/0" } ] 
+        } 
+    } 
+]' 
+ 
+--- 
+apiVersion: "kubernetes.com/v1" 
+kind: Network 
+metadata: 
+  name: br-net-1 
+plugin: bridge 
+args: '[ 
+    { 
+        "name": "br-net-1", 
+        "type": "bridge", 
+        "bridge": "br-net-1", 
+        "ipam": { 
+            "type": "host-local", 
+            "subnet": "10.1.10.0/24" 
+        } 
+    } 
+]' 
+ 
+--- 
+apiVersion: "kubernetes.com/v1" 
+kind: Network 
+metadata: 
+  name: br-net-2 
+plugin: bridge 
+args: '[ 
+    { 
+        "name": "br-net-2", 
+        "type": "bridge", 
+        "bridge": "br-net-2", 
+        "ipam": { 
+            "type": "host-local", 
+            "subnet": "11.1.1.0/24" 
+        } 
+    } 
 ]'
+
 ```
+
 5. create the custom resource definition 
+
 ```
-# kubectl create -f customCRD/flannel-network.yaml
-network "flannel-networkobj" created
+$ kubectl create -f example-network.yaml
 ```
+
+#### Start a pod to make use of the CRD based networks
+
+1. Create the multus enabled pod configuration
+
+An example pod configuration, example-pod.yaml, is given below.  Note that you needn't
+use every network-object that was created, and that you may also create multiple interfaces
+from a single network object.
 ```
-# kubectl get network
-NAME                 KIND                        ARGS                                               PLUGIN
-flannel-networkobj   Network.v1.kubernetes.com   [ { "delegate": { "isDefaultGateway": true } } ]   flannel
-```
-6. Get the custom network object details
-```
-# kubectl get network flannel-networkobj -o yaml
-apiVersion: kubernetes.com/v1
-args: '[ { "delegate": { "isDefaultGateway": true } } ]'
-kind: Network
+---
+apiVersion: v1
+kind: Pod
 metadata:
-  clusterName: ""
-  creationTimestamp: 2017-07-11T21:46:52Z
-  deletionGracePeriodSeconds: null
-  deletionTimestamp: null
-  name: flannel-networkobj
-  namespace: default
-  resourceVersion: "6848829"
-  selfLink: /apis/kubernetes.com/v1/namespaces/default/networks/flannel-networkobj
-  uid: 7311c965-6682-11e7-b0b9-408d5c537d27
-plugin: flannel
+  name: crd-network-test
+  annotations:
+    networks: '[
+        { "name": "br-net-1" },
+        { "name": "br-net-2" },
+        { "name": "br-net-2" },
+        { "name": "ptp-net" }
+    ]'
+spec:
+  containers:
+  - name: ubuntu
+    image: "ubuntu:14.04"
+    stdin: true
+    tty: true
 ```
+
+2. Launch the pod
+
+```
+$ kubectl create -f example-pod.yaml
+```
+
+3. Verify the newly created interfaces
+
+We expect to see a primary 10.1.10.x, two 11.1.1.x and a 10.248.246.x based network interface
+in the pod.  Use kubectl exec as follows to verify:
+
+```
+$ sudo -E kubectl exec -it crd-network-test -- bash -c " ip a"
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+3: eth0@if255: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 0a:58:0a:01:0a:19 brd ff:ff:ff:ff:ff:ff
+    inet 10.1.10.25/24 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::f0ce:a3ff:feaf:1cd1/64 scope link 
+       valid_lft forever preferred_lft forever
+5: net0@if256: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 0a:58:0b:01:01:25 brd ff:ff:ff:ff:ff:ff
+    inet 11.1.1.37/24 scope global net0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::68ea:c3ff:fe95:f114/64 scope link 
+       valid_lft forever preferred_lft forever
+7: net1@if257: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 0a:58:0b:01:01:26 brd ff:ff:ff:ff:ff:ff
+    inet 11.1.1.38/24 scope global net1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::641a:50ff:feb0:5ada/64 scope link 
+       valid_lft forever preferred_lft forever
+9: net2@if258: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 0a:58:0a:f8:f6:98 brd ff:ff:ff:ff:ff:ff
+    inet 10.248.246.152/28 scope global net2
+       valid_lft forever preferred_lft forever
+    inet6 fe80::b417:57ff:fe52:c091/64 scope link 
+       valid_lft forever preferred_lft forever
+```
+
+
 
 ### Configuring Multus to use the kubeconfig
 
