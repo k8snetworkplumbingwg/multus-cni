@@ -231,6 +231,11 @@ $ sudo -E kubectl exec -it ubuntu-pod -- bash -c "ip a"
        valid_lft forever preferred_lft forever
  ```
 
+### An example using the SRIOV CNI plugin
+
+Another example of using a network configuration file can be found [here](https://github.com/egernst/multus-cni/blob/readme-updates/doc/sriov-conf-example.md)
+
+
 Having a CNI configuration file for Multus helps provide a default option for a cluster's networking.
 In the next section, we'll introduce CRD, an alternative option for creating and assigning networks to pods.
 
@@ -256,16 +261,15 @@ network in the pod configuration will act as the ```masterplugin``` for the pod.
 which will serve as the primary interface, providing the pod's IP address and DNS information back to 
 Kubernetes.  No other interfaces will be visible to Kubernetes. 
                                                              
-For more details, please refer to the [Kubernetes Network SIG Multiple Network Proposal(https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
+For more details, please refer to the [Kubernetes Network SIG Multiple Network Proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
 
 <p align="center">
    <img src="doc/images/multus_crd_usage_diagram.JPG" width="1008" />
 </p>    
     
-### Usage with Kubernetes CRD based Network Objects
+### Simple example of Multus with Kubernetes CRD based Network Objects
 
-
-#### Create CRD based Network objects in Kubernetes
+#### Create CRD based Network objects
 
 1. Create a CRD resource “crdnetwork.yaml” for the network object as shown below
 
@@ -294,14 +298,14 @@ spec:
     - net
 ```
 
-2. kubectl create command for the Custom Resource Definition
+2. Create the network CRD
 
 ```
 # kubectl create -f ./crdnetwork.yaml
 customresourcedefinition "network.kubernetes.com" created
 ```
 
-3. kubectl get command to check the Network CRD creation
+3. Verify the network CRD's creation
 
 ```
 # kubectl get CustomResourceDefinition
@@ -309,7 +313,11 @@ NAME                      KIND
 networks.kubernetes.com   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 ```
 
-4. Save the following to example-networks.yaml to create network definitions:
+4. Create a description of the network objects to make
+
+Save the following to example-networks.yaml to create network definitions.  Note, you can store
+these in their own files as well.  For convenience we placed a few arbitrary bridge and PTP
+networks here.
 
 ```
 ---- 
@@ -368,10 +376,14 @@ args: '[
 
 ```
 
-5. create the custom resource definition 
+5. Create the custom resource defined networks
 
 ```
-$ kubectl create -f example-network.yaml
+$ kubectl create -f example-networks.yaml
+
+network "ptp-net" created
+network "br-net-1" created
+network "br-net-2" created
 ```
 
 #### Start a pod to make use of the CRD based networks
@@ -446,7 +458,6 @@ $ sudo -E kubectl exec -it crd-network-test -- bash -c " ip a"
     inet6 fe80::b417:57ff:fe52:c091/64 scope link 
        valid_lft forever preferred_lft forever
 ```
-
 
 
 ### Configuring Multus to use the kubeconfig
