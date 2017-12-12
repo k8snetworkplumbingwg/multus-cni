@@ -28,8 +28,6 @@ Table of Contents
 
 Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
 
-### For more info on Multus - Sign In for KubeCon 2017 Salon: [Enabling NFV Features in Kubernetes. ](https://kccncna17.sched.com/event/Cvnw/enabling-nfv-features-in-kubernetes-hosted-by-kuralamudhan-ramakrishnan-ivan-coughlan-intel)
-
 # MULTUS CNI plugin
 
 - *Multus* is the latin word for “Multi”
@@ -46,17 +44,43 @@ Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
 
 - Master plugin invokes "eth0" interface in the pod, rest of plugins(Mininon plugins eg: sriov,ipam) invoke interfaces as "net0", "net1".. "netn"
 
-- The "masterplugin" is the only net conf option of multus cni, it identifies the primary network. The default route will point to the primary network 
+- The "masterplugin" is the only net conf option of multus cni, it identifies the primary network. The default route will point to the primary network
+
+- Multus is one of project in [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
 
 Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
 
-## Multus additional plugins
+### Multus additional plugins
 - [DPDK -SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni)
 - [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
 
-## NFV based Networking in Kubernetes
-- Feature Brief -[Multiple Network Interface Support in Kubernetes](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-support-in-kubernetes-feature-brief.pdf)
-- White Paper - [Enabling New Features with Kubernetes for NFV](https://builders.intel.com/docs/networkbuilders/enabling_new_features_in_kubernetes_for_NFV.pdf)
+### <a name="help"></a>Need assistance
+
+- Read [Containers Experience Kits - will be updated soon](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
+- Try our container exp kit demo - KubeCon's workshop [Enabling NFV Features in Kubernetes](https://github.com/intel/container-experience-kits-demo-area/)
+- Invite yourself to the <a href="https://intel-corp.herokuapp.com/" target="_blank"> #intel-sddsg-slack</a> slack channel.
+- Ask a question on the <a href="https://intel-corp-team.slack.com/messages/C4C5RSEER"> #general-discussion</a> slack channel.
+- Need more assistant<a href="mailto:kuralamudhan.ramakrishnan@intel.com"> email us</a>
+- Feel free to <a href="https://github.com/Intel-Corp/multus-cni/issues/new">file an issue.</a>
+
+Please fill in the Questions/feedback -  [google-form](https://goo.gl/forms/upBWyGs8Wmq69IEi2)!
+
+### NFV based Networking in Kubernetes
+* KubeCon workshop on ["Enabling NFV features in Kubernetes"](https://kccncna17.sched.com/event/Cvnw/enabling-nfv-features-in-kubernetes-hosted-by-kuralamudhan-ramakrishnan-ivan-coughlan-intel) presentation [slide deck](https://www.slideshare.net/KuralamudhanRamakris/enabling-nfv-features-in-kubernetes-83923352)
+* Feature brief
+    * [Multiple Network Interface Support in Kubernetes ](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-support-in-kubernetes-feature-brief.pdf)
+    * [Enhanced Platform Awareness in Kubernetes](https://builders.intel.com/docs/networkbuilders/enhanced-platform-awareness-feature-brief.pdf)
+* Application note
+    * [Multiple Network Interfaces in Kubernetes and Container Bare Metal ](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-in-kubernetes-application-note.pdf)
+    * [Enhanced Platform Awareness Features in Kubernetes ](https://builders.intel.com/docs/networkbuilders/enhanced-platform-awareness-in-kubernetes-application-note.pdf)
+* White paper
+  * [Enabling New Features with Kubernetes for NFV](https://builders.intel.com/docs/networkbuilders/enabling_new_features_in_kubernetes_for_NFV.pdf)
+* Multus's related project github pages
+    * [Multus](https://github.com/Intel-Corp/multus-cni)
+    * [SRIOV - DPDK CNI](https://github.com/Intel-Corp/sriov-cni)
+    * [Vhostuser - VPP & OVS - DPDK CNI](https://github.com/intel/vhost-user-net-plugin)
+    * [Node Feature Discovery](https://github.com/kubernetes-incubator/node-feature-discovery)
+    * [CPU Manager for Kubernetes](https://github.com/Intel-Corp/CPU-Manager-for-Kubernetes)
 
 ## Multi-Homed pod
 <p align="center">
