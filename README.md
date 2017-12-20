@@ -53,7 +53,7 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 ### Multus additional plugins
 - [DPDK -SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni)
 - [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
-- [Bond CNI - For fail-over and high availability of networking](https://github.com/Intel-Corp/sriov-cni)
+- [Bond CNI - For fail-over and high availability of networking](https://github.com/Intel-Corp/bond-cni)
 
 ### <a name="help"></a>Need assistance
 
@@ -80,7 +80,7 @@ Please fill in the Questions/feedback -  [google-form](https://goo.gl/forms/upBW
     * [Multus](https://github.com/Intel-Corp/multus-cni)
     * [SRIOV - DPDK CNI](https://github.com/Intel-Corp/sriov-cni)
     * [Vhostuser - VPP & OVS - DPDK CNI](https://github.com/intel/vhost-user-net-plugin)
-    * [Bond CNI](https://github.com/Intel-Corp/sriov-cni)
+    * [Bond CNI](https://github.com/Intel-Corp/bond-cni)
     * [Node Feature Discovery](https://github.com/kubernetes-incubator/node-feature-discovery)
     * [CPU Manager for Kubernetes](https://github.com/Intel-Corp/CPU-Manager-for-Kubernetes)
 
