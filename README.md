@@ -80,6 +80,7 @@ Please fill in the Questions/feedback -  [google-form](https://goo.gl/forms/upBW
     * [Multus](https://github.com/Intel-Corp/multus-cni)
     * [SRIOV - DPDK CNI](https://github.com/Intel-Corp/sriov-cni)
     * [Vhostuser - VPP & OVS - DPDK CNI](https://github.com/intel/vhost-user-net-plugin)
+    * [Bond CNI](https://github.com/Intel-Corp/sriov-cni)
     * [Node Feature Discovery](https://github.com/kubernetes-incubator/node-feature-discovery)
     * [CPU Manager for Kubernetes](https://github.com/Intel-Corp/CPU-Manager-for-Kubernetes)
 
