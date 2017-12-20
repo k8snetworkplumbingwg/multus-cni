@@ -53,6 +53,7 @@ Please read [CNI](https://github.com/containernetworking/cni) for more informati
 ### Multus additional plugins
 - [DPDK -SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni)
 - [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
+- [Bond CNI - For fail-over and high availability of networking](https://github.com/Intel-Corp/sriov-cni)
 
 ### <a name="help"></a>Need assistance
 
