@@ -335,7 +335,7 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/kubernetes.com/v1/namespaces/default/networks/%s", networkname)
+	tprclient := fmt.Sprintf("/apis/kubernetes-network.cni.cncf.io/v1/namespaces/default/networks/%s", networkname)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
