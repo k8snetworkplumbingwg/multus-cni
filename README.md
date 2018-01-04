@@ -6,9 +6,7 @@
 Table of Contents
 =================
 
-   * [MULTUS CNI plugin](#multus-cni-plugin)
-      * [Multus additional plugins](#multus-additional-plugins)
-      * [NFV based Networking in Kubernetes](#nfv-based-networking-in-kubernetes)
+   * [Multi network CNI plugin](#multi-network-cni-plugin)
       * [Multi-Homed pod](#multi-homed-pod)
       * [Build](#build)
       * [Work flow](#work-flow)
@@ -29,65 +27,8 @@ Table of Contents
             * [Launching workloads in Kubernetes](#launching-workloads-in-kubernetes)
       * [Contacts](#contacts)
 
-Created by [gh-md-toc](https://github.com/ekalinin/github-markdown-toc)
 
-# Attention !! this is WIP for Network Plumbing WG POC & Exp works, not part of Multus Implementation
-
-# MULTUS CNI plugin
-
-- *Multus* is the latin word for “Multi”
-
-- As the name suggests, it acts as the Multi plugin in Kubernetes and provides the Multi interface support in a pod
-
-- Multus supports all [reference plugins](https://github.com/containernetworking/plugins) (eg. [Flannel](https://github.com/containernetworking/plugins/tree/master/plugins/meta/flannel), [DHCP](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/dhcp), [Macvlan](https://github.com/containernetworking/plugins/tree/master/plugins/main/macvlan)) that implement the CNI specification and all 3rd party plugins (eg. [Calico](https://github.com/projectcalico/cni-plugin), [Weave](https://github.com/weaveworks/weave), [Cilium](https://github.com/cilium/cilium), [Contiv](https://github.com/contiv/netplugin)). In addition to it, Multus supports [SRIOV](https://github.com/hustcat/sriov-cni), [DPDK](https://github.com/Intel-Corp/sriov-cni), [OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin) workloads in Kubernetes with both cloud native and NFV based applications in Kubernetes. 
-
-- It is a contact between the container runtime and other plugins, and it doesn't have any of its own net configuration, it calls other plugins like flannel/calico to do the real net conf job. 
-
-- Multus reuses the concept of invoking the delegates in flannel, it groups the multi plugins into delegates and invoke each other in sequential order, according to the JSON scheme in the cni configuration.
-
-- No. of plugins supported is dependent upon the number of delegates in the conf file.
-
-- Master plugin invokes "eth0" interface in the pod, rest of plugins(Mininon plugins eg: sriov,ipam) invoke interfaces as "net0", "net1".. "netn"
-
-- The "masterplugin" is the only net conf option of multus cni, it identifies the primary network. The default route will point to the primary network
-
-- Multus is one of project in [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
-
-Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
-
-### Multus additional plugins
-- [DPDK -SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni)
-- [Vhostuser CNI - a Dataplane network plugin - Supports OVS-DPDK & VPP](https://github.com/intel/vhost-user-net-plugin)
-- [Bond CNI - For fail-over and high availability of networking](https://github.com/Intel-Corp/bond-cni)
-
-### <a name="help"></a>Need assistance
-
-- Read [Containers Experience Kits - will be updated soon](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
-- Try our container exp kit demo - KubeCon's workshop [Enabling NFV Features in Kubernetes](https://github.com/intel/container-experience-kits-demo-area/)
-- Invite yourself to the <a href="https://intel-corp.herokuapp.com/" target="_blank"> #intel-sddsg-slack</a> slack channel.
-- Ask a question on the <a href="https://intel-corp-team.slack.com/messages/C4C5RSEER"> #general-discussion</a> slack channel.
-- Need more assistant<a href="mailto:kuralamudhan.ramakrishnan@intel.com"> email us</a>
-- Feel free to <a href="https://github.com/Intel-Corp/multus-cni/issues/new">file an issue.</a>
-
-Please fill in the Questions/feedback -  [google-form](https://goo.gl/forms/upBWyGs8Wmq69IEi2)!
-
-### NFV based Networking in Kubernetes
-* KubeCon workshop on ["Enabling NFV features in Kubernetes"](https://kccncna17.sched.com/event/Cvnw/enabling-nfv-features-in-kubernetes-hosted-by-kuralamudhan-ramakrishnan-ivan-coughlan-intel) presentation [slide deck](https://www.slideshare.net/KuralamudhanRamakris/enabling-nfv-features-in-kubernetes-83923352)
-* Feature brief
-    * [Multiple Network Interface Support in Kubernetes ](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-support-in-kubernetes-feature-brief.pdf)
-    * [Enhanced Platform Awareness in Kubernetes](https://builders.intel.com/docs/networkbuilders/enhanced-platform-awareness-feature-brief.pdf)
-* Application note
-    * [Multiple Network Interfaces in Kubernetes and Container Bare Metal ](https://builders.intel.com/docs/networkbuilders/multiple-network-interfaces-in-kubernetes-application-note.pdf)
-    * [Enhanced Platform Awareness Features in Kubernetes ](https://builders.intel.com/docs/networkbuilders/enhanced-platform-awareness-in-kubernetes-application-note.pdf)
-* White paper
-  * [Enabling New Features with Kubernetes for NFV](https://builders.intel.com/docs/networkbuilders/enabling_new_features_in_kubernetes_for_NFV.pdf)
-* Multus's related project github pages
-    * [Multus](https://github.com/Intel-Corp/multus-cni)
-    * [SRIOV - DPDK CNI](https://github.com/Intel-Corp/sriov-cni)
-    * [Vhostuser - VPP & OVS - DPDK CNI](https://github.com/intel/vhost-user-net-plugin)
-    * [Bond CNI](https://github.com/Intel-Corp/bond-cni)
-    * [Node Feature Discovery](https://github.com/kubernetes-incubator/node-feature-discovery)
-    * [CPU Manager for Kubernetes](https://github.com/Intel-Corp/CPU-Manager-for-Kubernetes)
+# Multi network CNI plugin
 
 ## Multi-Homed pod
 <p align="center">
