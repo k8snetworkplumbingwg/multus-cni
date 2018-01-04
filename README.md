@@ -1,4 +1,7 @@
-![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
+# Attention !! this is WIP for Network Plumbing WG POC & Exp works, not part of Multus Implementation
+
+* [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
+* [Dan's CRD proposal](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
 
 Table of Contents
 =================
