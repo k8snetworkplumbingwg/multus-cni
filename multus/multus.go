@@ -335,11 +335,11 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/kubernetes-network.cni.cncf.io/v1/namespaces/default/networks/%s", networkname)
+	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/default/kubernetes-network/%s", networkname)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
-		return "", fmt.Errorf("getnetplugin: failed to get TRP, refer Multus README.md for the usage guide: %v", err)
+		return "", fmt.Errorf("getnetplugin: failed to get CRD (result: %s), refer Multus README.md for the usage guide: %v", netobjdata, err)
 	}
 
 	np := netplugin{}
