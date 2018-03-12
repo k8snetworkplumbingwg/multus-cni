@@ -298,29 +298,19 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
-
-	// Determine if the string is JSON format, or comma-delimited.
-	if (isJSON(podnetwork)) {
-		// Use the JSON as-is
-		if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-			return nil, fmt.Errorf("parsePodNetworkObject: failed to load pod network err: %v | pod network: %v", err, podnetwork)
-		}
-	} else {
-		// Build a map from the comma delimited items.
+	// Parse the podnetwork string, and assume it is JSON.
+	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
+		// If the JSON parsing fails, assume it is comma delimited.
 		commaItems := strings.Split(podnetwork, ",")
+		// Build a map from the comma delimited items.
 		for i := range commaItems {
 			m := make(map[string]interface{})
-			m["name"] = commaItems[i]
+			m["name"] = strings.TrimSpace(commaItems[i])
 			podNet = append(podNet,m)
 		}
 	}
 
 	return podNet, nil
-}
-
-func isJSON(str string) bool {
-    var js json.RawMessage
-    return json.Unmarshal([]byte(str), &js) == nil
 }
 
 func getpluginargs(name string, args string, primary bool) (string, error) {
