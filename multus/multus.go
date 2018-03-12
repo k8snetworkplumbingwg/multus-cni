@@ -288,7 +288,7 @@ func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs K8sArgs) (str
 		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm", string(k8sArgs.K8S_POD_NAME))
 	}
 
-	return pod.Annotations["networks"], nil
+	return pod.Annotations["kubernetes.cni.cncf.io/networks"], nil
 }
 
 func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) {
@@ -298,8 +298,16 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
+	// Parse the podnetwork string, and assume it is JSON.
 	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-		return nil, fmt.Errorf("parsePodNetworkObject: failed to load pod network err: %v | pod network: %v", err, podnetwork)
+		// If the JSON parsing fails, assume it is comma delimited.
+		commaItems := strings.Split(podnetwork, ",")
+		// Build a map from the comma delimited items.
+		for i := range commaItems {
+			m := make(map[string]interface{})
+			m["name"] = strings.TrimSpace(commaItems[i])
+			podNet = append(podNet,m)
+		}
 	}
 
 	return podNet, nil
@@ -335,7 +343,7 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/default/kubernetes-network/%s", networkname)
+	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/default/networks/%s", networkname)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
