@@ -49,6 +49,7 @@ type NetConf struct {
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
+	UseDefault bool                     `json:"always_use_default"`
 }
 
 type netplugin struct {
@@ -88,10 +89,17 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 		defaultcninetwork = true
 	}
 
-	if netconf.Kubeconfig != "" && !defaultcninetwork {
+	if netconf.UseDefault {
+		if netconf.Kubeconfig == "" || !defaultcninetwork {
+			return nil, fmt.Errorf(`If you have set always_use_default, you must also set the delegates & the kubeconfig, refer to the README`)
+		}
 		return netconf, nil
 	}
 
+	if !netconf.UseDefault && (netconf.Kubeconfig != "" && !defaultcninetwork) {
+		return netconf, nil
+	}
+	
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
@@ -503,8 +511,20 @@ func cmdAdd(args *skel.CmdArgs) error {
 			}
 		}
 
+		// If it's empty just leave it as the netconfig states (e.g. just default)
 		if len(podDelegate) != 0 {
-			n.Delegates = podDelegate
+			if n.UseDefault {
+				// In the case that we force the default
+				// We add the found configs from CRD
+				for _, eachDelegate := range podDelegate {
+					eachDelegate["masterplugin"] = false
+					n.Delegates = append(n.Delegates,eachDelegate)
+				}
+
+			} else {
+				// Otherwise, only the CRD delegates are used.
+				n.Delegates = podDelegate
+			}
 		}
 	}
 
@@ -571,7 +591,16 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 
 		if len(podDelegate) != 0 {
-			in.Delegates = podDelegate
+			if in.UseDefault {
+				// In the case that we force the default
+				// We add the found configs from CRD (in reverse order)
+				for i := len(podDelegate)-1; i >= 0; i-- {
+					podDelegate[i]["masterplugin"] = false
+					in.Delegates = append(in.Delegates,podDelegate[i])
+				}
+			} else {
+				in.Delegates = podDelegate
+			}
 		}
 	}
 
