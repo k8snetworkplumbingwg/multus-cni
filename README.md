@@ -451,6 +451,23 @@ Given the following network configuration:
 EOF
 
 ```
+
+### Further options for CNI configuration file.
+
+One may also specify `always_use_default` as a boolean value. This option requires that you're using the CRD method (and therefore requires that you must also specify both the `kubeconfig` and the `delegates` option as well, or Multus will present an error message). In the case that `always_use_default` is true, the `delegates` network will always be applied, along with those specified in the annotations.
+
+For example, a valid configuration using the `always_use_default` may look like:
+
+```
+{
+  "name": "multus-cni-network",
+  "type": "multus",
+  "delegates": [{"type": "flannel", "isDefaultGateway": true, "masterplugin": true}],
+  "always_use_default": true,
+  "kubeconfig": "/etc/kubernetes/kubelet.conf"
+}
+```
+
 ## Testing the Multus CNI ##
 ### Multiple Flannel Network
 Github user [YYGCui](https://github.com/YYGCui) has used Multiple flannel network to work with Multus CNI plugin. Please refer this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for Multiple overlay network support with Multus CNI.
