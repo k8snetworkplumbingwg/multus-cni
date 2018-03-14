@@ -1,0 +1,30 @@
+language: go
+# see https://docs.travis-ci.com/user/reference/overview/#Virtualization-environments
+# for the detail
+# sudo: requried
+dist: trusty
+
+before_install:
+  - sudo apt-get update -qq
+
+#install:
+#  - go get .
+#  - go get github.com/golang/lint/golint
+
+#before_script:
+#  - go vet .
+#  - golint . | xargs -r false
+
+script:
+  - ./build
+  - mkdir -p ${TRAVIS_BUILD_DIR}/dist
+  - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
+
+after_success:
+  # put build tgz to bintray
+  - curl -T ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz -u${BINTRAY_USER}:${BINTRAY_APIKEY} https://api.bintray.com/content/redhat-nfvpe/multus-cni-crd-snapshots/snapshot/snapshot-${TRAVIS_COMMIT}/multus-cni_amd64-${TRAVIS_COMMIT}.tar.gz
+  # publish uploaded file
+  - curl -X POST -u${BINTRAY_USER}:${BINTRAY_APIKEY} https://api.bintray.com/content/redhat-nfvpe/multus-cni-crd-snapshots/snapshot/snapshot-${TRAVIS_COMMIT}/publish
+  # put it in bintray download list
+  - sleep 20
+  - "curl -X PUT -H 'Accept: application/json' -H 'Content-type: application/json' -u${BINTRAY_USER}:${BINTRAY_APIKEY} https://api.bintray.com/file_metadata/redhat-nfvpe/multus-cni-crd-snapshots/multus-cni_amd64-${TRAVIS_COMMIT}.tar.gz -d '{\"list_in_downloads\":true}'"
