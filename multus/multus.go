@@ -209,6 +209,12 @@ func delegateAdd(podif func() string, argif string, netconf map[string]interface
 		}
 	}
 
+	if netconf["ifnameRequest"] != nil {
+		if os.Setenv("CNI_IFNAME", netconf["ifnameRequest"].(string)) != nil {
+			return true, fmt.Errorf("Multus: error in setting CNI_IFNAME")
+		}
+	}
+
 	result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
 	if err != nil {
 		return true, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
@@ -309,8 +315,13 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		// Build a map from the comma delimited items.
 		commaItems := strings.Split(podnetwork, ",")
 		for i := range commaItems {
+			netName := strings.TrimSpace(commaItems[i])
+			atItems := strings.Split(netName, "@")
 			m := make(map[string]interface{})
-			m["name"] = commaItems[i]
+			m["name"] = atItems[0]
+			if len(atItems) == 2 {
+				m["interfaceRequest"] = atItems[1]
+			}
 			podNet = append(podNet,m)
 		}
 	}
@@ -323,7 +334,7 @@ func isJSON(str string) bool {
     return json.Unmarshal([]byte(str), &js) == nil
 }
 
-func getpluginargs(name string, args string, primary bool) (string, error) {
+func getpluginargs(name string, args string, primary bool, ifname string) (string, error) {
 	var netconf string
 	var tmpargs []string
 
@@ -332,10 +343,15 @@ func getpluginargs(name string, args string, primary bool) (string, error) {
 	}
 
 	if primary != false {
-		tmpargs = []string{`{"type": "`, name, `","masterplugin": true,`, args[strings.Index(args, "\"") : len(args)-1]}
+		tmpargs = []string{`{"type": "`, name, `","masterplugin": true,`}
 	} else {
-		tmpargs = []string{`{"type": "`, name, `",`, args[strings.Index(args, "\"") : len(args)-1]}
+		tmpargs = []string{`{"type": "`, name, `",`}
 	}
+
+	if ifname != "" {
+		tmpargs = append(tmpargs, fmt.Sprintf(`"ifnameRequest": "%s",`, ifname))
+	}
+	tmpargs = append(tmpargs, args[strings.Index(args, "\"") : len(args)-1])
 
 	var str bytes.Buffer
 
@@ -348,7 +364,8 @@ func getpluginargs(name string, args string, primary bool) (string, error) {
 
 }
 
-func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool) (string, error) {
+func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool) (string, error) {
+	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
@@ -365,7 +382,12 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: failed to get the netplugin data: %v", err)
 	}
 
-	netargs, err := getpluginargs(np.Plugin, np.Args, primary)
+	ifnameRequest := ""
+	if networkinfo["interfaceRequest"] != nil {
+		ifnameRequest = networkinfo["interfaceRequest"].(string)
+	}
+
+	netargs, err := getpluginargs(np.Plugin, np.Args, primary, ifnameRequest)
 	if err != nil {
 		return "", err
 	}
@@ -388,7 +410,7 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 			primary = true
 		}
 
-		np, err = getnetplugin(client, net["name"].(string), primary)
+		np, err = getnetplugin(client, net, primary)
 		if err != nil {
 			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
 		}
