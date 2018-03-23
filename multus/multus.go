@@ -304,21 +304,15 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
-
-	// Determine if the string is JSON format, or comma-delimited.
-	if (isJSON(podnetwork)) {
-		// Use the JSON as-is
-		if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-			return nil, fmt.Errorf("parsePodNetworkObject: failed to load pod network err: %v | pod network: %v", err, podnetwork)
-		}
-	} else {
-		// Build a map from the comma delimited items.
+	// Parse the podnetwork string, and assume it is JSON.
+	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
+		// If the JSON parsing fails, assume it is comma delimited.
 		commaItems := strings.Split(podnetwork, ",")
+		// Build a map from the comma delimited items.
 		for i := range commaItems {
-			netName := strings.TrimSpace(commaItems[i])
-			atItems := strings.Split(netName, "@")
+			atItems := strings.Split(commaItems[i], "@")
 			m := make(map[string]interface{})
-			m["name"] = atItems[0]
+			m["name"] = strings.TrimSpace(atItems[0])
 			if len(atItems) == 2 {
 				m["interfaceRequest"] = atItems[1]
 			}
