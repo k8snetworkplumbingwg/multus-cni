@@ -43,15 +43,12 @@ const defaultCNIDir = "/var/lib/cni/multus"
 var masterpluginEnabled bool
 var defaultcninetwork bool
 
+// NetConf for cni config file written in json
 type NetConf struct {
 	types.NetConf
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
-}
-
-type PodNet struct {
-	Networkname string `json:"name"`
 }
 
 type netplugin struct {
@@ -322,7 +319,7 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 			if len(atItems) == 2 {
 				m["interfaceRequest"] = atItems[1]
 			}
-			podNet = append(podNet,m)
+			podNet = append(podNet, m)
 		}
 	}
 
@@ -330,8 +327,8 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 }
 
 func isJSON(str string) bool {
-    var js json.RawMessage
-    return json.Unmarshal([]byte(str), &js) == nil
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
 }
 
 func getpluginargs(name string, args string, primary bool, ifname string) (string, error) {
@@ -351,7 +348,7 @@ func getpluginargs(name string, args string, primary bool, ifname string) (strin
 	if ifname != "" {
 		tmpargs = append(tmpargs, fmt.Sprintf(`"ifnameRequest": "%s",`, ifname))
 	}
-	tmpargs = append(tmpargs, args[strings.Index(args, "\"") : len(args)-1])
+	tmpargs = append(tmpargs, args[strings.Index(args, "\""):len(args)-1])
 
 	var str bytes.Buffer
 
@@ -445,8 +442,10 @@ func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
 	return tmpNetconf.Delegates, nil
 }
 
+// NoK8sNetworkError indicates error, no network in kubernetes
 type NoK8sNetworkError string
-func (e NoK8sNetworkError) Error() string  { return string(e) }
+
+func (e NoK8sNetworkError) Error() string { return string(e) }
 
 func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interface{}, error) {
 	k8sArgs := K8sArgs{}
