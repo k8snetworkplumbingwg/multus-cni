@@ -294,6 +294,31 @@ func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs K8sArgs) (str
 	return pod.Annotations["kubernetes.cni.cncf.io/networks"], nil
 }
 
+func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
+	var netNsName string
+	var netIfName string
+	var networkName string
+
+	slashItems := strings.Split(podnetwork, "/")
+	if len(slashItems) == 2 {
+		netNsName = strings.TrimSpace(slashItems[0])
+		networkName = slashItems[1]
+	} else if len(slashItems) == 1 {
+		networkName = slashItems[0]
+	} else {
+		return "", "", "", fmt.Errorf("Invalid network object (failed at '/')")
+	}
+
+	atItems := strings.Split(networkName, "@")
+	networkName = strings.TrimSpace(atItems[0])
+	if len(atItems) == 2 {
+		netIfName = strings.TrimSpace(atItems[1])
+	} else if len(atItems) != 1 {
+		return "", "", "", fmt.Errorf("Invalid network object (failed at '@')")
+	}
+	return netNsName, networkName, netIfName, nil
+}
+
 func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) {
 	var podNet []map[string]interface{}
 
@@ -301,24 +326,26 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
-
-	// Determine if the string is JSON format, or comma-delimited.
-	if (isJSON(podnetwork)) {
-		// Use the JSON as-is
-		if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-			return nil, fmt.Errorf("parsePodNetworkObject: failed to load pod network err: %v | pod network: %v", err, podnetwork)
-		}
-	} else {
-		// Build a map from the comma delimited items.
+	// Parse the podnetwork string, and assume it is JSON.
+	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
+		// If the JSON parsing fails, assume it is comma delimited.
 		commaItems := strings.Split(podnetwork, ",")
+		// Build a map from the comma delimited items.
 		for i := range commaItems {
-			netName := strings.TrimSpace(commaItems[i])
-			atItems := strings.Split(netName, "@")
-			m := make(map[string]interface{})
-			m["name"] = atItems[0]
-			if len(atItems) == 2 {
-				m["interfaceRequest"] = atItems[1]
+			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
+			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(commaItems[i])
+			if err != nil {
+				return nil, fmt.Errorf("parsePodNetworkObject: %v", err)
 			}
+			m := make(map[string]interface{})
+			m["name"] = networkName
+			if netNsName != "" {
+				m["namespace"] = netNsName
+			}
+			if netIfName != "" {
+				m["interfaceRequest"] = netIfName
+			}
+
 			podNet = append(podNet, m)
 		}
 	}
@@ -367,7 +394,12 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/default/networks/%s", networkname)
+	netNsName := "default"
+	if networkinfo["namespace"] != nil {
+		netNsName = networkinfo["namespace"].(string)
+	}
+
+	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/%s/networks/%s", netNsName, networkname)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
