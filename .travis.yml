@@ -7,13 +7,14 @@ dist: trusty
 before_install:
   - sudo apt-get update -qq
 
-#install:
-#  - go get .
-#  - go get github.com/golang/lint/golint
+install:
+  - go get github.com/golang/lint/golint
 
-#before_script:
-#  - go vet .
-#  - golint . | xargs -r false
+before_script:
+  - golint ./multus/... | grep -v ALL_CAPS | xargs -r false
+  - go fmt ./multus/...
+  - go vet ./multus/...
+#  - gocyclo -over 15 ./multus
 
 script:
   - ./build
