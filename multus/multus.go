@@ -43,15 +43,13 @@ const defaultCNIDir = "/var/lib/cni/multus"
 var masterpluginEnabled bool
 var defaultcninetwork bool
 
+// NetConf for cni config file written in json
 type NetConf struct {
 	types.NetConf
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
-}
-
-type PodNet struct {
-	Networkname string `json:"name"`
+	UseDefault bool                     `json:"always_use_default"`
 }
 
 type netplugin struct {
@@ -91,10 +89,17 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 		defaultcninetwork = true
 	}
 
-	if netconf.Kubeconfig != "" && !defaultcninetwork {
+	if netconf.UseDefault {
+		if netconf.Kubeconfig == "" || !defaultcninetwork {
+			return nil, fmt.Errorf(`If you have set always_use_default, you must also set the delegates & the kubeconfig, refer to the README`)
+		}
 		return netconf, nil
 	}
 
+	if !netconf.UseDefault && (netconf.Kubeconfig != "" && !defaultcninetwork) {
+		return netconf, nil
+	}
+	
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
@@ -209,6 +214,12 @@ func delegateAdd(podif func() string, argif string, netconf map[string]interface
 		}
 	}
 
+	if netconf["ifnameRequest"] != nil {
+		if os.Setenv("CNI_IFNAME", netconf["ifnameRequest"].(string)) != nil {
+			return true, fmt.Errorf("Multus: error in setting CNI_IFNAME")
+		}
+	}
+
 	result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
 	if err != nil {
 		return true, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", netconf["type"].(string), err)
@@ -288,7 +299,32 @@ func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs K8sArgs) (str
 		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm", string(k8sArgs.K8S_POD_NAME))
 	}
 
-	return pod.Annotations["networks"], nil
+	return pod.Annotations["kubernetes.cni.cncf.io/networks"], nil
+}
+
+func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
+	var netNsName string
+	var netIfName string
+	var networkName string
+
+	slashItems := strings.Split(podnetwork, "/")
+	if len(slashItems) == 2 {
+		netNsName = strings.TrimSpace(slashItems[0])
+		networkName = slashItems[1]
+	} else if len(slashItems) == 1 {
+		networkName = slashItems[0]
+	} else {
+		return "", "", "", fmt.Errorf("Invalid network object (failed at '/')")
+	}
+
+	atItems := strings.Split(networkName, "@")
+	networkName = strings.TrimSpace(atItems[0])
+	if len(atItems) == 2 {
+		netIfName = strings.TrimSpace(atItems[1])
+	} else if len(atItems) != 1 {
+		return "", "", "", fmt.Errorf("Invalid network object (failed at '@')")
+	}
+	return netNsName, networkName, netIfName, nil
 }
 
 func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) {
@@ -298,14 +334,39 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
+	// Parse the podnetwork string, and assume it is JSON.
 	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-		return nil, fmt.Errorf("parsePodNetworkObject: failed to load pod network err: %v | pod network: %v", err, podnetwork)
+		// If the JSON parsing fails, assume it is comma delimited.
+		commaItems := strings.Split(podnetwork, ",")
+		// Build a map from the comma delimited items.
+		for i := range commaItems {
+			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
+			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(commaItems[i])
+			if err != nil {
+				return nil, fmt.Errorf("parsePodNetworkObject: %v", err)
+			}
+			m := make(map[string]interface{})
+			m["name"] = networkName
+			if netNsName != "" {
+				m["namespace"] = netNsName
+			}
+			if netIfName != "" {
+				m["interfaceRequest"] = netIfName
+			}
+
+			podNet = append(podNet, m)
+		}
 	}
 
 	return podNet, nil
 }
 
-func getpluginargs(name string, args string, primary bool) (string, error) {
+func isJSON(str string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
+}
+
+func getpluginargs(name string, args string, primary bool, ifname string) (string, error) {
 	var netconf string
 	var tmpargs []string
 
@@ -314,10 +375,15 @@ func getpluginargs(name string, args string, primary bool) (string, error) {
 	}
 
 	if primary != false {
-		tmpargs = []string{`{"type": "`, name, `","masterplugin": true,`, args[strings.Index(args, "\"") : len(args)-1]}
+		tmpargs = []string{`{"type": "`, name, `","masterplugin": true,`}
 	} else {
-		tmpargs = []string{`{"type": "`, name, `",`, args[strings.Index(args, "\"") : len(args)-1]}
+		tmpargs = []string{`{"type": "`, name, `",`}
 	}
+
+	if ifname != "" {
+		tmpargs = append(tmpargs, fmt.Sprintf(`"ifnameRequest": "%s",`, ifname))
+	}
+	tmpargs = append(tmpargs, args[strings.Index(args, "\""):len(args)-1])
 
 	var str bytes.Buffer
 
@@ -330,12 +396,18 @@ func getpluginargs(name string, args string, primary bool) (string, error) {
 
 }
 
-func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool) (string, error) {
+func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool) (string, error) {
+	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/default/kubernetes-network/%s", networkname)
+	netNsName := "default"
+	if networkinfo["namespace"] != nil {
+		netNsName = networkinfo["namespace"].(string)
+	}
+
+	tprclient := fmt.Sprintf("/apis/cni.cncf.io/v1/namespaces/%s/networks/%s", netNsName, networkname)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
@@ -347,7 +419,12 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: failed to get the netplugin data: %v", err)
 	}
 
-	netargs, err := getpluginargs(np.Plugin, np.Args, primary)
+	ifnameRequest := ""
+	if networkinfo["interfaceRequest"] != nil {
+		ifnameRequest = networkinfo["interfaceRequest"].(string)
+	}
+
+	netargs, err := getpluginargs(np.Plugin, np.Args, primary, ifnameRequest)
 	if err != nil {
 		return "", err
 	}
@@ -370,7 +447,7 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 			primary = true
 		}
 
-		np, err = getnetplugin(client, net["name"].(string), primary)
+		np, err = getnetplugin(client, net, primary)
 		if err != nil {
 			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
 		}
@@ -405,8 +482,10 @@ func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
 	return tmpNetconf.Delegates, nil
 }
 
+// NoK8sNetworkError indicates error, no network in kubernetes
 type NoK8sNetworkError string
-func (e NoK8sNetworkError) Error() string  { return string(e) }
+
+func (e NoK8sNetworkError) Error() string { return string(e) }
 
 func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interface{}, error) {
 	k8sArgs := K8sArgs{}
@@ -470,8 +549,20 @@ func cmdAdd(args *skel.CmdArgs) error {
 			}
 		}
 
+		// If it's empty just leave it as the netconfig states (e.g. just default)
 		if len(podDelegate) != 0 {
-			n.Delegates = podDelegate
+			if n.UseDefault {
+				// In the case that we force the default
+				// We add the found configs from CRD
+				for _, eachDelegate := range podDelegate {
+					eachDelegate["masterplugin"] = false
+					n.Delegates = append(n.Delegates,eachDelegate)
+				}
+
+			} else {
+				// Otherwise, only the CRD delegates are used.
+				n.Delegates = podDelegate
+			}
 		}
 	}
 
@@ -538,7 +629,16 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 
 		if len(podDelegate) != 0 {
-			in.Delegates = podDelegate
+			if in.UseDefault {
+				// In the case that we force the default
+				// We add the found configs from CRD (in reverse order)
+				for i := len(podDelegate)-1; i >= 0; i-- {
+					podDelegate[i]["masterplugin"] = false
+					in.Delegates = append(in.Delegates,podDelegate[i])
+				}
+			} else {
+				in.Delegates = podDelegate
+			}
 		}
 	}
 

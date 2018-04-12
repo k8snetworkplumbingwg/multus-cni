@@ -280,10 +280,10 @@ sriov-vlanid-l2enable-conf   Network.v1.kubernetes-network.cni.cncf.io
 sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
 ```
 ### Configuring Multus to use the kubeconfig
-1.	Create Multus CNI configuration file /etc/cni/net.d/multus-cni.conf with below content in minions. Use only the absolute path to point to the kubeconfig file (it may change depending upon your cluster env) and make sure all CNI binary files are in `\opt\cni\bin` dir
+1.	Create Multus CNI configuration file /etc/cni/net.d/multus-cni.conf with below content on the nodes. Use only the absolute path to point to the kubeconfig file (it may change depending upon your cluster env) and make sure all CNI binary files are in `\opt\cni\bin` dir
 ```
 {
-    "name": "minion-cni-network",
+    "name": "node-cni-network",
     "type": "multus",
     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml"
 }
@@ -296,7 +296,7 @@ sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
 1.	Many user want default networking feature along with Network object. Refer [#14](https://github.com/Intel-Corp/multus-cni/issues/14) & [#17](https://github.com/Intel-Corp/multus-cni/issues/17) issues for more information. In this following config, Weave act as the default network in the absence of network field in the pod metadata annotation.
 ```
 {
-    "name": "minion-cni-network",
+    "name": "node-cni-network",
     "type": "multus",
     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
     "delegates": [{
@@ -451,6 +451,23 @@ Given the following network configuration:
 EOF
 
 ```
+
+### Further options for CNI configuration file.
+
+One may also specify `always_use_default` as a boolean value. This option requires that you're using the CRD method (and therefore requires that you must also specify both the `kubeconfig` and the `delegates` option as well, or Multus will present an error message). In the case that `always_use_default` is true, the `delegates` network will always be applied, along with those specified in the annotations.
+
+For example, a valid configuration using the `always_use_default` may look like:
+
+```
+{
+  "name": "multus-cni-network",
+  "type": "multus",
+  "delegates": [{"type": "flannel", "isDefaultGateway": true, "masterplugin": true}],
+  "always_use_default": true,
+  "kubeconfig": "/etc/kubernetes/kubelet.conf"
+}
+```
+
 ## Testing the Multus CNI ##
 ### Multiple Flannel Network
 Github user [YYGCui](https://github.com/YYGCui) has used Multiple flannel network to work with Multus CNI plugin. Please refer this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for Multiple overlay network support with Multus CNI.
