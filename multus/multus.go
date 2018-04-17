@@ -23,7 +23,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +33,8 @@ import (
 
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+        "github.com/Intel-Corp/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/version"
 )
 
@@ -43,30 +43,6 @@ const defaultCNIDir = "/var/lib/cni/multus"
 var masterpluginEnabled bool
 var defaultcninetwork bool
 
-// NetConf for cni config file written in json
-type NetConf struct {
-	types.NetConf
-	CNIDir     string                   `json:"cniDir"`
-	Delegates  []map[string]interface{} `json:"delegates"`
-	Kubeconfig string                   `json:"kubeconfig"`
-	UseDefault bool                     `json:"always_use_default"`
-}
-
-type netplugin struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" description:"standard object metadata"`
-	Plugin            string `json:"plugin"`
-	Args              string `json:"args"`
-}
-
-// K8sArgs is the valid CNI_ARGS used for Kubernetes
-type K8sArgs struct {
-	types.CommonArgs
-	IP                         net.IP
-	K8S_POD_NAME               types.UnmarshallableString
-	K8S_POD_NAMESPACE          types.UnmarshallableString
-	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString
-}
 
 //taken from cni/plugins/meta/flannel/flannel.go
 func isString(i interface{}) bool {
@@ -79,8 +55,8 @@ func isBool(i interface{}) bool {
 	return ok
 }
 
-func loadNetConf(bytes []byte) (*NetConf, error) {
-	netconf := &NetConf{}
+func loadNetConf(bytes []byte) (*types.NetConf, error) {
+	netconf := &types.NetConf{}
 	if err := json.Unmarshal(bytes, netconf); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
 	}
@@ -99,7 +75,7 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 	if !netconf.UseDefault && (netconf.Kubeconfig != "" && !defaultcninetwork) {
 		return netconf, nil
 	}
-	
+
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
@@ -290,7 +266,7 @@ func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
 	return kubernetes.NewForConfig(config)
 }
 
-func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs K8sArgs) (string, error) {
+func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs types.K8sArgs) (string, error) {
 	var annot string
 	var err error
 
@@ -414,7 +390,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 		return "", fmt.Errorf("getnetplugin: failed to get CRD (result: %s), refer Multus README.md for the usage guide: %v", netobjdata, err)
 	}
 
-	np := netplugin{}
+	np := types.Netplugin{}
 	if err := json.Unmarshal(netobjdata, &np); err != nil {
 		return "", fmt.Errorf("getnetplugin: failed to get the netplugin data: %v", err)
 	}
@@ -464,7 +440,7 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 }
 
 func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
-	tmpNetconf := &NetConf{}
+	tmpNetconf := &types.NetConf{}
 	tmpDelegate := "{\"delegates\": " + delegate + "}"
 
 	if delegate == "" {
@@ -488,10 +464,10 @@ type NoK8sNetworkError string
 func (e NoK8sNetworkError) Error() string { return string(e) }
 
 func getK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interface{}, error) {
-	k8sArgs := K8sArgs{}
+	k8sArgs := types.K8sArgs{}
 	var podNet []map[string]interface{}
 
-	err := types.LoadArgs(args.Args, &k8sArgs)
+	err := cnitypes.LoadArgs(args.Args, &k8sArgs)
 	if err != nil {
 		return podNet, err
 	}
