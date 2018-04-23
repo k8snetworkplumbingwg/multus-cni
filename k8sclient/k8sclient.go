@@ -30,11 +30,9 @@ import (
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
-type NoK8sNetworkError struct {
-	message string
-}
+type NoK8sNetworkError string
 
-func (e *NoK8sNetworkError) Error() string { return string(e.message) }
+func (e NoK8sNetworkError) Error() string { return string(e) }
 
 func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
 
@@ -260,7 +258,7 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interfac
 	}
 
 	if len(netAnnot) == 0 {
-		return podNet, &NoK8sNetworkError{"no kubernetes network found"}
+		return podNet, NoK8sNetworkError("no kubernetes network found")
 	}
 
 	netObjs, err := parsePodNetworkObject(netAnnot)
