@@ -119,34 +119,101 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 	return podNet, nil
 }
 
-func getpluginargs(name string, args string, primary bool, ifname string) (string, error) {
-	var netconf string
-	var tmpargs []string
+func getCNIConfig(name string, primary bool, ifname string) (string, error) {
+	//Todo
+	// In the absence of valid keys in a Spec, the runtime (or
+	// meta-plugin) should load and execute a CNI .configlist
+	// or .config (in that order) file on-disk whose JSON
+	// “name” key matches this Network object’s name.
+	return "", nil
 
-	if name == "" || args == "" {
-		return "", fmt.Errorf("getpluginargs: plugin name/args can't be empty")
-	}
+}
+
+func getPlugin(plugin string, name string, primary bool, ifname string) string {
+	tmpconfig := []string{}
+
+	tmpconfig = append(tmpconfig, fmt.Sprintf(`{"cniVersion": "0.3.1" , "name": "%s", "type": "%s"`, name, plugin))
 
 	if primary != false {
-		tmpargs = []string{`{"type": "`, name, `","masterplugin": true,`}
-	} else {
-		tmpargs = []string{`{"type": "`, name, `",`}
+		tmpconfig = append(tmpconfig, `, "masterplugin": true`)
 	}
 
 	if ifname != "" {
-		tmpargs = append(tmpargs, fmt.Sprintf(`"ifnameRequest": "%s",`, ifname))
-	}
-	tmpargs = append(tmpargs, args[strings.Index(args, "\""):len(args)-1])
-
-	var str bytes.Buffer
-
-	for _, a := range tmpargs {
-		str.WriteString(a)
+		tmpconfig = append(tmpconfig, fmt.Sprintf(`, "ifnameRequest": "%s"`, ifname))
 	}
 
-	netconf = str.String()
-	return netconf, nil
+	tmpconfig = append(tmpconfig, "}")
 
+	return strings.Join(tmpconfig,"")
+
+}
+
+func getConfig(config string, primary bool, ifname string) string {
+	tmpconfig := []string{}
+
+	tmpconfig = append(tmpconfig, config[:1])
+
+	if primary != false {
+		tmpconfig = append(tmpconfig, ` "masterplugin": true,`)
+	}
+
+	if ifname != "" {
+		tmpconfig = append(tmpconfig, fmt.Sprintf(` "ifnameRequest": "%s",`, ifname))
+	}
+
+	tmpconfig = append(tmpconfig, config[1:])
+
+	return strings.Join(tmpconfig,"")
+
+}
+
+func getNetSpec(ns types.NetworkSpec, name string, primary bool, ifname string) (string, error) {
+
+	if ns.Plugin == "" && ns.Config == "" {
+		return "", fmt.Errorf("Network Object spec plugin and config can't be empty")
+	}
+
+	if ns.Plugin != "" && ns.Config != "" {
+		return "", fmt.Errorf("Network Object spec can't have both plugin and config")
+	}
+
+	if ns.Plugin != "" {
+		// Plugin contains the name of a CNI plugin on-disk in a
+		// runtime-defined path (eg /opt/cni/bin and/or other paths.
+		// This plugin should be executed with a basic CNI JSON
+		// configuration on stdin containing the Network object
+		// name and the plugin:
+		//   { “cniVersion”: “0.3.1”, “type”: <Plugin>, “name”: <Network.Name> }
+		// and any additional “runtimeConfig” field per the
+		// CNI specification and conventions.
+		return getPlugin(ns.Plugin, name, primary, ifname), nil
+	}
+
+	// Config contains a standard JSON-encoded CNI configuration
+	// or configuration list which defines the plugin chain to
+	// execute.  If present, this key takes precedence over
+	// ‘Plugin’.
+	return getConfig(ns.Config, primary, ifname), nil
+
+}
+
+func getNetObject(net types.Network, primary bool, ifname string) (string, error) {
+	var config string
+	var err error
+
+	if (types.NetworkSpec{}) == net.Spec {
+		config, err = getCNIConfig(net.Metadata.Name, primary, ifname)
+		if err != nil {
+			return "", fmt.Errorf("getNetObject: err in getCNIConfig: %v", err)
+		}
+	} else {
+		config, err = getNetSpec(net.Spec, net.Metadata.Name, primary, ifname)
+		if err != nil {
+			return "", fmt.Errorf("getNetObject: err in getNetSpec: %v", err)
+		}
+	}
+
+	return config, nil
 }
 
 func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool) (string, error) {
@@ -167,8 +234,8 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 		return "", fmt.Errorf("getnetplugin: failed to get CRD (result: %s), refer Multus README.md for the usage guide: %v", netobjdata, err)
 	}
 
-	np := types.Netplugin{}
-	if err := json.Unmarshal(netobjdata, &np); err != nil {
+	netobj := types.Network{}
+	if err := json.Unmarshal(netobjdata, &netobj); err != nil {
 		return "", fmt.Errorf("getnetplugin: failed to get the netplugin data: %v", err)
 	}
 
@@ -177,7 +244,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 		ifnameRequest = networkinfo["interfaceRequest"].(string)
 	}
 
-	netargs, err := getpluginargs(np.Plugin, np.Args, primary, ifnameRequest)
+	netargs, err := getNetObject(netobj, primary, ifnameRequest)
 	if err != nil {
 		return "", err
 	}
@@ -225,7 +292,7 @@ func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
 	}
 
 	if err := json.Unmarshal([]byte(tmpDelegate), tmpNetconf); err != nil {
-		return nil, fmt.Errorf("getMultusDelegates: failed to load netconf: %v", err)
+		return nil, fmt.Errorf("getMultusDelegates: failed to load netconf for delegate %v: %v", delegate, err)
 	}
 
 	if tmpNetconf.Delegates == nil {
