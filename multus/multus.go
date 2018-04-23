@@ -336,15 +336,17 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	if in.Kubeconfig != "" {
 		podDelegate, r := k8s.GetK8sNetwork(args, in.Kubeconfig)
-		if r != nil && r.Error() == "nonet" {
-			nopodnet = true
-			if !defaultcninetwork {
-				return fmt.Errorf("Multus: Err in getting k8s network from the poc spec, check the pod spec or set delegate for the default network, Refer the README.md: %v", r)
+		if r != nil {
+			if _, ok := r.(*NoK8sNetworkError); ok {
+				nopodnet = true
+				// no network found from default and annotaed network,
+				// we do nothing to remove network for the pod!
+				if !defaultcninetwork {
+					return fmt.Errorf("Multus: Err in getting k8s network from the poc spec, check the pod spec or set delegate for the default network, Refer the README.md: %v", r)
+				}
+			} else {
+				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
 			}
-		}
-
-		if r != nil && !defaultcninetwork {
-			return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
 		}
 
 		if len(podDelegate) != 0 {
