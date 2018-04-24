@@ -8,7 +8,13 @@ before_install:
   - sudo apt-get update -qq
 
 install:
+  # workaround golint install error in https://github.com/golang/lint/issues/288
+  - mkdir -p $GOPATH/src/golang.org/x
+  - pushd $GOPATH/src/golang.org/x
+  - git clone https://github.com/golang/tools.git
+  - git clone https://github.com/golang/lint.git
   - go get github.com/golang/lint/golint
+  - popd
 
 before_script:
   - golint ./multus/... | grep -v ALL_CAPS | xargs -r false
