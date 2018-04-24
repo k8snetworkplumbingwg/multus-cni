@@ -39,7 +39,7 @@ func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
 	// uses the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("createK8sClient: failed to get context for the kubeconfig %v, refer Multus README.md for the usage guide", kubeconfig)
+		return nil, fmt.Errorf("createK8sClient: failed to get context for the kubeconfig %v, refer Multus README.md for the usage guide: %v", kubeconfig, err)
 	}
 
 	// creates the clientset
@@ -52,7 +52,7 @@ func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs types.K8sArgs
 
 	pod, err := client.Pods(string(k8sArgs.K8S_POD_NAMESPACE)).Get(fmt.Sprintf("%s", string(k8sArgs.K8S_POD_NAME)), metav1.GetOptions{})
 	if err != nil {
-		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm", string(k8sArgs.K8S_POD_NAME))
+		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
 	}
 
 	return pod.Annotations["kubernetes.v1.cni.cncf.io/networks"], nil
@@ -115,11 +115,6 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 	}
 
 	return podNet, nil
-}
-
-func isJSON(str string) bool {
-	var js json.RawMessage
-	return json.Unmarshal([]byte(str), &js) == nil
 }
 
 func getpluginargs(name string, args string, primary bool, ifname string) (string, error) {
