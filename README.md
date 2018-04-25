@@ -62,6 +62,8 @@ Kubelet is responsible for establishing the network interfaces for each pod; it 
 
 Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more details refer the link - [K8s Multiple Network proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
 
+Example configurations for CRD are also available in the [examples directory](examples/README.md).
+
 <p align="center">
    <img src="doc/images/multus_crd_usage_diagram.JPG" width="1008" />
 </p>
