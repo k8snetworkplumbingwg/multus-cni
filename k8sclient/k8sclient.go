@@ -25,8 +25,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/Intel-Corp/multus-cni/types"
+	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+)
+
+const (
+	DefaultConfDir = "/etc/cni/net.d"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -120,13 +125,43 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 }
 
 func getCNIConfig(name string, primary bool, ifname string) (string, error) {
-	//Todo
+
 	// In the absence of valid keys in a Spec, the runtime (or
 	// meta-plugin) should load and execute a CNI .configlist
 	// or .config (in that order) file on-disk whose JSON
 	// “name” key matches this Network object’s name.
-	return "", nil
 
+	//Todo
+	// support conflist for chaining mechanism
+	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#getDefaultCNINetwork
+	confDir := DefaultConfDir
+	files, err := libcni.ConfFiles(confDir, []string{".conf", ".json"})
+	switch {
+	case err != nil:
+		fmt.Errorf("No networks found in %s", confDir)
+	case len(files) == 0:
+		fmt.Errorf("No networks found in %s", confDir)
+	}
+
+	for _, confFile := range files {
+		conf, err := libcni.ConfFromFile(confFile)
+		if err != nil {
+			return "", fmt.Errorf("Error loading CNI config file %s: %v", confFile, err)
+		}
+
+		if conf.Network.Name == name {
+			// Ensure the config has a "type" so we know what plugin to run.
+			// Also catches the case where somebody put a conflist into a conf file.
+			if conf.Network.Type == "" {
+				return "", fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+			}
+
+			return getConfig(string(conf.Bytes[:]), primary, ifname), nil
+
+		}
+	}
+
+	return "", fmt.Errorf("no network available in the name %s in cni dir %s", name, confDir)
 }
 
 func getPlugin(plugin string, name string, primary bool, ifname string) string {
@@ -144,7 +179,7 @@ func getPlugin(plugin string, name string, primary bool, ifname string) string {
 
 	tmpconfig = append(tmpconfig, "}")
 
-	return strings.Join(tmpconfig,"")
+	return strings.Join(tmpconfig, "")
 
 }
 
@@ -163,7 +198,7 @@ func getConfig(config string, primary bool, ifname string) string {
 
 	tmpconfig = append(tmpconfig, config[1:])
 
-	return strings.Join(tmpconfig,"")
+	return strings.Join(tmpconfig, "")
 
 }
 
