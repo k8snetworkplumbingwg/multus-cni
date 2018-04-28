@@ -34,9 +34,9 @@
 - One of the plugin acts as a “Master” plugin and responsible for configuring k8s network with Pod interface “eth0”
 - The “Master” plugin also responsible to set the default route for the Pod
 - Any subsequent plugin gets Pod interface name as “net0”, “net1”,… “netX and so on
-- Multus is one of project in [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
+- Multus is one of the projects in the [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
 
-Please read [CNI](https://github.com/containernetworking/cni) for more information on container networking.
+Please check the [CNI](https://github.com/containernetworking/cni) documentation for more information on container networking.
 
 ## Multi-Homed pod
 <p align="center">
