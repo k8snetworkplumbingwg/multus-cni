@@ -25,10 +25,24 @@ import (
 // NetConf for cni config file written in json
 type NetConf struct {
 	types.NetConf
-	ConfDir    string                   `json:"confDir"`
-	CNIDir     string                   `json:"cniDir"`
-	Delegates  []map[string]interface{} `json:"delegates"`
-	Kubeconfig string                   `json:"kubeconfig"`
+	ConfDir string `json:"confDir"`
+	CNIDir  string `json:"cniDir"`
+	// RawDelegates is private to the NetConf class; use Delegates instead
+	RawDelegates []map[string]interface{} `json:"delegates"`
+	Delegates    []*DelegateNetConf       `json:"-"`
+	Kubeconfig   string                   `json:"kubeconfig"`
+}
+
+type DelegateNetConf struct {
+	types.NetConf
+	IfnameRequest string `json:"ifnameRequest,omitempty"`
+	// MasterPlugin is only used internal housekeeping
+	MasterPlugin bool `json:"-"`
+
+	// Raw unmarshalled JSON
+	RawConfig map[string]interface{}
+	// Raw bytes
+	Bytes []byte
 }
 
 type Network struct {

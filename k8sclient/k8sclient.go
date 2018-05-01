@@ -25,10 +25,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/intel/multus-cni/types"
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	"github.com/intel/multus-cni/types"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -335,62 +335,54 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 	return netconf, nil
 }
 
-func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
-	tmpNetconf := &types.NetConf{}
-	tmpDelegate := "{\"delegates\": " + delegate + "}"
-
+func getMultusDelegates(delegate string) ([]*types.DelegateNetConf, error) {
 	if delegate == "" {
 		return nil, fmt.Errorf("getMultusDelegates: TPR network obj data can't be empty")
 	}
 
-	if err := json.Unmarshal([]byte(tmpDelegate), tmpNetconf); err != nil {
+	n, err := types.LoadNetConf([]byte("{\"delegates\": " + delegate + "}"))
+	if err != nil {
 		return nil, fmt.Errorf("getMultusDelegates: failed to load netconf for delegate %v: %v", delegate, err)
 	}
 
-	if tmpNetconf.Delegates == nil {
+	if len(n.Delegates) == 0 {
 		return nil, fmt.Errorf(`getMultusDelegates: "delegates" is must, refer Multus README.md for the usage guide`)
 	}
 
-	return tmpNetconf.Delegates, nil
+	return n.Delegates, nil
 }
 
-func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, confdir string) ([]map[string]interface{}, error) {
+func GetK8sNetwork(args *skel.CmdArgs, kubeconfig, confdir string) ([]*types.DelegateNetConf, error) {
 	k8sArgs := types.K8sArgs{}
-	var podNet []map[string]interface{}
 
 	err := cnitypes.LoadArgs(args.Args, &k8sArgs)
 	if err != nil {
-		return podNet, err
+		return nil, err
 	}
 
 	k8sclient, err := createK8sClient(kubeconfig)
 	if err != nil {
-		return podNet, err
+		return nil, err
 	}
 
 	netAnnot, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
 	if err != nil {
-		return podNet, err
+		return nil, err
 	}
 
 	if len(netAnnot) == 0 {
-		return podNet, &NoK8sNetworkError{"no kubernetes network found"}
+		return nil, &NoK8sNetworkError{"no kubernetes network found"}
 	}
 
 	netObjs, err := parsePodNetworkObject(netAnnot)
 	if err != nil {
-		return podNet, err
+		return nil, err
 	}
 
 	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs, confdir)
 	if err != nil {
-		return podNet, err
+		return nil, err
 	}
 
-	podNet, err = getMultusDelegates(multusDelegates)
-	if err != nil {
-		return podNet, err
-	}
-
-	return podNet, nil
+	return getMultusDelegates(multusDelegates)
 }
