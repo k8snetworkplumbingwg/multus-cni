@@ -1,0 +1,12 @@
+apiVersion: "kubernetes.cni.cncf.io/v1"
+kind: Network
+metadata:
+  name: flannel-conf
+plugin: flannel
+args: '[
+        {
+                "delegate": {
+                        "isDefaultGateway": true
+                }
+        }
+]'
