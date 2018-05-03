@@ -1,0 +1,72 @@
+---
+apiVersion: "kubernetes.cni.cncf.io/v1"
+kind: Network
+metadata:
+  name: macvlan-conf-1
+plugin: macvlan
+args: '[
+        {
+            "master": "eth1",
+            "mode": "bridge",
+            "ipam": {
+                "type": "static",
+                "addresses": [
+                    { "address": "192.168.1.1/24" }
+                ]
+            }
+        }
+]'
+---
+apiVersion: "kubernetes.cni.cncf.io/v1"
+kind: Network
+metadata:
+  name: macvlan-conf-2
+plugin: macvlan
+args: '[
+        {
+            "master": "eth1",
+            "mode": "bridge",
+            "ipam": {
+                "type": "static",
+                "addresses": [
+                    { "address": "192.168.1.2/24" }
+                ]
+            }
+        }
+]'
+---
+apiVersion: "kubernetes.cni.cncf.io/v1"
+kind: Network
+metadata:
+  name: macvlan-conf-3
+plugin: macvlan
+args: '[
+        {
+            "master": "eth1",
+            "mode": "bridge",
+            "ipam": {
+                "type": "static",
+                "addresses": [
+                    { "address": "192.168.1.3/24" }
+                ]
+            }
+        }
+]'
+---
+apiVersion: "kubernetes.cni.cncf.io/v1"
+kind: Network
+metadata:
+  name: macvlan-conf-4
+plugin: macvlan
+args: '[
+        {
+            "master": "eth1",
+            "mode": "bridge",
+            "ipam": {
+                "type": "static",
+                "addresses": [
+                    { "address": "192.168.1.4/24" }
+                ]
+            }
+        }
+]'

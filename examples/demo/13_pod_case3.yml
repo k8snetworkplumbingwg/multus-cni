@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-03
+  annotations:
+    kubernetes.v1.cni.cncf.io/networks: '[
+            { "name": "macvlan-conf-3" },
+            { "name": "macvlan-conf-4" },
+            { "name": "flannel-conf" } # need verify!
+    ]'
+spec:
+  containers:
+  - name: pod-case-03
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
