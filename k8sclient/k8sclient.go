@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"regexp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -87,6 +88,20 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	} else if len(atItems) != 1 {
 		return "", "", "", fmt.Errorf("Invalid network object (failed at '@')")
 	}
+
+	// Check and see if each item matches the specification for valid attachment name.
+	// "Valid attachment names must be comprised of units of the DNS-1123 label format"
+	// [a-z0-9]([-a-z0-9]*[a-z0-9])?
+	// And we allow at (@), and forward slash (/) (units separated by commas)
+	// It must start and end alphanumerically.
+	allItems := []string{netNsName, networkName, netIfName}
+	for i := range allItems {
+		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
+		if (!matched && len([]rune(allItems[i]))>0) {
+			return "", "", "", fmt.Errorf(fmt.Sprintf("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'",allItems[i]))
+		}
+	}
+
 	return netNsName, networkName, netIfName, nil
 }
 
@@ -99,10 +114,16 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 
 	// Parse the podnetwork string, and assume it is JSON.
 	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-		// If the JSON parsing fails, assume it is comma delimited.
+
+		// If JSON doesn't parse, assume comma-delimited.
 		commaItems := strings.Split(podnetwork, ",")
+
 		// Build a map from the comma delimited items.
 		for i := range commaItems {
+
+			// Remove leading and trailing whitespace.
+			commaItems[i] = strings.TrimSpace(commaItems[i])
+
 			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
 			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(commaItems[i])
 			if err != nil {
