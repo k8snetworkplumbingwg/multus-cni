@@ -186,6 +186,7 @@ func getPlugin(plugin string, name string, primary bool, ifname string) string {
 func getConfig(config string, primary bool, ifname string) string {
 	tmpconfig := []string{}
 
+	config = strings.TrimSpace(config)
 	tmpconfig = append(tmpconfig, config[:1])
 
 	if primary != false {
