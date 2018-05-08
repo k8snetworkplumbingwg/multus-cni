@@ -58,6 +58,10 @@ func loadNetConf(bytes []byte) (*types.NetConf, error) {
 		defaultcninetwork = true
 	}
 
+	if netconf.CNIDir == "" {
+		netconf.CNIDir = defaultCNIDir
+	}
+
 	if netconf.UseDefault {
 		if netconf.Kubeconfig == "" || !defaultcninetwork {
 			return nil, fmt.Errorf(`If you have set always_use_default, you must also set the delegates & the kubeconfig, refer to the README`)
@@ -71,10 +75,6 @@ func loadNetConf(bytes []byte) (*types.NetConf, error) {
 
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
-	}
-
-	if netconf.CNIDir == "" {
-		netconf.CNIDir = defaultCNIDir
 	}
 
 	return netconf, nil
