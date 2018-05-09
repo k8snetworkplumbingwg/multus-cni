@@ -34,7 +34,10 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-const defaultCNIDir = "/var/lib/cni/multus"
+const (
+	defaultCNIDir  = "/var/lib/cni/multus"
+	defaultConfDir = "/etc/cni/multus/net.d"
+)
 
 var masterpluginEnabled bool
 var defaultcninetwork bool
@@ -62,6 +65,10 @@ func loadNetConf(bytes []byte) (*types.NetConf, error) {
 
 	if netconf.CNIDir == "" {
 		netconf.CNIDir = defaultCNIDir
+	}
+
+	if netconf.ConfDir == "" {
+		netconf.ConfDir = defaultConfDir
 	}
 
 	if netconf.UseDefault {
@@ -283,7 +290,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	if n.Kubeconfig != "" {
-		podDelegate, err := k8s.GetK8sNetwork(args, n.Kubeconfig)
+		podDelegate, err := k8s.GetK8sNetwork(args, n.Kubeconfig, n.ConfDir)
 		if err != nil {
 			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
 				nopodnet = true
@@ -362,7 +369,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	if in.Kubeconfig != "" {
-		podDelegate, r := k8s.GetK8sNetwork(args, in.Kubeconfig)
+		podDelegate, r := k8s.GetK8sNetwork(args, in.Kubeconfig, in.ConfDir)
 		if r != nil {
 			if _, ok := r.(*k8s.NoK8sNetworkError); ok {
 				nopodnet = true
