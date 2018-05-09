@@ -176,9 +176,8 @@ func validateIfName(nsname string, ifname string) error {
 		if err != nil {
 			if err.Error() == "Link not found" {
 				return nil
-			} else {
-				return err
 			}
+			return err
 		}
 		return fmt.Errorf("ifname %s is already exist", ifname)
 	})
