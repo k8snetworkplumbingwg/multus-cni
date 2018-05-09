@@ -1,9 +1,10 @@
-hash: 93f0eb61653a11e8c92837ca08f67d6cbad2d2f67baff0406cd9b0a280b02c14
-updated: 2017-06-29T16:28:02.736774222+01:00
+hash: 9f567f5e6122fc0f7092f9373f1cfd491978315b0d9ff01ab81cebe269ffa048
+updated: 2018-05-08T04:22:31.321965197-04:00
 imports:
 - name: github.com/containernetworking/cni
   version: 137b4975ecab6e1f0c24c1e3c228a50a3cfba75e
   subpackages:
+  - libcni
   - pkg/invoke
   - pkg/ip
   - pkg/ipam
@@ -70,6 +71,10 @@ imports:
   - codec
 - name: github.com/vishvananda/netlink
   version: 4e28683688429fdf8413cc610d59fb1841986300
+  subpackages:
+  - nl
+- name: github.com/vishvananda/netns
+  version: be1fbeda19366dea804f00efff2dd73a1642fdcc
 - name: golang.org/x/crypto
   version: d172538b2cfce0c13cee31e647d0367aa8cd2486
   subpackages:

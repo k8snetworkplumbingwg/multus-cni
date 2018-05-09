@@ -28,8 +28,10 @@ import (
 	k8s "github.com/Intel-Corp/multus-cni/k8sclient"
 	"github.com/Intel-Corp/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/invoke"
+	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/vishvananda/netlink"
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
@@ -163,6 +165,27 @@ func isMasterplugin(netconf map[string]interface{}) bool {
 	return false
 }
 
+func validateIfName(nsname string, ifname string) error {
+	podNs, err := ns.GetNS(nsname)
+	if err != nil {
+		return fmt.Errorf("no netns: %v", err)
+	}
+
+	err = podNs.Do(func(_ ns.NetNS) error {
+		_, err := netlink.LinkByName(ifname)
+		if err != nil {
+			if err.Error() == "Link not found" {
+				return nil
+			} else {
+				return err
+			}
+		}
+		return fmt.Errorf("ifname %s is already exist", ifname)
+	})
+
+	return err
+}
+
 func delegateAdd(podif func() string, argif string, netconf map[string]interface{}, onlyMaster bool) (bool, error) {
 	netconfBytes, err := json.Marshal(netconf)
 	if err != nil {
@@ -187,6 +210,11 @@ func delegateAdd(podif func() string, argif string, netconf map[string]interface
 		if os.Setenv("CNI_IFNAME", netconf["ifnameRequest"].(string)) != nil {
 			return true, fmt.Errorf("Multus: error in setting CNI_IFNAME")
 		}
+	}
+
+	err = validateIfName(os.Getenv("CNI_NETNS"), os.Getenv("CNI_IFNAME"))
+	if err != nil {
+		return true, fmt.Errorf("cannot set %q ifname: %v", netconf["type"].(string), err)
 	}
 
 	result, err := invoke.DelegateAdd(netconf["type"].(string), netconfBytes)
