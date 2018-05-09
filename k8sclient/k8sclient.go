@@ -18,8 +18,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"regexp"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -29,10 +29,6 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-)
-
-const (
-	DefaultConfDir = "/etc/cni/net.d"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -97,8 +93,8 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	allItems := []string{netNsName, networkName, netIfName}
 	for i := range allItems {
 		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
-		if (!matched && len([]rune(allItems[i]))>0) {
-			return "", "", "", fmt.Errorf(fmt.Sprintf("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'",allItems[i]))
+		if !matched && len([]rune(allItems[i])) > 0 {
+			return "", "", "", fmt.Errorf(fmt.Sprintf("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
 		}
 	}
 
@@ -145,7 +141,7 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 	return podNet, nil
 }
 
-func getCNIConfig(name string, primary bool, ifname string) (string, error) {
+func getCNIConfig(name string, primary bool, ifname string, confdir string) (string, error) {
 
 	// In the absence of valid keys in a Spec, the runtime (or
 	// meta-plugin) should load and execute a CNI .configlist
@@ -155,13 +151,12 @@ func getCNIConfig(name string, primary bool, ifname string) (string, error) {
 	//Todo
 	// support conflist for chaining mechanism
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#getDefaultCNINetwork
-	confDir := DefaultConfDir
-	files, err := libcni.ConfFiles(confDir, []string{".conf", ".json"})
+	files, err := libcni.ConfFiles(confdir, []string{".conf", ".json"})
 	switch {
 	case err != nil:
-		fmt.Errorf("No networks found in %s", confDir)
+		fmt.Errorf("No networks found in %s", confdir)
 	case len(files) == 0:
-		fmt.Errorf("No networks found in %s", confDir)
+		fmt.Errorf("No networks found in %s", confdir)
 	}
 
 	for _, confFile := range files {
@@ -182,7 +177,7 @@ func getCNIConfig(name string, primary bool, ifname string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("no network available in the name %s in cni dir %s", name, confDir)
+	return "", fmt.Errorf("no network available in the name %s in cni dir %s", name, confdir)
 }
 
 func getPlugin(plugin string, name string, primary bool, ifname string) string {
@@ -254,12 +249,12 @@ func getNetSpec(ns types.NetworkSpec, name string, primary bool, ifname string) 
 
 }
 
-func getNetObject(net types.Network, primary bool, ifname string) (string, error) {
+func getNetObject(net types.Network, primary bool, ifname string, confdir string) (string, error) {
 	var config string
 	var err error
 
 	if (types.NetworkSpec{}) == net.Spec {
-		config, err = getCNIConfig(net.Metadata.Name, primary, ifname)
+		config, err = getCNIConfig(net.Metadata.Name, primary, ifname, confdir)
 		if err != nil {
 			return "", fmt.Errorf("getNetObject: err in getCNIConfig: %v", err)
 		}
@@ -273,7 +268,7 @@ func getNetObject(net types.Network, primary bool, ifname string) (string, error
 	return config, nil
 }
 
-func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool) (string, error) {
+func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool, confdir string) (string, error) {
 	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
@@ -301,7 +296,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 		ifnameRequest = networkinfo["interfaceRequest"].(string)
 	}
 
-	netargs, err := getNetObject(netobj, primary, ifnameRequest)
+	netargs, err := getNetObject(netobj, primary, ifnameRequest, confdir)
 	if err != nil {
 		return "", err
 	}
@@ -309,7 +304,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 	return netargs, nil
 }
 
-func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interface{}) (string, error) {
+func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interface{}, confdir string) (string, error) {
 
 	var np string
 	var err error
@@ -324,7 +319,7 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 			primary = true
 		}
 
-		np, err = getnetplugin(client, net, primary)
+		np, err = getnetplugin(client, net, primary, confdir)
 		if err != nil {
 			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
 		}
@@ -359,7 +354,7 @@ func getMultusDelegates(delegate string) ([]map[string]interface{}, error) {
 	return tmpNetconf.Delegates, nil
 }
 
-func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interface{}, error) {
+func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, confdir string) ([]map[string]interface{}, error) {
 	k8sArgs := types.K8sArgs{}
 	var podNet []map[string]interface{}
 
@@ -387,7 +382,7 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string) ([]map[string]interfac
 		return podNet, err
 	}
 
-	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs)
+	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs, confdir)
 	if err != nil {
 		return podNet, err
 	}
