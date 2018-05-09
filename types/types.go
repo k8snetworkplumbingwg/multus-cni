@@ -25,6 +25,7 @@ import (
 // NetConf for cni config file written in json
 type NetConf struct {
 	types.NetConf
+	ConfDir    string                   `json:"confDir"`
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
