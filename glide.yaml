@@ -16,3 +16,4 @@ import:
   subpackages:
   - kubernetes
   - tools/clientcmd
+- package: github.com/vishvananda/netns
