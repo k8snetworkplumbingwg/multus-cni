@@ -29,7 +29,6 @@ type NetConf struct {
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
-	UseDefault bool                     `json:"always_use_default"`
 }
 
 type Network struct {
