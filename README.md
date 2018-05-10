@@ -54,7 +54,6 @@ Go 1.5 users will need to set `GO15VENDOREXPERIMENT=1` to get vendored dependenc
 * `type` (string, required): "multus"
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver, Refer the doc
 * `delegates` (([]map,required): number of delegate details in the Multus, ignored in case kubeconfig is added.
-* `masterplugin` (bool,required): master plugin to report back the IP address and DNS to the container
 
 ## Usage with Kubernetes CRD/TPR based Network Objects
 
@@ -303,8 +302,7 @@ sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
     "delegates": [{
         "type": "weave-net",
-        "hairpinMode": true,
-        "masterplugin": true
+        "hairpinMode": true
     }]
 }
 ```
@@ -443,7 +441,6 @@ Given the following network configuration:
         },
         {
                 "type": "flannel",
-                "masterplugin": true,
                 "delegate": {
                         "isDefaultGateway": true
                 }
@@ -452,22 +449,6 @@ Given the following network configuration:
 }
 EOF
 
-```
-
-### Further options for CNI configuration file.
-
-One may also specify `always_use_default` as a boolean value. This option requires that you're using the CRD method (and therefore requires that you must also specify both the `kubeconfig` and the `delegates` option as well, or Multus will present an error message). In the case that `always_use_default` is true, the `delegates` network will always be applied, along with those specified in the annotations.
-
-For example, a valid configuration using the `always_use_default` may look like:
-
-```
-{
-  "name": "multus-cni-network",
-  "type": "multus",
-  "delegates": [{"type": "flannel", "isDefaultGateway": true, "masterplugin": true}],
-  "always_use_default": true,
-  "kubeconfig": "/etc/kubernetes/kubelet.conf"
-}
 ```
 
 ## Testing the Multus CNI ##

@@ -71,20 +71,16 @@ func loadNetConf(bytes []byte) (*types.NetConf, error) {
 		netconf.ConfDir = defaultConfDir
 	}
 
-	if netconf.UseDefault {
-		if netconf.Kubeconfig == "" || !defaultcninetwork {
-			return nil, fmt.Errorf(`If you have set always_use_default, you must also set the delegates & the kubeconfig, refer to the README`)
-		}
-		return netconf, nil
-	}
-
-	if !netconf.UseDefault && (netconf.Kubeconfig != "" && !defaultcninetwork) {
-		return netconf, nil
+	if netconf.Kubeconfig == "" || !defaultcninetwork {
+		return nil, fmt.Errorf(`You must also set the delegates & the kubeconfig, refer to the README`)
 	}
 
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
+
+	// default network in multus conf as master plugin
+	netconf.Delegates[0]["masterplugin"] = true
 
 	return netconf, nil
 }
@@ -304,17 +300,11 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		// If it's empty just leave it as the netconfig states (e.g. just default)
 		if len(podDelegate) != 0 {
-			if n.UseDefault {
-				// In the case that we force the default
-				// We add the found configs from CRD
-				for _, eachDelegate := range podDelegate {
-					eachDelegate["masterplugin"] = false
-					n.Delegates = append(n.Delegates, eachDelegate)
-				}
-
-			} else {
-				// Otherwise, only the CRD delegates are used.
-				n.Delegates = podDelegate
+			// In the case that we force the default
+			// We add the found configs from CRD
+			for _, eachDelegate := range podDelegate {
+				eachDelegate["masterplugin"] = false
+				n.Delegates = append(n.Delegates, eachDelegate)
 			}
 		}
 	}
@@ -384,15 +374,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 
 		if len(podDelegate) != 0 {
-			if in.UseDefault {
-				// In the case that we force the default
-				// We add the found configs from CRD (in reverse order)
-				for i := len(podDelegate) - 1; i >= 0; i-- {
-					podDelegate[i]["masterplugin"] = false
-					in.Delegates = append(in.Delegates, podDelegate[i])
-				}
-			} else {
-				in.Delegates = podDelegate
+			// In the case that we force the default
+			// We add the found configs from CRD (in reverse order)
+			for i := len(podDelegate) - 1; i >= 0; i-- {
+				podDelegate[i]["masterplugin"] = false
+				in.Delegates = append(in.Delegates, podDelegate[i])
 			}
 		}
 	}

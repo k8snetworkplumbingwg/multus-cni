@@ -67,13 +67,11 @@ data:
       "delegates": [
         {
           "type": "flannel",
-          "masterplugin": true,
           "delegate": {
             "isDefaultGateway": true
           }
         }
       ],
-      "always_use_default": true,
       "kubeconfig": "/etc/kubernetes/kubelet.conf"
     }
   net-conf.json: |
