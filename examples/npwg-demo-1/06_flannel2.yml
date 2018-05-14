@@ -103,7 +103,7 @@ spec:
       - name: flannel-etcdctl
         image: quay.io/coreos/etcd:latest
         command: ["etcdctl"]
-        args: ["--endpoints=http://10.1.1.1:12379", "set", "/flannel2/network/config", '{ "Network": "10.5.0.0/16", "Backend": {"Type": "vxlan"}}']
+        args: ["--endpoints=http://10.1.1.1:12379", "set", "/flannel2/network/config", '{ "Network": "10.5.0.0/16", "Backend": {"Type": "vxlan", "VNI": 2}}']
       hostNetwork: true
       nodeName: kube-master
       restartPolicy: Never
