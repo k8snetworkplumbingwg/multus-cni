@@ -296,10 +296,11 @@ kind: Pod
 metadata:
   name: multus-multi-net-poc
   annotations:
-    networks: '[  
-        { "name": "flannel-conf" },
-        { "name": "sriov-conf"},
-        { "name": "sriov-vlanid-l2enable-conf" } 
+    kubernetes.v1.cni.cncf.io/networks: '[
+            { "name": "flannel-conf" },
+            { "name": "sriov-conf" },
+            { "name": "sriov-vlanid-l2enable-conf",
+              "interfaceRequest": "north" }
     ]'
 spec:  # specification of the pod's contents
   containers:
@@ -329,15 +330,14 @@ multus-multi-net-poc   1/1       Running   0          30s
 
 1. Run &quot;ifconfig&quot; command in Pod:
 ```
-# kubectl exec -it multus-multi-net-poc -- ifconfig
-eth0      Link encap:Ethernet  HWaddr 06:21:91:2D:74:B9  
-          inet addr:192.168.42.3  Bcast:0.0.0.0  Mask:255.255.255.0
-          inet6 addr: fe80::421:91ff:fe2d:74b9/64 Scope:Link
+# kubectl exec -it multus-multi-net-poc -- ifconfig       
+eth0      Link encap:Ethernet  HWaddr C6:43:7C:09:B4:9C
+          inet addr:10.128.0.4  Bcast:0.0.0.0  Mask:255.255.255.0
           UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
-          RX bytes:0 (0.0 B)  TX bytes:648 (648.0 B)
+          RX packets:8 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:1 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0
+          RX bytes:648 (648.0 B)  TX bytes:42 (42.0 B)
 
 lo        Link encap:Local Loopback  
           inet addr:127.0.0.1  Mask:255.0.0.0
@@ -347,8 +347,17 @@ lo        Link encap:Local Loopback
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
           collisions:0 txqueuelen:1 
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
+          
+net0      Link encap:Ethernet  HWaddr 06:21:91:2D:74:B9  
+          inet addr:192.168.42.3  Bcast:0.0.0.0  Mask:255.255.255.0
+          inet6 addr: fe80::421:91ff:fe2d:74b9/64 Scope:Link
+          UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
+          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:0 (0.0 B)  TX bytes:648 (648.0 B)
 
-net0      Link encap:Ethernet  HWaddr D2:94:98:82:00:00  
+net1      Link encap:Ethernet  HWaddr D2:94:98:82:00:00  
           inet addr:10.56.217.171  Bcast:0.0.0.0  Mask:255.255.255.0
           inet6 addr: fe80::d094:98ff:fe82:0/64 Scope:Link
           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
@@ -368,8 +377,9 @@ north     Link encap:Ethernet  HWaddr BE:F2:48:42:83:12
 | Interface name | Description |
 | --- | --- |
 | lo | loopback |
-| eth0@if41 | Flannel network tap interface |
-| net0 | VF0 of NIC 1 assigned to the container by [Intel - SR-IOV CNI](https://github.com/intel/sriov-cni) plugin |
+| eth0 | weave network interface |
+| net0 | Flannel network tap interface |
+| net1 | VF0 of NIC 1 assigned to the container by [Intel - SR-IOV CNI](https://github.com/intel/sriov-cni) plugin |
 | north | VF0 of NIC 2 assigned with VLAN ID 210 to the container by SR-IOV CNI plugin |
 
 2. Check the vlan ID of the NIC 2 VFs
