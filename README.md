@@ -182,11 +182,9 @@ network "flannel-networkobj" created
 ```
 ```
 # kubectl get network
-NAME                  AGE
-flannel-networkobj      26s
+NAME                         AGE
+flannel-networkobj           26s
 ```
-
-
 4. Get the custom network object details
 ```
 apiVersion: kubernetes.cni.cncf.io/v1
@@ -212,22 +210,21 @@ apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: sriov-conf
-plugin: sriov
-args: '[
-       {
-                "if0": "enp12s0f1",
-                "ipam": {
-                        "type": "host-local",
-                        "subnet": "10.56.217.0/24",
-                        "rangeStart": "10.56.217.171",
-                        "rangeEnd": "10.56.217.181",
-                        "routes": [
-                                { "dst": "0.0.0.0/0" }
-                        ],
-                        "gateway": "10.56.217.1"
-                }
-        }
-]'
+spec:
+  config: '{
+    "type": "sriov",
+    "if0": "enp12s0f1",
+    "ipam": {
+            "type": "host-local",
+            "subnet": "10.56.217.0/24",
+            "rangeStart": "10.56.217.171",
+            "rangeEnd": "10.56.217.181",
+            "routes": [
+                    { "dst": "0.0.0.0/0" }
+            ],
+            "gateway": "10.56.217.1"
+    }
+  }'
 ```
 6. Likewise save the following YAML to sriov-vlanid-l2enable-network.yaml to create another sriov based network object:
 
@@ -236,24 +233,23 @@ apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: sriov-vlanid-l2enable-conf
-plugin: sriov
-args: '[
-       {
-                "if0": "enp2s0",
-                "vlan": 210,
-                "if0name": "north",
-                "l2enable": true
-        }
-]'
+spec:
+  config: '{
+    "type": "sriov",
+    "if0": "enp2s0",
+    "vlan": 210,
+    "l2enable": true
+  }'
 ```
 7. Follow step 3 above to create &quot;sriov-vlanid-l2enable-conf&quot; and &quot;sriov-conf&quot; network objects
 8. View network objects using kubectl
 ```
 # kubectl get network
-NAME                         KIND
-flannel-conf                 Network.v1.kubernetes.cni.cncf.io
-sriov-vlanid-l2enable-conf   Network.v1.kubernetes.cni.cncf.io
-sriov-conf                   Network.v1.kubernetes.cni.cncf.io
+NAME                         AGE
+flannel-networkobj           29m
+sriov-conf                   6m
+sriov-vlanid-l2enable-conf   2m
+
 ```
 ### Configuring Multus to use the kubeconfig
 1. Create a Mutlus CNI configuration file on each Kubernetes node. This file should be created in: /etc/cni/net.d/multus-cni.conf with the content shown below. Use only the absolute path to point to the kubeconfig file (as it may change depending upon your cluster env). We are assuming all CNI plugin binaries are default location (`\opt\cni\bin dir`)
