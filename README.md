@@ -154,21 +154,22 @@ flannel-networkobj      26s
 
 6. Get the custom network object details
 ```
-# kubectl get network flannel-networkobj -o yaml
 apiVersion: kubernetes.cni.cncf.io/v1
-args: '[ { "delegate": { "isDefaultGateway": true } } ]'
 kind: Network
 metadata:
   clusterName: ""
-  creationTimestamp: 2017-07-11T21:46:52Z
+  creationTimestamp: 2018-05-17T09:13:20Z
   deletionGracePeriodSeconds: null
   deletionTimestamp: null
+  initializers: null
   name: flannel-networkobj
   namespace: default
-  resourceVersion: "6848829"
+  resourceVersion: "21176114"
   selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
-  uid: 7311c965-6682-11e7-b0b9-408d5c537d27
-plugin: flannel
+  uid: 8ac8f873-59b2-11e8-8308-a4bf01024e6f
+spec:
+  config: '{ "cniVersion": "0.3.0", "type": "flannel", "delegate": { "isDefaultGateway":
+    true } }'
 ```
 
 For Kubernetes v1.7 and above use CRD to create network object. For version older than 1.7 use TPR based objects as shown below: 
