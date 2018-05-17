@@ -9,14 +9,14 @@
       * [Multi-Homed pod](#multi-homed-pod)
       * [Build](#build)
       * [Work flow](#work-flow)
-      * [Usage with Kubernetes CRD/TPR based network objects](#usage-with-kubernetes-crdtpr-based-network-objects)
+      * [Usage with Kubernetes CRD based network objects](#usage-with-kubernetes-crd-based-network-objects)
          * [Creating "Network" resources in Kubernetes](#creating-network-resources-in-kubernetes)
             * [<strong>CRD based Network objects</strong>](#crd-based-network-objects)
             * [TPR based Network objects(TPR deprecated in Kubernetes 1.7)](#tpr-based-network-objects)
          * [Creating network resources in Kubernetes](#creating-network-resources-in-kubernetes-1)
          * [Configuring Multus to use the kubeconfig](#configuring-multus-to-use-the-kubeconfig)
          * [Configuring Multus to use kubeconfig and a default network](#configuring-multus-to-use-kubeconfig-and-a-default-network)
-         * [Configuring Pod to use the CRD/TPR network objects](#configuring-pod-to-use-the-crdtpr-network-objects)
+         * [Configuring Pod to use the CRD network objects](#configuring-pod-to-use-the-crd-network-objects)
          * [Verifying Pod network interfaces](#verifying-pod-network-interfaces)
       * [Using with Multus conf file](#using-with-multus-conf-file)
       * [Testing Multus CNI](#testing-multus-cni)
@@ -68,7 +68,7 @@ Go 1.5 users will need to set GO15VENDOREXPERIMENT=1 to get vendored dependencie
 - delegates (([]map,required): number of delegate details in the Multus, ignored in case kubeconfig is added.
 - masterplugin (bool,required): master plugin to report back the IP address and DNS to the container
 
-## Usage with Kubernetes CRD/TPR based network objects
+## Usage with Kubernetes CRD based network objects
 
 Kubelet is responsible for establishing network interfaces for pods; it does this by invoking its configured CNI plugin. When Multus is invoked it retrieves network references from Pod annotation. Multus then uses these network references to get network configurations. Network configurations are defined as Kubernetes Custom Resource Object (CRD). These configurations describe which CNI plugins to invoke and what their configurations are. The order of plugin invocation is important as it identifies the primary plugin. This order is taken from network object references given in a Pod spec.
 
@@ -78,7 +78,7 @@ Kubelet is responsible for establishing network interfaces for pods; it does thi
 
 ### Creating &quot;Network&quot; resources in Kubernetes
 
-Multus is compatible to work with both CRD/TPR. Both CRD/TPR based network object api self link is same.
+Multus is compatible to work with both CRD and TPR(deprecated in K8s 1.7).
 
 ##### **CRD based Network objects**
 
@@ -204,7 +204,7 @@ network.kubernetes-network.cni.cncf.io   A specification of a Network obj in the
 ```
 ### Creating network resources in Kubernetes
 
-1. After creating CRD/TPR network object you can create network resources in Kubernetes. These network resources may contain additional underlying CNI plugin parameters given in JSON format. In the following example shown below the args field contains parameters that will be passed into “flannel” plugin.
+1. After creating CRD network object you can create network resources in Kubernetes. These network resources may contain additional underlying CNI plugin parameters given in JSON format. In the following example shown below the args field contains parameters that will be passed into “flannel” plugin.
 
 2. Save the following YAML to flannel-network.yaml
 
@@ -333,7 +333,7 @@ sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
 # systemctl restart kubelet
 ```
 
-### Configuring Pod to use the CRD/TPR network objects
+### Configuring Pod to use the CRD network objects
 
 1. Save the following YAML to pod-multi-network.yaml. In this case flannel-conf network object acts as the primary network.
 ```
