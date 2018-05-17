@@ -3,7 +3,7 @@
 * [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
 * [Dan's CRD proposal](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
 
-![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
+![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
    * [MULTUS CNI plugin](#multus-cni-plugin)
       * [Multi-Homed pod](#multi-homed-pod)
@@ -64,9 +64,8 @@ Go 1.5 users will need to set GO15VENDOREXPERIMENT=1 to get vendored dependencie
 
 - name (string, required): the name of the network
 - type (string, required): &quot;multus&quot;
-- kubeconfig (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/Intel-Corp/multus-cni/blob/master/doc/node-kubeconfig.yaml)
-- delegates (([]map,required): number of delegate details in the Multus, ignored in case kubeconfig is added.
-- masterplugin (bool,required): master plugin to report back the IP address and DNS to the container
+- kubeconfig (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml)
+- delegates (([]map,required): number of delegate details in the Multus
 
 ## Usage with Kubernetes CRD based network objects
 
@@ -313,7 +312,7 @@ sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
 ```
 ### Configuring Multus to use kubeconfig and a default network
 
-1. Many users want Kubernetes default networking feature along with network objects. Refer to issues [#14](https://github.com/Intel-Corp/multus-cni/issues/14) &amp; [#17](https://github.com/Intel-Corp/multus-cni/issues/17) for more information. In the following Multus configuration, Weave act as the default network in the absence of network field in the pod metadata annotation.
+1. Many users want Kubernetes default networking feature along with network objects. Refer to issues [#14](https://github.com/intel/multus-cni/issues/14) &amp; [#17](https://github.com/intel/multus-cni/issues/17) for more information. In the following Multus configuration, Weave act as the default network in the absence of network field in the pod metadata annotation.
 
 ```
 {
@@ -416,7 +415,7 @@ north     Link encap:Ethernet  HWaddr BE:F2:48:42:83:12
 | --- | --- |
 | lo | loopback |
 | eth0@if41 | Flannel network tap interface |
-| net0 | VF0 of NIC 1 assigned to the container by [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin |
+| net0 | VF0 of NIC 1 assigned to the container by [Intel - SR-IOV CNI](https://github.com/intel/sriov-cni) plugin |
 | north | VF0 of NIC 2 assigned with VLAN ID 210 to the container by SR-IOV CNI plugin |
 
 2. Check the vlan ID of the NIC 2 VFs
@@ -485,7 +484,7 @@ EOF
 
 ### Multiple flannel networks
 
-Github user [YYGCui](https://github.com/YYGCui) has used multiple flannel network to work with Multus CNI plugin. Please refer to this [closed issue](https://github.com/Intel-Corp/multus-cni/issues/7) for ,multiple overlay network support with Multus CNI.
+Github user [YYGCui](https://github.com/YYGCui) has used multiple flannel network to work with Multus CNI plugin. Please refer to this [closed issue](https://github.com/intel/multus-cni/issues/7) for ,multiple overlay network support with Multus CNI.
 
 Make sure that the multus, [sriov](https://github.com/Intel-Corp/sriov-cni), [flannel](https://github.com/containernetworking/cni/blob/master/Documentation/flannel.md), and [ptp](https://github.com/containernetworking/cni/blob/master/Documentation/ptp.md) binaries are in the /opt/cni/bin directories and follow the steps as mentioned in the [CNI](https://github.com/containernetworking/cni/#running-a-docker-container-with-network-namespace-set-up-by-cni-plugins)
 
