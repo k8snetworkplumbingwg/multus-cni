@@ -1,8 +1,3 @@
-# Attention !! this is WIP for Network Plumbing WG POC & Exp works, not part of Multus Implementation
-
-* [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
-* [Dan's CRD proposal](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
-
 ![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
    * [MULTUS CNI plugin](#multus-cni-plugin)
@@ -42,6 +37,12 @@
 - Multus is one of the projects in the [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
 
 Please check the [CNI](https://github.com/containernetworking/cni) documentation for more information on container networking.
+
+# Kubernetes Network Custom Resource Definition De-facto Standard - Reference implementation
+
+* This project is a reference implementation for Kubernetes Network Custom Resource Definition De-facto Standard. For more information refer [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
+* Kubernetes Network Custom Resource Definition De-facto Standard [documentation link](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
+* Refer the reference implemenation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
 
 ## Multi-Homed pod
 <p align="center">
