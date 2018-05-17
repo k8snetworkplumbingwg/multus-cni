@@ -7,7 +7,6 @@
       * [Usage with Kubernetes CRD based network objects](#usage-with-kubernetes-crd-based-network-objects)
          * [Creating "Network" resources in Kubernetes](#creating-network-resources-in-kubernetes)
             * [<strong>CRD based Network objects</strong>](#crd-based-network-objects)
-            * [TPR based Network objects(TPR deprecated in Kubernetes 1.7)](#tpr-based-network-objects)
          * [Creating network resources in Kubernetes](#creating-network-resources-in-kubernetes-1)
          * [Configuring Multus to use the kubeconfig](#configuring-multus-to-use-the-kubeconfig)
          * [Configuring Multus to use kubeconfig and a default network](#configuring-multus-to-use-kubeconfig-and-a-default-network)
@@ -121,57 +120,6 @@ customresourcedefinition "networks.kubernetes.cni.cncf.io" created
 NAME                      KIND
 networks.kubernetes.cni.cncf.io   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 ```
-
-4. Save the following YAML to flannel-network.yaml
-
-```
-apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
-metadata:
-  name: flannel-networkobj
-spec: 
-  config: '{
-    "cniVersion": "0.3.0",
-    "type": "flannel",
-    "delegate": {
-      "isDefaultGateway": true
-    }
-  }'
-```
-
-5. Create the custom resource definition
-
-```
-# kubectl create -f customCRD/flannel-network.yaml
-network "flannel-networkobj" created
-```
-```
-# kubectl get network
-NAME                  AGE
-flannel-networkobj      26s
-```
-
-
-6. Get the custom network object details
-```
-apiVersion: kubernetes.cni.cncf.io/v1
-kind: Network
-metadata:
-  clusterName: ""
-  creationTimestamp: 2018-05-17T09:13:20Z
-  deletionGracePeriodSeconds: null
-  deletionTimestamp: null
-  initializers: null
-  name: flannel-networkobj
-  namespace: default
-  resourceVersion: "21176114"
-  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
-  uid: 8ac8f873-59b2-11e8-8308-a4bf01024e6f
-spec:
-  config: '{ "cniVersion": "0.3.0", "type": "flannel", "delegate": { "isDefaultGateway":
-    true } }'
-```
-
 For Kubernetes v1.7 and above use CRD to create network object. For version older than 1.7 use TPR based objects as shown below: 
 
 Note: Both TPR and CRD will have same selfLink : 
@@ -215,44 +163,50 @@ network.kubernetes.cni.cncf.io   A specification of a Network obj in the kuberne
 apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
-  name: flannel-conf
-plugin: flannel
-args: '[
-        {
-                "delegate": {
-                        "isDefaultGateway": true
-                }
-        }
-]'
+  name: flannel-networkobj
+spec: 
+  config: '{
+    "cniVersion": "0.3.0",
+    "type": "flannel",
+    "delegate": {
+      "isDefaultGateway": true
+    }
+  }'
 ```
-3. Run kubectl create command to create network object
-```
-# kubectl create -f ./flannel-network.yaml 
-network "flannel-conf" created
-```
-4. Show network objects using kubectl:
-```
-# kubectl get network
-NAME                         KIND
-flannel-conf                 Network.v1.kubernetes.cni.cncf.io
-```
-5. Show details of the network object:
+
+3. Create the custom resource definition
 
 ```
-# kubectl get network flannel-conf -o yaml
+# kubectl create -f customCRD/flannel-network.yaml
+network "flannel-networkobj" created
+```
+```
+# kubectl get network
+NAME                  AGE
+flannel-networkobj      26s
+```
+
+
+4. Get the custom network object details
+```
 apiVersion: kubernetes.cni.cncf.io/v1
-args: '[ { "delegate": { "isDefaultGateway": true } } ]'
 kind: Network
 metadata:
-  creationTimestamp: 2017-06-28T14:20:52Z
-  name: flannel-conf
+  clusterName: ""
+  creationTimestamp: 2018-05-17T09:13:20Z
+  deletionGracePeriodSeconds: null
+  deletionTimestamp: null
+  initializers: null
+  name: flannel-networkobj
   namespace: default
-  resourceVersion: "5422876"
-  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-conf
-  uid: fdcb94a2-5c0c-11e7-bbeb-408d5c537d27
-plugin: flannel
+  resourceVersion: "21176114"
+  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
+  uid: 8ac8f873-59b2-11e8-8308-a4bf01024e6f
+spec:
+  config: '{ "cniVersion": "0.3.0", "type": "flannel", "delegate": { "isDefaultGateway":
+    true } }'
 ```
-6. Save the following YAML to sriov-network.yaml to creating sriov network object. ( Refer to [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes)
+5. Save the following YAML to sriov-network.yaml to creating sriov network object. ( Refer to [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes)
 ```
 apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
@@ -275,7 +229,7 @@ args: '[
         }
 ]'
 ```
-7. Likewise save the following YAML to sriov-vlanid-l2enable-network.yaml to create another sriov based network object:
+6. Likewise save the following YAML to sriov-vlanid-l2enable-network.yaml to create another sriov based network object:
 
 ```
 apiVersion: "kubernetes.cni.cncf.io/v1"
@@ -292,8 +246,8 @@ args: '[
         }
 ]'
 ```
-8. Follow step 3 above to create &quot;sriov-vlanid-l2enable-conf&quot; and &quot;sriov-conf&quot; network objects
-9. View network objects using kubectl
+7. Follow step 3 above to create &quot;sriov-vlanid-l2enable-conf&quot; and &quot;sriov-conf&quot; network objects
+8. View network objects using kubectl
 ```
 # kubectl get network
 NAME                         KIND
