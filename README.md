@@ -90,10 +90,10 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
-  name: networks.kubernetes-network.cni.cncf.io
+  name: networks.kubernetes.cni.cncf.io
 spec:
   # group name to use for REST API: /apis/<group>/<version>
-  group: kubernetes-network.cni.cncf.io
+  group: kubernetes.cni.cncf.io
   # version name to use for REST API: /apis/<group>/<version>
   version: v1
   # either Namespaced or Cluster
@@ -112,30 +112,30 @@ spec:
 2. Run kubectl create command for the Custom Resource Definition
 ```
 # kubectl create -f ./crdnetwork.yaml
-customresourcedefinition "networks.kubernetes-network.cni.cncf.io" created
+customresourcedefinition "networks.kubernetes.cni.cncf.io" created
 ```
 3. Run kubectl get command to check the Network CRD creation
 ```
 # kubectl get CustomResourceDefinition
 NAME                      KIND
-networks.kubernetes-network.cni.cncf.io   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
+networks.kubernetes.cni.cncf.io   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 ```
 
 4. Save the following YAML to flannel-network.yaml
 
 ```
-apiVersion: "kubernetes-network.cni.cncf.io/v1"
+apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: flannel-networkobj
-plugin: flannel
-args: '[
-        {
-                "delegate": {
-                        "isDefaultGateway": true
-                }
-        }
-]'
+spec: 
+  config: '{
+    "cniVersion": "0.3.0",
+    "type": "flannel",
+    "delegate": {
+      "isDefaultGateway": true
+    }
+  }'
 ```
 
 5. Create the custom resource definition
@@ -146,15 +146,15 @@ network "flannel-networkobj" created
 ```
 ```
 # kubectl get network
-NAME                 KIND                        ARGS                                               PLUGIN
-flannel-networkobj   Network.v1.kubernetes-network.cni.cncf.io   [ { "delegate": { "isDefaultGateway": true } } ]   flannel
+NAME                  AGE
+flannel-networkobj      26s
 ```
 
 
 6. Get the custom network object details
 ```
 # kubectl get network flannel-networkobj -o yaml
-apiVersion: kubernetes-network.cni.cncf.io/v1
+apiVersion: kubernetes.cni.cncf.io/v1
 args: '[ { "delegate": { "isDefaultGateway": true } } ]'
 kind: Network
 metadata:
@@ -165,7 +165,7 @@ metadata:
   name: flannel-networkobj
   namespace: default
   resourceVersion: "6848829"
-  selfLink: /apis/kubernetes-network.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
+  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
   uid: 7311c965-6682-11e7-b0b9-408d5c537d27
 plugin: flannel
 ```
@@ -174,7 +174,7 @@ For Kubernetes v1.7 and above use CRD to create network object. For version olde
 
 Note: Both TPR and CRD will have same selfLink : 
 
-*/apis/kubernetes-network.cni.cncf.io/v1/namespaces/default/networks/*
+*/apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/*
 
 
 #### TPR based Network objects
@@ -185,7 +185,7 @@ Note: Both TPR and CRD will have same selfLink :
 apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 metadata:
-  name: network.kubernetes-network.cni.cncf.io
+  name: network.kubernetes.cni.cncf.io
 description: "A specification of a Network obj in the kubernetes"
 versions:
 - name: v1
@@ -195,13 +195,13 @@ versions:
 
 ```
 # kubectl create -f ./tprnetwork.yaml
-thirdpartyresource "network.kubernetes-network.cni.cncf.io" created
+thirdpartyresource "network.kubernetes.cni.cncf.io" created
 ```
 3. Run kubectl get command to check the Network TPR creation
 ```
 # kubectl get thirdpartyresource
 NAME                     DESCRIPTION                                          VERSION(S)
-network.kubernetes-network.cni.cncf.io   A specification of a Network obj in the kubernetes   v1
+network.kubernetes.cni.cncf.io   A specification of a Network obj in the kubernetes   v1
 ```
 ### Creating network resources in Kubernetes
 
@@ -210,7 +210,7 @@ network.kubernetes-network.cni.cncf.io   A specification of a Network obj in the
 2. Save the following YAML to flannel-network.yaml
 
 ```
-apiVersion: "kubernetes-network.cni.cncf.io/v1"
+apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: flannel-conf
@@ -232,13 +232,13 @@ network "flannel-conf" created
 ```
 # kubectl get network
 NAME                         KIND
-flannel-conf                 Network.v1.kubernetes-network.cni.cncf.io
+flannel-conf                 Network.v1.kubernetes.cni.cncf.io
 ```
 5. Show details of the network object:
 
 ```
 # kubectl get network flannel-conf -o yaml
-apiVersion: kubernetes-network.cni.cncf.io/v1
+apiVersion: kubernetes.cni.cncf.io/v1
 args: '[ { "delegate": { "isDefaultGateway": true } } ]'
 kind: Network
 metadata:
@@ -246,13 +246,13 @@ metadata:
   name: flannel-conf
   namespace: default
   resourceVersion: "5422876"
-  selfLink: /apis/kubernetes-network.cni.cncf.io/v1/namespaces/default/networks/flannel-conf
+  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-conf
   uid: fdcb94a2-5c0c-11e7-bbeb-408d5c537d27
 plugin: flannel
 ```
 6. Save the following YAML to sriov-network.yaml to creating sriov network object. ( Refer to [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes)
 ```
-apiVersion: "kubernetes-network.cni.cncf.io/v1"
+apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: sriov-conf
@@ -276,7 +276,7 @@ args: '[
 7. Likewise save the following YAML to sriov-vlanid-l2enable-network.yaml to create another sriov based network object:
 
 ```
-apiVersion: "kubernetes-network.cni.cncf.io/v1"
+apiVersion: "kubernetes.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: sriov-vlanid-l2enable-conf
@@ -295,9 +295,9 @@ args: '[
 ```
 # kubectl get network
 NAME                         KIND
-flannel-conf                 Network.v1.kubernetes-network.cni.cncf.io
-sriov-vlanid-l2enable-conf   Network.v1.kubernetes-network.cni.cncf.io
-sriov-conf                   Network.v1.kubernetes-network.cni.cncf.io
+flannel-conf                 Network.v1.kubernetes.cni.cncf.io
+sriov-vlanid-l2enable-conf   Network.v1.kubernetes.cni.cncf.io
+sriov-conf                   Network.v1.kubernetes.cni.cncf.io
 ```
 ### Configuring Multus to use the kubeconfig
 1. Create a Mutlus CNI configuration file on each Kubernetes node. This file should be created in: /etc/cni/net.d/multus-cni.conf with the content shown below. Use only the absolute path to point to the kubeconfig file (as it may change depending upon your cluster env). We are assuming all CNI plugin binaries are default location (`\opt\cni\bin dir`)
