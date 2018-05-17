@@ -29,11 +29,7 @@
 - Multus supports all [reference plugins](https://github.com/containernetworking/plugins) (eg. [Flannel](https://github.com/containernetworking/plugins/tree/master/plugins/meta/flannel), [DHCP](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/dhcp), [Macvlan](https://github.com/containernetworking/plugins/tree/master/plugins/main/macvlan)) that implement the CNI specification and all 3rd party plugins (eg. [Calico](https://github.com/projectcalico/cni-plugin), [Weave](https://github.com/weaveworks/weave), [Cilium](https://github.com/cilium/cilium), [Contiv](https://github.com/contiv/netplugin)). In addition to it, Multus supports [SRIOV](https://github.com/hustcat/sriov-cni), [SRIOV-DPDK](https://github.com/Intel-Corp/sriov-cni), [OVS-DPDK &amp; VPP](https://github.com/intel/vhost-user-net-plugin) workloads in Kubernetes with both cloud native and NFV based applications in Kubernetes
 - It is a contact between the container runtime and other plugins, and it doesn&#39;t have any of its own net configuration, it calls other plugins like flannel/calico to do the real net conf job.
 - Multus reuses the concept of invoking delegates as used in flannel by grouping multiple plugins into delegates and invoking them in the sequential order of the CNI configuration file provided in json format
-- Number of plugins supported is depends on the number of delegates in the configuration file.
-- The "masterplugin" is the only net conf option of multus cni, it identifies the primary network. The default route will point to the primary network
-- One of the plugin acts as a “Master” plugin and responsible for configuring k8s network with Pod interface “eth0”
-- The “Master” plugin also responsible to set the default route for the Pod
-- Any subsequent plugin gets Pod interface name as “net0”, “net1”,… “netX and so on
+- The default network gets "eth0" and additional network Pod interface name as “net0”, “net1”,… “netX and so on. Multus also support interface names from the user.
 - Multus is one of the projects in the [Baremetal Container Experience kit](https://networkbuilders.intel.com/network-technologies/container-experience-kits).
 
 Please check the [CNI](https://github.com/containernetworking/cni) documentation for more information on container networking.
@@ -42,6 +38,11 @@ Please check the [CNI](https://github.com/containernetworking/cni) documentation
 
 * This project is a reference implementation for Kubernetes Network Custom Resource Definition De-facto Standard. For more information refer [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
 * Kubernetes Network Custom Resource Definition De-facto Standard [documentation link](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
+* Reference implementation support following modes
+   * CNI config JSON in network object
+   * Not using CNI config (“thick” plugin usecase)
+   * CNI configuration stored in on-disk file
+   > refer the section 3.2 Network Object Definition for more details in Kubernetes Network Custom Resource Definition De-facto Standard
 * Refer the reference implemenation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
 * Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD specifications.
 
