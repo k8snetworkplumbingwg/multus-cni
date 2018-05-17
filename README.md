@@ -43,6 +43,7 @@ Please check the [CNI](https://github.com/containernetworking/cni) documentation
 * This project is a reference implementation for Kubernetes Network Custom Resource Definition De-facto Standard. For more information refer [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
 * Kubernetes Network Custom Resource Definition De-facto Standard [documentation link](https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit)
 * Refer the reference implemenation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
+* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD specifications.
 
 ## Multi-Homed pod
 <p align="center">
