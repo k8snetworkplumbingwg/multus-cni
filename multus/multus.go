@@ -25,8 +25,8 @@ import (
 	"os"
 	"path/filepath"
 
-	k8s "github.com/Intel-Corp/multus-cni/k8sclient"
-	"github.com/Intel-Corp/multus-cni/types"
+	k8s "github.com/intel/multus-cni/k8sclient"
+	"github.com/intel/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/skel"

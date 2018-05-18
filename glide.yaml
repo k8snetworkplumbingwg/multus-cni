@@ -1,4 +1,4 @@
-package: github.com/Intel-Corp/multus-cni
+package: github.com/intel/multus-cni
 import:
 - package: github.com/containernetworking/cni
   version: v0.5.2
