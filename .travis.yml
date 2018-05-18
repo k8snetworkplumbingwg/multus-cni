@@ -27,6 +27,23 @@ script:
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
 
+before_deploy:
+  - go get -u github.com/laher/goxc
+  - mkdir -p $TRAVIS_BUILD_DIR/dist
+  - goxc -d=$TRAVIS_BUILD_DIR/dist -pv=$TRAVIS_TAG -bc=linux -tasks=clean-destination,xc,archive,rmbin
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "iy7eqzXNvb/juc+5eVPQ/pFYDTCqDt8Zjt63n+zEK856Qzr2aEZwwOguMWs78XFDMFXagCs5PRTvtvZz8apoTfHX7Wkss3kRyEziAkuldQbH5yGDvpGyHsGBw78N95hauMoogefE7NuuLG3qRSWPeVz8RAKGhP7ADwEVyyfQKKYdum3Bqrz0D89HqKbCQqs3eZae7ppDIler3lab9WAQGuKNJ2HL6mqREVe48kb8sdsuSr+yV4qwVrBDNhXxQDxAT6LYuMXbknE7qTde2vViP13ZHpptbuZqiZG2ytzReIIs/iC9AWoIQXr3XTXl9z8fqlC3VljPCikBWVcmxDFA2aANYzx3M/7fMOO/DniwNhlZc9+pYfAkUrpoQPfPOWNqf45Qz0jP3wk49xy5hxEqe/rfmo5lipSsqeUsk+j3pT8kjVIAnDLrQpxSx7xwnijPLgtm34UwROVowfwLlOhE/7mUOFCbYlzEo3CKvjDN3Kmn35yHEueuu//Gv5jesVYvgcNPBHqaTKb5AXVTqymNBtA43PchLJ8gCC1mNukzSZifQP996vzbV5c9AxzBLjWbiDJ3lOFIpNhF8Sed0m0C0RylrTXHTX5TSrlMdXXffzYwbjJ96J+cFPBTpJNfSn+3N7hiart1r1k1bSXoPqYW4+94M8E1eZ5LjszoeiZbRrI="
+  file_glob: true
+  file: "$TRAVIS_BUILD_DIR/dist/snapshot/*/*.gz"
+  skip_cleanup: true
+  on:
+    tags: true
+    all_branches: true
+    condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
+
 after_success:
   # put build tgz to bintray
   - curl -T ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz -u${BINTRAY_USER}:${BINTRAY_APIKEY} https://api.bintray.com/content/redhat-nfvpe/multus-cni-crd-snapshots/snapshot/snapshot-${TRAVIS_COMMIT}/multus-cni_amd64-${TRAVIS_COMMIT}.tar.gz
