@@ -17,6 +17,10 @@ imports:
   version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
   subpackages:
   - pkg/ns
+- name: github.com/onsi/ginkgo
+  version: 7f8ab55aaf3b86885aa55b762e803744d1674700
+- name: github.com/onsi/gomega
+  version: 2152b45fa28a361beba9aab0885972323a444e28
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
