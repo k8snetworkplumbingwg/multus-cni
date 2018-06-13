@@ -12,6 +12,10 @@ import:
   version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
   subpackages:
   - pkg/ns
+- package: github.com/onsi/ginkgo
+  version: 7f8ab55aaf3b86885aa55b762e803744d1674700
+- package: github.com/onsi/gomega
+  version: 2152b45fa28a361beba9aab0885972323a444e28
 - package: github.com/golang/glog
 - package: github.com/vishvananda/netlink
 - package: k8s.io/client-go
