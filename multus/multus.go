@@ -26,10 +26,10 @@ import (
 	"path/filepath"
 
 	"github.com/containernetworking/cni/pkg/invoke"
-	"github.com/containernetworking/cni/pkg/ns"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/containernetworking/plugins/pkg/ns"
 	k8s "github.com/intel/multus-cni/k8sclient"
 	"github.com/intel/multus-cni/types"
 	"github.com/vishvananda/netlink"
