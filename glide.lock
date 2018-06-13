@@ -2,18 +2,21 @@ hash: 9f567f5e6122fc0f7092f9373f1cfd491978315b0d9ff01ab81cebe269ffa048
 updated: 2018-05-08T04:22:31.321965197-04:00
 imports:
 - name: github.com/containernetworking/cni
-  version: 137b4975ecab6e1f0c24c1e3c228a50a3cfba75e
+  version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
   subpackages:
   - libcni
   - pkg/invoke
   - pkg/ip
   - pkg/ipam
-  - pkg/ns
   - pkg/skel
   - pkg/types
   - pkg/types/020
   - pkg/types/current
   - pkg/version
+- name: github.com/containernetworking/plugins
+  version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
+  subpackages:
+  - pkg/ns
 - name: github.com/davecgh/go-spew
   version: 5215b55f46b2b919f50a1df0eaa5886afe4e3b3d
   subpackages:
