@@ -113,7 +113,7 @@ func delegateAdd(ifName string, delegate *types.DelegateNetConf) (cnitypes.Resul
 		return nil, fmt.Errorf("cannot set %q ifname to %q: %v", delegate.Type, ifName, err)
 	}
 
-	result, err := invoke.DelegateAdd(delegate.Type, delegate.Bytes)
+	result, err := invoke.DelegateAdd(delegate.Type, delegate.Bytes, nil)
 	if err != nil {
 		return nil, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Type, err)
 	}
@@ -126,7 +126,7 @@ func delegateDel(ifName string, delegateConf *types.DelegateNetConf) error {
 		return fmt.Errorf("Multus: error in setting CNI_IFNAME")
 	}
 
-	if err := invoke.DelegateDel(delegateConf.Type, delegateConf.Bytes); err != nil {
+	if err := invoke.DelegateDel(delegateConf.Type, delegateConf.Bytes, nil); err != nil {
 		return fmt.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Type, err)
 	}
 
@@ -200,6 +200,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 	return result.Print()
 }
 
+func cmdGet(args *skel.CmdArgs) error {
+	in, err := types.LoadNetConf(args.StdinData)
+	if err != nil {
+		return err
+	}
+
+	// FIXME: call all delegates
+
+	return in.PrevResult.Print()
+}
+
 func cmdDel(args *skel.CmdArgs) error {
 	var nopodnet bool
 
@@ -242,5 +253,5 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdGet, cmdDel, version.All, "meta-plugin that delegates to other CNI plugins")
 }
