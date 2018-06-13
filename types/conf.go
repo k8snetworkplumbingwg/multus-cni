@@ -18,6 +18,9 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/containernetworking/cni/pkg/types/current"
+	"github.com/containernetworking/cni/pkg/version"
 )
 
 const (
@@ -50,6 +53,23 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf := &NetConf{}
 	if err := json.Unmarshal(bytes, netconf); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
+	}
+
+	// Parse previous result
+	if netconf.RawPrevResult != nil {
+		resultBytes, err := json.Marshal(netconf.RawPrevResult)
+		if err != nil {
+			return nil, fmt.Errorf("could not serialize prevResult: %v", err)
+		}
+		res, err := version.NewResult(netconf.CNIVersion, resultBytes)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse prevResult: %v", err)
+		}
+		netconf.RawPrevResult = nil
+		netconf.PrevResult, err = current.NewResultFromResult(res)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert result to current version: %v", err)
+		}
 	}
 
 	// Delegates must always be set. If no kubeconfig is present, the

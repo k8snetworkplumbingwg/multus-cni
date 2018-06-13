@@ -19,12 +19,19 @@ import (
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types/current"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NetConf for cni config file written in json
 type NetConf struct {
 	types.NetConf
+
+	// support chaining for master interface and IP decisions
+	// occurring prior to running ipvlan plugin
+	RawPrevResult *map[string]interface{} `json:"prevResult"`
+	PrevResult    *current.Result         `json:"-"`
+
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
