@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/containernetworking/cni/libcni"
@@ -38,8 +39,22 @@ type NoK8sNetworkError struct {
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }
 
-func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
+type defaultKubeClient struct {
+	client kubernetes.Interface
+}
 
+// defaultKubeClient implements KubeClient
+var _ KubeClient = &defaultKubeClient{}
+
+func (d *defaultKubeClient) GetRawWithPath(path string) ([]byte, error) {
+	return d.client.ExtensionsV1beta1().RESTClient().Get().AbsPath(path).DoRaw()
+}
+
+func (d *defaultKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
+	return d.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+}
+
+func createK8sClient(kubeconfig string) (KubeClient, error) {
 	// uses the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
@@ -47,14 +62,19 @@ func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
 	}
 
 	// creates the clientset
-	return kubernetes.NewForConfig(config)
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &defaultKubeClient{client: client}, nil
 }
 
-func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs types.K8sArgs) (string, error) {
+func getPodNetworkAnnotation(client KubeClient, k8sArgs types.K8sArgs) (string, error) {
 	var annot string
 	var err error
 
-	pod, err := client.Pods(string(k8sArgs.K8S_POD_NAMESPACE)).Get(fmt.Sprintf("%s", string(k8sArgs.K8S_POD_NAME)), metav1.GetOptions{})
+	pod, err := client.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 	if err != nil {
 		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
 	}
@@ -268,7 +288,7 @@ func getNetObject(net types.Network, primary bool, ifname string, confdir string
 	return config, nil
 }
 
-func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface{}, primary bool, confdir string) (string, error) {
+func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary bool, confdir string) (string, error) {
 	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
@@ -281,7 +301,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 
 	tprclient := fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", netNsName, networkname)
 
-	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
+	netobjdata, err := client.GetRawWithPath(tprclient)
 	if err != nil {
 		return "", fmt.Errorf("getnetplugin: failed to get CRD (result: %s), refer Multus README.md for the usage guide: %v", netobjdata, err)
 	}
@@ -304,7 +324,7 @@ func getnetplugin(client *kubernetes.Clientset, networkinfo map[string]interface
 	return netargs, nil
 }
 
-func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interface{}, confdir string) (string, error) {
+func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confdir string) (string, error) {
 
 	var np string
 	var err error
@@ -352,7 +372,12 @@ func getMultusDelegates(delegate string) ([]*types.DelegateNetConf, error) {
 	return n.Delegates, nil
 }
 
-func GetK8sNetwork(args *skel.CmdArgs, kubeconfig, confdir string) ([]*types.DelegateNetConf, error) {
+type KubeClient interface {
+	GetRawWithPath(path string) ([]byte, error)
+	GetPod(namespace, name string) (*v1.Pod, error)
+}
+
+func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, k8sclient KubeClient, confdir string) ([]*types.DelegateNetConf, error) {
 	k8sArgs := types.K8sArgs{}
 
 	err := cnitypes.LoadArgs(args.Args, &k8sArgs)
@@ -360,9 +385,11 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig, confdir string) ([]*types.Del
 		return nil, err
 	}
 
-	k8sclient, err := createK8sClient(kubeconfig)
-	if err != nil {
-		return nil, err
+	if k8sclient == nil {
+		k8sclient, err = createK8sClient(kubeconfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	netAnnot, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
