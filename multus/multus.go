@@ -148,7 +148,7 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
-func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
+func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
 	var nopodnet bool
 	n, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
@@ -156,7 +156,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
 	}
 
 	if n.Kubeconfig != "" {
-		delegates, err := k8s.GetK8sNetwork(args, n.Kubeconfig, n.ConfDir)
+		delegates, err := k8s.GetK8sNetwork(args, n.Kubeconfig, kubeClient, n.ConfDir)
 		if err != nil {
 			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
 				nopodnet = true
@@ -201,7 +201,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
 	return result, nil
 }
 
-func cmdGet(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
+func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
 		return nil, err
@@ -212,7 +212,7 @@ func cmdGet(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
 	return in.PrevResult, nil
 }
 
-func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
+func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) error {
 	var nopodnet bool
 
 	in, err := types.LoadNetConf(args.StdinData)
@@ -221,12 +221,12 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
 	}
 
 	if in.Kubeconfig != "" {
-		delegates, r := k8s.GetK8sNetwork(args, in.Kubeconfig, in.ConfDir)
-		if r != nil {
-			if _, ok := r.(*k8s.NoK8sNetworkError); ok {
+		delegates, err := k8s.GetK8sNetwork(args, in.Kubeconfig, kubeClient, in.ConfDir)
+		if err != nil {
+			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
 				nopodnet = true
 			} else {
-				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", r)
+				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
 			}
 		}
 
@@ -256,19 +256,19 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
 func main() {
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
-			result, err := cmdAdd(args, nil)
+			result, err := cmdAdd(args, nil, nil)
 			if err != nil {
 				return err
 			}
 			return result.Print()
 		},
 		func(args *skel.CmdArgs) error {
-			result, err := cmdGet(args, nil)
+			result, err := cmdGet(args, nil, nil)
 			if err != nil {
 				return err
 			}
 			return result.Print()
 		},
-		func(args *skel.CmdArgs) error { return cmdDel(args, nil) },
+		func(args *skel.CmdArgs) error { return cmdDel(args, nil, nil) },
 		version.All, "meta-plugin that delegates to other CNI plugins")
 }
