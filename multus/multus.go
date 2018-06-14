@@ -148,11 +148,11 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
-func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) error {
+func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
 	var nopodnet bool
 	n, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
-		return fmt.Errorf("err in loading netconf: %v", err)
+		return nil, fmt.Errorf("err in loading netconf: %v", err)
 	}
 
 	if n.Kubeconfig != "" {
@@ -161,18 +161,18 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) error {
 			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
 				nopodnet = true
 			} else {
-				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
+				return nil, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
 			}
 		}
 
 		if err = n.AddDelegates(delegates); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	if n.Kubeconfig == "" || nopodnet {
 		if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
-			return fmt.Errorf("Multus: Err in saving the delegates: %v", err)
+			return nil, fmt.Errorf("Multus: Err in saving the delegates: %v", err)
 		}
 	}
 
@@ -191,24 +191,25 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) error {
 			result = tmpResult
 		}
 	}
+
 	if err != nil {
 		// Ignore errors; DEL must be idempotent anyway
 		_ = delPlugins(exec, args.IfName, n.Delegates, lastIdx)
-		return err
+		return nil, err
 	}
 
-	return result.Print()
+	return result, nil
 }
 
-func cmdGet(args *skel.CmdArgs, exec invoke.Exec) error {
+func cmdGet(args *skel.CmdArgs, exec invoke.Exec) (cnitypes.Result, error) {
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// FIXME: call all delegates
 
-	return in.PrevResult.Print()
+	return in.PrevResult, nil
 }
 
 func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
@@ -254,8 +255,20 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
 
 func main() {
 	skel.PluginMain(
-		func(args *skel.CmdArgs) error { return cmdAdd(args, nil) },
-		func(args *skel.CmdArgs) error { return cmdGet(args, nil) },
+		func(args *skel.CmdArgs) error {
+			result, err := cmdAdd(args, nil)
+			if err != nil {
+				return err
+			}
+			return result.Print()
+		},
+		func(args *skel.CmdArgs) error {
+			result, err := cmdGet(args, nil)
+			if err != nil {
+				return err
+			}
+			return result.Print()
+		},
 		func(args *skel.CmdArgs) error { return cmdDel(args, nil) },
 		version.All, "meta-plugin that delegates to other CNI plugins")
 }
