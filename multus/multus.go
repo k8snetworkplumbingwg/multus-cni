@@ -104,7 +104,7 @@ func validateIfName(nsname string, ifname string) error {
 	return err
 }
 
-func delegateAdd(ifName string, delegate *types.DelegateNetConf) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetConf) (cnitypes.Result, error) {
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, fmt.Errorf("Multus: error in setting CNI_IFNAME")
 	}
@@ -113,7 +113,7 @@ func delegateAdd(ifName string, delegate *types.DelegateNetConf) (cnitypes.Resul
 		return nil, fmt.Errorf("cannot set %q ifname to %q: %v", delegate.Type, ifName, err)
 	}
 
-	result, err := invoke.DelegateAdd(delegate.Type, delegate.Bytes, nil)
+	result, err := invoke.DelegateAdd(delegate.Type, delegate.Bytes, exec)
 	if err != nil {
 		return nil, fmt.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Type, err)
 	}
@@ -121,26 +121,26 @@ func delegateAdd(ifName string, delegate *types.DelegateNetConf) (cnitypes.Resul
 	return result, nil
 }
 
-func delegateDel(ifName string, delegateConf *types.DelegateNetConf) error {
+func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNetConf) error {
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return fmt.Errorf("Multus: error in setting CNI_IFNAME")
 	}
 
-	if err := invoke.DelegateDel(delegateConf.Type, delegateConf.Bytes, nil); err != nil {
+	if err := invoke.DelegateDel(delegateConf.Type, delegateConf.Bytes, exec); err != nil {
 		return fmt.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Type, err)
 	}
 
 	return nil
 }
 
-func delPlugins(argIfname string, delegates []*types.DelegateNetConf, lastIdx int) error {
+func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateNetConf, lastIdx int) error {
 	if os.Setenv("CNI_COMMAND", "DEL") != nil {
 		return fmt.Errorf("Multus: error in setting CNI_COMMAND to DEL")
 	}
 
 	for idx := lastIdx; idx >= 0; idx-- {
 		ifName := getIfname(delegates[idx], argIfname, idx)
-		if err := delegateDel(ifName, delegates[idx]); err != nil {
+		if err := delegateDel(exec, ifName, delegates[idx]); err != nil {
 			return err
 		}
 	}
@@ -148,7 +148,7 @@ func delPlugins(argIfname string, delegates []*types.DelegateNetConf, lastIdx in
 	return nil
 }
 
-func cmdAdd(args *skel.CmdArgs) error {
+func cmdAdd(args *skel.CmdArgs, exec invoke.Exec) error {
 	var nopodnet bool
 	n, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
@@ -181,7 +181,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	for idx, delegate := range n.Delegates {
 		lastIdx = idx
 		ifName := getIfname(delegate, args.IfName, idx)
-		tmpResult, err = delegateAdd(ifName, delegate)
+		tmpResult, err = delegateAdd(exec, ifName, delegate)
 		if err != nil {
 			break
 		}
@@ -193,14 +193,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	if err != nil {
 		// Ignore errors; DEL must be idempotent anyway
-		_ = delPlugins(args.IfName, n.Delegates, lastIdx)
+		_ = delPlugins(exec, args.IfName, n.Delegates, lastIdx)
 		return err
 	}
 
 	return result.Print()
 }
 
-func cmdGet(args *skel.CmdArgs) error {
+func cmdGet(args *skel.CmdArgs, exec invoke.Exec) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
 		return err
@@ -211,7 +211,7 @@ func cmdGet(args *skel.CmdArgs) error {
 	return in.PrevResult.Print()
 }
 
-func cmdDel(args *skel.CmdArgs) error {
+func cmdDel(args *skel.CmdArgs, exec invoke.Exec) error {
 	var nopodnet bool
 
 	in, err := types.LoadNetConf(args.StdinData)
@@ -249,9 +249,13 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	return delPlugins(args.IfName, in.Delegates, len(in.Delegates)-1)
+	return delPlugins(exec, args.IfName, in.Delegates, len(in.Delegates)-1)
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdGet, cmdDel, version.All, "meta-plugin that delegates to other CNI plugins")
+	skel.PluginMain(
+		func(args *skel.CmdArgs) error { return cmdAdd(args, nil) },
+		func(args *skel.CmdArgs) error { return cmdGet(args, nil) },
+		func(args *skel.CmdArgs) error { return cmdDel(args, nil) },
+		version.All, "meta-plugin that delegates to other CNI plugins")
 }
