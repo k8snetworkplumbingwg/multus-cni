@@ -70,16 +70,15 @@ func createK8sClient(kubeconfig string) (KubeClient, error) {
 	return &defaultKubeClient{client: client}, nil
 }
 
-func getPodNetworkAnnotation(client KubeClient, k8sArgs types.K8sArgs) (string, error) {
-	var annot string
+func getPodNetworkAnnotation(client KubeClient, k8sArgs types.K8sArgs) (string, string, error) {
 	var err error
 
 	pod, err := client.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 	if err != nil {
-		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
+		return "", "", fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
 	}
 
-	return pod.Annotations["kubernetes.v1.cni.cncf.io/networks"], nil
+	return pod.Annotations["kubernetes.v1.cni.cncf.io/networks"], pod.ObjectMeta.Namespace, nil
 }
 
 func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
@@ -288,13 +287,13 @@ func getNetObject(net types.Network, primary bool, ifname string, confdir string
 	return config, nil
 }
 
-func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary bool, confdir string) (string, error) {
+func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary bool, confdir, defaultNamespace string) (string, error) {
 	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	netNsName := "default"
+	netNsName := defaultNamespace
 	if networkinfo["namespace"] != nil {
 		netNsName = networkinfo["namespace"].(string)
 	}
@@ -324,7 +323,7 @@ func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary
 	return netargs, nil
 }
 
-func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confdir string) (string, error) {
+func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confdir, defaultNamespace string) (string, error) {
 
 	var np string
 	var err error
@@ -339,7 +338,7 @@ func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confd
 			primary = true
 		}
 
-		np, err = getnetplugin(client, net, primary, confdir)
+		np, err = getnetplugin(client, net, primary, confdir, defaultNamespace)
 		if err != nil {
 			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
 		}
@@ -392,7 +391,7 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, k8sclient KubeClient, 
 		}
 	}
 
-	netAnnot, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
+	netAnnot, defaultNamespace, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +405,7 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, k8sclient KubeClient, 
 		return nil, err
 	}
 
-	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs, confdir)
+	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs, confdir, defaultNamespace)
 	if err != nil {
 		return nil, err
 	}
