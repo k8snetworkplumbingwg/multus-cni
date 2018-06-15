@@ -160,7 +160,7 @@ func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) 
 	return podNet, nil
 }
 
-func getCNIConfig(name string, primary bool, ifname string, confdir string) (string, error) {
+func getCNIConfig(name string, ifname string, confdir string) (string, error) {
 
 	// In the absence of valid keys in a Spec, the runtime (or
 	// meta-plugin) should load and execute a CNI .configlist
@@ -191,7 +191,7 @@ func getCNIConfig(name string, primary bool, ifname string, confdir string) (str
 				return "", fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
 			}
 
-			return getConfig(string(conf.Bytes[:]), primary, ifname), nil
+			return getConfig(string(conf.Bytes[:]), ifname), nil
 
 		}
 	}
@@ -199,14 +199,10 @@ func getCNIConfig(name string, primary bool, ifname string, confdir string) (str
 	return "", fmt.Errorf("no network available in the name %s in cni dir %s", name, confdir)
 }
 
-func getPlugin(plugin string, name string, primary bool, ifname string) string {
+func getPlugin(plugin string, name string, ifname string) string {
 	tmpconfig := []string{}
 
 	tmpconfig = append(tmpconfig, fmt.Sprintf(`{"cniVersion": "0.3.1" , "name": "%s", "type": "%s"`, name, plugin))
-
-	if primary != false {
-		tmpconfig = append(tmpconfig, `, "masterplugin": true`)
-	}
 
 	if ifname != "" {
 		tmpconfig = append(tmpconfig, fmt.Sprintf(`, "ifnameRequest": "%s"`, ifname))
@@ -218,15 +214,11 @@ func getPlugin(plugin string, name string, primary bool, ifname string) string {
 
 }
 
-func getConfig(config string, primary bool, ifname string) string {
+func getConfig(config string, ifname string) string {
 	tmpconfig := []string{}
 
 	config = strings.TrimSpace(config)
 	tmpconfig = append(tmpconfig, config[:1])
-
-	if primary != false {
-		tmpconfig = append(tmpconfig, ` "masterplugin": true,`)
-	}
 
 	if ifname != "" {
 		tmpconfig = append(tmpconfig, fmt.Sprintf(` "ifnameRequest": "%s",`, ifname))
@@ -238,7 +230,7 @@ func getConfig(config string, primary bool, ifname string) string {
 
 }
 
-func getNetSpec(ns types.NetworkSpec, name string, primary bool, ifname string) (string, error) {
+func getNetSpec(ns types.NetworkSpec, name string, ifname string) (string, error) {
 
 	if ns.Plugin == "" && ns.Config == "" {
 		return "", fmt.Errorf("Network Object spec plugin and config can't be empty")
@@ -257,28 +249,28 @@ func getNetSpec(ns types.NetworkSpec, name string, primary bool, ifname string) 
 		//   { “cniVersion”: “0.3.1”, “type”: <Plugin>, “name”: <Network.Name> }
 		// and any additional “runtimeConfig” field per the
 		// CNI specification and conventions.
-		return getPlugin(ns.Plugin, name, primary, ifname), nil
+		return getPlugin(ns.Plugin, name, ifname), nil
 	}
 
 	// Config contains a standard JSON-encoded CNI configuration
 	// or configuration list which defines the plugin chain to
 	// execute.  If present, this key takes precedence over
 	// ‘Plugin’.
-	return getConfig(ns.Config, primary, ifname), nil
+	return getConfig(ns.Config, ifname), nil
 
 }
 
-func getNetObject(net types.Network, primary bool, ifname string, confdir string) (string, error) {
+func getNetObject(net types.Network, ifname string, confdir string) (string, error) {
 	var config string
 	var err error
 
 	if (types.NetworkSpec{}) == net.Spec {
-		config, err = getCNIConfig(net.Metadata.Name, primary, ifname, confdir)
+		config, err = getCNIConfig(net.Metadata.Name, ifname, confdir)
 		if err != nil {
 			return "", fmt.Errorf("getNetObject: err in getCNIConfig: %v", err)
 		}
 	} else {
-		config, err = getNetSpec(net.Spec, net.Metadata.Name, primary, ifname)
+		config, err = getNetSpec(net.Spec, net.Metadata.Name, ifname)
 		if err != nil {
 			return "", fmt.Errorf("getNetObject: err in getNetSpec: %v", err)
 		}
@@ -287,7 +279,7 @@ func getNetObject(net types.Network, primary bool, ifname string, confdir string
 	return config, nil
 }
 
-func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary bool, confdir, defaultNamespace string) (string, error) {
+func getnetplugin(client KubeClient, networkinfo map[string]interface{}, confdir, defaultNamespace string) (string, error) {
 	networkname := networkinfo["name"].(string)
 	if networkname == "" {
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
@@ -315,7 +307,7 @@ func getnetplugin(client KubeClient, networkinfo map[string]interface{}, primary
 		ifnameRequest = networkinfo["interfaceRequest"].(string)
 	}
 
-	netargs, err := getNetObject(netobj, primary, ifnameRequest, confdir)
+	netargs, err := getNetObject(netobj, ifnameRequest, confdir)
 	if err != nil {
 		return "", err
 	}
@@ -332,13 +324,7 @@ func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confd
 	str.WriteString("[")
 
 	for index, net := range netObjs {
-		var primary bool
-
-		if index == 0 {
-			primary = true
-		}
-
-		np, err = getnetplugin(client, net, primary, confdir, defaultNamespace)
+		np, err = getnetplugin(client, net, confdir, defaultNamespace)
 		if err != nil {
 			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
 		}
