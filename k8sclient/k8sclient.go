@@ -15,7 +15,6 @@
 package k8sclient
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -120,44 +119,44 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	return netNsName, networkName, netIfName, nil
 }
 
-func parsePodNetworkObject(podnetwork string) ([]map[string]interface{}, error) {
-	var podNet []map[string]interface{}
+func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
+	var networks []*types.NetworkSelectionElement
 
-	if podnetwork == "" {
-		return nil, fmt.Errorf("parsePodNetworkObject: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
+	if podNetworks == "" {
+		return nil, fmt.Errorf("parsePodNetworkAnnotation: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
 	}
 
-	// Parse the podnetwork string, and assume it is JSON.
-	if err := json.Unmarshal([]byte(podnetwork), &podNet); err != nil {
-
-		// If JSON doesn't parse, assume comma-delimited.
-		commaItems := strings.Split(podnetwork, ",")
-
-		// Build a map from the comma delimited items.
-		for i := range commaItems {
-
+	if strings.IndexAny(podNetworks, "[{\"") >= 0 {
+		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
+			return nil, fmt.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
+		}
+	} else {
+		// Comma-delimited list of network attachment object names
+		for _, item := range strings.Split(podNetworks, ",") {
 			// Remove leading and trailing whitespace.
-			commaItems[i] = strings.TrimSpace(commaItems[i])
+			item = strings.TrimSpace(item)
 
 			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
-			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(commaItems[i])
+			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(item)
 			if err != nil {
-				return nil, fmt.Errorf("parsePodNetworkObject: %v", err)
-			}
-			m := make(map[string]interface{})
-			m["name"] = networkName
-			if netNsName != "" {
-				m["namespace"] = netNsName
-			}
-			if netIfName != "" {
-				m["interfaceRequest"] = netIfName
+				return nil, fmt.Errorf("parsePodNetworkAnnotation: %v", err)
 			}
 
-			podNet = append(podNet, m)
+			networks = append(networks, &types.NetworkSelectionElement{
+				Name:             networkName,
+				Namespace:        netNsName,
+				InterfaceRequest: netIfName,
+			})
 		}
 	}
 
-	return podNet, nil
+	for _, net := range networks {
+		if net.Namespace == "" {
+			net.Namespace = defaultNamespace
+		}
+	}
+
+	return networks, nil
 }
 
 func getCNIConfig(name string, ifname string, confdir string) (string, error) {
@@ -173,9 +172,9 @@ func getCNIConfig(name string, ifname string, confdir string) (string, error) {
 	files, err := libcni.ConfFiles(confdir, []string{".conf", ".json"})
 	switch {
 	case err != nil:
-		fmt.Errorf("No networks found in %s", confdir)
+		return "", fmt.Errorf("No networks found in %s", confdir)
 	case len(files) == 0:
-		fmt.Errorf("No networks found in %s", confdir)
+		return "", fmt.Errorf("No networks found in %s", confdir)
 	}
 
 	for _, confFile := range files {
@@ -260,101 +259,53 @@ func getNetSpec(ns types.NetworkSpec, name string, ifname string) (string, error
 
 }
 
-func getNetObject(net types.Network, ifname string, confdir string) (string, error) {
+func cniConfigFromNetworkResource(customResource *types.Network, net *types.NetworkSelectionElement, confdir string) (string, error) {
 	var config string
 	var err error
 
-	if (types.NetworkSpec{}) == net.Spec {
-		config, err = getCNIConfig(net.Metadata.Name, ifname, confdir)
+	if (types.NetworkSpec{}) == customResource.Spec {
+		// Network Spec empty; generate delegate from CNI JSON config
+		// from the configuration directory that has the same network
+		// name as the custom resource
+		config, err = getCNIConfig(customResource.Metadata.Name, net.InterfaceRequest, confdir)
 		if err != nil {
-			return "", fmt.Errorf("getNetObject: err in getCNIConfig: %v", err)
+			return "", fmt.Errorf("cniConfigFromNetworkResource: err in getCNIConfig: %v", err)
 		}
 	} else {
-		config, err = getNetSpec(net.Spec, net.Metadata.Name, ifname)
+		// Generate delegate from CNI configuration embedded in the
+		// custom resource
+		config, err = getNetSpec(customResource.Spec, customResource.Metadata.Name, net.InterfaceRequest)
 		if err != nil {
-			return "", fmt.Errorf("getNetObject: err in getNetSpec: %v", err)
+			return "", fmt.Errorf("cniConfigFromNetworkResource: err in getNetSpec: %v", err)
 		}
 	}
 
 	return config, nil
 }
 
-func getnetplugin(client KubeClient, networkinfo map[string]interface{}, confdir, defaultNamespace string) (string, error) {
-	networkname := networkinfo["name"].(string)
-	if networkname == "" {
-		return "", fmt.Errorf("getnetplugin: network name can't be empty")
-	}
-
-	netNsName := defaultNamespace
-	if networkinfo["namespace"] != nil {
-		netNsName = networkinfo["namespace"].(string)
-	}
-
-	tprclient := fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", netNsName, networkname)
-
-	netobjdata, err := client.GetRawWithPath(tprclient)
+func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string) (*types.DelegateNetConf, error) {
+	rawPath := fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", net.Namespace, net.Name)
+	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		return "", fmt.Errorf("getnetplugin: failed to get CRD (result: %s), refer Multus README.md for the usage guide: %v", netobjdata, err)
+		return nil, fmt.Errorf("getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
 	}
 
-	netobj := types.Network{}
-	if err := json.Unmarshal(netobjdata, &netobj); err != nil {
-		return "", fmt.Errorf("getnetplugin: failed to get the netplugin data: %v", err)
+	customResource := &types.Network{}
+	if err := json.Unmarshal(netData, customResource); err != nil {
+		return nil, fmt.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
 
-	ifnameRequest := ""
-	if networkinfo["interfaceRequest"] != nil {
-		ifnameRequest = networkinfo["interfaceRequest"].(string)
-	}
-
-	netargs, err := getNetObject(netobj, ifnameRequest, confdir)
+	cniConfig, err := cniConfigFromNetworkResource(customResource, net, confdir)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return netargs, nil
-}
-
-func getPodNetworkObj(client KubeClient, netObjs []map[string]interface{}, confdir, defaultNamespace string) (string, error) {
-
-	var np string
-	var err error
-
-	var str bytes.Buffer
-	str.WriteString("[")
-
-	for index, net := range netObjs {
-		np, err = getnetplugin(client, net, confdir, defaultNamespace)
-		if err != nil {
-			return "", fmt.Errorf("getPodNetworkObj: failed in getting the netplugin: %v", err)
-		}
-
-		str.WriteString(np)
-		if index != (len(netObjs) - 1) {
-			str.WriteString(",")
-		}
-	}
-
-	str.WriteString("]")
-	netconf := str.String()
-	return netconf, nil
-}
-
-func getMultusDelegates(delegate string) ([]*types.DelegateNetConf, error) {
-	if delegate == "" {
-		return nil, fmt.Errorf("getMultusDelegates: TPR network obj data can't be empty")
-	}
-
-	n, err := types.LoadNetConf([]byte("{\"delegates\": " + delegate + "}"))
+	delegate, err := types.LoadDelegateNetConf([]byte(cniConfig))
 	if err != nil {
-		return nil, fmt.Errorf("getMultusDelegates: failed to load netconf for delegate %v: %v", delegate, err)
+		return nil, err
 	}
 
-	if len(n.Delegates) == 0 {
-		return nil, fmt.Errorf(`getMultusDelegates: "delegates" is must, refer Multus README.md for the usage guide`)
-	}
-
-	return n.Delegates, nil
+	return delegate, nil
 }
 
 type KubeClient interface {
@@ -386,15 +337,20 @@ func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, k8sclient KubeClient, 
 		return nil, &NoK8sNetworkError{"no kubernetes network found"}
 	}
 
-	netObjs, err := parsePodNetworkObject(netAnnot)
+	networks, err := parsePodNetworkAnnotation(netAnnot, defaultNamespace)
 	if err != nil {
 		return nil, err
 	}
 
-	multusDelegates, err := getPodNetworkObj(k8sclient, netObjs, confdir, defaultNamespace)
-	if err != nil {
-		return nil, err
+	// Read all network objects referenced by 'networks'
+	var delegates []*types.DelegateNetConf
+	for _, net := range networks {
+		delegate, err := getKubernetesDelegate(k8sclient, net, confdir)
+		if err != nil {
+			return nil, fmt.Errorf("GetK8sNetwork: failed getting the delegate: %v", err)
+		}
+		delegates = append(delegates, delegate)
 	}
 
-	return getMultusDelegates(multusDelegates)
+	return delegates, nil
 }
