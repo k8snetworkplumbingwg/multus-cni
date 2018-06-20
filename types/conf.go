@@ -28,17 +28,12 @@ const (
 	defaultConfDir = "/etc/cni/multus/net.d"
 )
 
-// Convert a raw delegate config map into a DelegateNetConf structure
-func loadDelegateNetConf(rawConf map[string]interface{}) (*DelegateNetConf, error) {
-	bytes, err := json.Marshal(rawConf)
-	if err != nil {
-		return nil, fmt.Errorf("error marshalling delegate config: %v", err)
-	}
+// Convert raw CNI JSON into a DelegateNetConf structure
+func LoadDelegateNetConf(bytes []byte) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
-	if err = json.Unmarshal(bytes, delegateConf); err != nil {
+	if err := json.Unmarshal(bytes, delegateConf); err != nil {
 		return nil, fmt.Errorf("error unmarshalling delegate config: %v", err)
 	}
-	delegateConf.RawConfig = rawConf
 	delegateConf.Bytes = bytes
 
 	// Do some minimal validation
@@ -90,7 +85,11 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	for idx, rawConf := range netconf.RawDelegates {
-		delegateConf, err := loadDelegateNetConf(rawConf)
+		bytes, err := json.Marshal(rawConf)
+		if err != nil {
+			return nil, fmt.Errorf("error marshalling delegate %d config: %v", idx, err)
+		}
+		delegateConf, err := LoadDelegateNetConf(bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load delegate %d config: %v", idx, err)
 		}
@@ -102,21 +101,6 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf.Delegates[0].MasterPlugin = true
 
 	return netconf, nil
-}
-
-func (d *DelegateNetConf) updateRawConfig() error {
-	if d.IfnameRequest != "" {
-		d.RawConfig["ifnameRequest"] = d.IfnameRequest
-	} else {
-		delete(d.RawConfig, "ifnameRequest")
-	}
-
-	bytes, err := json.Marshal(d.RawConfig)
-	if err != nil {
-		return err
-	}
-	d.Bytes = bytes
-	return nil
 }
 
 // AddDelegates appends the new delegates to the delegates list
