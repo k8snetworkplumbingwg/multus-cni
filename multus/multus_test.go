@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -43,10 +44,11 @@ func TestMultus(t *testing.T) {
 }
 
 type fakePlugin struct {
-	expectedEnv  []string
-	expectedConf string
-	result       cnitypes.Result
-	err          error
+	expectedEnv    []string
+	expectedConf   string
+	expectedIfname string
+	result         cnitypes.Result
+	err            error
 }
 
 type fakeExec struct {
@@ -57,12 +59,13 @@ type fakeExec struct {
 	plugins  []*fakePlugin
 }
 
-func (f *fakeExec) addPlugin(expectedEnv []string, expectedConf string, result *types020.Result, err error) {
+func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf string, result *types020.Result, err error) {
 	f.plugins = append(f.plugins, &fakePlugin{
-		expectedEnv:  expectedEnv,
-		expectedConf: expectedConf,
-		result:       result,
-		err:          err,
+		expectedEnv:    expectedEnv,
+		expectedConf:   expectedConf,
+		expectedIfname: expectedIfname,
+		result:         result,
+		err:            err,
 	})
 }
 
@@ -81,6 +84,19 @@ func matchArray(a1, a2 []string) {
 	}
 }
 
+// When faking plugin execution the ExecPlugin() call environ is not populated
+// (while it would be for real exec). Filter the environment variables for
+// CNI-specific ones that testcases will care about.
+func gatherCNIEnv() []string {
+	filtered := make([]string, 0)
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "CNI_") {
+			filtered = append(filtered, env)
+		}
+	}
+	return filtered
+}
+
 func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
 	cmd := os.Getenv("CNI_COMMAND")
 	var index int
@@ -91,8 +107,7 @@ func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []str
 		f.addIndex++
 	case "DEL":
 		Expect(len(f.plugins)).To(BeNumerically(">", f.delIndex))
-		// +1 to skip loopback since it isn't run on DEL
-		index = f.delIndex + 1
+		index = len(f.plugins) - f.delIndex - 1
 		f.delIndex++
 	default:
 		// Should never be reached
@@ -105,8 +120,11 @@ func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []str
 	if plugin.expectedConf != "" {
 		Expect(string(stdinData)).To(MatchJSON(plugin.expectedConf))
 	}
+	if plugin.expectedIfname != "" {
+		Expect(os.Getenv("CNI_IFNAME")).To(Equal(plugin.expectedIfname))
+	}
 	if len(plugin.expectedEnv) > 0 {
-		matchArray(environ, plugin.expectedEnv)
+		matchArray(gatherCNIEnv(), plugin.expectedEnv)
 	}
 
 	if plugin.err != nil {
@@ -179,7 +197,7 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "weave-net"
 }`
-		fExec.addPlugin(nil, expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -192,7 +210,7 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "other-plugin"
 }`
-		fExec.addPlugin(nil, expectedConf2, expectedResult2, nil)
+		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -202,6 +220,12 @@ var _ = Describe("multus operations", func() {
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		os.Setenv("CNI_COMMAND", "DEL")
+		os.Setenv("CNI_IFNAME", "eth0")
+		err = cmdDel(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
 
 	It("executes delegates and kubernetes networks", func() {
@@ -250,14 +274,14 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "weave-net"
 }`
-		fExec.addPlugin(nil, expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, net1, &types020.Result{
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 		}, nil)
-		fExec.addPlugin(nil, net2, &types020.Result{
+		fExec.addPlugin(nil, "net2", net2, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),
