@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/intel/multus-cni/logging"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 )
@@ -48,6 +49,14 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf := &NetConf{}
 	if err := json.Unmarshal(bytes, netconf); err != nil {
 		return nil, fmt.Errorf("failed to load netconf: %v", err)
+	}
+
+	// Logging
+	if netconf.Logging != "" {
+		logging.SetLogFile(netconf.Logging)
+	}
+	if netconf.LoggingLevel != "" {
+		logging.SetLogLevel(netconf.LoggingLevel)
 	}
 
 	// Parse previous result
