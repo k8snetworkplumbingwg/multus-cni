@@ -23,7 +23,7 @@ before_script:
 #  - gocyclo -over 15 ./multus
 
 script:
-  - ./build
+  - ./build.sh
   - sudo ./test.sh
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
