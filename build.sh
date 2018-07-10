@@ -12,6 +12,10 @@ fi
 export GO15VENDOREXPERIMENT=1
 export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
+export GO="${GO:-go}"
+
+mkdir -p "${PWD}/bin"
 
 echo "Building plugins"
-go install "$@" ${REPO_PATH}/multus
+BUILD="$GO build "$@" -o "${PWD}/bin/multus" "$REPO_PATH"/multus"
+eval $BUILD
