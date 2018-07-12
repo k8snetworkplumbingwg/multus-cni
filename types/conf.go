@@ -52,11 +52,11 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	// Logging
-	if netconf.Logging != "" {
-		logging.SetLogFile(netconf.Logging)
+	if netconf.LogFile != "" {
+		logging.SetLogFile(netconf.LogFile)
 	}
-	if netconf.LoggingLevel != "" {
-		logging.SetLogLevel(netconf.LoggingLevel)
+	if netconf.LogLevel != "" {
+		logging.SetLogLevel(netconf.LogLevel)
 	}
 
 	// Parse previous result
