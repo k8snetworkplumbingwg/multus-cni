@@ -64,7 +64,7 @@ func (f *FakeKubeClient) AddNetConfig(namespace, name, data string) {
 }`, namespace, name, strings.Replace(data, "\"", "\\\"", -1))
 	cr = strings.Replace(cr, "\n", "", -1)
 	cr = strings.Replace(cr, "\t", "", -1)
-	f.nets[fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", namespace, name)] = cr
+	f.nets[fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
 }
 
 func (f *FakeKubeClient) AddNetFile(namespace, name, filePath, fileData string) {
@@ -76,7 +76,7 @@ func (f *FakeKubeClient) AddNetFile(namespace, name, filePath, fileData string) 
     "name": "%s"
   }
 }`, namespace, name)
-	f.nets[fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", namespace, name)] = cr
+	f.nets[fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
 
 	err := ioutil.WriteFile(filePath, []byte(fileData), 0600)
 	Expect(err).NotTo(HaveOccurred())

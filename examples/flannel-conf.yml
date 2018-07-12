@@ -1,5 +1,5 @@
 apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: flannel-conf
 spec: 
