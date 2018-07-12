@@ -13,6 +13,7 @@
          * [Configuring Pod to use the CRD network objects](#configuring-pod-to-use-the-crd-network-objects)
          * [Verifying Pod network interfaces](#verifying-pod-network-interfaces)
       * [Using with Multus conf file](#using-with-multus-conf-file)
+      * [Logging Options](#logging-options)
       * [Testing Multus CNI](#testing-multus-cni)
          * [Multiple flannel networks](#multiple-flannel-networks)
             * [Configure Kubernetes with CNI](#configure-kubernetes-with-cni)
@@ -442,6 +443,38 @@ Given the following network configuration:
     ]
 }
 EOF
+```
+
+## Logging Options
+
+You may wish to enable some enhanced logging for Multus, especially during the process where you're configuring Multus and need to understand what is or isn't working with your particular configuration. 
+
+Multus will always log via `STDERR`, which is the standard method by which CNI plugins communicate errors, and these errors are logged by the Kubelet. This method is always enabled.
+
+### Writing to a Log File
+
+Optionally, you may have Multus log to a file on the filesystem. This file will be written locally on each node where Multus is executed. You may configure this via the `LogFile` option in the CNI configuration. By default this additional logging to a flat file is disabled.
+
+For example in your CNI configuration, you may set:
+
+```
+    "LogFile": "/var/log/multus.log",
+```
+
+### Logging Level
+
+The default logging level is set as `panic` -- this will log only the most critical errors, and is the least verbose logging level.
+
+The available logging level values, in descreasing order of verbosity are:
+
+* `debug`
+* `error`
+* `panic`
+
+You may configure the logging level by using the `LogLevel` option in your CNI configuration. For example:
+
+```
+    "LogLevel": "debug",
 ```
 
 ## Testing Multus CNI
