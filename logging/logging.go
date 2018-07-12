@@ -124,7 +124,7 @@ func SetLogFile (filename string) {
 }
 
 func init() {
-	loggingStderr = false
+	loggingStderr = true
 	loggingFp = nil
 	loggingLevel = PanicLevel
 }
