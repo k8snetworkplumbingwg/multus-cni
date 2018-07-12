@@ -1,5 +1,6 @@
 ![multus-cni Logo](https://github.com/Intel-Corp/multus-cni/blob/master/doc/images/Multus.png)
 
+### Newest Multus Version v2.0(Kubernetes Network Plumbing working group- reference meta plugin) will be merged to master from dev branch(network-plumbing-working-group-crd-change). For more info - refer : [Multus v2.0 readme.md](https://github.com/intel/multus-cni/tree/dev/network-plumbing-working-group-crd-change#kubernetes-network-custom-resource-definition-de-facto-standard---reference-implementation)
    * [MULTUS CNI plugin](#multus-cni-plugin)
       * [Multi-Homed pod](#multi-homed-pod)
       * [Build](#build)
