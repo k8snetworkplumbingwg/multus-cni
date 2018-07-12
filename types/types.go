@@ -38,8 +38,8 @@ type NetConf struct {
 	RawDelegates []map[string]interface{} `json:"delegates"`
 	Delegates    []*DelegateNetConf       `json:"-"`
 	Kubeconfig   string                   `json:"kubeconfig"`
-	Logging      string                   `json:"logging"`
-	LoggingLevel string                   `json:"logging_level"`
+	LogFile      string                   `json:"logFile"`
+	LogLevel     string                   `json:"logLevel"`
 }
 
 type DelegateNetConf struct {
