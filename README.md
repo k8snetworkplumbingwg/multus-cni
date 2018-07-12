@@ -90,25 +90,24 @@ Multus is compatible to work with both CRD and TPR(deprecated in K8s 1.7).
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  # name must match the spec fields below, and be in the form: <plural>.<group>
-  name: networks.kubernetes.cni.cncf.io
+  name: network-attachment-definitions.kubernetes.cni.cncf.io
 spec:
-  # group name to use for REST API: /apis/<group>/<version>
   group: kubernetes.cni.cncf.io
-  # version name to use for REST API: /apis/<group>/<version>
   version: v1
-  # either Namespaced or Cluster
   scope: Namespaced
   names:
-    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
-    plural: networks
-    # singular name to be used as an alias on the CLI and for display
-    singular: network
-    # kind is normally the CamelCased singular type. Your resource manifests use this.
-    kind: Network
-    # shortNames allow shorter string to match your resource on the CLI
+    plural: network-attachment-definitions
+    singular: network-attachment-definition
+    kind: NetworkAttachmentDefinition
     shortNames:
-    - net
+    - net-attach-def
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties:
+            config:
+                 type: string
 ```
 2. Run kubectl create command for the Custom Resource Definition
 ```
@@ -162,7 +161,7 @@ network.kubernetes.cni.cncf.io   A specification of a Network obj in the kuberne
 
 ```
 apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: flannel-networkobj
 spec: 
@@ -189,7 +188,7 @@ flannel-networkobj           26s
 4. Get the custom network object details
 ```
 apiVersion: kubernetes.cni.cncf.io/v1
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   clusterName: ""
   creationTimestamp: 2018-05-17T09:13:20Z
@@ -208,7 +207,7 @@ spec:
 5. Save the following YAML to sriov-network.yaml to creating sriov network object. ( Refer to [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes)
 ```
 apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: sriov-conf
 spec:
@@ -231,7 +230,7 @@ spec:
 
 ```
 apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: sriov-vlanid-l2enable-conf
 spec:

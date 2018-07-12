@@ -229,7 +229,7 @@ func getConfig(config string, ifname string) string {
 
 }
 
-func getNetSpec(ns types.NetworkSpec, name string, ifname string) (string, error) {
+func getNetSpec(ns types.NetworkAttachmentDefinitionSpec, name string, ifname string) (string, error) {
 
 	if ns.Plugin == "" && ns.Config == "" {
 		return "", fmt.Errorf("Network Object spec plugin and config can't be empty")
@@ -259,11 +259,11 @@ func getNetSpec(ns types.NetworkSpec, name string, ifname string) (string, error
 
 }
 
-func cniConfigFromNetworkResource(customResource *types.Network, net *types.NetworkSelectionElement, confdir string) (string, error) {
+func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinition, net *types.NetworkSelectionElement, confdir string) (string, error) {
 	var config string
 	var err error
 
-	if (types.NetworkSpec{}) == customResource.Spec {
+	if (types.NetworkAttachmentDefinitionSpec{}) == customResource.Spec {
 		// Network Spec empty; generate delegate from CNI JSON config
 		// from the configuration directory that has the same network
 		// name as the custom resource
@@ -284,13 +284,13 @@ func cniConfigFromNetworkResource(customResource *types.Network, net *types.Netw
 }
 
 func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string) (*types.DelegateNetConf, error) {
-	rawPath := fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/networks/%s", net.Namespace, net.Name)
+	rawPath := fmt.Sprintf("/apis/kubernetes.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", net.Namespace, net.Name)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
 		return nil, fmt.Errorf("getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
 	}
 
-	customResource := &types.Network{}
+	customResource := &types.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
 		return nil, fmt.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
