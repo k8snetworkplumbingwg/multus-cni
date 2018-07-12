@@ -50,7 +50,7 @@ type DelegateNetConf struct {
 	Bytes []byte
 }
 
-type Network struct {
+type NetworkAttachmentDefinition struct {
 	metav1.TypeMeta `json:",inline"`
 	// Note that ObjectMeta is mandatory, as an object
 	// name is required
@@ -63,10 +63,10 @@ type Network struct {
 	// or .config (in that order) file on-disk whose JSON
 	// “name” key matches this Network object’s name.
 	// +optional
-	Spec NetworkSpec `json:"spec"`
+	Spec NetworkAttachmentDefinitionSpec `json:"spec"`
 }
 
-type NetworkSpec struct {
+type NetworkAttachmentDefinitionSpec struct {
 	// Config contains a standard JSON-encoded CNI configuration
 	// or configuration list which defines the plugin chain to
 	// execute.  If present, this key takes precedence over
