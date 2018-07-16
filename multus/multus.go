@@ -16,6 +16,20 @@
 // It reads other plugin netconf, and then invoke them, e.g.
 // flannel or sriov plugin.
 
+// Changes History:
+//
+// Date			Who			Reason
+//
+// 04/15/2018 		pkdas/Casa Systems 	Enhancement
+// - Allow to specify a default pod network delegate in the multus CNI conf 
+//   but still allow to include addtional network annotations in a POD yaml spec.
+//   Currently these two options are mutually exclusive. 
+//   Add a new parameter "defaultpodnet" bool in the CNI conf file for this purpose
+//   If 'defaultpodnet' is true, Multus-CNI will use the delegate in the conf file
+//   as the masterplugin (the default network eth0 in a container of a POD) 
+//   Any additional network(s) can be specified in the POD yaml as CRD annonations.
+//   
+
 package main
 
 import (
@@ -27,6 +41,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"github.com/golang/glog"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -39,15 +54,19 @@ import (
 )
 
 const defaultCNIDir = "/var/lib/cni/multus"
+const k8scrdgroupversion = "kubernetes.com/v1"
 
 var masterpluginEnabled bool
 var defaultcninetwork bool
+var defaultpodnet bool
+var crdnetwork string
 
 type NetConf struct {
 	types.NetConf
 	CNIDir     string                   `json:"cniDir"`
 	Delegates  []map[string]interface{} `json:"delegates"`
 	Kubeconfig string                   `json:"kubeconfig"`
+	DefaultPodNet bool                  `json:"defaultpodnet"`
 }
 
 type PodNet struct {
@@ -88,14 +107,27 @@ func loadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	if netconf.Kubeconfig != "" && netconf.Delegates != nil {
+		// if both kubeconfig and delegates are specified
+		// the networks defined in delegates are chosen 
+		// this will ignore the CRD network annotations in the POD yaml 
 		defaultcninetwork = true
 	}
 
+	if netconf.DefaultPodNet == true && len(netconf.Delegates) != 0  {
+		// this network will be the master plugin
+		// NOTE add additional checks  
+		defaultpodnet = true
+		defaultcninetwork = false
+        }
+
 	if netconf.Kubeconfig != "" && !defaultcninetwork {
+		// if kubeconfig is specified and delegates are not specified
+		// select the networks specified in annotations in the POD yaml
 		return netconf, nil
 	}
 
 	if len(netconf.Delegates) == 0 && !defaultcninetwork {
+		// if both kubeconfig and delegates are not specified
 		return nil, fmt.Errorf(`delegates or kubeconfig option is must, refer README.md`)
 	}
 
@@ -227,6 +259,7 @@ func delegateDel(podif func() string, argif string, netconf map[string]interface
 		return fmt.Errorf("Multus: error serializing multus delegate netconf: %v", err)
 	}
 
+
 	if !isMasterplugin(netconf) {
 		if os.Setenv("CNI_IFNAME", podif()) != nil {
 			return fmt.Errorf("Multus: error in setting CNI_IFNAME")
@@ -236,6 +269,8 @@ func delegateDel(podif func() string, argif string, netconf map[string]interface
 			return fmt.Errorf("Multus: error in setting CNI_IFNAME")
 		}
 	}
+
+	glog.Errorf("Delegate Del delegate %+v", netconf)
 
 	err = invoke.DelegateDel(netconf["type"].(string), netconfBytes)
 	if err != nil {
@@ -282,11 +317,21 @@ func createK8sClient(kubeconfig string) (*kubernetes.Clientset, error) {
 func getPodNetworkAnnotation(client *kubernetes.Clientset, k8sArgs K8sArgs) (string, error) {
 	var annot string
 	var err error
+	var crdgroupversion string
 
 	pod, err := client.Pods(string(k8sArgs.K8S_POD_NAMESPACE)).Get(fmt.Sprintf("%s", string(k8sArgs.K8S_POD_NAME)), metav1.GetOptions{})
 	if err != nil {
 		return annot, fmt.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm", string(k8sArgs.K8S_POD_NAME))
 	}
+
+	//  crdgroupversion if specified  - this is a hack and needs to cleaned up
+	if pod.Annotations["crdgroupversion"] != "" {
+		crdgroupversion = pod.Annotations["crdgroupversion"]
+	} else {
+		crdgroupversion = k8scrdgroupversion 
+	}
+
+	crdnetwork = fmt.Sprintf("/apis/%s/namespaces/%s/networks/", crdgroupversion, string(k8sArgs.K8S_POD_NAMESPACE))
 
 	return pod.Annotations["networks"], nil
 }
@@ -335,11 +380,14 @@ func getnetplugin(client *kubernetes.Clientset, networkname string, primary bool
 		return "", fmt.Errorf("getnetplugin: network name can't be empty")
 	}
 
-	tprclient := fmt.Sprintf("/apis/kubernetes.com/v1/namespaces/default/networks/%s", networkname)
+	glog.Infof("getnetplugin: network %v (primary=%v)", networkname, primary)
+
+	tprclient := fmt.Sprintf("%s%s", crdnetwork, networkname)
+	glog.Errorf("getnetplugin:networkname %v tprclient %v", networkname, tprclient)
 
 	netobjdata, err := client.ExtensionsV1beta1().RESTClient().Get().AbsPath(tprclient).DoRaw()
 	if err != nil {
-		return "", fmt.Errorf("getnetplugin: failed to get TRP, refer Multus README.md for the usage guide: %v", err)
+		return "", fmt.Errorf("getnetplugin: failed to get TPR/CRD, network %v tpr %v refer Multus README.md for the usage guide: %v", networkname, tprclient, err)
 	}
 
 	np := netplugin{}
@@ -366,7 +414,8 @@ func getPodNetworkObj(client *kubernetes.Clientset, netObjs []map[string]interfa
 	for index, net := range netObjs {
 		var primary bool
 
-		if index == 0 {
+		// if defaultpodnet is specified in cni conf then don't add primary net
+		if index == 0 && defaultpodnet == false {
 			primary = true
 		}
 
@@ -465,13 +514,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 				if !defaultcninetwork {
 					return fmt.Errorf("Multus: Err in getting k8s network from the pod spec annotation, check the pod spec or set delegate for the default network, Refer the README.md: %v", err)
 				}
-			} else if !defaultcninetwork {
+			} else if !defaultcninetwork && defaultpodnet == false {
 				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
 			}
 		}
 
 		if len(podDelegate) != 0 {
-			n.Delegates = podDelegate
+			if defaultpodnet == true {
+				n.Delegates = append(n.Delegates, podDelegate...)
+			} else {
+				n.Delegates = podDelegate
+			}
 		}
 	}
 
@@ -488,6 +541,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	podifName := getifname()
+
 	var mIndex int
 	for index, delegate := range n.Delegates {
 		err, r := delegateAdd(podifName, args.IfName, delegate, true)
@@ -558,6 +612,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	podifName := getifname()
+
 	for _, delegate := range in.Delegates {
 		r := delegateDel(podifName, args.IfName, delegate)
 		if r != nil {
