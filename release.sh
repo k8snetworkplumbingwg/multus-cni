@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -xe
 
+# This script is for the local users and developers.
+# Release for github page will be maintained by github maintainers. 
+# Refer .travis.yml for more info. on this.
 SRC_DIR="${SRC_DIR:-$PWD}"
 
 TAG=$(git describe --tags --dirty)
