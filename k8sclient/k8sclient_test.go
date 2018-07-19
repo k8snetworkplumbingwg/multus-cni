@@ -207,6 +207,26 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(delegates[1].Type).To(Equal("mynet2"))
 	})
 
+	It("injects network name into minimal thick plugin CNI config", func() {
+		fakePod := testutils.NewFakePod("testpod", "net1")
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", "{\"type\": \"mynet\"}")
+
+		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fKubeClient.PodCount).To(Equal(1))
+		Expect(fKubeClient.NetCount).To(Equal(1))
+
+		Expect(len(delegates)).To(Equal(1))
+		Expect(delegates[0].Name).To(Equal("net1"))
+		Expect(delegates[0].Type).To(Equal("mynet"))
+	})
+
 	It("fails when on-disk config file is not valid", func() {
 		fakePod := testutils.NewFakePod("testpod", "net1,net2")
 		args := &skel.CmdArgs{
@@ -226,6 +246,6 @@ var _ = Describe("k8sclient operations", func() {
 
 		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
 		Expect(len(delegates)).To(Equal(0))
-		Expect(err).To(MatchError(fmt.Sprintf("GetK8sNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfig: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
+		Expect(err).To(MatchError(fmt.Sprintf("GetK8sNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
 })
