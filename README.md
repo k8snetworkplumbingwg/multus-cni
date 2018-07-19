@@ -90,9 +90,9 @@ Multus is compatible to work with both CRD and TPR(deprecated in K8s 1.7).
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: network-attachment-definitions.kubernetes.cni.cncf.io
+  name: network-attachment-definitions.k8s.cni.cncf.io
 spec:
-  group: kubernetes.cni.cncf.io
+  group: k8s.cni.cncf.io
   version: v1
   scope: Namespaced
   names:
@@ -112,19 +112,19 @@ spec:
 2. Run kubectl create command for the Custom Resource Definition
 ```
 # kubectl create -f ./crdnetwork.yaml
-customresourcedefinition "networks.kubernetes.cni.cncf.io" created
+customresourcedefinition "network-attachment-definitions.k8s.cni.cncf.io" created
 ```
 3. Run kubectl get command to check the Network CRD creation
 ```
 # kubectl get CustomResourceDefinition
 NAME                      KIND
-networks.kubernetes.cni.cncf.io   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
+network-attachment-definitions.k8s.cni.cncf.io   CustomResourceDefinition.v1beta1.apiextensions.k8s.io
 ```
 For Kubernetes v1.7 and above use CRD to create network object. For version older than 1.7 use TPR based objects as shown below: 
 
 Note: Both TPR and CRD will have same selfLink : 
 
-*/apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/*
+*/apis/k8s.cni.cncf.io/v1/namespaces/default/network-attachment-definitions/*
 
 
 #### TPR based Network objects
@@ -135,7 +135,7 @@ Note: Both TPR and CRD will have same selfLink :
 apiVersion: extensions/v1beta1
 kind: ThirdPartyResource
 metadata:
-  name: network.kubernetes.cni.cncf.io
+  name: network-attachment-definition.k8s.cni.cncf.io
 description: "A specification of a Network obj in the kubernetes"
 versions:
 - name: v1
@@ -145,13 +145,13 @@ versions:
 
 ```
 # kubectl create -f ./tprnetwork.yaml
-thirdpartyresource "network.kubernetes.cni.cncf.io" created
+thirdpartyresource "network-attachment-definition.k8s.cni.cncf.io" created
 ```
 3. Run kubectl get command to check the Network TPR creation
 ```
 # kubectl get thirdpartyresource
 NAME                     DESCRIPTION                                          VERSION(S)
-network.kubernetes.cni.cncf.io   A specification of a Network obj in the kubernetes   v1
+network-attachment-definition.k8s.cni.cncf.io   A specification of a Network obj in the kubernetes   v1
 ```
 ### Creating network resources in Kubernetes
 
@@ -160,7 +160,7 @@ network.kubernetes.cni.cncf.io   A specification of a Network obj in the kuberne
 2. Save the following YAML to flannel-network.yaml
 
 ```
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: flannel-networkobj
@@ -187,7 +187,7 @@ flannel-networkobj           26s
 ```
 4. Get the custom network object details
 ```
-apiVersion: kubernetes.cni.cncf.io/v1
+apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
 metadata:
   clusterName: ""
@@ -198,7 +198,7 @@ metadata:
   name: flannel-networkobj
   namespace: default
   resourceVersion: "21176114"
-  selfLink: /apis/kubernetes.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
+  selfLink: /apis/k8s.cni.cncf.io/v1/namespaces/default/networks/flannel-networkobj
   uid: 8ac8f873-59b2-11e8-8308-a4bf01024e6f
 spec:
   config: '{ "cniVersion": "0.3.0", "type": "flannel", "delegate": { "isDefaultGateway":
@@ -206,7 +206,7 @@ spec:
 ```
 5. Save the following YAML to sriov-network.yaml to creating sriov network object. ( Refer to [Intel - SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) or contact @kural in [Intel-Corp Slack](https://intel-corp.herokuapp.com/) for running the DPDK based workloads in Kubernetes)
 ```
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: sriov-conf
@@ -229,7 +229,7 @@ spec:
 6. Likewise save the following YAML to sriov-vlanid-l2enable-network.yaml to create another sriov based network object:
 
 ```
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: sriov-vlanid-l2enable-conf
@@ -296,7 +296,7 @@ kind: Pod
 metadata:
   name: multus-multi-net-poc
   annotations:
-    kubernetes.v1.cni.cncf.io/networks: '[
+    k8s.v1.cni.cncf.io/networks: '[
             { "name": "flannel-conf" },
             { "name": "sriov-conf" },
             { "name": "sriov-vlanid-l2enable-conf",
