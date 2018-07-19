@@ -30,7 +30,7 @@ const (
 )
 
 // Convert raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
 	if err := json.Unmarshal(bytes, delegateConf); err != nil {
 		return nil, fmt.Errorf("error unmarshalling delegate config: %v", err)
@@ -40,6 +40,10 @@ func LoadDelegateNetConf(bytes []byte) (*DelegateNetConf, error) {
 	// Do some minimal validation
 	if delegateConf.Type == "" {
 		return nil, fmt.Errorf("delegate must have the 'type' field")
+	}
+
+	if ifnameRequest != "" {
+		delegateConf.IfnameRequest = ifnameRequest
 	}
 
 	return delegateConf, nil
@@ -98,7 +102,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error marshalling delegate %d config: %v", idx, err)
 		}
-		delegateConf, err := LoadDelegateNetConf(bytes)
+		delegateConf, err := LoadDelegateNetConf(bytes, "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to load delegate %d config: %v", idx, err)
 		}

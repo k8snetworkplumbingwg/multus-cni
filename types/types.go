@@ -75,17 +75,6 @@ type NetworkAttachmentDefinitionSpec struct {
 	// ‘Plugin’.
 	// +optional
 	Config string `json:"config"`
-
-	// Plugin contains the name of a CNI plugin on-disk in a
-	// runtime-defined path (eg /opt/cni/bin and/or other paths.
-	// This plugin should be executed with a basic CNI JSON
-	// configuration on stdin containing the Network object
-	// name and the plugin:
-	//   { “cniVersion”: “0.3.1”, “type”: <Plugin>, “name”: <Network.Name> }
-	// and any additional “runtimeConfig” field per the
-	// CNI specification and conventions.
-	// +optional
-	Plugin string `json:"plugin"`
 }
 
 // NetworkSelectionElement represents one element of the JSON format
