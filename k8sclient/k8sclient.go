@@ -159,7 +159,7 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 	return networks, nil
 }
 
-func getCNIConfig(name string, ifname string, confdir string) (string, error) {
+func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 
 	// In the absence of valid keys in a Spec, the runtime (or
 	// meta-plugin) should load and execute a CNI .configlist
@@ -172,111 +172,74 @@ func getCNIConfig(name string, ifname string, confdir string) (string, error) {
 	files, err := libcni.ConfFiles(confdir, []string{".conf", ".json"})
 	switch {
 	case err != nil:
-		return "", fmt.Errorf("No networks found in %s", confdir)
+		return nil, fmt.Errorf("No networks found in %s", confdir)
 	case len(files) == 0:
-		return "", fmt.Errorf("No networks found in %s", confdir)
+		return nil, fmt.Errorf("No networks found in %s", confdir)
 	}
 
 	for _, confFile := range files {
 		conf, err := libcni.ConfFromFile(confFile)
 		if err != nil {
-			return "", fmt.Errorf("Error loading CNI config file %s: %v", confFile, err)
+			return nil, fmt.Errorf("Error loading CNI config file %s: %v", confFile, err)
 		}
 
 		if conf.Network.Name == name {
 			// Ensure the config has a "type" so we know what plugin to run.
 			// Also catches the case where somebody put a conflist into a conf file.
 			if conf.Network.Type == "" {
-				return "", fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				return nil, fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
 			}
-
-			return getConfig(string(conf.Bytes[:]), ifname), nil
-
+			return conf.Bytes, nil
 		}
 	}
 
-	return "", fmt.Errorf("no network available in the name %s in cni dir %s", name, confdir)
+	return nil, fmt.Errorf("no network available in the name %s in cni dir %s", name, confdir)
 }
 
-func getPlugin(plugin string, name string, ifname string) string {
-	tmpconfig := []string{}
-
-	tmpconfig = append(tmpconfig, fmt.Sprintf(`{"cniVersion": "0.3.1" , "name": "%s", "type": "%s"`, name, plugin))
-
-	if ifname != "" {
-		tmpconfig = append(tmpconfig, fmt.Sprintf(`, "ifnameRequest": "%s"`, ifname))
-	}
-
-	tmpconfig = append(tmpconfig, "}")
-
-	return strings.Join(tmpconfig, "")
-
-}
-
-func getConfig(config string, ifname string) string {
-	tmpconfig := []string{}
-
-	config = strings.TrimSpace(config)
-	tmpconfig = append(tmpconfig, config[:1])
-
-	if ifname != "" {
-		tmpconfig = append(tmpconfig, fmt.Sprintf(` "ifnameRequest": "%s",`, ifname))
-	}
-
-	tmpconfig = append(tmpconfig, config[1:])
-
-	return strings.Join(tmpconfig, "")
-
-}
-
-func getNetSpec(ns types.NetworkAttachmentDefinitionSpec, name string, ifname string) (string, error) {
-
-	if ns.Plugin == "" && ns.Config == "" {
-		return "", fmt.Errorf("Network Object spec plugin and config can't be empty")
-	}
-
-	if ns.Plugin != "" && ns.Config != "" {
-		return "", fmt.Errorf("Network Object spec can't have both plugin and config")
-	}
-
-	if ns.Plugin != "" {
-		// Plugin contains the name of a CNI plugin on-disk in a
-		// runtime-defined path (eg /opt/cni/bin and/or other paths.
-		// This plugin should be executed with a basic CNI JSON
-		// configuration on stdin containing the Network object
-		// name and the plugin:
-		//   { “cniVersion”: “0.3.1”, “type”: <Plugin>, “name”: <Network.Name> }
-		// and any additional “runtimeConfig” field per the
-		// CNI specification and conventions.
-		return getPlugin(ns.Plugin, name, ifname), nil
-	}
-
-	// Config contains a standard JSON-encoded CNI configuration
-	// or configuration list which defines the plugin chain to
-	// execute.  If present, this key takes precedence over
-	// ‘Plugin’.
-	return getConfig(ns.Config, ifname), nil
-
-}
-
-func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinition, net *types.NetworkSelectionElement, confdir string) (string, error) {
-	var config string
+// getCNIConfigFromSpec reads a CNI JSON configuration from the NetworkAttachmentDefinition
+// object's Spec.Config field and fills in any missing details like the network name
+func getCNIConfigFromSpec(configData, netName string) ([]byte, error) {
+	var rawConfig map[string]interface{}
 	var err error
 
-	if (types.NetworkAttachmentDefinitionSpec{}) == customResource.Spec {
+	configBytes := []byte(configData)
+	err = json.Unmarshal(configBytes, &rawConfig)
+	if err != nil {
+		return nil, fmt.Errorf("getCNIConfigFromSpec: failed to unmarshal Spec.Config: %v", err)
+	}
+
+	// Inject network name if missing from Config for the thick plugin case
+	if n, ok := rawConfig["name"]; !ok || n == "" {
+		rawConfig["name"] = netName
+		configBytes, err = json.Marshal(rawConfig)
+		if err != nil {
+			return nil, fmt.Errorf("getCNIConfigFromSpec: failed to re-marshal Spec.Config: %v", err)
+		}
+	}
+
+	return configBytes, nil
+}
+
+func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinition, confdir string) ([]byte, error) {
+	var config []byte
+	var err error
+
+	emptySpec := types.NetworkAttachmentDefinitionSpec{}
+	if (customResource.Spec == emptySpec) {
 		// Network Spec empty; generate delegate from CNI JSON config
 		// from the configuration directory that has the same network
 		// name as the custom resource
-		config, err = getCNIConfig(customResource.Metadata.Name, net.InterfaceRequest, confdir)
+		config, err = getCNIConfigFromFile(customResource.Metadata.Name, confdir)
 		if err != nil {
-			return "", fmt.Errorf("cniConfigFromNetworkResource: err in getCNIConfig: %v", err)
+			return nil, fmt.Errorf("cniConfigFromNetworkResource: err in getCNIConfigFromFile: %v", err)
 		}
 	} else {
-		// Generate delegate from CNI configuration embedded in the
-		// custom resource
-		config, err = getNetSpec(customResource.Spec, customResource.Metadata.Name, net.InterfaceRequest)
+		// Config contains a standard JSON-encoded CNI configuration
+		// or configuration list which defines the plugin chain to
+		// execute.
+		config, err = getCNIConfigFromSpec(customResource.Spec.Config, customResource.Metadata.Name)
 		if err != nil {
-			return "", fmt.Errorf("cniConfigFromNetworkResource: err in getNetSpec: %v", err)
+			return nil, fmt.Errorf("cniConfigFromNetworkResource: err in getCNIConfigFromSpec: %v", err)
 		}
 	}
 
@@ -295,12 +258,12 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		return nil, fmt.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
 
-	cniConfig, err := cniConfigFromNetworkResource(customResource, net, confdir)
+	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
 	if err != nil {
 		return nil, err
 	}
 
-	delegate, err := types.LoadDelegateNetConf([]byte(cniConfig))
+	delegate, err := types.LoadDelegateNetConf(configBytes, net.InterfaceRequest)
 	if err != nil {
 		return nil, err
 	}
