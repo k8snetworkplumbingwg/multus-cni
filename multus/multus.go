@@ -148,29 +148,52 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
+// Attempts to load Kubernetes-defined delegates and add them to the Multus config.
+// Returns the number of Kubernetes-defined delegates added or an error.
+func tryLoadK8sDelegates(args *skel.CmdArgs, conf *types.NetConf, kubeClient k8s.KubeClient) (int, error) {
+	var err error
+
+	kubeClient, err = k8s.GetK8sClient(conf.Kubeconfig, kubeClient)
+	if err != nil {
+		return 0, err
+	}
+
+	if kubeClient == nil {
+		if len(conf.Delegates) == 0 {
+			// No available kube client and no delegates, we can't do anything
+			return 0, fmt.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+		}
+		return 0, nil
+	}
+
+	delegates, err := k8s.GetK8sNetwork(kubeClient, args, conf.ConfDir)
+	if err != nil {
+		if _, ok := err.(*k8s.NoK8sNetworkError); ok {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
+	}
+
+	if err = conf.AddDelegates(delegates); err != nil {
+		return 0, err
+	}
+
+	return len(delegates), nil
+}
+
 func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
-	var nopodnet bool
 	n, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
 		return nil, fmt.Errorf("err in loading netconf: %v", err)
 	}
 
-	if n.Kubeconfig != "" {
-		delegates, err := k8s.GetK8sNetwork(args, n.Kubeconfig, kubeClient, n.ConfDir)
-		if err != nil {
-			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
-				nopodnet = true
-			} else {
-				return nil, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
-			}
-		}
-
-		if err = n.AddDelegates(delegates); err != nil {
-			return nil, err
-		}
+	numK8sDelegates, err := tryLoadK8sDelegates(args, n, kubeClient)
+	if err != nil {
+		return nil, err
 	}
 
-	if n.Kubeconfig == "" || nopodnet {
+	if numK8sDelegates == 0 {
+		// cache the multus config if we have only Multus delegates
 		if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
 			return nil, fmt.Errorf("Multus: Err in saving the delegates: %v", err)
 		}
@@ -213,29 +236,18 @@ func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 }
 
 func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) error {
-	var nopodnet bool
-
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
 		return err
 	}
 
-	if in.Kubeconfig != "" {
-		delegates, err := k8s.GetK8sNetwork(args, in.Kubeconfig, kubeClient, in.ConfDir)
-		if err != nil {
-			if _, ok := err.(*k8s.NoK8sNetworkError); ok {
-				nopodnet = true
-			} else {
-				return fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
-			}
-		}
-
-		if err = in.AddDelegates(delegates); err != nil {
-			return err
-		}
+	numK8sDelegates, err := tryLoadK8sDelegates(args, in, kubeClient)
+	if err != nil {
+		return err
 	}
 
-	if in.Kubeconfig == "" || nopodnet {
+	if numK8sDelegates == 0 {
+		// re-read the scratch multus config if we have only Multus delegates
 		netconfBytes, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 		if err != nil {
 			if os.IsNotExist(err) {
