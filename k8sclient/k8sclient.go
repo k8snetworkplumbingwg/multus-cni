@@ -17,12 +17,14 @@ package k8sclient
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/containernetworking/cni/libcni"
@@ -51,22 +53,6 @@ func (d *defaultKubeClient) GetRawWithPath(path string) ([]byte, error) {
 
 func (d *defaultKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return d.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
-}
-
-func createK8sClient(kubeconfig string) (KubeClient, error) {
-	// uses the current context in kubeconfig
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return nil, fmt.Errorf("createK8sClient: failed to get context for the kubeconfig %v, refer Multus README.md for the usage guide: %v", kubeconfig, err)
-	}
-
-	// creates the clientset
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &defaultKubeClient{client: client}, nil
 }
 
 func getPodNetworkAnnotation(client KubeClient, k8sArgs types.K8sArgs) (string, string, error) {
@@ -313,19 +299,49 @@ type KubeClient interface {
 	GetPod(namespace, name string) (*v1.Pod, error)
 }
 
-func GetK8sNetwork(args *skel.CmdArgs, kubeconfig string, k8sclient KubeClient, confdir string) ([]*types.DelegateNetConf, error) {
+func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) {
+	// If we get a valid kubeClient (eg from testcases) just return that
+	// one.
+	if kubeClient != nil {
+		return kubeClient, nil
+	}
+
+	var err error
+	var config *rest.Config
+
+	// Otherwise try to create a kubeClient from a given kubeConfig
+	if kubeconfig != "" {
+		// uses the current context in kubeconfig
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("GetK8sClient: failed to get context for the kubeconfig %v, refer Multus README.md for the usage guide: %v", kubeconfig, err)
+		}
+	} else if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
+		// Try in-cluster config where multus might be running in a kubernetes pod
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, fmt.Errorf("createK8sClient: failed to get context for in-cluster kube config, refer Multus README.md for the usage guide: %v", err)
+		}
+	} else {
+		// No kubernetes config; assume we shouldn't talk to Kube at all
+		return nil, nil
+	}
+
+	// creates the clientset
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &defaultKubeClient{client: client}, nil
+}
+
+func GetK8sNetwork(k8sclient KubeClient, args *skel.CmdArgs, confdir string) ([]*types.DelegateNetConf, error) {
 	k8sArgs := types.K8sArgs{}
 
 	err := cnitypes.LoadArgs(args.Args, &k8sArgs)
 	if err != nil {
 		return nil, err
-	}
-
-	if k8sclient == nil {
-		k8sclient, err = createK8sClient(kubeconfig)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	netAnnot, defaultNamespace, err := getPodNetworkAnnotation(k8sclient, k8sArgs)

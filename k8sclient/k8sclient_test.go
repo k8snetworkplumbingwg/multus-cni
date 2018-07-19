@@ -77,7 +77,9 @@ var _ = Describe("k8sclient operations", func() {
 		// net3 is not used; make sure it's not accessed
 		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net3", net3)
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(2))
@@ -106,7 +108,9 @@ var _ = Describe("k8sclient operations", func() {
 		fKubeClient.AddPod(fakePod)
 		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net3", net3)
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("GetK8sNetwork: failed getting the delegate: getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: resource not found"))
 	})
@@ -146,7 +150,9 @@ var _ = Describe("k8sclient operations", func() {
 	"cniVersion": "0.2.0"
 }`)
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(3))
@@ -169,7 +175,9 @@ var _ = Describe("k8sclient operations", func() {
 		fKubeClient := testutils.NewFakeKubeClient()
 		fKubeClient.AddPod(fakePod)
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
 	})
@@ -195,7 +203,9 @@ var _ = Describe("k8sclient operations", func() {
 	"cniVersion": "0.2.0"
 }`)
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(2))
@@ -224,7 +234,9 @@ var _ = Describe("k8sclient operations", func() {
 		net2Name := filepath.Join(tmpDir, "20-net2.conf")
 		fKubeClient.AddNetFile(fakePod.ObjectMeta.Namespace, "net2", net2Name, "asdfasdfasfdasfd")
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetK8sNetwork(kubeClient, args, tmpDir)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError(fmt.Sprintf("GetK8sNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfig: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
