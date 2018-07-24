@@ -4,7 +4,7 @@ kind: Pod
 metadata:
   name: pod-case-02
   annotations:
-    kubernetes.v1.cni.cncf.io/networks: '[
+    k8s.v1.cni.cncf.io/networks: '[
             { "name": "macvlan-conf-2" },
             { "name": "vlan-conf-1-1",
               "namespace": "testns1",
