@@ -4,7 +4,7 @@ kind: Pod
 metadata:
   name: samplepod
   annotations:
-    kubernetes.v1.cni.cncf.io/networks: macvlan-conf
+    k8s.v1.cni.cncf.io/networks: macvlan-conf
 spec:
   containers:
   - name: samplepod

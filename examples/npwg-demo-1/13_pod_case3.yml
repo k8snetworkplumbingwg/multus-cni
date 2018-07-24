@@ -4,7 +4,7 @@ kind: Pod
 metadata:
   name: pod-case-03
   annotations:
-    kubernetes.v1.cni.cncf.io/networks: '[
+    k8s.v1.cni.cncf.io/networks: '[
             { "name": "macvlan-conf-3" },
             { "name": "macvlan-conf-4" },
             { "name": "flannel-2" }
