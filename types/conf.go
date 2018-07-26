@@ -19,32 +19,73 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/intel/multus-cni/logging"
+	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+	"github.com/intel/multus-cni/logging"
 )
 
 const (
 	defaultCNIDir  = "/var/lib/cni/multus"
 	defaultConfDir = "/etc/cni/multus/net.d"
+	defaultBinDir  = "/opt/cni/bin"
 )
+
+func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
+
+	if err := json.Unmarshal(bytes, &delegateConf.ConfList); err != nil {
+		return fmt.Errorf("err in unmarshalling delegate conflist: %v", err)
+	}
+
+	if delegateConf.ConfList.Plugins == nil {
+		return fmt.Errorf("delegate must have the 'type'or 'Plugin' field")
+	}
+	if delegateConf.ConfList.Plugins[0].Type == "" {
+		return fmt.Errorf("a plugin delegate must have the 'type' field")
+	}
+	delegateConf.ConfListPlugin = true
+	return nil
+}
+
+func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*libcni.RuntimeConf, error) {
+
+	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
+	// Todo
+	// ingress, egress and bandwidth capability features as same as kubelet.
+	rt := &libcni.RuntimeConf{
+		ContainerID: args.ContainerID,
+		NetNS:       args.Netns,
+		IfName:      ifName,
+		Args: [][2]string{
+			{"IgnoreUnknown", "1"},
+			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
+			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
+			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
+		},
+	}
+	return rt, nil
+}
 
 // Convert raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
-	if err := json.Unmarshal(bytes, delegateConf); err != nil {
-		return nil, fmt.Errorf("error unmarshalling delegate config: %v", err)
+	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
+		return nil, fmt.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
-	delegateConf.Bytes = bytes
 
 	// Do some minimal validation
-	if delegateConf.Type == "" {
-		return nil, fmt.Errorf("delegate must have the 'type' field")
+	if delegateConf.Conf.Type == "" {
+		if err := LoadDelegateNetConfList(bytes, delegateConf); err != nil {
+			return nil, fmt.Errorf("error in LoadDelegateNetConf: %v")
+		}
 	}
 
 	if ifnameRequest != "" {
 		delegateConf.IfnameRequest = ifnameRequest
 	}
+
+	delegateConf.Bytes = bytes
 
 	return delegateConf, nil
 }
@@ -93,8 +134,13 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	if netconf.CNIDir == "" {
 		netconf.CNIDir = defaultCNIDir
 	}
+
 	if netconf.ConfDir == "" {
 		netconf.ConfDir = defaultConfDir
+	}
+
+	if netconf.BinDir == "" {
+		netconf.BinDir = defaultBinDir
 	}
 
 	for idx, rawConf := range netconf.RawDelegates {
