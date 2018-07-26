@@ -34,6 +34,7 @@ type NetConf struct {
 
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
+	BinDir  string `json:"binDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
 	RawDelegates []map[string]interface{} `json:"delegates"`
 	Delegates    []*DelegateNetConf       `json:"-"`
@@ -43,10 +44,13 @@ type NetConf struct {
 }
 
 type DelegateNetConf struct {
-	types.NetConf
+	Conf          types.NetConf
+	ConfList      types.NetConfList
 	IfnameRequest string `json:"ifnameRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
+	// Conflist plugin is only used internal housekeeping
+	ConfListPlugin bool `json:"-"`
 
 	// Raw JSON
 	Bytes []byte
