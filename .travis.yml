@@ -3,6 +3,10 @@ language: go
 # for the detail
 # sudo: requried
 dist: trusty
+env:
+  global:
+    - REGISTRY_USER=nfvperobot
+    - secure: "LnQV09sy5nfrJd0PKAbxYPdKJ5QtLECofsunYfVk7tFp+ivKyZBXHwi4V4aGFuB2SqCnpauXBRTLet8hrfm5kN9ZZQRqy0WNs/fJHdFC6YKOKwyCQwczFb1by/iTX68dxWc2nK9+Opi6s/81Bh5yb3Oquqzdk+OEgaQHz2KP7BwI4yDrobinBR5laJ4KdxZJYgYx4mP6uUPxj7UZww+HaWqyiGy8cAeK3L81sGjxXJIYTRRfG1J4pifI5A3c3IOJRID0pvifgUIsQXp5MHpx+nxmhRJ7KMBLeNkUKruLTEsufgGCvhY5eWpdBhVN2YefGTqlKBCtKEqRUPlLbP5eJGUdY1PlUMUnQsr+FRWAZz90A1TESOZXZqDs4xR1ox1wX7mBUeelViXvUfLQB9sOD8G86FkXqNTqx/thp3x0Dqgy44pL+12Y3k5xVZmIsWDSpGmmIe1jOCsoL26Fdic+dTO/l3mx3KP1+gPNqbScuJsccLyPsr96uFCBCPJ2mSy7nCqb01KZTbbkIvv6oOCQ+Mfq8MT9lkxf6FJ+K+7vVbcgshOGhqA/l1UO3rKxnGt8Rkj/5XoHkcjXjM6YzT5LvljVWszJGXeTQxGjcsPrK2AscyX7JvNp/AMElII/Hxm6P0NESfV0whrZHyVOaqIRrbhUsK9j4YP8IMFoI4qYp4g="
 
 before_install:
   - sudo apt-get update -qq
@@ -27,6 +31,7 @@ script:
   - sudo ./test.sh
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
+  - docker build -t nfvpe/multus -f ./images/Dockerfile .
 
 before_deploy:
   - go get -u github.com/laher/goxc
@@ -34,16 +39,28 @@ before_deploy:
   - goxc -d=$TRAVIS_BUILD_DIR/dist -pv=$TRAVIS_TAG -bc=linux -tasks=clean-destination,xc,archive,rmbin
 
 deploy:
-  provider: releases
-  api_key:
-    secure: "iy7eqzXNvb/juc+5eVPQ/pFYDTCqDt8Zjt63n+zEK856Qzr2aEZwwOguMWs78XFDMFXagCs5PRTvtvZz8apoTfHX7Wkss3kRyEziAkuldQbH5yGDvpGyHsGBw78N95hauMoogefE7NuuLG3qRSWPeVz8RAKGhP7ADwEVyyfQKKYdum3Bqrz0D89HqKbCQqs3eZae7ppDIler3lab9WAQGuKNJ2HL6mqREVe48kb8sdsuSr+yV4qwVrBDNhXxQDxAT6LYuMXbknE7qTde2vViP13ZHpptbuZqiZG2ytzReIIs/iC9AWoIQXr3XTXl9z8fqlC3VljPCikBWVcmxDFA2aANYzx3M/7fMOO/DniwNhlZc9+pYfAkUrpoQPfPOWNqf45Qz0jP3wk49xy5hxEqe/rfmo5lipSsqeUsk+j3pT8kjVIAnDLrQpxSx7xwnijPLgtm34UwROVowfwLlOhE/7mUOFCbYlzEo3CKvjDN3Kmn35yHEueuu//Gv5jesVYvgcNPBHqaTKb5AXVTqymNBtA43PchLJ8gCC1mNukzSZifQP996vzbV5c9AxzBLjWbiDJ3lOFIpNhF8Sed0m0C0RylrTXHTX5TSrlMdXXffzYwbjJ96J+cFPBTpJNfSn+3N7hiart1r1k1bSXoPqYW4+94M8E1eZ5LjszoeiZbRrI="
-  file_glob: true
-  file: "$TRAVIS_BUILD_DIR/dist/snapshot/*/*.gz"
-  skip_cleanup: true
-  on:
-    tags: true
-    all_branches: true
-    condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
+  - provider: releases
+    api_key:
+      secure: "iy7eqzXNvb/juc+5eVPQ/pFYDTCqDt8Zjt63n+zEK856Qzr2aEZwwOguMWs78XFDMFXagCs5PRTvtvZz8apoTfHX7Wkss3kRyEziAkuldQbH5yGDvpGyHsGBw78N95hauMoogefE7NuuLG3qRSWPeVz8RAKGhP7ADwEVyyfQKKYdum3Bqrz0D89HqKbCQqs3eZae7ppDIler3lab9WAQGuKNJ2HL6mqREVe48kb8sdsuSr+yV4qwVrBDNhXxQDxAT6LYuMXbknE7qTde2vViP13ZHpptbuZqiZG2ytzReIIs/iC9AWoIQXr3XTXl9z8fqlC3VljPCikBWVcmxDFA2aANYzx3M/7fMOO/DniwNhlZc9+pYfAkUrpoQPfPOWNqf45Qz0jP3wk49xy5hxEqe/rfmo5lipSsqeUsk+j3pT8kjVIAnDLrQpxSx7xwnijPLgtm34UwROVowfwLlOhE/7mUOFCbYlzEo3CKvjDN3Kmn35yHEueuu//Gv5jesVYvgcNPBHqaTKb5AXVTqymNBtA43PchLJ8gCC1mNukzSZifQP996vzbV5c9AxzBLjWbiDJ3lOFIpNhF8Sed0m0C0RylrTXHTX5TSrlMdXXffzYwbjJ96J+cFPBTpJNfSn+3N7hiart1r1k1bSXoPqYW4+94M8E1eZ5LjszoeiZbRrI="
+    file_glob: true
+    file: "$TRAVIS_BUILD_DIR/dist/*/*.gz"
+    skip_cleanup: true
+    on:
+      tags: true
+      all_branches: true
+      condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
+  # Push images to Dockerhub
+  - provider: script
+    script: >
+      bash -c '
+      docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
+      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
+      docker push nfvpe/multus; 
+      docker push nfvpe/multus:$TRAVIS_TAG'
+    on:
+      tags: true
+      all_branches: true
+      condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
 
 after_success:
   # put build tgz to bintray
