@@ -77,7 +77,7 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, 
 	// Do some minimal validation
 	if delegateConf.Conf.Type == "" {
 		if err := LoadDelegateNetConfList(bytes, delegateConf); err != nil {
-			return nil, fmt.Errorf("error in LoadDelegateNetConf: %v")
+			return nil, fmt.Errorf("error in LoadDelegateNetConf: %v", err)
 		}
 	}
 
