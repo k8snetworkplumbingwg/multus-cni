@@ -1,6 +1,7 @@
 ![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
    * [MULTUS CNI plugin](#multus-cni-plugin)
+      * [Quickstart Guide](#quickstart-guide)
       * [Multi-Homed pod](#multi-homed-pod)
       * [Build](#build)
       * [Work flow](#work-flow)
@@ -34,6 +35,55 @@
 
 Please check the [CNI](https://github.com/containernetworking/cni) documentation for more information on container networking.
 
+# Quickstart Guide
+
+Multus may be deployed as a Daemonset, and is provided in this guide along with Flannel. Flannel is deployed as a pod-to-pod network that is used as our "default network". Each network attachment is made in addition to this default network.
+
+```
+$ curl --silent https://raw.githubusercontent.com/intel/multus-cni/master/images/{multus-daemonset.yml,flannel-daemonset.yml} > multus-install.yml
+$ kubectl apply -f multus-install.yml
+```
+
+Create a configuration, in this case an extra Flannel interface is defined. You may replace the `config` field with any valid CNI configuration where the CNI binary is available on the nodes.
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: additional-flannel-conf
+spec: 
+  config: '{
+      "type": "flannel",
+      "name": "flannel.2"
+    }'
+EOF
+```
+
+You may then create a pod which attached this additional interface, where the annotation correlates to the `name` in the `NetworkAttachmentDefinition` above.
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: samplepod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: additional-flannel-conf
+spec:
+  containers:
+  - name: samplepod
+    command: ["/bin/bash", "-c", "sleep 2000000000000"]
+    image: dougbtv/centos-network
+EOF
+```
+
+You may now inspect the pod and see that there is an additional interface configured, like so:
+
+```
+$ kubectl exec -it samplepod -- ip a
+```
+
 # Kubernetes Network Custom Resource Definition De-facto Standard - Reference implementation
 
 * This project is a reference implementation for Kubernetes Network Custom Resource Definition De-facto Standard. For more information refer [Network Plumbing Working Group Agenda](https://docs.google.com/document/d/1oE93V3SgOGWJ4O1zeD1UmpeToa0ZiiO6LqRAmZBPFWM/edit)
@@ -44,7 +94,8 @@ Please check the [CNI](https://github.com/containernetworking/cni) documentation
    * CNI configuration stored in on-disk file
    > refer the section 3.2 Network Object Definition for more details in Kubernetes Network Custom Resource Definition De-facto Standard
 * Refer the reference implemenation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
-* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD specifications.
+* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD 
+  * [MULTUS CNI plugin](#multus-cni-plugin)specifications.
 
 ## Multi-Homed pod
 <p align="center">
