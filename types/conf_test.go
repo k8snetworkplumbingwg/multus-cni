@@ -40,7 +40,7 @@ var _ = Describe("config operations", func() {
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
-		Expect(netConf.Delegates[0].Type).To(Equal("weave-net"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
 	})
 
@@ -57,9 +57,9 @@ var _ = Describe("config operations", func() {
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(2))
-		Expect(netConf.Delegates[0].Type).To(Equal("weave-net"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
-		Expect(netConf.Delegates[1].Type).To(Equal("foobar"))
+		Expect(netConf.Delegates[1].Conf.Type).To(Equal("foobar"))
 		Expect(netConf.Delegates[1].MasterPlugin).To(BeFalse())
 	})
 
