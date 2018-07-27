@@ -227,7 +227,7 @@ var _ = Describe("k8sclient operations", func() {
 		fKubeClient.AddPod(fakePod)
 		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", "{\"type\": \"mynet\"}")
 
-		delegates, err := GetK8sNetwork(args, "", fKubeClient, tmpDir)
+		delegates, err := GetK8sNetwork(fKubeClient, args, tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(1))
