@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 func TestRateLimitingQueue(t *testing.T) {
@@ -30,9 +30,9 @@ func TestRateLimitingQueue(t *testing.T) {
 	delayingQueue := &delayingType{
 		Interface:       New(),
 		clock:           fakeClock,
-		heartbeat:       fakeClock.Tick(maxWait),
+		heartbeat:       fakeClock.NewTicker(maxWait),
 		stopCh:          make(chan struct{}),
-		waitingForAddCh: make(chan waitFor, 1000),
+		waitingForAddCh: make(chan *waitFor, 1000),
 		metrics:         newRetryMetrics(""),
 	}
 	queue.DelayingInterface = delayingQueue

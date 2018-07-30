@@ -1,18 +1,34 @@
-package: github.com/Intel-Corp/multus-cni
+package: github.com/intel/multus-cni
 import:
 - package: github.com/containernetworking/cni
-  version: v0.5.2
+  version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
   subpackages:
   - pkg/ip
   - pkg/ipam
-  - pkg/ns
   - pkg/skel
   - pkg/types
   - pkg/version
+- package: github.com/containernetworking/plugins
+  version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
+  subpackages:
+  - pkg/ns
+- package: github.com/onsi/ginkgo
+  version: 7f8ab55aaf3b86885aa55b762e803744d1674700
+- package: github.com/onsi/gomega
+  version: 2152b45fa28a361beba9aab0885972323a444e28
 - package: github.com/golang/glog
 - package: github.com/vishvananda/netlink
+- package: k8s.io/apimachinery
+  version: kubernetes-1.11.1
+- package: k8s.io/api
+  version: kubernetes-1.11.1
+  subpackages:
+  - core/v1
 - package: k8s.io/client-go
-  version: 4a3ab2f5be5177366f8206fd79ce55ca80e417fa
+  version: kubernetes-1.11.1
   subpackages:
   - kubernetes
   - tools/clientcmd
+  - util/retry
+- package: github.com/vishvananda/netns
+- package: github.com/pkg/errors

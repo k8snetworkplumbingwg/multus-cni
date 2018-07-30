@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-ORG_PATH="github.com/Intel-Corp"
+ORG_PATH="github.com/intel"
 REPO_PATH="${ORG_PATH}/multus-cni"
 
 if [ ! -h gopath/src/${REPO_PATH} ]; then
