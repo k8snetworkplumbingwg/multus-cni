@@ -21,11 +21,12 @@ import (
 	"regexp"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -36,6 +37,12 @@ import (
 // NoK8sNetworkError indicates error, no network in kubernetes
 type NoK8sNetworkError struct {
 	message string
+}
+
+type clientInfo struct {
+	Client       KubeClient
+	Podnamespace string
+	Podname      string
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }
@@ -53,6 +60,71 @@ func (d *defaultKubeClient) GetRawWithPath(path string) ([]byte, error) {
 
 func (d *defaultKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return d.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+}
+
+func (d *defaultKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
+	return d.client.Core().Pods(pod.Namespace).UpdateStatus(pod)
+}
+
+func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs) {
+	c.Client = client
+	c.Podnamespace = string(k8sArgs.K8S_POD_NAMESPACE)
+	c.Podname = string(k8sArgs.K8S_POD_NAME)
+}
+
+func SetNetworkStatus(k *clientInfo, netStatus []*types.NetworkStatus) error {
+
+	pod, err := k.Client.GetPod(k.Podnamespace, k.Podname)
+	if err != nil {
+		return fmt.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", k.Podname, err)
+	}
+
+	var ns string
+	if netStatus != nil {
+		var networkStatus []string
+		for _, nets := range netStatus {
+			data, err := json.MarshalIndent(nets, "", "    ")
+			if err != nil {
+				return fmt.Errorf("SetNetworkStatus: error with Marshal Indent: %v", err)
+			}
+			networkStatus = append(networkStatus, string(data))
+		}
+
+		ns = fmt.Sprintf("[%s]", strings.Join(networkStatus, ","))
+	}
+	_, err = setPodNetworkAnnotation(k.Client, k.Podnamespace, pod, ns)
+	if err != nil {
+		return fmt.Errorf("SetNetworkStatus: failed to update the pod %v in out of cluster comm: %v", k.Podname, err)
+	}
+
+	return nil
+}
+
+func setPodNetworkAnnotation(client KubeClient, namespace string, pod *v1.Pod, networkstatus string) (*v1.Pod, error) {
+	//if pod annotations is empty, make sure it allocatable
+	if len(pod.Annotations) == 0 {
+		pod.Annotations = make(map[string]string)
+	}
+
+	pod.Annotations["k8s.v1.cni.cncf.io/networks-status"] = networkstatus
+
+	pod = pod.DeepCopy()
+	var err error
+	if resultErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err != nil {
+			// Re-get the pod unless it's the first attempt to update
+			pod, err = client.GetPod(pod.Namespace, pod.Name)
+			if err != nil {
+				return err
+			}
+		}
+
+		pod, err = client.UpdatePodStatus(pod)
+		return err
+	}); resultErr != nil {
+		return nil, fmt.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
+	}
+	return pod, nil
 }
 
 func getPodNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (string, string, error) {
@@ -271,6 +343,7 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 type KubeClient interface {
 	GetRawWithPath(path string) ([]byte, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
+	UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error)
 }
 
 func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
@@ -282,6 +355,41 @@ func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 	}
 
 	return k8sArgs, nil
+}
+
+// Attempts to load Kubernetes-defined delegates and add them to the Multus config.
+// Returns the number of Kubernetes-defined delegates added or an error.
+func TryLoadK8sDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (int, *clientInfo, error) {
+	var err error
+	clientInfo := &clientInfo{}
+
+	kubeClient, err = GetK8sClient(conf.Kubeconfig, kubeClient)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if kubeClient == nil {
+		if len(conf.Delegates) == 0 {
+			// No available kube client and no delegates, we can't do anything
+			return 0, nil, fmt.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+		}
+		return 0, nil, nil
+	}
+
+	setKubeClientInfo(clientInfo, kubeClient, k8sArgs)
+	delegates, err := GetK8sNetwork(kubeClient, k8sArgs, conf.ConfDir)
+	if err != nil {
+		if _, ok := err.(*NoK8sNetworkError); ok {
+			return 0, nil, nil
+		}
+		return 0, nil, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
+	}
+
+	if err = conf.AddDelegates(delegates); err != nil {
+		return 0, nil, err
+	}
+
+	return len(delegates), clientInfo, nil
 }
 
 func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) {

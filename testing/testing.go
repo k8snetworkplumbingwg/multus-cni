@@ -21,8 +21,8 @@ import (
 	"net"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/client-go/pkg/api/v1"
 
 	. "github.com/onsi/gomega"
 )
@@ -90,6 +90,12 @@ func (f *FakeKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	}
 	f.PodCount++
 	return pod, nil
+}
+
+func (f *FakeKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
+	key := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
+	f.pods[key] = pod
+	return f.pods[key], nil
 }
 
 func (f *FakeKubeClient) AddPod(pod *v1.Pod) {

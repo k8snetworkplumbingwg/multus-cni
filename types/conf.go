@@ -21,6 +21,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/multus-cni/logging"
@@ -48,25 +49,6 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 	return nil
 }
 
-func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*libcni.RuntimeConf, error) {
-
-	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
-	// Todo
-	// ingress, egress and bandwidth capability features as same as kubelet.
-	rt := &libcni.RuntimeConf{
-		ContainerID: args.ContainerID,
-		NetNS:       args.Netns,
-		IfName:      ifName,
-		Args: [][2]string{
-			{"IgnoreUnknown", "1"},
-			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
-			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
-			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
-		},
-	}
-	return rt, nil
-}
-
 // Convert raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
@@ -88,6 +70,60 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, 
 	delegateConf.Bytes = bytes
 
 	return delegateConf, nil
+}
+
+func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*libcni.RuntimeConf, error) {
+
+	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
+	// Todo
+	// ingress, egress and bandwidth capability features as same as kubelet.
+	rt := &libcni.RuntimeConf{
+		ContainerID: args.ContainerID,
+		NetNS:       args.Netns,
+		IfName:      ifName,
+		Args: [][2]string{
+			{"IgnoreUnknown", "1"},
+			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
+			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
+			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
+		},
+	}
+	return rt, nil
+}
+
+func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
+	// Convert whatever the IPAM result was into the current Result type
+	result, err := current.NewResultFromResult(r)
+	if err != nil {
+		return nil, fmt.Errorf("error convert the type.Result to current.Result: %v", err)
+	}
+
+	netstatus := &NetworkStatus{}
+	netstatus.Name = netName
+	netstatus.Default = defaultNet
+
+	for _, ifs := range result.Interfaces {
+		//Only pod interfaces can have sandbox information
+		if ifs.Sandbox != "" {
+			netstatus.Interface = ifs.Name
+			netstatus.Mac = ifs.Mac
+		}
+	}
+
+	for _, ipconfig := range result.IPs {
+		if ipconfig.Version == "4" && ipconfig.Address.IP.To4() != nil {
+			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
+		}
+
+		if ipconfig.Version == "6" && ipconfig.Address.IP.To16() != nil {
+			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
+		}
+	}
+
+	netstatus.DNS = result.DNS
+
+	return netstatus, nil
+
 }
 
 func LoadNetConf(bytes []byte) (*NetConf, error) {
