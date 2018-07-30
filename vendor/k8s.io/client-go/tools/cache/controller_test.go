@@ -23,12 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/pkg/api/v1"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
 	"github.com/google/gofuzz"
@@ -44,7 +44,7 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, nil, downstream)
+	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, downstream)
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -307,13 +307,13 @@ func TestUpdate(t *testing.T) {
 	// asynchronous, there are a lot of valid possibilities.
 	type pair struct{ from, to string }
 	allowedTransitions := map[pair]bool{
-		pair{FROM, TO}: true,
+		{FROM, TO}: true,
 
 		// Because a resync can happen when we've already observed one
 		// of the above but before the item is deleted.
-		pair{TO, TO}: true,
+		{TO, TO}: true,
 		// Because a resync could happen before we observe an update.
-		pair{FROM, FROM}: true,
+		{FROM, FROM}: true,
 	}
 
 	pod := func(name, check string, final bool) *v1.Pod {
