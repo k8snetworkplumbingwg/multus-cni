@@ -300,7 +300,7 @@ var _ = Describe("multus operations", func() {
 		result, err := cmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		Expect(fKubeClient.PodCount).To(Equal(1))
+		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(2))
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin

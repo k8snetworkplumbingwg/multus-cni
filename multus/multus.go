@@ -204,39 +204,6 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
-// Attempts to load Kubernetes-defined delegates and add them to the Multus config.
-// Returns the number of Kubernetes-defined delegates added or an error.
-func tryLoadK8sDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient k8s.KubeClient) (int, error) {
-	var err error
-
-	kubeClient, err = k8s.GetK8sClient(conf.Kubeconfig, kubeClient)
-	if err != nil {
-		return 0, err
-	}
-
-	if kubeClient == nil {
-		if len(conf.Delegates) == 0 {
-			// No available kube client and no delegates, we can't do anything
-			return 0, fmt.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
-		}
-		return 0, nil
-	}
-
-	delegates, err := k8s.GetK8sNetwork(kubeClient, k8sArgs, conf.ConfDir)
-	if err != nil {
-		if _, ok := err.(*k8s.NoK8sNetworkError); ok {
-			return 0, nil
-		}
-		return 0, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
-	}
-
-	if err = conf.AddDelegates(delegates); err != nil {
-		return 0, err
-	}
-
-	return len(delegates), nil
-}
-
 func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
@@ -248,9 +215,9 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		return nil, fmt.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
-	numK8sDelegates, err := tryLoadK8sDelegates(k8sArgs, n, kubeClient)
+	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, n, kubeClient)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Multus: Err in loading K8s Delegates k8s args: %v", err)
 	}
 
 	if numK8sDelegates == 0 {
@@ -261,6 +228,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	}
 
 	var result, tmpResult cnitypes.Result
+	var netStatus []*types.NetworkStatus
 	var rt *libcni.RuntimeConf
 	lastIdx := 0
 	for idx, delegate := range n.Delegates {
@@ -276,12 +244,30 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		if delegate.MasterPlugin || result == nil {
 			result = tmpResult
 		}
+
+		//create the network status, only in case Multus as kubeconfig
+		if n.Kubeconfig != "" && kc.Podnamespace != "kube-system" {
+			delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("Multus: Err in setting  networks status: %v", err)
+			}
+
+			netStatus = append(netStatus, delegateNetStatus)
+		}
 	}
 
 	if err != nil {
 		// Ignore errors; DEL must be idempotent anyway
 		_ = delPlugins(exec, args.IfName, n.Delegates, lastIdx, rt, n.BinDir)
-		return nil, err
+		return nil, fmt.Errorf("Multus: Err in tearing down failed plugins: %v", err)
+	}
+
+	//set the network status annotation in apiserver, only in case Multus as kubeconfig
+	if n.Kubeconfig != "" && kc.Podnamespace != "kube-system" {
+		err = k8s.SetNetworkStatus(kc, netStatus)
+		if err != nil {
+			return nil, fmt.Errorf("Multus: Err set the networks status: %v", err)
+		}
 	}
 
 	return result, nil
@@ -309,7 +295,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		return fmt.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
-	numK8sDelegates, err := tryLoadK8sDelegates(k8sArgs, in, kubeClient)
+	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, in, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -327,6 +313,14 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return fmt.Errorf("Multus: failed to load netconf: %v", err)
+		}
+	}
+
+	//unset the network status annotation in apiserver, only in case Multus as kubeconfig
+	if in.Kubeconfig != "" && kc.Podnamespace != "kube-system" {
+		err := k8s.SetNetworkStatus(kc, nil)
+		if err != nil {
+			return fmt.Errorf("Multus: Err unset the networks status: %v", err)
 		}
 	}
 
