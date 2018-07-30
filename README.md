@@ -190,7 +190,7 @@ spec:
 $ kubectl create -f ./flannel-network.yaml
 network "flannel-networkobj" created
 
-$ kubectl get network
+$ kubectl get net-attach-def
 NAME                         AGE
 flannel-networkobj           26s
 ```
@@ -261,7 +261,7 @@ spec:
 8. View network objects using kubectl
 
 ```
-# kubectl get network
+# kubectl get net-attach-def
 NAME                         AGE
 flannel-networkobj           29m
 sriov-conf                   6m
