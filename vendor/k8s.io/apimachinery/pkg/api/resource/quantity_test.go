@@ -24,12 +24,9 @@ import (
 	"unicode"
 
 	fuzz "github.com/google/gofuzz"
-	"github.com/spf13/pflag"
 
 	inf "gopkg.in/inf.v0"
 )
-
-var useInfDec bool
 
 func amount(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
@@ -77,6 +74,17 @@ func TestQuantityParseZero(t *testing.T) {
 	if expected, actual := "0", zero.String(); expected != actual {
 		t.Errorf("Expected %v, actual %v", expected, actual)
 	}
+}
+
+// TestQuantityParseNonNumericPanic ensures that when a non-numeric string is parsed
+// it panics
+func TestQuantityParseNonNumericPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("MustParse did not panic")
+		}
+	}()
+	_ = MustParse("Non-Numeric")
 }
 
 // TestQuantityAddZeroPreservesSuffix verifies that a suffix is preserved
@@ -129,7 +137,7 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 	}
 }
 
-// Verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
+// TestQuantityCanocicalizeZero verifies that you get 0 as canonical value if internal value is 0, and not 0<suffix>
 func TestQuantityCanocicalizeZero(t *testing.T) {
 	val := MustParse("1000m")
 	val.i.Sub(int64Amount{value: 1})
@@ -140,6 +148,7 @@ func TestQuantityCanocicalizeZero(t *testing.T) {
 }
 
 func TestQuantityCmp(t *testing.T) {
+	// Test when d is nil
 	table := []struct {
 		x      string
 		y      string
@@ -157,8 +166,8 @@ func TestQuantityCmp(t *testing.T) {
 			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
-
-	nils := []struct {
+	// Test when i is {0,0}
+	table2 := []struct {
 		x      *inf.Dec
 		y      *inf.Dec
 		expect int
@@ -172,11 +181,11 @@ func TestQuantityCmp(t *testing.T) {
 		{dec(10, 0).Dec, nil, 1},
 		{dec(-10, 0).Dec, nil, -1},
 	}
-	for _, nilCase := range nils {
-		q1 := Quantity{d: infDecAmount{nilCase.x}, Format: DecimalSI}
-		q2 := Quantity{d: infDecAmount{nilCase.y}, Format: DecimalSI}
-		if result := q1.Cmp(q2); result != nilCase.expect {
-			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", nilCase.x, nilCase.y, nilCase.expect, result)
+	for _, testCase := range table2 {
+		q1 := Quantity{d: infDecAmount{testCase.x}, Format: DecimalSI}
+		q2 := Quantity{d: infDecAmount{testCase.y}, Format: DecimalSI}
+		if result := q1.Cmp(q2); result != testCase.expect {
+			t.Errorf("X: %v, Y: %v, Expected: %v, Actual: %v", testCase.x, testCase.y, testCase.expect, result)
 		}
 	}
 }
@@ -799,6 +808,34 @@ var fuzzer = fuzz.New().Funcs(
 	},
 )
 
+func TestQuantityDeepCopy(t *testing.T) {
+	// Test when d is nil
+	slice := []string{"0", "100m", "50m", "10000T"}
+	for _, testCase := range slice {
+		q := MustParse(testCase)
+		if result := q.DeepCopy(); result != q {
+			t.Errorf("Expected: %v, Actual: %v", q, result)
+		}
+	}
+	table := []*inf.Dec{
+		dec(0, 0).Dec,
+		dec(10, 0).Dec,
+		dec(-10, 0).Dec,
+	}
+	// Test when i is {0,0}
+	for _, testCase := range table {
+		q := Quantity{d: infDecAmount{testCase}, Format: DecimalSI}
+		result := q.DeepCopy()
+		if q.d.Cmp(result.AsDec()) != 0 {
+			t.Errorf("Expected: %v, Actual: %v", q.String(), result.String())
+		}
+		result = Quantity{d: infDecAmount{dec(2, 0).Dec}, Format: DecimalSI}
+		if q.d.Cmp(result.AsDec()) == 0 {
+			t.Errorf("Modifying result has affected q")
+		}
+	}
+}
+
 func TestJSON(t *testing.T) {
 	for i := 0; i < 500; i++ {
 		q := &Quantity{}
@@ -1018,21 +1055,6 @@ func TestCopy(t *testing.T) {
 	c.Set(6)
 	if q.Value() == 6 {
 		t.Errorf("Copy didn't")
-	}
-}
-
-func TestQFlagSet(t *testing.T) {
-	qf := qFlag{&Quantity{}}
-	qf.Set("1Ki")
-	if e, a := "1Ki", qf.String(); e != a {
-		t.Errorf("Unexpected result %v != %v", e, a)
-	}
-}
-
-func TestQFlagIsPFlag(t *testing.T) {
-	var pfv pflag.Value = qFlag{}
-	if e, a := "quantity", pfv.Type(); e != a {
-		t.Errorf("Unexpected result %v != %v", e, a)
 	}
 }
 

@@ -134,12 +134,26 @@ func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
 		return "", false, err
 	}
 
-	ns, ok, err := mergedKubeConfig.Namespace()
+	ns, overridden, err := mergedKubeConfig.Namespace()
 	// if we get an error and it is not empty config, or if the merged config defined an explicit namespace, or
 	// if in-cluster config is not possible, return immediately
-	if (err != nil && !IsEmptyConfig(err)) || ok || !config.icc.Possible() {
+	if (err != nil && !IsEmptyConfig(err)) || overridden || !config.icc.Possible() {
 		// return on any error except empty config
-		return ns, ok, err
+		return ns, overridden, err
+	}
+
+	if len(ns) > 0 {
+		// if we got a non-default namespace from the kubeconfig, use it
+		if ns != "default" {
+			return ns, false, nil
+		}
+
+		// if we got a default namespace, determine whether it was explicit or implicit
+		if raw, err := mergedKubeConfig.RawConfig(); err == nil {
+			if context := raw.Contexts[raw.CurrentContext]; context != nil && len(context.Namespace) > 0 {
+				return ns, false, nil
+			}
+		}
 	}
 
 	glog.V(4).Infof("Using in-cluster namespace")
