@@ -110,7 +110,7 @@ $ kubectl exec -it samplepod -- ip a
    * CNI configuration stored in on-disk file
    > refer the section 3.2 Network Object Definition for more details in Kubernetes Network Custom Resource Definition De-facto Standard
 * Refer the reference implementation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
-* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD
+* Release version from v3.0 is not compatible with v1.0 and v2.0 version Network Object CRD
   * [MULTUS CNI plugin](#multus-cni-plugin)specifications.
 
 ## Multi-Homed pod
