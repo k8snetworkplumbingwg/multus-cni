@@ -1,6 +1,6 @@
 ---
-apiVersion: "kubernetes.cni.cncf.io/v1"
-kind: Network
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
 metadata:
   name: vlan-conf-1-1
   namespace: testns1
