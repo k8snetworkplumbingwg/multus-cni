@@ -1,5 +1,5 @@
 ---
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: macvlan-conf-1
@@ -17,7 +17,7 @@ spec:
             }
         }'
 ---
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: macvlan-conf-2
@@ -35,7 +35,7 @@ spec:
             }
         }'
 ---
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: macvlan-conf-3
@@ -53,7 +53,7 @@ spec:
             }
         }'
 ---
-apiVersion: "kubernetes.cni.cncf.io/v1"
+apiVersion: "k8s.cni.cncf.io/v1"
 kind: Network
 metadata:
   name: macvlan-conf-4
