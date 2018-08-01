@@ -1,6 +1,6 @@
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf-1
 spec: 
@@ -18,7 +18,7 @@ spec:
         }'
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf-2
 spec: 
@@ -36,7 +36,7 @@ spec:
         }'
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf-3
 spec: 
@@ -54,7 +54,7 @@ spec:
         }'
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
-kind: Network
+kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf-4
 spec: 
