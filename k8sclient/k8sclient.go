@@ -381,7 +381,6 @@ func TryLoadK8sDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	if err != nil {
 		if _, ok := err.(*NoK8sNetworkError); ok {
 			return 0, clientInfo, nil
-			//return 0, nil, nil
 		}
 		return 0, nil, fmt.Errorf("Multus: Err in getting k8s network from pod: %v", err)
 	}
