@@ -246,13 +246,15 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		}
 
 		//create the network status, only in case Multus as kubeconfig
-		if n.Kubeconfig != "" && kc.Podnamespace != "kube-system" {
-			delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
-			if err != nil {
-				return nil, fmt.Errorf("Multus: Err in setting  networks status: %v", err)
-			}
+		if n.Kubeconfig != "" && kc != nil {
+			if kc.Podnamespace != "kube-system" {
+				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
+				if err != nil {
+					return nil, fmt.Errorf("Multus: Err in setting  networks status: %v", err)
+				}
 
-			netStatus = append(netStatus, delegateNetStatus)
+				netStatus = append(netStatus, delegateNetStatus)
+			}
 		}
 	}
 
