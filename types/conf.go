@@ -34,7 +34,7 @@ const (
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
 
-	logging.Debugf("LoadDelegateNetConfList: %v, %v", bytes, delegateConf)
+	logging.Debugf("LoadDelegateNetConfList: %s, %v", string(bytes), delegateConf)
 	if err := json.Unmarshal(bytes, &delegateConf.ConfList); err != nil {
 		return logging.Errorf("err in unmarshalling delegate conflist: %v", err)
 	}
@@ -52,7 +52,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 // Convert raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
-	logging.Debugf("LoadDelegateNetConf: %v, %s", bytes, ifnameRequest)
+	logging.Debugf("LoadDelegateNetConf: %s, %s", string(bytes), ifnameRequest)
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
@@ -133,7 +133,7 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf := &NetConf{}
 
-	logging.Debugf("LoadNetConf: %v", bytes)
+	logging.Debugf("LoadNetConf: %s", string(bytes))
 	if err := json.Unmarshal(bytes, netconf); err != nil {
 		return nil, logging.Errorf("failed to load netconf: %v", err)
 	}
