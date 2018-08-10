@@ -38,6 +38,7 @@ import (
 )
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
+	logging.Debugf("saveScratchNetConf: %s, %s, %s", containerID, dataDir, string(netconf))
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return logging.Errorf("failed to create the multus data directory(%q): %v", dataDir, err)
 	}
@@ -53,6 +54,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 }
 
 func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
+	logging.Debugf("consumeScratchNetConf: %s, %s", containerID, dataDir)
 	path := filepath.Join(dataDir, containerID)
 	defer os.Remove(path)
 
@@ -60,6 +62,7 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, error) {
 }
 
 func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
+	logging.Debugf("getIfname: %v, %s, %d", delegate, argif, idx)
 	if delegate.IfnameRequest != "" {
 		return delegate.IfnameRequest
 	}
@@ -74,6 +77,7 @@ func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
 }
 
 func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetConf) error {
+	logging.Debugf("saveDelegates: %s, %s, %v", containerID, dataDir, delegates)
 	delegatesBytes, err := json.Marshal(delegates)
 	if err != nil {
 		return logging.Errorf("error serializing delegate netconf: %v", err)
@@ -87,6 +91,7 @@ func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetCo
 }
 
 func validateIfName(nsname string, ifname string) error {
+	logging.Debugf("validateIfName: %s, %s", nsname, ifname)
 	podNs, err := ns.GetNS(nsname)
 	if err != nil {
 		return logging.Errorf("no netns: %v", err)
@@ -107,6 +112,7 @@ func validateIfName(nsname string, ifname string) error {
 }
 
 func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) (cnitypes.Result, error) {
+	logging.Debugf("conflistAdd: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := []string{binDir}
 	cniNet := libcni.CNIConfig{Path: binDirs}
@@ -125,6 +131,7 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) (
 }
 
 func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) error {
+	logging.Debugf("conflistDel: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := []string{binDir}
 	cniNet := libcni.CNIConfig{Path: binDirs}
