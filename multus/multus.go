@@ -299,16 +299,14 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 	}
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
-		if err != nil {
-			//  if NetNs is passed down by the CEO, or if it called multiple times
-			// so don't return an error if the device is already removed.
-			// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
-			_, ok := err.(ns.NSPathNotExistErr)
-			if ok {
-				return nil
-			}
-			return fmt.Errorf("failed to open netns %q: %v", netns, err)
+		//  if NetNs is passed down by the Cloud Orchestration Engine, or if it called multiple times
+		// so don't return an error if the device is already removed.
+		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
+		_, ok := err.(ns.NSPathNotExistErr)
+		if ok {
+			return nil
 		}
+		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
 	defer netns.Close()
 
