@@ -29,7 +29,8 @@ before_script:
 script:
   - ./build
   - sudo ./test.sh
-  - $GOPATH/bin/goveralls -service=travis-ci
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - $GOPATH/bin/goveralls  -coverprofile=coverage.out -service=travis-ci
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
   - docker build -t nfvpe/multus -f ./images/Dockerfile .
