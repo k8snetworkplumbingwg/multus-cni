@@ -1,6 +1,6 @@
 ![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
-[![Travis CI](https://travis-ci.org/intel/multus-cni.svg?branch=master)](https://travis-ci.org/intel/multus-cni/builds)[![Coverage Status](https://coveralls.io/repos/github/intel/multus-cni/badge.svg?branch=master)](https://coveralls.io/github/intel/multus-cni?branch=master)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)
+[![Travis CI](https://travis-ci.org/intel/multus-cni.svg?branch=master)](https://travis-ci.org/intel/multus-cni/builds)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)
 
    * [MULTUS CNI plugin](#multus-cni-plugin)
       * [Quickstart Guide](#quickstart-guide)
