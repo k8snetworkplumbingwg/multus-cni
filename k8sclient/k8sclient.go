@@ -379,7 +379,7 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		return nil, resourceMap, err
 	}
 
-	delegate, err := types.LoadDelegateNetConf(configBytes, net.InterfaceRequest, deviceID)
+	delegate, err := types.LoadDelegateNetConf(configBytes, net, deviceID)
 	if err != nil {
 		return nil, resourceMap, err
 	}
