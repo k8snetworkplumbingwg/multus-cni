@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -167,6 +168,18 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 
 	if err := validateIfName(os.Getenv("CNI_NETNS"), ifName); err != nil {
 		return nil, logging.Errorf("cannot set %q ifname to %q: %v", delegate.Conf.Type, ifName, err)
+	}
+
+	if delegate.MacRequest != "" {
+		// validate Mac address
+		_, err := net.ParseMAC(delegate.MacRequest)
+		if err != nil {
+			return nil, logging.Errorf("failed to parse mac address %q", delegate.MacRequest)
+		}
+
+		if os.Setenv("MAC", delegate.MacRequest) != nil {
+			return nil, logging.Errorf("cannot set %q mac to %q: %v", delegate.Conf.Type, delegate.MacRequest, err)
+		}
 	}
 
 	if delegate.ConfListPlugin != false {

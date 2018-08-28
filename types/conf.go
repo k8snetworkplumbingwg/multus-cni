@@ -51,7 +51,10 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // Convert raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
+	delegateConf := &DelegateNetConf{}
+	logging.Debugf("LoadDelegateNetConf: %s, %v", string(bytes), net)
+
 	// If deviceID is present, inject this into delegate config
 	if deviceID != "" {
 		if updatedBytes, err := delegateAddDeviceID(bytes, deviceID); err != nil {
@@ -61,8 +64,6 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*Delegat
 		}
 	}
 
-	delegateConf := &DelegateNetConf{}
-	logging.Debugf("LoadDelegateNetConf: %s, %s", string(bytes), ifnameRequest)
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
@@ -74,8 +75,13 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*Delegat
 		}
 	}
 
-	if ifnameRequest != "" {
-		delegateConf.IfnameRequest = ifnameRequest
+	if net != nil {
+		if net.InterfaceRequest != "" {
+			delegateConf.IfnameRequest = net.InterfaceRequest
+		}
+		if net.MacRequest != "" {
+			delegateConf.MacRequest = net.MacRequest
+		}
 	}
 
 	delegateConf.Bytes = bytes
