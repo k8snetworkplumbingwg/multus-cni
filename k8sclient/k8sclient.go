@@ -383,6 +383,21 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		}
 	}
 
+	// DEVICE_ID
+	// Get resourceName annotation from NetDefinition
+	deviceID := ""
+	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
+	if ok {
+		// ResourceName annotation is found; try to get device info from resourceMap
+		entry, ok := resourceMap[resourceName]
+		if ok {
+			if idCount := len(entry.deviceIDs); idCount > 0 && idCount > entry.Index {
+				deviceID = entry.deviceIDs[entry.Index]
+				entry.Index++ // increment Index for next delegate
+			}
+		}
+	}
+
 	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
 	if err != nil {
 		return nil, err
