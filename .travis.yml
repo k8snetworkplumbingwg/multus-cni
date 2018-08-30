@@ -10,12 +10,12 @@ env:
 
 before_install:
   - sudo apt-get update -qq
+  - go get github.com/mattn/goveralls
 
 install:
   # workaround golint install error in https://github.com/golang/lint/issues/288
   - mkdir -p $GOPATH/src/golang.org/x
   - pushd $GOPATH/src/golang.org/x
-  - git clone https://github.com/golang/tools.git
   - git clone https://github.com/golang/lint.git
   - go get github.com/golang/lint/golint
   - popd
@@ -29,9 +29,10 @@ before_script:
 script:
   - ./build
   - sudo ./test.sh
+  - $GOPATH/bin/goveralls  -coverprofile=coverage.out -service=travis-ci
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
-  - docker build -t nfvpe/multus -f ./images/Dockerfile .
+  - docker build -t nfvpe/multus .
 
 before_deploy:
   - go get -u github.com/laher/goxc

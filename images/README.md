@@ -2,10 +2,10 @@
 
 This is used for distribution of Multus in a Docker image.
 
-Typically you'd build this from the root of your Multus clone, and you'd set the `-f` flag to specify the Dockerfile during build time. This allows the addition of the entirety of the Multus git clone as part of the Docker context. Use the `-f` flag with the root of the clone as the context (e.g. your current work directory would be root of git clone), such as:
+Typically you'd build this from the root of your Multus clone, as such:
 
 ```
-$ docker build -t dougbtv/multus -f ./images/Dockerfile .
+$ docker build -t dougbtv/multus .
 ```
 
 ---

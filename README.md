@@ -1,5 +1,7 @@
 ![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
+[![Travis CI](https://travis-ci.org/intel/multus-cni.svg?branch=master)](https://travis-ci.org/intel/multus-cni/builds)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)
+
    * [MULTUS CNI plugin](#multus-cni-plugin)
       * [Quickstart Guide](#quickstart-guide)
       * [Multi-Homed pod](#multi-homed-pod)

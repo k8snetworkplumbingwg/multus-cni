@@ -35,8 +35,9 @@ const (
 )
 
 var loggingStderr bool
-var loggingFp	*os.File
+var loggingFp *os.File
 var loggingLevel Level
+
 const defaultTimestampFormat = time.RFC3339
 
 func (l Level) String() string {
@@ -75,8 +76,9 @@ func Debugf(format string, a ...interface{}) {
 	Printf(DebugLevel, format, a...)
 }
 
-func Errorf(format string, a ...interface{}) {
+func Errorf(format string, a ...interface{}) error {
 	Printf(ErrorLevel, format, a...)
+	return fmt.Errorf(format, a...)
 }
 
 func Panicf(format string, a ...interface{}) {
@@ -86,7 +88,7 @@ func Panicf(format string, a ...interface{}) {
 	Printf(PanicLevel, "========= Stack trace output end ========")
 }
 
-func GetLoggingLevel (levelStr string) Level {
+func GetLoggingLevel(levelStr string) Level {
 	switch strings.ToLower(levelStr) {
 	case "debug":
 		return DebugLevel
@@ -99,18 +101,18 @@ func GetLoggingLevel (levelStr string) Level {
 	return UnknownLevel
 }
 
-func SetLogLevel (levelStr string) {
+func SetLogLevel(levelStr string) {
 	level := GetLoggingLevel(levelStr)
 	if level < MaxLevel {
 		loggingLevel = level
 	}
 }
 
-func SetLogStderr (enable bool) {
+func SetLogStderr(enable bool) {
 	loggingStderr = enable
 }
 
-func SetLogFile (filename string) {
+func SetLogFile(filename string) {
 	if filename == "" {
 		return
 	}
