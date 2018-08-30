@@ -17,7 +17,6 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -35,15 +34,16 @@ const (
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
 
+	logging.Debugf("LoadDelegateNetConfList: %s, %v", string(bytes), delegateConf)
 	if err := json.Unmarshal(bytes, &delegateConf.ConfList); err != nil {
-		return fmt.Errorf("err in unmarshalling delegate conflist: %v", err)
+		return logging.Errorf("err in unmarshalling delegate conflist: %v", err)
 	}
 
 	if delegateConf.ConfList.Plugins == nil {
-		return fmt.Errorf("delegate must have the 'type'or 'Plugin' field")
+		return logging.Errorf("delegate must have the 'type'or 'Plugin' field")
 	}
 	if delegateConf.ConfList.Plugins[0].Type == "" {
-		return fmt.Errorf("a plugin delegate must have the 'type' field")
+		return logging.Errorf("a plugin delegate must have the 'type' field")
 	}
 	delegateConf.ConfListPlugin = true
 	return nil
@@ -52,14 +52,15 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 // Convert raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
 	delegateConf := &DelegateNetConf{}
+	logging.Debugf("LoadDelegateNetConf: %s, %s", string(bytes), ifnameRequest)
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
-		return nil, fmt.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
+		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
 
 	// Do some minimal validation
 	if delegateConf.Conf.Type == "" {
 		if err := LoadDelegateNetConfList(bytes, delegateConf); err != nil {
-			return nil, fmt.Errorf("error in LoadDelegateNetConf: %v", err)
+			return nil, logging.Errorf("error in LoadDelegateNetConf: %v", err)
 		}
 	}
 
@@ -74,6 +75,7 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, 
 
 func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*libcni.RuntimeConf, error) {
 
+	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s", args, k8sArgs, ifName)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	// Todo
 	// ingress, egress and bandwidth capability features as same as kubelet.
@@ -92,10 +94,12 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*l
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
+	logging.Debugf("LoadNetworkStatus: %v, %s, %s", r, netName, defaultNet)
+
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
 	if err != nil {
-		return nil, fmt.Errorf("error convert the type.Result to current.Result: %v", err)
+		return nil, logging.Errorf("error convert the type.Result to current.Result: %v", err)
 	}
 
 	netstatus := &NetworkStatus{}
@@ -128,8 +132,10 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 
 func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf := &NetConf{}
+
+	logging.Debugf("LoadNetConf: %s", string(bytes))
 	if err := json.Unmarshal(bytes, netconf); err != nil {
-		return nil, fmt.Errorf("failed to load netconf: %v", err)
+		return nil, logging.Errorf("failed to load netconf: %v", err)
 	}
 
 	// Logging
@@ -144,16 +150,16 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	if netconf.RawPrevResult != nil {
 		resultBytes, err := json.Marshal(netconf.RawPrevResult)
 		if err != nil {
-			return nil, fmt.Errorf("could not serialize prevResult: %v", err)
+			return nil, logging.Errorf("could not serialize prevResult: %v", err)
 		}
 		res, err := version.NewResult(netconf.CNIVersion, resultBytes)
 		if err != nil {
-			return nil, fmt.Errorf("could not parse prevResult: %v", err)
+			return nil, logging.Errorf("could not parse prevResult: %v", err)
 		}
 		netconf.RawPrevResult = nil
 		netconf.PrevResult, err = current.NewResultFromResult(res)
 		if err != nil {
-			return nil, fmt.Errorf("could not convert result to current version: %v", err)
+			return nil, logging.Errorf("could not convert result to current version: %v", err)
 		}
 	}
 
@@ -164,7 +170,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	// the existing delegate list and all delegates executed in-order.
 
 	if len(netconf.RawDelegates) == 0 {
-		return nil, fmt.Errorf("at least one delegate must be specified")
+		return nil, logging.Errorf("at least one delegate must be specified")
 	}
 
 	if netconf.CNIDir == "" {
@@ -182,11 +188,11 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	for idx, rawConf := range netconf.RawDelegates {
 		bytes, err := json.Marshal(rawConf)
 		if err != nil {
-			return nil, fmt.Errorf("error marshalling delegate %d config: %v", idx, err)
+			return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
 		}
 		delegateConf, err := LoadDelegateNetConf(bytes, "")
 		if err != nil {
-			return nil, fmt.Errorf("failed to load delegate %d config: %v", idx, err)
+			return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
 		}
 		netconf.Delegates = append(netconf.Delegates, delegateConf)
 	}
@@ -200,6 +206,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 // AddDelegates appends the new delegates to the delegates list
 func (n *NetConf) AddDelegates(newDelegates []*DelegateNetConf) error {
+	logging.Debugf("AddDelegates: %v", newDelegates)
 	n.Delegates = append(n.Delegates, newDelegates...)
 	return nil
 }
