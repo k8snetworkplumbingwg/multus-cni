@@ -35,18 +35,9 @@ import (
 	"github.com/intel/multus-cni/types"
 )
 
-const (
-	resourceNameAnnot = "k8s.v1.cni.cncf.io/resourceName"
-)
-
 // NoK8sNetworkError indicates error, no network in kubernetes
 type NoK8sNetworkError struct {
 	message string
-}
-
-type ResourceInfo struct {
-	Index     int
-	deviceIDs []string
 }
 
 type clientInfo struct {
@@ -74,26 +65,6 @@ func (d *defaultKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 
 func (d *defaultKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
 	return d.client.Core().Pods(pod.Namespace).UpdateStatus(pod)
-}
-
-// GetComputeDeviceMap returns a map of resourceName to list of device IDs
-func GetComputeDeviceMap(pod *v1.Pod) map[string]*ResourceInfo {
-
-	resourceMap := make(map[string]*ResourceInfo)
-
-	for _, cntr := range pod.Spec.Containers {
-		for _, cd := range cntr.ComputeDevices {
-			entry, ok := resourceMap[cd.ResourceName]
-			if ok {
-				// already exists; append to it
-				entry.deviceIDs = append(entry.deviceIDs, cd.DeviceIDs...)
-			} else {
-				// new entry
-				resourceMap[cd.ResourceName] = &ResourceInfo{deviceIDs: cd.DeviceIDs}
-			}
-		}
-	}
-	return resourceMap
 }
 
 func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs) {
@@ -160,8 +131,15 @@ func setPodNetworkAnnotation(client KubeClient, namespace string, pod *v1.Pod, n
 	return pod, nil
 }
 
-func getPodNetworkAnnotation(pod *v1.Pod) (string, string, error) {
-  logging.Debugf("getPodNetworkAnnotation: %v", pod)
+func getPodNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (string, string, error) {
+	var err error
+
+	logging.Debugf("getPodNetworkAnnotation: %v, %v", client, k8sArgs)
+	pod, err := client.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+	if err != nil {
+		return "", "", logging.Errorf("getPodNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
+	}
+
 	return pod.Annotations["k8s.v1.cni.cncf.io/networks"], pod.ObjectMeta.Namespace, nil
 }
 
@@ -348,9 +326,8 @@ func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinit
 	return config, nil
 }
 
-func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string, resourceMap map[string]*ResourceInfo) (*types.DelegateNetConf, error) {
-
-  logging.Debugf("getKubernetesDelegate: %v, %v, %s", client, net, confdir)
+func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string) (*types.DelegateNetConf, error) {
+	logging.Debugf("getKubernetesDelegate: %v, %v, %s", client, net, confdir)
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", net.Namespace, net.Name)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
@@ -362,55 +339,17 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		return nil, logging.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
 
-	// DEVICE_ID
-	// Get resourceName annotation from NetDefinition
-	deviceID := ""
-	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
-	if ok {
-		// ResourceName annotation is found; try to get device info from resourceMap
-		entry, ok := resourceMap[resourceName]
-		if ok {
-			if idCount := len(entry.deviceIDs); idCount > 0 && idCount > entry.Index {
-				deviceID = entry.deviceIDs[entry.Index]
-				entry.Index++ // increment Index for next delegate
-			}
-		}
-	}
-
 	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
 	if err != nil {
 		return nil, err
-	}
-
-	if deviceID != "" {
-		if configBytes, err = delegateAddDeviceID(configBytes, deviceID); err != nil {
-			return nil, err
-		}
 	}
 
 	delegate, err := types.LoadDelegateNetConf(configBytes, net.InterfaceRequest)
 	if err != nil {
 		return nil, err
 	}
-  
+
 	return delegate, nil
-}
-
-func delegateAddDeviceID(inBytes []byte, deviceID string) ([]byte, error) {
-	var rawConfig map[string]interface{}
-	var err error
-
-	err = json.Unmarshal(inBytes, &rawConfig)
-	if err != nil {
-		return nil, logging.Errorf("delegateAddDeviceID: failed to unmarshal inBytes: %v", err)
-	}
-	// Inject deviceID
-	rawConfig["deviceID"] = deviceID
-	configBytes, err := json.Marshal(rawConfig)
-	if err != nil {
-		return nil, logging.Errorf("delegateAddDeviceID: failed to re-marshal Spec.Config: %v", err)
-	}
-	return configBytes, nil
 }
 
 type KubeClient interface {
@@ -508,18 +447,10 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string) ([]*types.DelegateNetConf, error) {
 	logging.Debugf("GetK8sNetwork: %v, %v, %v", k8sclient, k8sArgs, confdir)
 
-	pod, err := k8sclient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-	if err != nil {
-		return nil, logging.Errorf("GetK8sNetwork: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
-	}
-
-	netAnnot, defaultNamespace, err := getPodNetworkAnnotation(pod)
+	netAnnot, defaultNamespace, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get Pod ComputeDevices info
-	resourceMap := GetComputeDeviceMap(pod)
 
 	if len(netAnnot) == 0 {
 		return nil, &NoK8sNetworkError{"no kubernetes network found"}
@@ -533,7 +464,7 @@ func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	for _, net := range networks {
-		delegate, err := getKubernetesDelegate(k8sclient, net, confdir, resourceMap)
+		delegate, err := getKubernetesDelegate(k8sclient, net, confdir)
 		if err != nil {
 			return nil, logging.Errorf("GetK8sNetwork: failed getting the delegate: %v", err)
 		}
