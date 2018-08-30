@@ -409,6 +409,15 @@ message ComponentStatusList {
   repeated ComponentStatus items = 2;
 }
 
+// ComputeDevice describes the devices assigned to this container for a given ResourceName
+message ComputeDevice {
+  // DeviceIDs is the list of devices assigned to this container
+  repeated string deviceIDs = 1;
+
+  // ResourceName is the name of the compute resource
+  optional string resourceName = 2;
+}
+
 // ConfigMap holds configuration data for pods to consume.
 message ConfigMap {
   // Standard object's metadata.
@@ -644,6 +653,13 @@ message Container {
   // +patchStrategy=merge
   // +optional
   repeated VolumeDevice volumeDevices = 21;
+
+  // AssignedDevices contains the devices assigned to this container
+  // This field is alpha-level and is only honored by servers that enable the DeviceAssignment feature.
+  // +patchMergeKey=resourceName
+  // +patchStrategy=merge
+  // +optional
+  repeated ComputeDevice computeDevices = 22;
 
   // Periodic probe of container liveness.
   // Container will be restarted if the probe fails.
@@ -3733,6 +3749,7 @@ message ScaleIOPersistentVolumeSource {
   optional string storagePool = 6;
 
   // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
@@ -3742,7 +3759,8 @@ message ScaleIOPersistentVolumeSource {
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // Ex. "ext4", "xfs", "ntfs".
+  // Default is "xfs"
   // +optional
   optional string fsType = 9;
 
@@ -3777,6 +3795,7 @@ message ScaleIOVolumeSource {
   optional string storagePool = 6;
 
   // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // Default is ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 
@@ -3786,7 +3805,8 @@ message ScaleIOVolumeSource {
 
   // Filesystem type to mount.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // Ex. "ext4", "xfs", "ntfs".
+  // Default is "xfs".
   // +optional
   optional string fsType = 9;
 

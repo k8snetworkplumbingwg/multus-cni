@@ -26,6 +26,7 @@ import (
 // The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type PodExpansion interface {
 	Bind(binding *v1.Binding) error
+	// TODO (dashpole) add subresource for setting pod devices
 	Evict(eviction *policy.Eviction) error
 	GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request
 }
