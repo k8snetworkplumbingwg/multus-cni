@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // List and ListV1 should be kept in sync with k8s.io/kubernetes/pkg/api#List
@@ -62,8 +61,8 @@ func TestScheme() (*runtime.Scheme, apiserializer.CodecFactory) {
 		&v1.CarpList{},
 		&List{},
 	)
-	utilruntime.Must(testapigroup.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
+	testapigroup.AddToScheme(scheme)
+	v1.AddToScheme(scheme)
 
 	codecs := apiserializer.NewCodecFactory(scheme)
 	return scheme, codecs

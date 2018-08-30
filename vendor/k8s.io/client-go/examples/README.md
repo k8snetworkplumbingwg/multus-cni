@@ -25,7 +25,3 @@ for client-go.
   the custom resources.
 
 [informer]: https://godoc.org/k8s.io/client-go/tools/cache#NewInformer
-
-### Testing
-
-- [**Fake Client**](./fake-client): Use a fake client in tests.

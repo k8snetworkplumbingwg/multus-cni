@@ -1339,7 +1339,6 @@ type ScaleIOVolumeSource struct {
 	// +optional
 	StoragePool string `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
-	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// The name of a volume already created in the ScaleIO system
@@ -1347,8 +1346,7 @@ type ScaleIOVolumeSource struct {
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs".
-	// Default is "xfs".
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1376,7 +1374,6 @@ type ScaleIOPersistentVolumeSource struct {
 	// +optional
 	StoragePool string `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
 	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
-	// Default is ThinProvisioned.
 	// +optional
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// The name of a volume already created in the ScaleIO system
@@ -1384,8 +1381,7 @@ type ScaleIOPersistentVolumeSource struct {
 	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs".
-	// Default is "xfs"
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	// +optional
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
 	// Defaults to false (read/write). ReadOnly here will force
@@ -1723,14 +1719,6 @@ type VolumeDevice struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// devicePath is the path inside of the container that the device will be mapped to.
 	DevicePath string `json:"devicePath" protobuf:"bytes,2,opt,name=devicePath"`
-}
-
-// ComputeDevice describes the devices assigned to this container for a given ResourceName
-type ComputeDevice struct {
-	// DeviceIDs is the list of devices assigned to this container
-	DeviceIDs []string `json:"deviceIDs" protobuf:"bytes,1,opt,name=deviceIDs"`
-	// ResourceName is the name of the compute resource
-	ResourceName string `json:"resourceName" protobuf:"bytes,2,opt,name=resourceName"`
 }
 
 // EnvVar represents an environment variable present in a Container.
@@ -2082,12 +2070,6 @@ type Container struct {
 	// +patchStrategy=merge
 	// +optional
 	VolumeDevices []VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
-	// AssignedDevices contains the devices assigned to this container
-	// This field is alpha-level and is only honored by servers that enable the DeviceAssignment feature.
-	// +patchMergeKey=resourceName
-	// +patchStrategy=merge
-	// +optional
-	ComputeDevices []ComputeDevice `json:"computeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"resourceName" protobuf:"bytes,22,rep,name=computeDevices"`
 	// Periodic probe of container liveness.
 	// Container will be restarted if the probe fails.
 	// Cannot be updated.

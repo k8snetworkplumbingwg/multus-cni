@@ -186,7 +186,7 @@ func TestSetRotationDeadline(t *testing.T) {
 						NotAfter:  tc.notAfter,
 					},
 				},
-				getTemplate:           func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
+				template:              &x509.CertificateRequest{},
 				usages:                []certificates.KeyUsage{},
 				certificateExpiration: &g,
 			}
@@ -221,8 +221,8 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 				NotAfter:  now.Add(-1 * time.Hour),
 			},
 		},
-		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificates.KeyUsage{},
+		template: &x509.CertificateRequest{},
+		usages:   []certificates.KeyUsage{},
 		certSigningRequestClient: fakeClient{
 			failureType: createError,
 		},
@@ -244,8 +244,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 				NotAfter:  now.Add(-1 * time.Hour),
 			},
 		},
-		getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
-		usages:      []certificates.KeyUsage{},
+		template: &x509.CertificateRequest{},
+		usages:   []certificates.KeyUsage{},
 		certSigningRequestClient: fakeClient{
 			failureType: watchError,
 		},
