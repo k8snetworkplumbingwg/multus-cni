@@ -387,6 +387,48 @@ NAME                   READY     STATUS    RESTARTS   AGE
 multus-multi-net-poc   1/1       Running   0          30s
 ```
 
+#### Pod Annotation Parameters
+
+JSON formated network annotation in Pod can have several parameters as following:
+
+- namespace: Kubernetes namespace that the target network attach definition is defined in.
+- mac: MAC address (e.g "c2:11:22:33:44:66") for target network interface
+- interfaceRequest: interface name for target network interface
+
+Note: If you add `mac`, please add 'tuning' plugin into target network attach definition as CNI plugin chaining as following.
+
+```
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan with tuning
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "name": "chains",
+      "plugins": [ {
+        "type": "macvlan",
+        "master": "eth0",
+        "mode": "bridge",
+          "ipam": {
+            "type": "host-local",
+            "subnet": "192.168.1.0/24",
+            "rangeStart": "192.168.1.200",
+            "rangeEnd": "192.168.1.216",
+            "routes": [
+              { "dst": "0.0.0.0/0" }
+            ],
+            "gateway": "192.168.1.1"
+          }
+        },
+        {
+          "name":"macchange",
+          "type":"tuning"
+        }]
+
+  }'
+```
+
 ### Verifying Pod network interfaces
 
 1. Run `ifconfig` command in Pod:
