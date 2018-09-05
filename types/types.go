@@ -108,10 +108,10 @@ type NetworkSelectionElement struct {
 	Namespace string `json:"namespace,omitempty"`
 	// IPRequest contains an optional requested IP address for this network
 	// attachment
-	IPRequest string `json:"ipRequest,omitempty"`
+	IPRequest string `json:"ips,omitempty"`
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
-	MacRequest string `json:"macRequest,omitempty"`
+	MacRequest string `json:"mac,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interfaceRequest,omitempty"`
