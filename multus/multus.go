@@ -181,6 +181,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		if os.Setenv("MAC", delegate.MacRequest) != nil {
 			return nil, logging.Errorf("cannot set %q mac to %q: %v", delegate.Conf.Type, delegate.MacRequest, err)
 		}
+		logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
 	}
 
 	if delegate.ConfListPlugin != false {
