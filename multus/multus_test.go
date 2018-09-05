@@ -249,7 +249,7 @@ var _ = Describe("multus operations", func() {
 		podNet := `[{"name":"net1",
 	         "interfaceRequest": "test1"},
 		{"name":"net2",
-		 "macRequest": "c2:11:22:33:44:66"}
+		 "mac": "c2:11:22:33:44:66"}
 ]`
 		fakePod := testhelpers.NewFakePod("testpod", podNet)
 		net1 := `{
