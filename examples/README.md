@@ -60,3 +60,35 @@ A sample `cni-configuration.conf` is provided, typically this file is placed in 
 ## Other considerations
 
 Primarily in this setup one thing that one should consider are the aspects of the `macvlan-conf.yml`, which is likely specific to the configuration of the node on which this resides.
+
+## Passing down device information
+Some CNI plugins require specific device information which maybe pre-allocated by K8s device plugin. This could be indicated by providing `k8s.v1.cni.cncf.io/resourceName` annotaton in its network attachment definition CRD. The file [`examples/sriov-net.yaml`](./sriov-net.yaml) shows an example on how to define a Network attachment definition with specific device allocation information. Multus will get allocated device information and make them available for CNI plugin to work on.
+
+In this exmaple (shown below), it is expected that an [SRIOV Device Plugin](https://github.com/intel/sriov-network-device-plugin/tree/dev/k8s-deviceid-model) making a pool of SRIOV VFs available to the K8s with `intel.com/sriov` as their resourceName. Any device allocated from this resource pool will be passed down by Multus to the [sriov-cni](https://github.com/intel/sriov-cni/tree/dev/k8s-deviceid-model) plugin in `deviceID` field. This is up to the sriov-cni plugin to capture this information and work with this specific device information.
+
+```yaml
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net-a
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov
+spec:
+  config: '{
+  "type": "sriov",
+  "vlan": 1000,
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "rangeStart": "10.56.217.171",
+    "rangeEnd": "10.56.217.181",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
+}'
+```
+The [net-resource-sample-pod.yaml](./net-resource-sample-pod.yaml) is an exmaple Pod manifest file that requesting a SRIOV device from a host which is then configured using the above network attachement definition.
+
+>For further information on how to configure SRIOV Device Plugin and SRIOV-CNI please refer to the links given above.
