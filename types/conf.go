@@ -50,7 +50,16 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // Convert raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, ifnameRequest string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*DelegateNetConf, error) {
+	// If deviceID is present, inject this into delegate config
+	if deviceID != "" {
+		if updatedBytes, err := delegateAddDeviceID(bytes, deviceID); err != nil {
+			return nil, logging.Errorf("error in LoadDelegateNetConf - delegateAddDeviceID unable to update delegate config: %v", err)
+		} else {
+			bytes = updatedBytes
+		}
+	}
+
 	delegateConf := &DelegateNetConf{}
 	logging.Debugf("LoadDelegateNetConf: %s, %s", string(bytes), ifnameRequest)
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
@@ -190,7 +199,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		if err != nil {
 			return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
 		}
-		delegateConf, err := LoadDelegateNetConf(bytes, "")
+		delegateConf, err := LoadDelegateNetConf(bytes, "", "")
 		if err != nil {
 			return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
 		}
@@ -209,4 +218,22 @@ func (n *NetConf) AddDelegates(newDelegates []*DelegateNetConf) error {
 	logging.Debugf("AddDelegates: %v", newDelegates)
 	n.Delegates = append(n.Delegates, newDelegates...)
 	return nil
+}
+
+// delegateAddDeviceID injects deviceID information in delegate bytes
+func delegateAddDeviceID(inBytes []byte, deviceID string) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("delegateAddDeviceID: failed to unmarshal inBytes: %v", err)
+	}
+	// Inject deviceID
+	rawConfig["deviceID"] = deviceID
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("delegateAddDeviceID: failed to re-marshal Spec.Config: %v", err)
+	}
+	return configBytes, nil
 }
