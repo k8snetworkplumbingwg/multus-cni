@@ -109,7 +109,7 @@ $ kubectl exec -it samplepod -- ip a
    * Not using CNI config (“thick” plugin usecase)
    * CNI configuration stored in on-disk file
    > refer the section 3.2 Network Object Definition for more details in Kubernetes Network Custom Resource Definition De-facto Standard
-* Refer the reference implemenation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
+* Refer the reference implementation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
 * Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD 
   * [MULTUS CNI plugin](#multus-cni-plugin)specifications.
 
@@ -480,7 +480,7 @@ For example in your CNI configuration, you may set:
 
 The default logging level is set as `panic` -- this will log only the most critical errors, and is the least verbose logging level.
 
-The available logging level values, in descreasing order of verbosity are:
+The available logging level values, in decreasing order of verbosity are:
 
 * `debug`
 * `error`

@@ -4,7 +4,7 @@ In the `./examples` folder some example configurations are provided for using Mu
 
 ## Examples overview
 
-Generally, the examples here show a setup using Multus with CRD support. The examples here demonstrate a setup with Multus as the meta-plugin used by Kubernetes, and delgating to either Flannel (which will be the default pod network), or to macvlan. The CRDs are intended to be alignment with the defacto standard.
+Generally, the examples here show a setup using Multus with CRD support. The examples here demonstrate a setup with Multus as the meta-plugin used by Kubernetes, and delegating to either Flannel (which will be the default pod network), or to macvlan. The CRDs are intended to be alignment with the defacto standard.
 
 It is expected that aspects of your own setup will vary, at least in part, from some of what's demonstrated here. Namely, the IP address spaces, and likely the host ethernet interface names used in the macvlan part of the configuration.
 
@@ -12,7 +12,7 @@ More specifically, these examples show:
 
 * Multus configured, using CNI a `.conf` file, with CRD support, specifying that we will use a "default network".
 * A resource definition with a daemonset that places the `.conf` on each node in the cluster.
-* A CRD definining the "networks" @ `network-attachment-definitions.k8s.cni.cncf.io` 
+* A CRD defining the "networks" @ `network-attachment-definitions.k8s.cni.cncf.io` 
 * CRD objects containing the configuration for both Flannel & macvlan.
 
 ## Quick-start instructions
@@ -37,7 +37,7 @@ More specifically, these examples show:
 
 ## RBAC configuration
 
-You'll need to abnel the `system:node` users access to the API endpoints that will deliver the CRD objects to Multus. 
+You'll need to enable the `system:node` users access to the API endpoints that will deliver the CRD objects to Multus. 
 
 Using these examples, you'll first create a cluster role with the provided sample:
 
