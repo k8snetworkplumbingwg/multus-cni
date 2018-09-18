@@ -331,29 +331,36 @@ func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinit
 	return config, nil
 }
 
-func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, error) {
+func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement, confdir string, podID string, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s", client, net, confdir)
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", net.Namespace, net.Name)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		return nil, logging.Errorf("getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
 	}
 
 	customResource := &types.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
-		return nil, logging.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
 
 	// Get resourceName annotation from NetDefinition
 	deviceID := ""
 	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
-	if ok {
+	if ok && podID != "" {
+		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
 		// ResourceName annotation is found; try to get device info from resourceMap
+		resourceMap, err := checkpoint.GetComputeDeviceMap(podID)
+		if err != nil {
+			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from kubelet checkpoint file: %v", err)
+		}
+
 		entry, ok := resourceMap[resourceName]
 		if ok {
 			if idCount := len(entry.DeviceIDs); idCount > 0 && idCount > entry.Index {
 				deviceID = entry.DeviceIDs[entry.Index]
+				logging.Debugf("getKubernetesDelegate: podID: %s deviceID: %s", podID, deviceID)
 				entry.Index++ // increment Index for next delegate
 			}
 		}
@@ -361,15 +368,15 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 
 	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
 	if err != nil {
-		return nil, err
+		return nil, resourceMap, err
 	}
 
 	delegate, err := types.LoadDelegateNetConf(configBytes, net.InterfaceRequest, deviceID)
 	if err != nil {
-		return nil, err
+		return nil, resourceMap, err
 	}
 
-	return delegate, nil
+	return delegate, resourceMap, nil
 }
 
 type KubeClient interface {
@@ -472,8 +479,6 @@ func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 		return nil, err
 	}
 
-	// Get Pod ComputeDevices info
-	resourceMap, err := checkpoint.GetComputeDeviceMap(podID)
 	if err != nil {
 		return nil, logging.Errorf("GetK8sNetwork: failed to get resourceMap for PodUID: %v %v", podID, err)
 	}
@@ -487,14 +492,19 @@ func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 		return nil, err
 	}
 
+	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
+	// This is only initialized once and all delegate objects can reference this to look up device info.
+	var resourceMap map[string]*types.ResourceInfo
+
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	for _, net := range networks {
-		delegate, err := getKubernetesDelegate(k8sclient, net, confdir, resourceMap)
+		delegate, resourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetK8sNetwork: failed getting the delegate: %v", err)
 		}
 		delegates = append(delegates, delegate)
+		_ = resourceMap // workaround for 'Go' error: 'resourceMap' declared and not used.
 	}
 
 	return delegates, nil
