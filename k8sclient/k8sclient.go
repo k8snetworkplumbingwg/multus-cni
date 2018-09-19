@@ -349,11 +349,19 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 	deviceID := ""
 	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
 	if ok && podID != "" {
-		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
 		// ResourceName annotation is found; try to get device info from resourceMap
-		resourceMap, err := checkpoint.GetComputeDeviceMap(podID)
-		if err != nil {
-			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from kubelet checkpoint file: %v", err)
+		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
+
+		if resourceMap == nil {
+			checkpoint, err := checkpoint.GetCheckpoint()
+			if err != nil {
+				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get a checkpoint instance: %v", err)
+			}
+			resourceMap, err = checkpoint.GetComputeDeviceMap(podID)
+			if err != nil {
+				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from kubelet checkpoint file: %v", err)
+			}
+			logging.Debugf("getKubernetesDelegate(): resourceMap instance: %+v", resourceMap)
 		}
 
 		entry, ok := resourceMap[resourceName]
@@ -493,18 +501,18 @@ func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 	}
 
 	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
-	// This is only initialized once and all delegate objects can reference this to look up device info.
+	// This will only be initialized once and all delegate objects can reference this to look up device info.
 	var resourceMap map[string]*types.ResourceInfo
 
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	for _, net := range networks {
-		delegate, resourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
+		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetK8sNetwork: failed getting the delegate: %v", err)
 		}
 		delegates = append(delegates, delegate)
-		_ = resourceMap // workaround for 'Go' error: 'resourceMap' declared and not used.
+		resourceMap = updatedResourceMap
 	}
 
 	return delegates, nil
