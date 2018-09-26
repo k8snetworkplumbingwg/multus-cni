@@ -56,7 +56,7 @@ apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf
-spec: 
+spec:
   config: '{
       "cniVersion": "0.3.0",
       "type": "macvlan",
@@ -110,7 +110,7 @@ $ kubectl exec -it samplepod -- ip a
    * CNI configuration stored in on-disk file
    > refer the section 3.2 Network Object Definition for more details in Kubernetes Network Custom Resource Definition De-facto Standard
 * Refer the reference implementation presentation and demo details - [link](https://docs.google.com/presentation/d/1dbCin6MnhK-BjjcVun5YiPTL99VA2uSiyWAtWAPNlIc/edit?usp=sharing)
-* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD 
+* Release version from v2.0 is not compatible with v1.1 and v1.2 network CRD
   * [MULTUS CNI plugin](#multus-cni-plugin)specifications.
 
 ## Multi-Homed pod
@@ -137,6 +137,7 @@ $ kubectl exec -it samplepod -- ip a
 - type (string, required): &quot;multus&quot;
 - kubeconfig (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml)
 - delegates (([]map,required): number of delegate details in the Multus
+- capabilities ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
 
 ## Usage with Kubernetes CRD based network objects
 
@@ -176,7 +177,7 @@ apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: flannel-networkobj
-spec: 
+spec:
   config: '{
     "cniVersion": "0.3.0",
     "type": "flannel",
@@ -305,7 +306,7 @@ Configurations referenced in annotations are created in addition to the default 
 
 1. Save the following YAML to pod-multi-network.yaml. In this case flannel-conf network object acts as the primary network.
 ```
-# cat pod-multi-network.yaml 
+# cat pod-multi-network.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -346,7 +347,7 @@ multus-multi-net-poc   1/1       Running   0          30s
 1. Run `ifconfig` command in Pod:
 
 ```
-# kubectl exec -it multus-multi-net-poc -- ifconfig       
+# kubectl exec -it multus-multi-net-poc -- ifconfig
 eth0      Link encap:Ethernet  HWaddr C6:43:7C:09:B4:9C
           inet addr:10.128.0.4  Bcast:0.0.0.0  Mask:255.255.255.0
           UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
@@ -355,39 +356,39 @@ eth0      Link encap:Ethernet  HWaddr C6:43:7C:09:B4:9C
           collisions:0 txqueuelen:0
           RX bytes:648 (648.0 B)  TX bytes:42 (42.0 B)
 
-lo        Link encap:Local Loopback  
+lo        Link encap:Local Loopback
           inet addr:127.0.0.1  Mask:255.0.0.0
           inet6 addr: ::1/128 Scope:Host
           UP LOOPBACK RUNNING  MTU:65536  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1 
+          collisions:0 txqueuelen:1
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
-          
-net0      Link encap:Ethernet  HWaddr 06:21:91:2D:74:B9  
+
+net0      Link encap:Ethernet  HWaddr 06:21:91:2D:74:B9
           inet addr:192.168.42.3  Bcast:0.0.0.0  Mask:255.255.255.0
           inet6 addr: fe80::421:91ff:fe2d:74b9/64 Scope:Link
           UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0 
+          collisions:0 txqueuelen:0
           RX bytes:0 (0.0 B)  TX bytes:648 (648.0 B)
 
-net1      Link encap:Ethernet  HWaddr D2:94:98:82:00:00  
+net1      Link encap:Ethernet  HWaddr D2:94:98:82:00:00
           inet addr:10.56.217.171  Bcast:0.0.0.0  Mask:255.255.255.0
           inet6 addr: fe80::d094:98ff:fe82:0/64 Scope:Link
           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
           RX packets:2 errors:0 dropped:0 overruns:0 frame:0
           TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000 
+          collisions:0 txqueuelen:1000
           RX bytes:120 (120.0 B)  TX bytes:648 (648.0 B)
 
-north     Link encap:Ethernet  HWaddr BE:F2:48:42:83:12  
+north     Link encap:Ethernet  HWaddr BE:F2:48:42:83:12
           inet6 addr: fe80::bcf2:48ff:fe42:8312/64 Scope:Link
           UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
           RX packets:1420 errors:0 dropped:0 overruns:0 frame:0
           TX packets:1276 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000 
+          collisions:0 txqueuelen:1000
           RX bytes:95956 (93.7 KiB)  TX bytes:82200 (80.2 KiB)
 ```
 
@@ -424,7 +425,7 @@ Given the following network configuration:
         {
                 "type": "sriov",
                 #part of sriov plugin conf
-                "if0": "enp12s0f0", 
+                "if0": "enp12s0f0",
                 "ipam": {
                         "type": "host-local",
                         "subnet": "10.56.217.0/24",
@@ -462,7 +463,7 @@ EOF
 
 ## Logging Options
 
-You may wish to enable some enhanced logging for Multus, especially during the process where you're configuring Multus and need to understand what is or isn't working with your particular configuration. 
+You may wish to enable some enhanced logging for Multus, especially during the process where you're configuring Multus and need to understand what is or isn't working with your particular configuration.
 
 Multus will always log via `STDERR`, which is the standard method by which CNI plugins communicate errors, and these errors are logged by the Kubelet. This method is always enabled.
 
@@ -557,7 +558,7 @@ pod "multus-test" created
 20: net0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
     link/ether f6:fb:21:4f:1d:63 brd ff:ff:ff:ff:ff:ff
 21: net1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq qlen 1000
-    link/ether 76:13:b1:60:00:00 brd ff:ff:ff:ff:ff:ff 
+    link/ether 76:13:b1:60:00:00 brd ff:ff:ff:ff:ff:ff
 ```
 
 | Interface name | Description |

@@ -111,11 +111,12 @@ func validateIfName(nsname string, ifname string) error {
 	return err
 }
 
-func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) (cnitypes.Result, error) {
+func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, exec invoke.Exec) (cnitypes.Result, error) {
 	logging.Debugf("conflistAdd: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
-	binDirs := []string{binDir}
-	cniNet := libcni.CNIConfig{Path: binDirs}
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append(binDirs, binDir)
+	cniNet := libcni.NewCNIConfig(binDirs, exec)
 
 	confList, err := libcni.ConfListFromBytes(rawnetconflist)
 	if err != nil {
@@ -160,7 +161,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 	}
 
 	if delegate.ConfListPlugin != false {
-		result, err := conflistAdd(rt, delegate.Bytes, binDir)
+		result, err := conflistAdd(rt, delegate.Bytes, binDir, exec)
 		if err != nil {
 			return nil, logging.Errorf("Multus: error in invoke Conflist add - %q: %v", delegate.ConfList.Name, err)
 		}
@@ -246,7 +247,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	for idx, delegate := range n.Delegates {
 		lastIdx = idx
 		ifName := getIfname(delegate, args.IfName, idx)
-		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName)
+		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
 		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir)
 		if err != nil {
 			break
@@ -360,7 +361,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		}
 	}
 
-	rt, _ := types.LoadCNIRuntimeConf(args, k8sArgs, "")
+	rt, _ := types.LoadCNIRuntimeConf(args, k8sArgs, "", in.RuntimeConfig)
 	return delPlugins(exec, args.IfName, in.Delegates, len(in.Delegates)-1, rt, in.BinDir)
 }
 
