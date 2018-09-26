@@ -93,9 +93,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
-func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*libcni.RuntimeConf, error) {
+func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) (*libcni.RuntimeConf, error) {
 
-	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s", args, k8sArgs, ifName)
+	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	// Todo
 	// ingress, egress and bandwidth capability features as same as kubelet.
@@ -109,6 +109,12 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*l
 			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
 			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
 		},
+	}
+
+	if rc != nil {
+		rt.CapabilityArgs = map[string]interface{}{
+			"portMappings": rc.PortMaps,
+		}
 	}
 	return rt, nil
 }

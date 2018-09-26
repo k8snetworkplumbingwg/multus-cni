@@ -51,6 +51,17 @@ type NetConf struct {
 	NamespaceIsolation bool `json:"namespaceIsolation"`
 }
 
+type RuntimeConfig struct {
+	PortMaps []PortMapEntry `json:"portMappings,omitempty"`
+}
+
+type PortMapEntry struct {
+	HostPort      int    `json:"hostPort"`
+	ContainerPort int    `json:"containerPort"`
+	Protocol      string `json:"protocol"`
+	HostIP        string `json:"hostIP,omitempty"`
+}
+
 type NetworkStatus struct {
 	Name      string    `json:"name"`
 	Interface string    `json:"interface,omitempty"`

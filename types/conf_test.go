@@ -35,13 +35,20 @@ var _ = Describe("config operations", func() {
     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
     "delegates": [{
         "type": "weave-net"
-    }]
+    }],
+	"runtimeConfig": {
+      "portMappings": [
+        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+      ]
+    }
+
 }`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
+		Expect(len(netConf.RuntimeConfig.PortMaps)).To(Equal(1))
 	})
 
 	It("succeeds if only delegates are set", func() {
