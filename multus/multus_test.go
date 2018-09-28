@@ -251,7 +251,7 @@ var _ = Describe("multus operations", func() {
 		{"name":"net2",
 		 "mac": "c2:11:22:33:44:66"}
 ]`
-		fakePod := testhelpers.NewFakePod("testpod", podNet)
+		fakePod := testhelpers.NewFakePod("testpod", podNet, "")
 		net1 := `{
 	"name": "net1",
 	"type": "mynet",
@@ -315,7 +315,7 @@ var _ = Describe("multus operations", func() {
 		result, err := cmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		Expect(fKubeClient.PodCount).To(Equal(2))
+		Expect(fKubeClient.PodCount).To(Equal(3))
 		Expect(fKubeClient.NetCount).To(Equal(2))
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
@@ -323,7 +323,7 @@ var _ = Describe("multus operations", func() {
 	})
 
 	It("executes delegates and kubernetes networks", func() {
-		fakePod := testhelpers.NewFakePod("testpod", "net1,net2")
+		fakePod := testhelpers.NewFakePod("testpod", "net1,net2", "")
 		net1 := `{
 	"name": "net1",
 	"type": "mynet",
@@ -394,7 +394,7 @@ var _ = Describe("multus operations", func() {
 		result, err := cmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		Expect(fKubeClient.PodCount).To(Equal(2))
+		Expect(fKubeClient.PodCount).To(Equal(3))
 		Expect(fKubeClient.NetCount).To(Equal(2))
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
