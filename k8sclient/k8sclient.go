@@ -426,6 +426,16 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	}
 
 	setKubeClientInfo(clientInfo, kubeClient, k8sArgs)
+
+	delegate, err := tryLoadK8sPodDefaultNetwork(k8sArgs, conf, kubeClient)
+	logging.Debugf("TryLoadK8sDelegates: load cluster network %v from pod annotations", delegate)
+	if err != nil {
+		return 0, nil, logging.Errorf("TryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
+	}else if delegate != nil{
+		// Overwrite the cluster default network.
+		conf.Delegates[0] = delegate
+	}
+
 	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir)
 	if err != nil {
 		if _, ok := err.(*NoK8sNetworkError); ok {
@@ -623,4 +633,48 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 	}
 
 	return nil
+}
+
+func getPodDefaultNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (string, error) {
+	logging.Debugf("getPodDefaultNetworkAnnotation: %v, %v", client, k8sArgs)
+	pod, err := client.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+	if err != nil {
+		return "", logging.Errorf("getPodDefaultNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
+	}
+
+	if v, ok := pod.Annotations["multus-cni.io/default-network"]; ok {
+		return v, nil
+	} else {
+		return "", nil
+	}
+}
+
+// tryLoadK8sPodDefaultNetwork get pod default network from annotations
+func tryLoadK8sPodDefaultNetwork(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (*types.DelegateNetConf, error) {
+	logging.Debugf("tryLoadK8sPodDefaultNetwork: %v, %v", kubeClient, k8sArgs)
+
+	netAnnot, err := getPodDefaultNetworkAnnotation(kubeClient, k8sArgs)
+	if err != nil {
+		return nil, err
+	}
+	if netAnnot == "" {
+		return nil, nil
+	}
+
+	// The CRD object of default network should only be defined in default namespace
+	networks, err := parsePodNetworkAnnotation(netAnnot, "default")
+	if err != nil {
+		return nil, err
+	}
+	if len(networks) > 1 {
+		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: more than one default network is specified: %s", netAnnot)
+	}
+
+	delegate, _, err := getKubernetesDelegate(kubeClient, networks[0], conf.ConfDir, "", nil)
+	if err != nil {
+		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed getting the delegate: %v", err)
+	}
+	delegate.MasterPlugin = true
+
+	return delegate, nil
 }
