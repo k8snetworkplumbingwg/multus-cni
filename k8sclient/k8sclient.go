@@ -345,7 +345,7 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
 	}
 
-	// Get resourceName annotation from NetDefinition
+	// Get resourceName annotation from NetworkAttachmentDefinition
 	deviceID := ""
 	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
 	if ok && podID != "" {
