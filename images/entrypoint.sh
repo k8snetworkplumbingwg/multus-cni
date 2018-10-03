@@ -8,14 +8,17 @@ CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
+MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 
 # Give help text for parameters.
 function usage()
 {
-    echo -e "This is an entrypoint script for Multus CNI to overlay its"
-    echo -e "binary and configuration into locations in a filesystem."
-    echo -e "The configuration & binary file will be copied to the "
-    echo -e "corresponding configuration directory."
+    echo -e "This is an entrypoint script for Multus CNI to overlay its binary and "
+    echo -e "configuration into locations in a filesystem. The configuration & binary file "
+    echo -e "will be copied to the corresponding configuration directory. When "
+    echo -e "`--multus-conf-file=auto` is used, 00-multus.conf will be automatically "
+    echo -e "generated from the CNI configuration file of the master plugin (the first file "
+    echo -e "in lexicographical order in cni-conf-dir)."
     echo -e ""
     echo -e "./entrypoint.sh"
     echo -e "\t-h --help"
@@ -23,6 +26,7 @@ function usage()
     echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
+    echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
 }
 
 # Parse parameters given as arguments to this script.
@@ -46,6 +50,9 @@ while [ "$1" != "" ]; do
         --multus-bin-file)
             MULTUS_BIN_FILE=$VALUE
             ;;
+        --multus-kubeconfig-file-host)
+            MULTUS_KUBECONFIG_FILE_HOST=$VALUE
+            ;;
         *)
             echo "ERROR: unknown parameter \"$PARAM\""
             usage
@@ -57,7 +64,11 @@ done
 
 
 # Create array of known locations
-declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_CONF_FILE $MULTUS_BIN_FILE)
+declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
+if [ "$MULTUS_CONF_FILE" != "auto" ]; then
+  arr+=($MULTUS_BIN_FILE)
+fi
+
 
 # Loop through and verify each location each.
 for i in "${arr[@]}"
@@ -69,8 +80,10 @@ do
 done
 
 # Copy files into proper places.
-cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
 cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR
+if [ "$MULTUS_CONF_FILE" != "auto" ]; then
+  cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
+fi
 
 # Make a multus.d directory (for our kubeconfig)
 
@@ -133,6 +146,35 @@ else
 fi
 
 # ---------------------- end Generate a "kube-config".
+
+# ------------------------------- Generate "00-multus.conf"
+
+if [ "$MULTUS_CONF_FILE" == "auto" ]; then
+  echo "Generating Multus configuration file ..."
+  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep .conf | head -1)"
+  if [ "$MASTER_PLUGIN" == "" ]; then
+    echo "Error: Multus could not be configured: no master plugin was found."
+    exit 1;
+  elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
+    echo "Warning: Multus is already configured: auto configuration skipped."
+  else
+    MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+    CONF=$(cat <<-EOF
+			{
+				"name": "multus-cni-network",
+				"type": "multus",
+				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
+				"delegates": [
+					$MASTER_PLUGIN_JSON
+				]
+			}
+			EOF
+		)
+    echo $CONF > $CNI_CONF_DIR/00-multus.conf
+  fi
+fi
+
+# ---------------------- end Generate "00-multus.conf".
 
 echo "Entering sleep... (success)"
 
