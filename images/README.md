@@ -31,10 +31,12 @@ You can get get help with the `--help` flag.
 ```
 $ ./entrypoint.sh --help
 
-This is an entrypoint script for Multus CNI to overlay its
-binary and configuration into locations in a filesystem.
-The configuration & binary file will be copied to the 
-corresponding configuration directory.
+This is an entrypoint script for Multus CNI to overlay its binary and
+configuration into locations in a filesystem. The configuration & binary file
+will be copied to the corresponding configuration directory. When
+`--multus-conf-file=auto` is used, 00-multus.conf will be automatically
+generated from the CNI configuration file of the master plugin (the first file
+in lexicographical order in cni-conf-dir).
 
 ./entrypoint.sh
     -h --help
@@ -42,6 +44,7 @@ corresponding configuration directory.
     --cni-bin-dir=/host/opt/cni/bin
     --multus-conf-file=/usr/src/multus-cni/images/70-multus.conf
     --multus-bin-file=/usr/src/multus-cni/bin/multus
+    --multus-kubeconfig-file-host=/etc/cni/net.d/multus.d/multus.kubeconfig
 ```
 
 You must use an `=` to delimit the parameter name and the value. For example you may set a custom `cni-conf-dir` like so:
@@ -59,7 +62,7 @@ Note: You'll noticed that there's a `/host/...` directory from the root for the 
 Example docker run command:
 
 ```
-$ docker run -it -v /opt/cni/bin/:/host/opt/cni/bin/ -v /etc/cni/net.d/:/host/etc/cni/net.d/ --entrypoint=/bin/bash dougbtv/multus 
+$ docker run -it -v /opt/cni/bin/:/host/opt/cni/bin/ -v /etc/cni/net.d/:/host/etc/cni/net.d/ --entrypoint=/bin/bash dougbtv/multus
 ```
 
 Originally inspired by and is a portmanteau of the [Flannel daemonset](https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel.yml), the [Calico Daemonset](https://github.com/projectcalico/calico/blob/master/v2.0/getting-started/kubernetes/installation/hosted/k8s-backend-addon-manager/calico-daemonset.yaml), and the [Calico CNI install bash script](https://github.com/projectcalico/cni-plugin/blob/be4df4db2e47aa7378b1bdf6933724bac1f348d0/k8s-install/scripts/install-cni.sh#L104-L153).
