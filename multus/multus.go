@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/invoke"
@@ -35,7 +36,15 @@ import (
 	"github.com/intel/multus-cni/logging"
 	"github.com/intel/multus-cni/types"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+var defaultReadinessBackoff = wait.Backoff{
+	Steps:    4,
+	Duration: 250 * time.Millisecond,
+	Factor:   4.0,
+	Jitter:   0.1,
+}
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	logging.Debugf("saveScratchNetConf: %s, %s, %s", containerID, dataDir, string(netconf))
@@ -226,6 +235,16 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	if err != nil {
 		return nil, logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
+
+	wait.ExponentialBackoff(defaultReadinessBackoff, func() (bool, error) {
+		_, err := os.Stat(n.ReadinessIndicatorFile)
+		switch {
+		case err == nil:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
 
 	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, n, kubeClient)
 	if err != nil {
