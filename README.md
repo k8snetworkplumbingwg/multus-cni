@@ -17,6 +17,7 @@
       * [Using with Multus conf file](#using-with-multus-conf-file)
       * [Logging Options](#logging-options)
       * [How to use with Network Device plugins?](#cni-running-with-network-device-plugin)
+      * [Default Network Readiness Checks](#default-network-readiness-checks)
       * [Testing Multus CNI](#testing-multus-cni)
          * [Multiple flannel networks](#multiple-flannel-networks)
             * [Configure Kubernetes with CNI](#configure-kubernetes-with-cni)
@@ -500,6 +501,21 @@ Allocation of the Network device(such as SRIOV VFs) are done by Device plugins(E
 * [Device plugin & CNI, NUMA Manager alignment - technical architecture document](https://docs.google.com/document/d/1Ewe9Of84GkP0b2Q2PC0y9RVZNkN2WeVEagX9m99Nrzc/edit)
 * Reference implementation : [SRIOV Network device plugin](https://github.com/intel/sriov-network-device-plugin)
 * Example: [How to make Multus work with device plugin?](https://github.com/intel/multus-cni/tree/master/examples#passing-down-device-information)
+
+## Default Network Readiness Checks
+
+You may wish for your "default network" (that is, the CNI plugin & its configuration you specify as your default delegate) to become ready before you attach networks with Multus. This is disabled by default and not used unless you add the readiness check option(s) to your CNI configuration file.
+
+For example, if you use Flannel as a default network, the recommended method for Flannel to be installed is via a daemonset that also drops a configuration file in `/etc/cni/net.d/`. This may apply to other plugins that place that configuration file upon their readiness, hence, Multus uses their configuration filename as a semaphore and optionally waits to attach networks to pods until that file exists.
+
+In this manner, you may prevent pods from crash looping, and instead wait for that default network to be ready.
+
+Only one option is necessary to configure this functionality:
+
+* `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready.
+
+*NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
+
 ## Testing Multus CNI
 
 ### Multiple flannel networks

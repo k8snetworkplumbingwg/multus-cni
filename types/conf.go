@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	defaultCNIDir  = "/var/lib/cni/multus"
-	defaultConfDir = "/etc/cni/multus/net.d"
-	defaultBinDir  = "/opt/cni/bin"
+	defaultCNIDir             = "/var/lib/cni/multus"
+	defaultConfDir            = "/etc/cni/multus/net.d"
+	defaultBinDir             = "/opt/cni/bin"
+	defaultReadinessIndicatorFile = ""
 )
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -198,6 +199,10 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 	if netconf.BinDir == "" {
 		netconf.BinDir = defaultBinDir
+	}
+
+	if netconf.ReadinessIndicatorFile == "" {
+		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
 	}
 
 	for idx, rawConf := range netconf.RawDelegates {
