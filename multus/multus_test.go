@@ -173,6 +173,8 @@ var _ = Describe("multus operations", func() {
 			StdinData: []byte(`{
     "name": "node-cni-network",
     "type": "multus",
+    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "defaultnetworkwaitseconds": 3,
     "delegates": [{
         "name": "weave1",
         "cniVersion": "0.2.0",
@@ -184,6 +186,10 @@ var _ = Describe("multus operations", func() {
     }]
 }`),
 		}
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
 
 		fExec := &fakeExec{}
 		expectedResult1 := &types020.Result{
@@ -226,6 +232,13 @@ var _ = Describe("multus operations", func() {
 		err = cmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+
 	})
 
 	It("executes delegates and kubernetes networks", func() {
