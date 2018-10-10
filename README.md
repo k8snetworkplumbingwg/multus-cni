@@ -497,7 +497,7 @@ You may configure the logging level by using the `LogLevel` option in your CNI c
 Allocation of the Network device(such as SRIOV VFs) are done by Device plugins(Eg.SRIOV Network device plugin), Multus developed to work in the co-existence enviroment to work with device plugin by passing down the allocated device information to the CNI plugins.
 
 * [Device plugin & CNI, NUMA Manager alignment - technical architecture document](https://docs.google.com/document/d/1Ewe9Of84GkP0b2Q2PC0y9RVZNkN2WeVEagX9m99Nrzc/edit)
-* Reference implementation : [SRIOV Network devie plugin](https://github.com/intel/sriov-network-device-plugin)
+* Reference implementation : [SRIOV Network device plugin](https://github.com/intel/sriov-network-device-plugin)
 * Example: [How to make Multus work with device plugin?](https://github.com/intel/multus-cni/tree/master/examples#passing-down-device-information)
 ## Testing Multus CNI
 
