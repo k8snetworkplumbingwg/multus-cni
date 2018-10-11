@@ -24,4 +24,4 @@ ADD ./images/entrypoint.sh /
 # does it require a root user?
 # USER 1001
 
-ENTRYPOINT [/entrypoint.sh]
+ENTRYPOINT ["/entrypoint.sh"]
