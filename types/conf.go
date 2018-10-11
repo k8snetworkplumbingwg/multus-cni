@@ -216,7 +216,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 			if err != nil {
 				return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
 			}
-			delegateConf, err := LoadDelegateNetConf(bytes, "")
+			delegateConf, err := LoadDelegateNetConf(bytes, "", "")
 			if err != nil {
 				return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
 			}

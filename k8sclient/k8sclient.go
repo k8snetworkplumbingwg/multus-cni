@@ -536,7 +536,7 @@ func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*t
 		return nil, err
 	}
 
-	delegate, err := types.LoadDelegateNetConf(configBytes, "")
+	delegate, err := types.LoadDelegateNetConf(configBytes, "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func getNetDelegate(client KubeClient, netname string, confdir string) (*types.D
 	var configBytes []byte
 	configBytes, err = getCNIConfigFromFile(netname, confdir)
 	if err == nil {
-		delegate, err := types.LoadDelegateNetConf(configBytes, "")
+		delegate, err := types.LoadDelegateNetConf(configBytes, "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -572,7 +572,7 @@ func getNetDelegate(client KubeClient, netname string, confdir string) (*types.D
 				var configBytes []byte
 				configBytes, err = getCNIConfigFromFile("", netname)
 				if err == nil {
-					delegate, err := types.LoadDelegateNetConf(configBytes, "")
+					delegate, err := types.LoadDelegateNetConf(configBytes, "", "")
 					if err != nil {
 						return nil, err
 					}
