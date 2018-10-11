@@ -135,10 +135,54 @@ $ kubectl exec -it samplepod -- ip a
 
 ## Network configuration reference
 
-- name (string, required): the name of the network
-- type (string, required): &quot;multus&quot;
-- kubeconfig (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml)
-- delegates (([]map,required): number of delegate details in the Multus
+Following is the example of multus config file, in `/etc/cni/net.d/`.
+```
+{
+    "name": "node-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+    "confDir": "/etc/cni/multus/net.d",
+    "cniDir": "/var/lib/cni/multus",
+    "binDir": "/opt/cni/bin",
+    "logFile": "/var/log/multus.log",
+    "logLevel": "debug",
+    /* NOTE: you can set clusterNetwork+defaultNetworks OR delegates!! (this is only for manual) */
+    "clusterNetwork": "defaultCRD",
+    "defaultNetwork": ["sidecarCRD", "flannel"],
+    "delegates": [{
+        "type": "weave-net",
+        "hairpinMode": true
+    }, {
+        "type": "macvlan",
+        ... (snip)
+    }]
+}
+```
+
+- `name` (string, required): the name of the network
+- `type` (string, required): &quot;multus&quot;
+- `confDir` (string, optional): directory for CNI config file that multus reads. default `/etc/cni/multus/net.d`
+- `cniDir` (string, optional): Multus CNI data directory, default `/var/lib/cni/multus`
+- `binDir` (string, optional): directory for CNI plugins which multus calls. default `/opt/cni/bin`
+- `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
+- `logFile` (string, optional): file path for log file. multus puts log in given file
+- `logLevel` (string, optional): logging level ("debug", "error" or "panic")
+- `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
+
+User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
+
+- `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
+- `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
+- `delegates` ([]map,required): number of delegate details in the Multus
+
+### Network selection flow of clusterNetwork/defaultNetworks
+
+Multus will find network for clusterNetwork/defaultNetworks as following sequences:
+
+1. CRD object for given network name
+1. CNI json config file in `confDir`. Given name should be without extention, like .conf/.conflist. (e.g. "test" for "test.conf")
+1. Directory for CNI json config file. Multus will find alphabetically first file for the network.
+1. Multus raise error message
 
 ## Usage with Kubernetes CRD based network objects
 
@@ -614,7 +658,6 @@ pod "multus-test" created
   - [Bond CNI](https://github.com/Intel-Corp/bond-cni)
   - [Node Feature Discovery](https://github.com/kubernetes-incubator/node-feature-discovery)
   - [CPU Manager for Kubernetes](https://github.com/Intel-Corp/CPU-Manager-for-Kubernetes)
-
 
 ## Need help
 

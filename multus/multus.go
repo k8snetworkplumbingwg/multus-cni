@@ -247,7 +247,16 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		}
 	})
 
-	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, n, kubeClient)
+	if n.ClusterNetwork != "" {
+		err = k8s.GetDefaultNetworks(k8sArgs, n, kubeClient)
+		if err != nil {
+			return nil, logging.Errorf("XXX")
+		}
+		// First delegate is always the master plugin
+		n.Delegates[0].MasterPlugin = true
+	}
+
+	numK8sDelegates, kc, err := k8s.TryLoadPodDelegates(k8sArgs, n, kubeClient)
 	if err != nil {
 		return nil, logging.Errorf("Multus: Err in loading K8s Delegates k8s args: %v", err)
 	}
@@ -349,7 +358,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		return logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
-	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, in, kubeClient)
+	numK8sDelegates, kc, err := k8s.TryLoadPodDelegates(k8sArgs, in, kubeClient)
 	if err != nil {
 		return err
 	}

@@ -104,7 +104,7 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*l
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
-	logging.Debugf("LoadNetworkStatus: %v, %s, %v", r, netName, defaultNet)
+	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
@@ -179,8 +179,8 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	// the master plugin. Kubernetes CRD delegates are then appended to
 	// the existing delegate list and all delegates executed in-order.
 
-	if len(netconf.RawDelegates) == 0 {
-		return nil, logging.Errorf("at least one delegate must be specified")
+	if len(netconf.RawDelegates) == 0 && netconf.ClusterNetwork == "" {
+		return nil, logging.Errorf("at least one delegate/defaultNetwork must be specified")
 	}
 
 	if netconf.CNIDir == "" {
@@ -199,21 +199,28 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
 	}
 
-	for idx, rawConf := range netconf.RawDelegates {
-		bytes, err := json.Marshal(rawConf)
-		if err != nil {
-			return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
+	// get RawDelegates and put delegates field
+	if len(netconf.DefaultNetworks) == 0 {
+		// for Delegates
+		if len(netconf.RawDelegates) == 0 {
+			return nil, logging.Errorf("at least one delegate must be specified")
 		}
-		delegateConf, err := LoadDelegateNetConf(bytes, "", "")
-		if err != nil {
-			return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
+		for idx, rawConf := range netconf.RawDelegates {
+			bytes, err := json.Marshal(rawConf)
+			if err != nil {
+				return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
+			}
+			delegateConf, err := LoadDelegateNetConf(bytes, "")
+			if err != nil {
+				return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
+			}
+			netconf.Delegates = append(netconf.Delegates, delegateConf)
 		}
-		netconf.Delegates = append(netconf.Delegates, delegateConf)
-	}
-	netconf.RawDelegates = nil
+		netconf.RawDelegates = nil
 
-	// First delegate is always the master plugin
-	netconf.Delegates[0].MasterPlugin = true
+		// First delegate is always the master plugin
+		netconf.Delegates[0].MasterPlugin = true
+	}
 
 	return netconf, nil
 }
