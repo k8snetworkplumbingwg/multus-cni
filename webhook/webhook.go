@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-func ValidateNetworkAttachmentDefinition(netAttachDef types.NetworkAttachmentDefinition) (bool, error) {
+func validateNetworkAttachmentDefinition(netAttachDef types.NetworkAttachmentDefinition) (bool, error) {
 	nameRegex := `^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
 	isNameCorrect, err := regexp.MatchString(nameRegex, netAttachDef.Metadata.Name)
 	if !isNameCorrect {
@@ -81,8 +81,10 @@ func prepareAdmissionReviewResponse(allowed bool, message string, ar *v1beta1.Ad
 				Message: message,
 			}
 		}
-	}
-	return nil
+    return nil
+	} else {
+    return fmt.Errorf("AdmissionReview request empty")
+  }
 }
 
 func deserializeAdmissionReview(body []byte) (v1beta1.AdmissionReview, error) {
@@ -107,8 +109,13 @@ func deserializeNetworkAttachmentDefinition(ar v1beta1.AdmissionReview) (types.N
 	return netAttachDef, err
 }
 
-func handleValidationError(w http.ResponseWriter, ar v1beta1.AdmissionReview, err error) {
-	prepareAdmissionReviewResponse(false, err.Error(), &ar)
+func handleValidationError(w http.ResponseWriter, ar v1beta1.AdmissionReview, orgErr error) {
+	err := prepareAdmissionReviewResponse(false, orgErr.Error(), &ar)
+	if err != nil {
+		logging.Errorf("Error preparing AdmissionResponse: %s", err.Error())
+		http.Error(w, fmt.Sprintf("Error preparing AdmissionResponse: %s", err.Error()), http.StatusBadRequest)
+		return
+	}
 	writeResponse(w, ar)
 }
 
@@ -156,13 +163,19 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	/* perform actual object validation */
-	allowed, err := ValidateNetworkAttachmentDefinition(netAttachDef)
+	allowed, err := validateNetworkAttachmentDefinition(netAttachDef)
 	if err != nil {
 		handleValidationError(w, ar, err)
 		return
 	}
 
-	prepareAdmissionReviewResponse(allowed, "", &ar)
+	err = prepareAdmissionReviewResponse(allowed, "", &ar)
+	if err != nil {
+		logging.Errorf(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+  
 	writeResponse(w, ar)
 }
 
