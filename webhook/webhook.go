@@ -81,10 +81,10 @@ func prepareAdmissionReviewResponse(allowed bool, message string, ar *v1beta1.Ad
 				Message: message,
 			}
 		}
-    return nil
+		return nil
 	} else {
-    return fmt.Errorf("AdmissionReview request empty")
-  }
+		return fmt.Errorf("AdmissionReview request empty")
+	}
 }
 
 func deserializeAdmissionReview(body []byte) (v1beta1.AdmissionReview, error) {
@@ -175,7 +175,7 @@ func validateHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-  
+
 	writeResponse(w, ar)
 }
 
