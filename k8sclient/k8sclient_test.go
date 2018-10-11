@@ -276,4 +276,29 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError(fmt.Sprintf("GetPodNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
+
+	It("retrieves cluster network from CRD", func() {
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "myCRD1",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}` // XXX: is confDir required?
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "myCRD1", "{\"type\": \"mynet\"}")
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err := GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
