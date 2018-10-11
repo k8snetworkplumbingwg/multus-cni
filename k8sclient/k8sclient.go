@@ -396,7 +396,7 @@ type KubeClient interface {
 func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 	k8sArgs := &types.K8sArgs{}
 
-	logging.Debugf("GetK8sNetwork: %v", args)
+	logging.Debugf("GetK8sArgs: %v", args)
 	err := cnitypes.LoadArgs(args.Args, k8sArgs)
 	if err != nil {
 		return nil, err
@@ -407,11 +407,11 @@ func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 
 // Attempts to load Kubernetes-defined delegates and add them to the Multus config.
 // Returns the number of Kubernetes-defined delegates added or an error.
-func TryLoadK8sDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (int, *clientInfo, error) {
+func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (int, *clientInfo, error) {
 	var err error
 	clientInfo := &clientInfo{}
 
-	logging.Debugf("TryLoadK8sDelegates: %v, %v, %v", k8sArgs, conf, kubeClient)
+	logging.Debugf("TryLoadPodDelegates: %v, %v, %v", k8sArgs, conf, kubeClient)
 	kubeClient, err = GetK8sClient(conf.Kubeconfig, kubeClient)
 	if err != nil {
 		return 0, nil, err
@@ -426,7 +426,7 @@ func TryLoadK8sDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	}
 
 	setKubeClientInfo(clientInfo, kubeClient, k8sArgs)
-	delegates, err := GetK8sNetwork(kubeClient, k8sArgs, conf.ConfDir)
+	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir)
 	if err != nil {
 		if _, ok := err.(*NoK8sNetworkError); ok {
 			return 0, clientInfo, nil
@@ -479,8 +479,8 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 	return &defaultKubeClient{client: client}, nil
 }
 
-func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string) ([]*types.DelegateNetConf, error) {
-	logging.Debugf("GetK8sNetwork: %v, %v, %v", k8sclient, k8sArgs, confdir)
+func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string) ([]*types.DelegateNetConf, error) {
+	logging.Debugf("GetPodNetwork: %v, %v, %v", k8sclient, k8sArgs, confdir)
 
 	netAnnot, defaultNamespace, podID, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
 	if err != nil {
@@ -509,11 +509,123 @@ func GetK8sNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 	for _, net := range networks {
 		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
 		if err != nil {
-			return nil, logging.Errorf("GetK8sNetwork: failed getting the delegate: %v", err)
+			return nil, logging.Errorf("GetPodNetwork: failed getting the delegate: %v", err)
 		}
 		delegates = append(delegates, delegate)
 		resourceMap = updatedResourceMap
 	}
 
 	return delegates, nil
+}
+
+func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*types.DelegateNetConf, error) {
+	logging.Debugf("getDefaultNetDelegate: %v, %v, %s", client, net, confdir)
+	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", "default", net)
+	netData, err := client.GetRawWithPath(rawPath)
+	if err != nil {
+		logging.Debugf("getDefaultNetDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
+		return nil, nil
+	}
+
+	customResource := &types.NetworkAttachmentDefinition{}
+	if err := json.Unmarshal(netData, customResource); err != nil {
+		return nil, logging.Errorf("getDefaultNetDelegate: failed to get the netplugin data: %v", err)
+	}
+
+	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
+	if err != nil {
+		return nil, err
+	}
+
+	delegate, err := types.LoadDelegateNetConf(configBytes, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return delegate, nil
+}
+
+func getNetDelegate(client KubeClient, netname string, confdir string) (*types.DelegateNetConf, error) {
+	logging.Debugf("getNetDelegate: %v, %v, %v", client, netname, confdir)
+	// option1) search CRD object for the network
+	delegate, err := getDefaultNetDelegateCRD(client, netname, confdir)
+	if err == nil {
+		return delegate, nil
+	}
+
+	// option2) search CNI json config file
+	var configBytes []byte
+	configBytes, err = getCNIConfigFromFile(netname, confdir)
+	if err == nil {
+		delegate, err := types.LoadDelegateNetConf(configBytes, "")
+		if err != nil {
+			return nil, err
+		}
+		return delegate, nil
+	}
+
+	// option3) search directry
+	fInfo, err := os.Stat(netname)
+	if err == nil {
+		if fInfo.IsDir() {
+			files, err := libcni.ConfFiles(netname, []string{".conf", ".conflist"})
+			if len(files) > 1 {
+				var configBytes []byte
+				configBytes, err = getCNIConfigFromFile(files[0], netname)
+				if err == nil {
+					delegate, err := types.LoadDelegateNetConf(configBytes, "")
+					if err != nil {
+						return nil, err
+					}
+					return delegate, nil
+				}
+			}
+		}
+	}
+	return nil, logging.Errorf("getNetDelegate: cannot find network: %v", netname)
+}
+
+// GetDefaultNetwork parses 'defaultNetwork' config, gets network json and put it into netconf.Delegates.
+func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) error {
+	logging.Debugf("GetDefaultNetworks: %v, %v, %v", k8sArgs, conf, kubeClient)
+	var delegates []*types.DelegateNetConf
+
+	kubeClient, err := GetK8sClient(conf.Kubeconfig, kubeClient)
+	if err != nil {
+		return err
+	}
+	if kubeClient == nil {
+		if len(conf.Delegates) == 0 {
+			// No available kube client and no delegates, we can't do anything
+			return logging.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+		}
+		return nil
+	}
+
+	//setKubeClientInfo(clientInfo, kubeClient, k8sArgs) XXX
+
+	delegate, err := getNetDelegate(kubeClient, conf.ClusterNetwork, conf.ConfDir)
+	if err != nil {
+		return err
+	}
+	delegate.MasterPlugin = true
+	delegates = append(delegates, delegate)
+
+	// First delegate is always the master plugin
+	conf.Delegates[0].MasterPlugin = true
+
+	//need to revisit
+	for _, netname := range conf.DefaultNetworks {
+		delegate, err := getNetDelegate(kubeClient, netname, conf.ConfDir)
+		if err != nil {
+			return err
+		}
+		delegates = append(delegates, delegate)
+	}
+
+	if err = conf.AddDelegates(delegates); err != nil {
+		return err
+	}
+
+	return nil
 }

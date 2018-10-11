@@ -36,13 +36,15 @@ type NetConf struct {
 	CNIDir  string `json:"cniDir"`
 	BinDir  string `json:"binDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
-	RawDelegates  []map[string]interface{} `json:"delegates"`
-	Delegates     []*DelegateNetConf       `json:"-"`
-	NetStatus     []*NetworkStatus         `json:"-"`
-	Kubeconfig    string                   `json:"kubeconfig"`
-	LogFile       string                   `json:"logFile"`
-	LogLevel      string                   `json:"logLevel"`
-	RuntimeConfig *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	RawDelegates    []map[string]interface{} `json:"delegates"`
+	Delegates       []*DelegateNetConf       `json:"-"`
+	NetStatus       []*NetworkStatus         `json:"-"`
+	Kubeconfig      string                   `json:"kubeconfig"`
+	ClusterNetwork  string                   `json:"clusterNetwork"`
+	DefaultNetworks []string                 `json:"defaultNetworks"`
+	LogFile         string                   `json:"logFile"`
+	LogLevel        string                   `json:"logLevel"`
+	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:readinessindicatorfile`
 }
