@@ -19,17 +19,22 @@ Create key and certificate pair and patch configuration-template.yaml file with 
 ```
 ./certs.sh
 ```
-*Note: Script generates private key and certificate signing request, which is then pushed to the Kubernetes API server. Next, script approves that CSR and API server issues the certificate. Certificate is obtained from the API server and used to create a secret. Script also patches `configuration-template.yaml` file with base64-encoded certificate and creates `configuration.yaml` file containing Validating Webhook Configuration specification, which is deployed in the next steps.
-Certificates API needs to be enabled in order to generate certificate signed by cluster CA. More information available [here](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/).*
+*Note: Verify that Kubernetes controller manager has --cluster-signing-cert-file and --cluster-signing-key-file parameters set to paths to your CA keypair,
+to make sure that Certificates API is enabled in order to generate certificate signed by cluster CA.
+Script generates private key and certificate signing request, which is then pushed to the Kubernetes API server.
+Then script approves that CSR and API server issues the certificate. Certificate is obtained from the API server and used to create a secret.
+Script also patches `configuration-template.yaml` file with base64-encoded certificate and creates `configuration.yaml` file containing
+Validating Webhook Configuration specification, which is deployed in one of the next steps.
+More details about TLS certificates management in a cluster available [here](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/).*
 
 Create service:
 ```
 kubectl create -f service.yaml
 ```
 
-Run pod:
+Run deployment:
 ```
-kubectl create -f pod.yaml
+kubectl create -f deployment.yaml
 ```
 
 Create Validating Webhook Configuration:
@@ -59,6 +64,7 @@ Error from server: error when creating "STDIN": admission webhook "multus-webhoo
 
 Now, try to create correctly defined one:
 ```
+cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -76,6 +82,7 @@ spec:
       "dataDir": "/mnt/cluster-ipam"
     }
   }'
+EOF
 ```
 Resource should be allowed and created:
 ```
@@ -86,7 +93,7 @@ networkattachmentdefinition.k8s.cni.cncf.io/correct-net-attach-def created
 Webhook server prints a lot of debug messages that could help to find the root cause of an issue.
 To display logs run:
 ```
-kubectl logs multus-webhook-pod
+kubectl logs -l app=multus-webhook
 ```
 Example output showing logs for handling requests generated in the "Verifying installation section":
 ```
