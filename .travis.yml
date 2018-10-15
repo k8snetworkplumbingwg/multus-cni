@@ -13,12 +13,7 @@ before_install:
   - go get github.com/mattn/goveralls
 
 install:
-  # workaround golint install error in https://github.com/golang/lint/issues/288
-  - mkdir -p $GOPATH/src/golang.org/x
-  - pushd $GOPATH/src/golang.org/x
-  - git clone https://github.com/golang/lint.git
-  - go get github.com/golang/lint/golint
-  - popd
+  - go get -u golang.org/x/lint/golint
 
 before_script:
   - golint ./multus/... | grep -v ALL_CAPS | xargs -r false
