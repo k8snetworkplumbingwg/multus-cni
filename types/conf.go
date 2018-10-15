@@ -206,7 +206,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	// get RawDelegates and put delegates field
-	if len(netconf.DefaultNetworks) == 0 {
+	if netconf.ClusterNetwork == "" {
 		// for Delegates
 		if len(netconf.RawDelegates) == 0 {
 			return nil, logging.Errorf("at least one delegate must be specified")

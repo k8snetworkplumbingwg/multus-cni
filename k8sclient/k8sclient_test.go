@@ -24,6 +24,7 @@ import (
 
 	testutils "github.com/intel/multus-cni/testing"
 
+	"github.com/intel/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/skel"
 
 	. "github.com/onsi/ginkgo"
@@ -278,12 +279,13 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("retrieves cluster network from CRD", func() {
+		fakePod := testutils.NewFakePod("testpod", "")
 		conf := `{
 			"name":"node-cni-network",
 			"type":"multus",
 			"clusterNetwork": "myCRD1",
 			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
-		}` // XXX: is confDir required?
+		}`
 		netConf, err := types.LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -292,13 +294,110 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "myCRD1", "{\"type\": \"mynet\"}")
+		fKubeClient.AddNetConfig("default", "myCRD1", "{\"type\": \"mynet\"}")
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		err := GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(len(netConf.Delegates)).To(Equal(1))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet"))
+	})
+
+	It("retrieves cluster network from file", func() {
+		fakePod := testutils.NewFakePod("testpod", "")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "myFile1",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		netConf.ConfDir = tmpDir
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		net1Name := filepath.Join(tmpDir, "10-net1.conf")
+		fKubeClient.AddNetFile(fakePod.ObjectMeta.Namespace, "net1", net1Name, `{
+	"name": "myFile1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(netConf.Delegates)).To(Equal(1))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myFile1"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet"))
+	})
+
+	It("retrieves cluster network from path", func() {
+		fakePod := testutils.NewFakePod("testpod", "")
+		conf := fmt.Sprintf(`{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "%s",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}`, tmpDir)
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		net1Name := filepath.Join(tmpDir, "10-net1.conf")
+		fKubeClient.AddNetFile(fakePod.ObjectMeta.Namespace, "10-net1", net1Name, `{
+	"name": "net1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(netConf.Delegates)).To(Equal(1))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet"))
+	})
+
+	It("Error in case of CRD not found", func() {
+		fakePod := testutils.NewFakePod("testpod", "")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "myCRD1",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		Expect(err).To(HaveOccurred())
 	})
 })

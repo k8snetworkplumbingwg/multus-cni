@@ -255,7 +255,7 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 				return nil, logging.Errorf("Error loading CNI conflist file %s: %v", confFile, err)
 			}
 
-			if confList.Name == name {
+			if confList.Name == name || name == "" {
 				return confList.Bytes, nil
 			}
 
@@ -265,7 +265,7 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 				return nil, logging.Errorf("Error loading CNI config file %s: %v", confFile, err)
 			}
 
-			if conf.Network.Name == name {
+			if conf.Network.Name == name || name == "" {
 				// Ensure the config has a "type" so we know what plugin to run.
 				// Also catches the case where somebody put a conflist into a conf file.
 				if conf.Network.Type == "" {
@@ -523,8 +523,7 @@ func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*t
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", "default", net)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		logging.Debugf("getDefaultNetDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
-		return nil, nil
+		return nil, logging.Errorf("getDefaultNetDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
 	}
 
 	customResource := &types.NetworkAttachmentDefinition{}
@@ -569,9 +568,9 @@ func getNetDelegate(client KubeClient, netname string, confdir string) (*types.D
 	if err == nil {
 		if fInfo.IsDir() {
 			files, err := libcni.ConfFiles(netname, []string{".conf", ".conflist"})
-			if len(files) > 1 {
+			if len(files) > 0 {
 				var configBytes []byte
-				configBytes, err = getCNIConfigFromFile(files[0], netname)
+				configBytes, err = getCNIConfigFromFile("", netname)
 				if err == nil {
 					delegate, err := types.LoadDelegateNetConf(configBytes, "")
 					if err != nil {
@@ -579,6 +578,7 @@ func getNetDelegate(client KubeClient, netname string, confdir string) (*types.D
 					}
 					return delegate, nil
 				}
+				return nil, err
 			}
 		}
 	}
@@ -602,17 +602,12 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 		return nil
 	}
 
-	//setKubeClientInfo(clientInfo, kubeClient, k8sArgs) XXX
-
 	delegate, err := getNetDelegate(kubeClient, conf.ClusterNetwork, conf.ConfDir)
 	if err != nil {
 		return err
 	}
 	delegate.MasterPlugin = true
 	delegates = append(delegates, delegate)
-
-	// First delegate is always the master plugin
-	conf.Delegates[0].MasterPlugin = true
 
 	//need to revisit
 	for _, netname := range conf.DefaultNetworks {
