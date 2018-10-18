@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	defaultCNIDir             = "/var/lib/cni/multus"
-	defaultConfDir            = "/etc/cni/multus/net.d"
-	defaultBinDir             = "/opt/cni/bin"
+	defaultCNIDir                 = "/var/lib/cni/multus"
+	defaultConfDir                = "/etc/cni/multus/net.d"
+	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
 )
 
@@ -104,7 +104,7 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string) (*l
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
-	logging.Debugf("LoadNetworkStatus: %v, %s, %s", r, netName, defaultNet)
+	logging.Debugf("LoadNetworkStatus: %v, %s, %v", r, netName, defaultNet)
 
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
