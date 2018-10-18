@@ -148,7 +148,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
     "logLevel": "debug",
     /* NOTE: you can set clusterNetwork+defaultNetworks OR delegates!! (this is only for manual) */
     "clusterNetwork": "defaultCRD",
-    "defaultNetwork": ["sidecarCRD", "flannel"],
+    "defaultNetworks": ["sidecarCRD", "flannel"],
     "delegates": [{
         "type": "weave-net",
         "hairpinMode": true
