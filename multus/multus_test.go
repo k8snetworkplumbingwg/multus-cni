@@ -400,4 +400,49 @@ var _ = Describe("multus operations", func() {
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
+
+	It("ensure delegates get portmap runtime config", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+    "name": "node-cni-network",
+    "type": "multus",
+    "delegates": [{
+        "cniVersion": "0.3.1",
+        "name": "mynet-confList",
+		"plugins": [
+			{
+				"type": "firstPlugin",
+                "capabilities": {"portMappings": true}
+            }
+		]
+	}],
+	"runtimeConfig": {
+        "portMappings": [
+            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+		]
+    }
+}`),
+		}
+
+		fExec := &fakeExec{}
+		expectedConf1 := `{
+    "capabilities": {"portMappings": true},
+	"name": "mynet-confList",
+    "cniVersion": "0.3.1",
+    "type": "firstPlugin",
+    "runtimeConfig": {
+	    "portMappings": [
+            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+		]
+    }
+}`
+		fExec.addPlugin(nil, "eth0", "", expectedConf1, nil, nil)
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		_, err := cmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
