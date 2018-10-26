@@ -439,7 +439,7 @@ var _ = Describe("multus operations", func() {
 		]
     }
 }`
-		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
+		fExec.addPlugin(nil, "eth0", "", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 		_, err := cmdAdd(args, fExec, nil)
