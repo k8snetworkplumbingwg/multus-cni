@@ -52,18 +52,19 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 
 // Convert raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
-	delegateConf := &DelegateNetConf{}
-	logging.Debugf("LoadDelegateNetConf: %s, %v", string(bytes), net)
+	var err error
+	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
 
 	// If deviceID is present, inject this into delegate config
 	if deviceID != "" {
-		if updatedBytes, err := delegateAddDeviceID(bytes, deviceID); err != nil {
+		var updatedBytes []byte
+		if updatedBytes, err = delegateAddDeviceID(bytes, deviceID); err != nil {
 			return nil, logging.Errorf("error in LoadDelegateNetConf - delegateAddDeviceID unable to update delegate config: %v", err)
-		} else {
-			bytes = updatedBytes
 		}
+		bytes = updatedBytes
 	}
 
+	delegateConf := &DelegateNetConf{}
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
