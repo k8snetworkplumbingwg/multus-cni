@@ -470,12 +470,12 @@ Multus will always log via `STDERR`, which is the standard method by which CNI p
 
 ### Writing to a Log File
 
-Optionally, you may have Multus log to a file on the filesystem. This file will be written locally on each node where Multus is executed. You may configure this via the `LogFile` option in the CNI configuration. By default this additional logging to a flat file is disabled.
+Optionally, you may have Multus log to a file on the filesystem. This file will be written locally on each node where Multus is executed. You may configure this via the `logFile` option in the CNI configuration. By default this additional logging to a flat file is disabled.
 
 For example in your CNI configuration, you may set:
 
 ```
-    "LogFile": "/var/log/multus.log",
+    "logFile": "/var/log/multus.log",
 ```
 
 ### Logging Level
