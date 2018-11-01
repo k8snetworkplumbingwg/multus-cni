@@ -139,11 +139,12 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) (
 	return result, nil
 }
 
-func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) error {
+func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, exec invoke.Exec) error {
 	logging.Debugf("conflistDel: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
-	binDirs := []string{binDir}
-	cniNet := libcni.CNIConfig{Path: binDirs}
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append(binDirs, binDir)
+	cniNet := libcni.NewCNIConfig(binDirs, exec)
 
 	confList, err := libcni.ConfListFromBytes(rawnetconflist)
 	if err != nil {
@@ -192,7 +193,7 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 	}
 
 	if delegateConf.ConfListPlugin != false {
-		err := conflistDel(rt, delegateConf.Bytes, binDir)
+		err := conflistDel(rt, delegateConf.Bytes, binDir, exec)
 		if err != nil {
 			return logging.Errorf("Multus: error in invoke Conflist Del - %q: %v", delegateConf.ConfList.Name, err)
 		}
