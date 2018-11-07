@@ -1,11 +1,9 @@
 # Validating admission webhook
 
 ## Building Docker image
-
 From the root directory of Multus execute:
 ```
-cd webhook
-./build
+./build_webhook
 ```
 
 ## Deploying webhook application
@@ -14,36 +12,32 @@ Change working directory. From the root directory of Multus execute:
 ```
 cd deployment/webhook
 ```
+Create Service Account for Multus webhook and webhook installer and apply RBAC rules to created account:
+```
+kubectl create -f rbac.yaml
+```
 
-Create key and certificate pair and patch configuration-template.yaml file with base64-encoded certificate file. Run:
+Next step runs Kubernetes Job which creates all resources required to run webhook:
+* mutating webhook configuration
+* validating webhook configuration
+* secret containing TLS key and certificate
+* service to expose webhook deployment to the API server
+Execute command:
 ```
-./certs.sh
+kubectl create -f install.yaml
 ```
-*Note: Verify that Kubernetes controller manager has --cluster-signing-cert-file and --cluster-signing-key-file parameters set to paths to your CA keypair,
+*Note: Verify that Kubernetes controller manager has --cluster-signing-cert-file and --cluster-signing-key-file parameters set to paths to your CA keypair
 to make sure that Certificates API is enabled in order to generate certificate signed by cluster CA.
-Script generates private key and certificate signing request, which is then pushed to the Kubernetes API server.
-Then script approves that CSR and API server issues the certificate. Certificate is obtained from the API server and used to create a secret.
-Script also patches `configuration-template.yaml` file with base64-encoded certificate and creates `configuration.yaml` file containing
-Validating Webhook Configuration specification, which is deployed in one of the next steps.
 More details about TLS certificates management in a cluster available [here](https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster/).*
 
-Create service:
+If Job has succesfully completed, you can run the actual webhook application.
+
+Create webhook server Deployment:
 ```
-kubectl create -f service.yaml
+kubectl create -f server.yaml
 ```
 
-Run deployment:
-```
-kubectl create -f deployment.yaml
-```
-
-Create Validating Webhook Configuration:
-```
-kubectl create -f configuration.yaml
-```
-
-## Verifying installation
-
+## Verifying that validating webhook works
 Try to create invalid Network Attachment Definition resource:
 ```
 cat <<EOF | kubectl create -f -
