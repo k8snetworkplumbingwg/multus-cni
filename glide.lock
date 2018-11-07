@@ -1,13 +1,20 @@
-hash: 0c4ea2a342364d2ff3b43242730cb3b1db3b7e8456f6cf43da3c51dbb67e18da
-updated: 2018-07-27T03:29:02.093332104+01:00
+hash: daaaddd9f0d2855daa35020cf7bf9fd47ef6d3d46d3bbadde6c19831cd2ac5a1
+updated: 2018-11-07T10:05:42.72264741Z
 imports:
+- name: github.com/cloudflare/cfssl
+  version: 5d63dbd981b5c408effbb58c442d54761ff94fbd
+  subpackages:
+  - crypto/pkcs7
+  - csr
+  - errors
+  - helpers
+  - helpers/derhelpers
+  - log
 - name: github.com/containernetworking/cni
   version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
   subpackages:
   - libcni
   - pkg/invoke
-  - pkg/ip
-  - pkg/ipam
   - pkg/skel
   - pkg/types
   - pkg/types/020
@@ -16,8 +23,12 @@ imports:
 - name: github.com/containernetworking/plugins
   version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
   subpackages:
+  - pkg/ip
+  - pkg/ipam
   - pkg/ns
   - pkg/testutils
+- name: github.com/evanphx/json-patch
+  version: 72bf35d0ff611848c1dc9df0f976c81192392fa5
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/gogo/protobuf
@@ -37,6 +48,13 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
+- name: github.com/google/certificate-transparency-go
+  version: f6c6014c907269aed47672becc298df12a1f2cc6
+  subpackages:
+  - asn1
+  - tls
+  - x509
+  - x509/pkix
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/googleapis/gnostic
@@ -61,6 +79,7 @@ imports:
   version: 7f8ab55aaf3b86885aa55b762e803744d1674700
   subpackages:
   - config
+  - extensions/table
   - internal/codelocation
   - internal/containernode
   - internal/failer
@@ -91,7 +110,7 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/pkg/errors
-  version: 816c9085562cd7ee03e7f8188a1cfd942858cded
+  version: 059132a15dd08d6704c67711dae0cf35ab991756
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: github.com/vishvananda/netlink
@@ -103,6 +122,11 @@ imports:
 - name: golang.org/x/crypto
   version: 49796115aa4b964c318aad4f3084fdb41e9aa067
   subpackages:
+  - cryptobyte
+  - cryptobyte/asn1
+  - ocsp
+  - pkcs12
+  - pkcs12/internal/rc2
   - ssh/terminal
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
@@ -135,6 +159,7 @@ imports:
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
+  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1

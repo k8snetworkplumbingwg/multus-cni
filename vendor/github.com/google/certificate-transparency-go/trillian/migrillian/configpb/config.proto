@@ -1,0 +1,102 @@
+// Copyright 2018 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package configpb;
+
+import "github.com/google/certificate-transparency-go/trillian/ctfe/configpb/config.proto";
+import "github.com/google/trillian/crypto/keyspb/keyspb.proto";
+
+// IdentityFunction specifies how Trillian identity hash is computed.
+enum IdentityFunction {
+  UNKNOWN_IDENTITY_FUNCTION = 0;
+
+  // Returns SHA256 hash of the certificate DER. This is the same function that
+  // CTFE uses when submitting add-[pre-]chain entries to Trillian.
+  //
+  // For example, it can be used when migrating a CT log to Trillian. Using the
+  // same function as CTFE makes any newly submitted entries compatible with the
+  // ones that migrated from the source log.
+  SHA256_CERT_DATA = 1;
+  // Returns SHA256 hash of the leaf index.
+  //
+  // For example, this function can be used for mirroring CT logs. Since the
+  // source logs might have duplicates of different kinds (depends on the
+  // operator), this function allows storing them all (unlike SHA256_CERT_DATA).
+  // Note that the CTFE log must stay read-only (mirror), as CTFE's identity
+  // hash is incompatible.
+  SHA256_LEAF_INDEX = 2;
+}
+
+// MigrationConfig describes the configuration options for a single CT log
+// migration instance.
+message MigrationConfig {
+  // The URI of the source CT log, e.g. "https://ct.googleapis.com/pilot".
+  string source_uri = 1;
+  // The public key of the source log.
+  keyspb.PublicKey public_key = 2;
+
+  // The name of the backend which this log migrates to. The name must be one of
+  // those defined in the LogBackendSet.
+  string log_backend_name = 3;
+  // The ID of a Trillian PREORDERED_LOG tree that stores the log data.
+  int64 log_id = 4;
+
+  // Max number of entries per get-entries request from the source log.
+  int32 batch_size = 5;
+
+  // Determines whether the migration should run continuously, i.e. watch and
+  // follow the updates of the source log's STH. For example, this mode can be
+  // used to support a mirror CT log.
+  bool is_continuous = 6;
+  // The log entry index to start fetching at. If negative, then it is assumed
+  // equal to the current Trillian tree size.
+  // Ignored in continuous mode which starts at the point where it stopped (e.g.
+  // the current Trillian tree size in a simple case).
+  int64 start_index = 7;
+  // The log index to end fetching at, non-inclusive. If zero, fetch up to the
+  // source log's current STH. Ignored in continuous mode which keeps updating
+  // STH and fetching up to that.
+  int64 end_index = 8;
+
+  // The number of parallel get-entries fetchers. Assumed equal to 1 if not
+  // specified.
+  int32 num_fetchers = 9;
+  // The number of parallel workers submitting entries to Trillian. Assumed
+  // equal to 1 if not specified.
+  int32 num_submitters = 10;
+  // Max number of batches in fetchers->submitters channel.
+  int32 channel_size = 11;
+
+  // The function that computes LeafIdentityHash for Trillian log entries.
+  IdentityFunction identity_function = 12;
+
+  // TODO(pavelkalinnikov): Fetch and push quotas, priorities, etc.
+}
+
+// MigrationConfigSet is a set of MigrationConfig messages.
+message MigrationConfigSet {
+  repeated MigrationConfig config = 1;
+}
+
+// MigrillianConfig holds configuration for multiple migration / mirroring jobs.
+message MigrillianConfig {
+  // The set of backends that this configuration will use to send requests to.
+  // The names of the backends in the LogBackendSet must all be distinct.
+  LogBackendSet backends = 1;
+  // The set of migrations that will use the above backends. All the protos in
+  // it must set a valid log_backend_name for the config to be usable.
+  MigrationConfigSet migration_configs = 2;
+}

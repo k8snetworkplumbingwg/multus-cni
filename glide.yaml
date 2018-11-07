@@ -34,3 +34,7 @@ import:
   - util/retry
 - package: github.com/vishvananda/netns
 - package: github.com/pkg/errors
+- package: github.com/evanphx/json-patch
+  version: v4.1.0
+- package: github.com/cloudflare/cfssl
+  version: 1.3.2
