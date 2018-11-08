@@ -247,7 +247,7 @@ var _ = Describe("multus operations", func() {
 
 	It("executes delegates with interface name and MAC addr", func() {
 		podNet := `[{"name":"net1",
-	         "interfaceRequest": "test1"},
+	         "interface": "test1"},
 		{"name":"net2",
 		 "mac": "c2:11:22:33:44:66"}
 ]`

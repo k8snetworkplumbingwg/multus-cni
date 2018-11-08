@@ -361,7 +361,7 @@ metadata:
             { "name": "flannel-conf" },
             { "name": "sriov-conf" },
             { "name": "sriov-vlanid-l2enable-conf",
-              "interfaceRequest": "north" }
+              "interface": "north" }
     ]'
 spec:  # specification of the pod's contents
   containers:
@@ -393,7 +393,7 @@ JSON formated network annotation in Pod can have several parameters as following
 
 - namespace: Kubernetes namespace that the target network attach definition is defined in.
 - mac: MAC address (e.g "c2:11:22:33:44:66") for target network interface
-- interfaceRequest: interface name for target network interface
+- interface: interface name for target network interface
 
 Note: If you add `mac`, please add 'tuning' plugin into target network attach definition as CNI plugin chaining as following.
 
