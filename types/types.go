@@ -125,7 +125,7 @@ type NetworkSelectionElement struct {
 	MacRequest string `json:"mac,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
-	InterfaceRequest string `json:"interfaceRequest,omitempty"`
+	InterfaceRequest string `json:"interface,omitempty"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes
