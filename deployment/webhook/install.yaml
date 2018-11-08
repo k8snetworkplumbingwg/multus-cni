@@ -22,8 +22,6 @@ metadata:
 spec:
   template:
     spec:
-      tolerations:
-      - operator: Exists
       serviceAccount: multus-webhook-sa
       containers:
       - name: multus-webhook-installer
