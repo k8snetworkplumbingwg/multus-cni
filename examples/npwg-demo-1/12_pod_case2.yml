@@ -8,7 +8,7 @@ metadata:
             { "name": "macvlan-conf-2" },
             { "name": "vlan-conf-1-1",
               "namespace": "testns1",
-              "interfaceRequest": "vlan1-1" }
+              "interface": "vlan1-1" }
     ]'
 spec:
   containers:
