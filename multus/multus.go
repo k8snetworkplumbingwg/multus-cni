@@ -177,7 +177,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			return nil, logging.Errorf("failed to parse mac address %q", delegate.MacRequest)
 		}
 
-		if os.Setenv("CNI_ARGS", fmt.Sprintf("IgnoreUnknown=true;MAC=%s", delegate.MacRequest)) != nil {
+		if os.Setenv("CNI_ARGS",fmt.Sprintf("%s;IgnoreUnknown=true;MAC=%s", os.Getenv("CNI_ARGS"), delegate.MacRequest)) != nil {
 			return nil, logging.Errorf("cannot set %q mac to %q: %v", delegate.Conf.Type, delegate.MacRequest, err)
 		}
 		logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
