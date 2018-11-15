@@ -30,7 +30,7 @@ You could copy binary directory or could use daemonset yaml in multus repository
 
 **If you use daemonset to install multus, skip this section and go to "Create network attachment"**
 
-You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alphabetically first file in the directory. (`"Note1"`, `"Note2"` are just comments, you can remove them at your configuration)
+You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alphabetically first file in the directory. (`"NOTE1"`, `"NOTE2"` are just comments, you can remove them at your configuration)
 
 ```
 # Execute following commands at all Kubernetes nodes (i.e. master and minions)
@@ -42,8 +42,8 @@ $ cat >/etc/cni/net.d/30-multus.conf <<EOF
   "readinessindicatorfile": "/var/run/flannel/subnet.env",
   "delegates": [
     {
-      "Note1": "This is example, wrote your CNI config in delegates",
-      "Note2": "If you use flannel, you also need to run flannel daemonset before!",
+      "NOTE1": "This is example, wrote your CNI config in delegates",
+      "NOTE2": "If you use flannel, you also need to run flannel daemonset before!",
       "type": "flannel",
       "name": "flannel.1",
       "delegate": {
@@ -58,7 +58,7 @@ EOF
 
 For the detail, please take a look into [Configuration Reference](configuration.md)
 
-**You can use "clusterNetwork"/"defaultNetworks" instead of "delegates", see []() for the detail**
+**NOTE: You can use "clusterNetwork"/"defaultNetworks" instead of "delegates", see []() for the detail**
 
 As above config, you need to set `"kubeconfig"` in the config file for NetworkAttachmentDefinition(CRD).
 
@@ -148,7 +148,7 @@ EOF
 ```
 
 Copy `/etc/cni/net.d/multus.d/multus.kubeconfig` into other Kubernetes nodes
-**Note: Recommend to exec 'chmod 600 /etc/cni/net.d/multus.d/multus.kubeconfig' to keep secure**
+**NOTE: Recommend to exec 'chmod 600 /etc/cni/net.d/multus.d/multus.kubeconfig' to keep secure**
 
 ```
 $ scp /etc/cni/net.d/multus.d/multus.kubeconfig ...
