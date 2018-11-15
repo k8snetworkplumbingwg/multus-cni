@@ -26,7 +26,9 @@ You could copy binary directory or could use daemonset yaml in multus repository
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
     ```
 
-### Set up conf file in /etc/cni/net.d/
+### Set up conf file in /etc/cni/net.d/ (daemonset automatically does)
+
+**If you use daemonset to install multus, skip this section and go to "Create network attachment"**
 
 You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alphabetically first file in the directory. (`"Note1"`, `"Note2"` are just comments, you can remove them at your configuration)
 
