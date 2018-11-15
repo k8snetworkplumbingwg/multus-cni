@@ -68,7 +68,7 @@ In case of "delegates", the first delegates network will be used for "Pod IP". O
 
 #### Create ServiceAccount, ClusterRole and its binding
 
-Create resources for multus to access CRD objects as folloiwng command:
+Create resources for multus to access CRD objects as following command:
 
 ```
 # Execute following commands at Kubernetes master
