@@ -6,6 +6,7 @@ dist: trusty
 env:
   global:
     - REGISTRY_USER=${REGISTRY_USER}
+    - REGISTRY_PASS=${REGISTRY_PASS}
     - secure: "${REGISTRY_SECURE}"
 
 before_install:
@@ -45,18 +46,29 @@ deploy:
       tags: true
       all_branches: true
       condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
-  # Push images to Dockerhub
+  # Push images to Dockerhub on tag
   - provider: script
     script: >
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
       docker push nfvpe/multus; 
-      docker push nfvpe/multus:$TRAVIS_TAG'
+      docker push nfvpe/multus:$TRAVIS_TAG;
+      echo foo'
     on:
       tags: true
       all_branches: true
       condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
+  # Push images to Dockerhub on merge to master
+  - provider: script
+    on:
+      branch: master
+    script: >
+      bash -c '
+      docker tag nfvpe/multus nfvpe/multus:snapshot;
+      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
+      docker push nfvpe/multus:snapshot; 
+      echo foo'
 
 after_success:
   # put build tgz to bintray
