@@ -26,6 +26,8 @@ You could copy binary directory or could use daemonset yaml in multus repository
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
     ```
 
+    Then skip to following section and go to ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition)
+
 ### Set up conf file in /etc/cni/net.d/ (daemonset automatically does)
 
 **If you use daemonset to install multus, skip this section and go to "Create network attachment"**
