@@ -189,6 +189,11 @@ EOF
 
 ### Create network attachment definition
 
+The 'NetworkAttachmentDefinition' is used to setup the network attachment, i.e. secondary interface for the pod, There are two ways to configure the 'NetworkAttachmentDefinition' as following:
+
+- NetworkAttachmentDefinition with json CNI config
+- NetworkAttachmentDefinition with CNI config file
+
 #### NetworkAttachmentDefinition with json CNI config:
 
 Following command creates NetworkAttachmentDefinition. CNI config is in `config:` field.
