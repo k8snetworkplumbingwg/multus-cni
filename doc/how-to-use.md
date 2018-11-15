@@ -2,14 +2,7 @@
 
 ### Prerequisite
 
-Kubelet must be configured to run with the CNI network plugin. Edit `/etc/kubernetes/kubelet` file and add `--network-plugin=cni` flags in `KUBELET\_OPTS `as shown below:
-
-```
-KUBELET_OPTS="...
---network-plugin-dir=/etc/cni/net.d
---network-plugin=cni
-"
-```
+Kubelet must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for its detail.
 
 ### Install multus
 
@@ -17,21 +10,21 @@ You could copy binary directory or could use daemonset yaml in multus repository
 
 - copy multus binary
 
-Copy multus binary into CNI binary directory, usually `/opt/cni/bin`.
+    Copy multus binary into CNI binary directory, usually `/opt/cni/bin`.
 
-```
-# Execute following commands at all Kubernetes nodes (i.e. master and minions)
-$ cp multus /opt/cni/bin
-```
+    ```
+    # Execute following commands at all Kubernetes nodes (i.e. master and minions)
+    $ cp multus /opt/cni/bin
+    ```
 
 - use daemonset
 
-As [Quickstart](https://github.com/intel/multus-cni/README.md#quickstart-guide), you could apply as such:
+    As [Quickstart](https://github.com/intel/multus-cni/README.md#quickstart-guide), you could apply as such:
 
-```
-# Execute following command at Kubernetes master
-$ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
-```
+    ```
+    # Execute following command at Kubernetes master
+    $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+    ```
 
 ### Set up conf file in /etc/cni/net.d/
 
