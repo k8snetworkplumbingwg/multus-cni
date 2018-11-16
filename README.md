@@ -20,7 +20,7 @@ Here's an illustration of the network interfaces attached to a pod, as provision
 
 ![multus-pod-image](doc/images/multus-pod-image.svg)
 
-## Quickstart Guide
+## Quickstart Installation Guide
 
 Multus may be deployed as a Daemonset, and is provided in this guide along with Flannel. Flannel is deployed as a pod-to-pod network that is used as our "default network" (a network interface that every pod will be created with). Each network attachment is made in addition to this default network.
 
@@ -32,7 +32,7 @@ We apply these files as such:
 $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 ```
 
-This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our [usage guide](doc/how-to-use.md)
+This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](doc/quickstart.md)
 
 ## Additional installation Options
 
@@ -42,7 +42,8 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 - Or, roll-you-own and build from source
   - See [Development](doc/development.md)
 
-## Documentation
+## Comprehensive Documentation
+
 - [How to use](doc/how-to-use.md)
 - [Configuration](doc/configuration.md)
 - [Development](doc/development.md)
