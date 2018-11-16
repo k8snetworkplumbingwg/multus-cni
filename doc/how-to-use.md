@@ -1,41 +1,39 @@
 ## How to use multus-cni?
 
-### Prerequisite
+### Prerequisites
 
-Kubelet must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for its detail.
+* Kubelet configured to use CNI 
+* Kubernetes version with CRD support (generally )
+
+Your Kubelet(s) must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for more details.
 
 ### Install multus
 
-You could copy binary directory or could use daemonset yaml in multus repository.
+Generally we recommend two options: Manually place a Multus binary in your `/opt/cni/bin`, or use our [quick-start method](quickstart.md) -- which creates a daemonset that has an opinionated way of how to install & configure Multus CNI (recommended).
 
-- copy multus binary
+*Copy Multus Binary into place*
 
-    Copy multus binary into CNI binary directory, usually `/opt/cni/bin`.
+You may acquire the Multus binary via compilation (see the [developer guide](development.md)) or download the a binary from the [GitHub releases](https://github.com/intel/multus-cni/releases) page. Copy multus binary into CNI binary directory, usually `/opt/cni/bin`. Perform this on all nodes in your cluster (master and nodes).
 
-    ```
-    # Execute following commands at all Kubernetes nodes (i.e. master and minions)
     $ cp multus /opt/cni/bin
-    ```
 
-- use daemonset
+*Via Daemonset method*
 
-    As [Quickstart](https://github.com/intel/multus-cni/README.md#quickstart-guide), you could apply as such:
+As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage yoru cluster). 
 
-    ```
-    # Execute following command at Kubernetes master
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
-    ```
 
-    Then skip to following section and go to ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition)
+If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition) section.
 
-### Set up conf file in /etc/cni/net.d/ (daemonset automatically does)
+### Set up conf file in /etc/cni/net.d/ (Installed automatically by Daemonset)
 
 **If you use daemonset to install multus, skip this section and go to "Create network attachment"**
 
 You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alphabetically first file in the directory. (`"NOTE1"`, `"NOTE2"` are just comments, you can remove them at your configuration)
 
+Execute following commands at all Kubernetes nodes (i.e. master and minions)
+
 ```
-# Execute following commands at all Kubernetes nodes (i.e. master and minions)
 $ mkdir -p /etc/cni/net.d
 $ cat >/etc/cni/net.d/30-multus.conf <<EOF
 {
