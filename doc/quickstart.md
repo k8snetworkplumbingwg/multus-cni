@@ -9,7 +9,7 @@ We'll first install Multus CNI, and then we'll setup some configurations so that
 Two things we'll refer to a number of times through this document are:
 
 * "Default network" -- This is your pod-to-pod network. This is how pods communicate among one another in your cluster, how they have connectivity. Generally speaking, this is presented as the interface named `eth0`. This interface is always attached to your pods, so that they can have connectivity among themselves. We'll add interfaces in addition to this.
-* "CRDs" -- Custom Resource Definitions. Custom Resources are a way that the Kubernetes API is extended. We use these here to store some information that Multus can ready. Primarily, we use these to store the configurations for each of the additional interfaces that are attached to your pods.
+* "CRDs" -- Custom Resource Definitions. Custom Resources are a way that the Kubernetes API is extended. We use these here to store some information that Multus can read. Primarily, we use these to store the configurations for each of the additional interfaces that are attached to your pods.
 
 ## Installation
 
@@ -58,12 +58,14 @@ Each configuration we'll add is a CNI configuration. If you're not familiar with
 CNI configurations are JSON, and we have a structure here that has a few things we're interested in:
 
 1. `cniVersion`: Tells each CNI plugin which version is being used and can give the plugin information if it's using a too late (or too early) version.
-2. `type`: This tells CNI which binary to call on disk. Each CNI plugin is a binary that's called. Typically, these binaries are stored in `/opt/cni/bin` on each node, and CNI executes this binary. In this case we've specified the `loopback` binary (which create a loopback-type network interface).
+2. `type`: This tells CNI which binary to call on disk. Each CNI plugin is a binary that's called. Typically, these binaries are stored in `/opt/cni/bin` on each node, and CNI executes this binary. In this case we've specified the `loopback` binary (which create a loopback-type network interface). If this is your first time installing Multus, you might want to verify that the plugins that are in the "type" field are actually on disk in the `/opt/cni/bin` directory.
 3. `additional`: This field is put here as an example, each CNI plugin can specify whatever configuration parameters they'd like in JSON. These are specific to the binary you're calling in the `type` field.
 
 For an even further example -- take a look at the [bridge CNI plugin README](https://github.com/containernetworking/plugins/tree/master/plugins/main/bridge) which shows additional
 
 If you'd like more information about CNI configuration, you can read [the entire CNI specification](https://github.com/containernetworking/cni/blob/master/SPEC.md). It might also be useful to look at the [CNI reference plugins](https://github.com/containernetworking/plugins) and see how they're configured.
+
+You do not need to reload or refresh the Kubelets when CNI configurations  change. These are read on each creation & deletion of pods. So if you change a configuration, it'll apply the next time a pod is created. Existing pods may need to be restarted if they need the new configuration.
 
 ### Storing a configuration as a Custom Resource
 
