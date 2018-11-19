@@ -1,4 +1,4 @@
-FROM golang:1.11 as builder
+FROM golang:1.11
 ENV PKG_NAME=github.com/intel/multus-cni
 ENV PKG_PATH=$GOPATH/src/$PKG_NAME
 WORKDIR $PKG_PATH
@@ -8,8 +8,7 @@ RUN go install
 WORKDIR $PKG_PATH/webhook/deployment
 RUN go install
 
-FROM golang:1.11
 RUN mkdir /webhook
-COPY --from=builder /go/bin/* /webhook/
+RUN cp /go/bin/* /webhook/
 WORKDIR /webhook
 CMD ["./server"]
