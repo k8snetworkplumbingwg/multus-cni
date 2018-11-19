@@ -50,13 +50,20 @@ deploy:
     script: >
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
-      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus; 
+      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
       docker push nfvpe/multus:$TRAVIS_TAG'
     on:
       tags: true
       all_branches: true
       condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
+  - provider: script
+    script: >
+      bash -c '
+      docker tag nfvpe/multus nfvpe/multus:latest;
+      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
+      docker push nfvpe/multus:latest'
+    on:
+      branch: master
 
 after_success:
   # put build tgz to bintray
