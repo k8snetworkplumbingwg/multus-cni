@@ -255,8 +255,7 @@ $ cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
           [ {
                "subnet": "11.10.0.0/16",
                "rangeStart": "11.10.1.20",
-               "rangeEnd": "11.10.3.50",
-               "gateway": "11.10.0.254"
+               "rangeEnd": "11.10.3.50"
           } ]
       ]
   }
@@ -285,6 +284,52 @@ spec:
 EOF
 ```
 
+#### Lauch pod with text annotation for NetworkAttachmentDefinition in different namespace
+
+You can also specify NetworkAttachmentDefinition with its namespace as adding `/<namespace>`
+
+```
+# Execute following command at Kubernetes master
+$ cat <<EOF | kubectl create -f -
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf-3
+  namespace: testns1
+spec:
+  config: '{
+            "cniVersion": "0.3.0",
+            "type": "macvlan",
+            "master": "eth1",
+            "mode": "bridge",
+            "ipam": {
+                "type": "host-local",
+                "ranges": [
+                    [ {
+                         "subnet": "12.10.0.0/16",
+                         "rangeStart": "12.10.1.20",
+                         "rangeEnd": "12.10.3.50"
+                    } ]
+                ]
+            }
+        }'
+EOF
+$ cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-02
+  annotations:
+    k8s.v1.cni.cncf.io/networks: macvlan-conf-3/testns1
+spec:
+  containers:
+  - name: pod-case-02
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+EOF
+```
+
 #### Lauch pod with text annotation with interface name
 
 You can also specify interface name as adding `@<ifname>`.
@@ -295,12 +340,12 @@ $ cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-case-02
+  name: pod-case-03
   annotations:
     k8s.v1.cni.cncf.io/networks: macvlan-conf-1@macvlan1
 spec:
   containers:
-  - name: pod-case-02
+  - name: pod-case-03
     image: docker.io/centos/tools:latest
     command:
     - /sbin/init
@@ -315,7 +360,7 @@ $ cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-case-03
+  name: pod-case-04
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
             { "name" : "macvlan-conf-1" },
@@ -323,7 +368,32 @@ metadata:
     ]'
 spec:
   containers:
-  - name: pod-case-03
+  - name: pod-case-04
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+EOF
+```
+
+#### Lauch pod with json annotation for NetworkAttachmentDefinition in different namespace
+
+You can also specify NetworkAttachmentDefinition with its namespace as adding `"namespace": "<namespace>"`.
+
+```
+# Execute following command at Kubernetes master
+$ cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-05
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name" : "macvlan-conf-1",
+              "namespace": "testns1" }
+    ]'
+spec:
+  containers:
+  - name: pod-case-05
     image: docker.io/centos/tools:latest
     command:
     - /sbin/init
@@ -340,7 +410,7 @@ $ cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-case-04
+  name: pod-case-06
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
             { "name" : "macvlan-conf-1",
@@ -349,7 +419,7 @@ metadata:
     ]'
 spec:
   containers:
-  - name: pod-case-04
+  - name: pod-case-06
     image: docker.io/centos/tools:latest
     command:
     - /sbin/init
@@ -358,11 +428,11 @@ EOF
 
 ### Verifying pod network
 
-Following the example of `ip -d address` output of above pod, "pod-case-04":
+Following the example of `ip -d address` output of above pod, "pod-case-06":
 
 ```
 # Execute following command at Kubernetes master
-$ kubectl exec -it pod-case-04 -- ip -d address
+$ kubectl exec -it pod-case-06 -- ip -d address
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00 promiscuity 0 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
     inet 127.0.0.1/8 scope host lo
