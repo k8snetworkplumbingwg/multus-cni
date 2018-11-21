@@ -163,7 +163,7 @@ var _ = Describe("Webhook", func() {
 	DescribeTable("Network selection elements parsing",
 
 		func(in string, out []*types.NetworkSelectionElement, shouldFail bool) {
-			actualOut, err := parsePodNetworkSelections(in)
+			actualOut, err := parsePodNetworkSelections(in, "default")
 			Expect(actualOut).To(ConsistOf(out))
 			if shouldFail {
 				Expect(err).To(HaveOccurred())

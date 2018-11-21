@@ -282,7 +282,7 @@ func deploy() {
 		logging.Errorf("error generating CSR and private key: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("raw CSR and private key succesfully created")
+	logging.Debugf("raw CSR and private key successfully created")
 
 	/* obtain signed certificate */
 	certificate, err := getSignedCertificate(csr)
@@ -290,7 +290,7 @@ func deploy() {
 		logging.Errorf("error getting signed certificate: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("signed certificate succesfully obtained")
+	logging.Debugf("signed certificate successfully obtained")
 
 	/* create secret and push it to the API */
 	err = createSecret(certificate, key)
@@ -298,7 +298,7 @@ func deploy() {
 		logging.Errorf("error creating secret: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("secret succesfully created")
+	logging.Debugf("secret successfully created")
 
 	/* create webhook configurations */
 	err = createMutatingWebhookConfiguration(certificate)
@@ -306,13 +306,13 @@ func deploy() {
 		logging.Errorf("error creating mutating webhook configuration: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("mutating webhook configuration succesfully created")
+	logging.Debugf("mutating webhook configuration successfully created")
 	err = createValidatingWebhookConfiguration(certificate)
 	if err != nil {
 		logging.Errorf("error creating validating webhook configuration: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("validating webhook configuration succesfully created")
+	logging.Debugf("validating webhook configuration successfully created")
 
 	/* create service */
 	err = createService()
@@ -320,9 +320,9 @@ func deploy() {
 		logging.Errorf("error creating service: %s", err)
 		os.Exit(1)
 	}
-	logging.Debugf("service succesfully created")
+	logging.Debugf("service successfully created")
 
-	logging.Debugf("all resources created succesfully")
+	logging.Debugf("all resources created successfully")
 }
 
 func main() {

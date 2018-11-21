@@ -217,7 +217,7 @@ func getNetworkAttachmentDefinition(namespace, name string) (*types.NetworkAttac
 	path := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)
 	rawNetworkAttachmentDefinition, err := clientset.ExtensionsV1beta1().RESTClient().Get().AbsPath(path).DoRaw()
 	if err != nil {
-		err := logging.Errorf("could not get Network Attachment Defintion %s/%s: %s", namespace, name, err)
+		err := logging.Errorf("could not get Network Attachment Definition %s/%s: %s", namespace, name, err)
 		return nil, err
 	}
 
@@ -227,14 +227,14 @@ func getNetworkAttachmentDefinition(namespace, name string) (*types.NetworkAttac
 	return &networkAttachmentDefinition, nil
 }
 
-func parsePodNetworkSelectionElement(selection string) (*types.NetworkSelectionElement, error) {
+func parsePodNetworkSelectionElement(selection, defaultNamespace string) (*types.NetworkSelectionElement, error) {
 	var namespace, name, netInterface string
 	var networkSelectionElement *types.NetworkSelectionElement
 
 	units := strings.Split(selection, "/")
 	switch len(units) {
 	case 1:
-		namespace = "default"
+		namespace = defaultNamespace
 		name = units[0]
 	case 2:
 		namespace = units[0]
@@ -272,7 +272,7 @@ func parsePodNetworkSelectionElement(selection string) (*types.NetworkSelectionE
 	return networkSelectionElement, nil
 }
 
-func parsePodNetworkSelections(podNetworks string) ([]*types.NetworkSelectionElement, error) {
+func parsePodNetworkSelections(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
 	var networkSelections []*types.NetworkSelectionElement
 
 	if len(podNetworks) == 0 {
@@ -287,7 +287,7 @@ func parsePodNetworkSelections(podNetworks string) ([]*types.NetworkSelectionEle
 		logging.Debugf("%s is not in JSON format: %s. Will try to parse as comma separated network selections list", podNetworks, err.Error())
 		for _, networkSelection := range strings.Split(podNetworks, ",") {
 			networkSelection = strings.TrimSpace(networkSelection)
-			networkSelectionElement, err := parsePodNetworkSelectionElement(networkSelection)
+			networkSelectionElement, err := parsePodNetworkSelectionElement(networkSelection, defaultNamespace)
 			if err != nil {
 				return nil, logging.Errorf("error parsing network selection element: %v", err)
 			}
@@ -298,7 +298,7 @@ func parsePodNetworkSelections(podNetworks string) ([]*types.NetworkSelectionEle
 	/* fill missing namespaces with default value */
 	for _, networkSelection := range networkSelections {
 		if networkSelection.Namespace == "" {
-			networkSelection.Namespace = "default"
+			networkSelection.Namespace = defaultNamespace
 		}
 	}
 
@@ -327,14 +327,14 @@ func mutateHandler(w http.ResponseWriter, req *http.Request) {
 		resourceRequests := make(map[string]int64)
 
 		/* unmarshal list of network selection objects */
-		networks, _ := parsePodNetworkSelections(netSelections)
+		networks, _ := parsePodNetworkSelections(netSelections, pod.ObjectMeta.Namespace)
 
 		for _, n := range networks {
 			/* for each network in annotation ask API server for network-attachment-definition */
 			networkAttachmentDefinition, err := getNetworkAttachmentDefinition(n.Namespace, n.Name)
 			if err != nil {
 				/* if doesn't exist: deny pod */
-				explanation := logging.Errorf("could not find network attachment definition '%s/%s': %s", n.Name, n.Namespace, err)
+				explanation := logging.Errorf("could not find network attachment definition '%s/%s': %s", n.Namespace, n.Name, err)
 				err = prepareAdmissionReviewResponse(false, explanation.Error(), ar)
 				if err != nil {
 					logging.Errorf("error preparing AdmissionReview response: %s", err)
@@ -352,7 +352,7 @@ func mutateHandler(w http.ResponseWriter, req *http.Request) {
 				resourceRequests[resourceName]++
 				logging.Debugf("resource '%s' needs to be requested for network '%s/%s'", resourceName, n.Name, n.Namespace)
 			} else {
-				logging.Debugf("network '%s/%s' doesn't use custom resources, skipping...", n.Name, n.Namespace)
+				logging.Debugf("network '%s/%s' doesn't use custom resources, skipping...", n.Namespace, n.Name)
 			}
 		}
 
