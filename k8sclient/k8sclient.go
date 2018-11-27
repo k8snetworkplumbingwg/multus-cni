@@ -568,6 +568,9 @@ func getNetDelegate(client KubeClient, netname string, confdir string) (*types.D
 	if err == nil {
 		if fInfo.IsDir() {
 			files, err := libcni.ConfFiles(netname, []string{".conf", ".conflist"})
+			if err != nil {
+				return nil, err
+			}
 			if len(files) > 0 {
 				var configBytes []byte
 				configBytes, err = getCNIConfigFromFile("", netname)
