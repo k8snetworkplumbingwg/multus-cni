@@ -428,11 +428,12 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	setKubeClientInfo(clientInfo, kubeClient, k8sArgs)
 
 	delegate, err := tryLoadK8sPodDefaultNetwork(k8sArgs, conf, kubeClient)
-	logging.Debugf("TryLoadK8sDelegates: load cluster network %v from pod annotations", delegate)
 	if err != nil {
-		return 0, nil, logging.Errorf("TryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
-	}else if delegate != nil{
-		// Overwrite the cluster default network.
+		return 0, nil, logging.Errorf("tryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
+	}
+	if delegate != nil{
+		logging.Debugf("tryLoadK8sDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
+
 		conf.Delegates[0] = delegate
 	}
 
@@ -644,9 +645,8 @@ func getPodDefaultNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (
 
 	if v, ok := pod.Annotations["multus-cni.io/default-network"]; ok {
 		return v, nil
-	} else {
-		return "", nil
 	}
+	return "", nil
 }
 
 // tryLoadK8sPodDefaultNetwork get pod default network from annotations
@@ -655,16 +655,17 @@ func tryLoadK8sPodDefaultNetwork(k8sArgs *types.K8sArgs, conf *types.NetConf, ku
 
 	netAnnot, err := getPodDefaultNetworkAnnotation(kubeClient, k8sArgs)
 	if err != nil {
-		return nil, err
+		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed to get pod annotation: %v", err)
 	}
 	if netAnnot == "" {
+		logging.Debugf("tryLoadK8sPodDefaultNetwork: Pod default network annotation is not defined")
 		return nil, nil
 	}
 
 	// The CRD object of default network should only be defined in default namespace
 	networks, err := parsePodNetworkAnnotation(netAnnot, "default")
 	if err != nil {
-		return nil, err
+		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed to parse CRD object: %v", err)
 	}
 	if len(networks) > 1 {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: more than one default network is specified: %s", netAnnot)
