@@ -83,6 +83,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.MacRequest != "" {
 			delegateConf.MacRequest = net.MacRequest
 		}
+		if net.IPRequest != "" {
+			delegateConf.IPRequest = net.IPRequest
+		}
 	}
 
 	delegateConf.Bytes = bytes

@@ -63,6 +63,7 @@ type DelegateNetConf struct {
 	ConfList      types.NetConfList
 	IfnameRequest string `json:"ifnameRequest,omitempty"`
 	MacRequest    string `json:"macRequest,omitempty"`
+	IPRequest string `json:"ipRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping

@@ -25,6 +25,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containernetworking/cni/libcni"
@@ -160,7 +161,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string, cniArgs string) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v, %s", exec, ifName, delegate, rt, binDir)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, logging.Errorf("Multus: error in setting CNI_IFNAME")
@@ -170,17 +171,40 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		return nil, logging.Errorf("cannot set %q ifname to %q: %v", delegate.Conf.Type, ifName, err)
 	}
 
-	if delegate.MacRequest != "" {
-		// validate Mac address
-		_, err := net.ParseMAC(delegate.MacRequest)
-		if err != nil {
-			return nil, logging.Errorf("failed to parse mac address %q", delegate.MacRequest)
+	if delegate.MacRequest != "" || delegate.IPRequest != "" {
+		if cniArgs != "" {
+			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
+		} else {
+			cniArgs = "IgnoreUnknown=true"
+		}
+		if delegate.MacRequest != "" {
+			// validate Mac address
+			_, err := net.ParseMAC(delegate.MacRequest)
+			if err != nil {
+				return nil, logging.Errorf("failed to parse mac address %q", delegate.MacRequest)
+			}
+
+			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
+			logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
 		}
 
-		if os.Setenv("CNI_ARGS",fmt.Sprintf("%s;IgnoreUnknown=true;MAC=%s", os.Getenv("CNI_ARGS"), delegate.MacRequest)) != nil {
-			return nil, logging.Errorf("cannot set %q mac to %q: %v", delegate.Conf.Type, delegate.MacRequest, err)
+		if delegate.IPRequest != "" {
+			// validate IP address
+			if strings.Contains(delegate.IPRequest, "/") {
+				_, _, err := net.ParseCIDR(delegate.IPRequest)
+				if err != nil {
+					return nil, logging.Errorf("failed to parse CIDR %q", delegate.MacRequest)
+				}
+			} else if net.ParseIP(delegate.IPRequest) == nil {
+				return nil, logging.Errorf("failed to parse IP address %q", delegate.IPRequest)
+			}
+
+			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, delegate.IPRequest)
+			logging.Debugf("Set IP address %q to %q", delegate.IPRequest, ifName)
 		}
-		logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
+		if os.Setenv("CNI_ARGS", cniArgs) != nil {
+			return nil, logging.Errorf("cannot set %q mac to %q and ip to %q", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
+		}
 	}
 
 	if delegate.ConfListPlugin != false {
@@ -286,11 +310,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	var netStatus []*types.NetworkStatus
 	var rt *libcni.RuntimeConf
 	lastIdx := 0
+	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		lastIdx = idx
 		ifName := getIfname(delegate, args.IfName, idx)
-		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName)
-		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir)
+		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
+		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			break
 		}
