@@ -44,12 +44,11 @@ func TestMultus(t *testing.T) {
 }
 
 type fakePlugin struct {
-	expectedEnv     []string
-	expectedConf    string
-	expectedIfname  string
-	expectedMacAddr string
-	result          cnitypes.Result
-	err             error
+	expectedEnv    []string
+	expectedConf   string
+	expectedIfname string
+	result         cnitypes.Result
+	err            error
 }
 
 type fakeExec struct {
@@ -60,7 +59,7 @@ type fakeExec struct {
 	plugins  []*fakePlugin
 }
 
-func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedMacAddr, expectedConf string, result *types020.Result, err error) {
+func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf string, result *types020.Result, err error) {
 	f.plugins = append(f.plugins, &fakePlugin{
 		expectedEnv:    expectedEnv,
 		expectedConf:   expectedConf,
@@ -124,11 +123,12 @@ func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []str
 	if plugin.expectedIfname != "" {
 		Expect(os.Getenv("CNI_IFNAME")).To(Equal(plugin.expectedIfname))
 	}
-	if plugin.expectedMacAddr != "" {
-		Expect(os.Getenv("MAC")).To(Equal(plugin.expectedMacAddr))
-	}
+
 	if len(plugin.expectedEnv) > 0 {
-		matchArray(gatherCNIEnv(), plugin.expectedEnv)
+		cniEnv := gatherCNIEnv()
+		for _, expectedCniEnvVar := range plugin.expectedEnv {
+			Expect(cniEnv).Should(ContainElement(expectedCniEnvVar))
+		}
 	}
 
 	if plugin.err != nil {
@@ -207,7 +207,7 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "weave-net"
 }`
-		fExec.addPlugin(nil, "eth0", "", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -220,7 +220,7 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "other-plugin"
 }`
-		fExec.addPlugin(nil, "net1", "", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -245,11 +245,13 @@ var _ = Describe("multus operations", func() {
 
 	})
 
-	It("executes delegates with interface name and MAC addr", func() {
+	It("executes delegates with interface name and MAC and IP addr", func() {
 		podNet := `[{"name":"net1",
-	         "interface": "test1"},
+			 "interface": "test1",
+			 "ips":"1.2.3.4/24"},
 		{"name":"net2",
-		 "mac": "c2:11:22:33:44:66"}
+		 "mac": "c2:11:22:33:44:66",
+		 "ips": "10.0.0.1"}
 ]`
 		fakePod := testhelpers.NewFakePod("testpod", podNet)
 		net1 := `{
@@ -291,14 +293,14 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "weave-net"
 }`
-		fExec.addPlugin(nil, "eth0", "", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "test1", "", net1, &types020.Result{
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;IP=1.2.3.4/24"}, "test1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 		}, nil)
-		fExec.addPlugin(nil, "net2", "c2:11:22:33:44:66", net2, &types020.Result{
+		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;MAC=c2:11:22:33:44:66;IP=10.0.0.1"}, "net2", net2, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),
@@ -368,14 +370,14 @@ var _ = Describe("multus operations", func() {
     "cniVersion": "0.2.0",
     "type": "weave-net"
 }`
-		fExec.addPlugin(nil, "eth0", "", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", "", net1, &types020.Result{
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 		}, nil)
-		fExec.addPlugin(nil, "net2", "", net2, &types020.Result{
+		fExec.addPlugin(nil, "net2", net2, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),
@@ -439,7 +441,7 @@ var _ = Describe("multus operations", func() {
 		]
     }
 }`
-		fExec.addPlugin(nil, "eth0", "", expectedConf1, nil, nil)
+		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 		_, err := cmdAdd(args, fExec, nil)
