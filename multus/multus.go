@@ -253,12 +253,19 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 		return logging.Errorf("Multus: error in setting CNI_COMMAND to DEL")
 	}
 
+	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
 		ifName := getIfname(delegates[idx], argIfname, idx)
 		rt.IfName = ifName
+		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, ifName, delegates[idx], rt, binDir); err != nil {
-			return err
+			errorstrings = append(errorstrings, err.Error())
 		}
+	}
+
+	// Check if we had any errors, and send them all back.
+	if len(errorstrings) > 0 {
+		return fmt.Errorf(strings.Join(errorstrings, " / "))
 	}
 
 	return nil
