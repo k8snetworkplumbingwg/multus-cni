@@ -264,7 +264,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	if n.ClusterNetwork != "" {
 		err = k8s.GetDefaultNetworks(k8sArgs, n, kubeClient)
 		if err != nil {
-			return nil, logging.Errorf("XXX")
+			return nil, logging.Errorf("Multus: Failed to get clusterNetwork/defaultNetworks: %v", err)
 		}
 		// First delegate is always the master plugin
 		n.Delegates[0].MasterPlugin = true
