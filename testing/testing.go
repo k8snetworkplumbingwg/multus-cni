@@ -124,7 +124,7 @@ func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) 
 	}
 
 	if defaultNetAnnotation != "" {
-		annotations["multus-cni.io/default-network"] = defaultNetAnnotation
+		annotations["v1.multus-cni.io/default-network"] = defaultNetAnnotation
 	}
 
 	pod.ObjectMeta.Annotations = annotations
