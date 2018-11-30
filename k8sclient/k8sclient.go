@@ -38,6 +38,7 @@ import (
 
 const (
 	resourceNameAnnot = "k8s.v1.cni.cncf.io/resourceName"
+	defaultNetAnnot = "v1.multus-cni.io/default-network"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -643,7 +644,7 @@ func getPodDefaultNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (
 		return "", logging.Errorf("getPodDefaultNetworkAnnotation: failed to query the pod %v in out of cluster comm: %v", string(k8sArgs.K8S_POD_NAME), err)
 	}
 
-	if v, ok := pod.Annotations["multus-cni.io/default-network"]; ok {
+	if v, ok := pod.Annotations[defaultNetAnnot]; ok {
 		return v, nil
 	}
 	return "", nil
