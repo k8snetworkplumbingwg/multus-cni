@@ -621,13 +621,15 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 	delegate.MasterPlugin = true
 	delegates = append(delegates, delegate)
 
-	//need to revisit
-	for _, netname := range conf.DefaultNetworks {
-		delegate, err := getNetDelegate(kubeClient, netname, conf.ConfDir)
-		if err != nil {
-			return err
+	// Pod in kube-system namespace does not have default network for now.
+	if string(k8sArgs.K8S_POD_NAMESPACE) != "kube-system" {
+		for _, netname := range conf.DefaultNetworks {
+			delegate, err := getNetDelegate(kubeClient, netname, conf.ConfDir)
+			if err != nil {
+				return err
+			}
+			delegates = append(delegates, delegate)
 		}
-		delegates = append(delegates, delegate)
 	}
 
 	if err = conf.AddDelegates(delegates); err != nil {
