@@ -53,7 +53,7 @@ User should chose following parameters combination (`clusterNetwork`+`defaultNet
 
 Multus will find network for clusterNetwork/defaultNetworks as following sequences:
 
-1. CRD object for given network name, in 'default' namespace
+1. CRD object for given network name, in 'kube-system' namespace
 1. CNI json config file in `confDir`. Given name should be without extention, like .conf/.conflist. (e.g. "test" for "test.conf")
 1. Directory for CNI json config file. Multus will find alphabetically first file for the network
 1. Multus failed to find network. Multus raise error message
