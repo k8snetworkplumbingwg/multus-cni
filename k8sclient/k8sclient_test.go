@@ -294,8 +294,8 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig("kube-system", "myCRD1", "{\"type\": \"mynet\"}")
 		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("default", "myCRD1", "{\"type\": \"mynet\"}")
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
@@ -325,9 +325,9 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig("kube-system", "myCRD1", "{\"type\": \"mynet\"}")
+		fKubeClient.AddNetConfig("kube-system", "myCRD2", "{\"type\": \"mynet2\"}")
 		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("default", "myCRD1", "{\"type\": \"mynet\"}")
-		fKubeClient.AddNetConfig("default", "myCRD2", "{\"type\": \"mynet2\"}")
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
@@ -361,9 +361,9 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig("kube-system", "myCRD1", "{\"type\": \"mynet\"}")
+		fKubeClient.AddNetConfig("kube-system", "myCRD2", "{\"type\": \"mynet2\"}")
 		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("default", "myCRD1", "{\"type\": \"mynet\"}")
-		fKubeClient.AddNetConfig("default", "myCRD2", "{\"type\": \"mynet2\"}")
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
@@ -428,13 +428,13 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
 		fKubeClient.AddNetFile(fakePod.ObjectMeta.Namespace, "10-net1", net1Name, `{
 	"name": "net1",
 	"type": "mynet",
 	"cniVersion": "0.2.0"
 }`)
+		fKubeClient.AddPod(fakePod)
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
@@ -490,9 +490,9 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
 		fKubeClient.AddNetConfig("default", "net1", "{\"type\": \"mynet1\"}")
-		fKubeClient.AddNetConfig("default", "net2", "{\"type\": \"mynet2\"}")
+		fKubeClient.AddNetConfig("kube-system", "net2", "{\"type\": \"mynet2\"}")
+		fKubeClient.AddPod(fakePod)
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
