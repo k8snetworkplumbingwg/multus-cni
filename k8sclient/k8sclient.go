@@ -532,7 +532,7 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 
 func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*types.DelegateNetConf, error) {
 	logging.Debugf("getDefaultNetDelegate: %v, %v, %s", client, net, confdir)
-	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", "default", net)
+	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", "kube-system", net)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
 		return nil, logging.Errorf("getDefaultNetDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
