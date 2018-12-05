@@ -1,3 +1,4 @@
+# This Dockerfile is used to build the image available on DockerHub
 FROM centos:centos7
 
 # Add everything
@@ -16,14 +17,6 @@ RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
 
 WORKDIR /
 
-LABEL io.k8s.display-name="Multus CNI" \
-      io.k8s.description="This is a component of OpenShift Container Platform and provides a meta CNI plugin." \
-      io.openshift.tags="openshift" \
-      maintainer="Doug Smith <dosmith@redhat.com>"
-
 ADD ./images/entrypoint.sh /
-
-# does it require a root user?
-# USER 1001
 
 ENTRYPOINT ["/entrypoint.sh"]
