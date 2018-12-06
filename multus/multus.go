@@ -172,7 +172,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		return nil, logging.Errorf("cannot set %q ifname to %q: %v", delegate.Conf.Type, ifName, err)
 	}
 
-	if delegate.MacRequest != "" || delegate.IPRequest != "" {
+	if delegate.MacRequest != "" || delegate.IPRequest != nil {
 		if cniArgs != "" {
 			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
 		} else {
@@ -189,22 +189,24 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
 		}
 
-		if delegate.IPRequest != "" {
-			// validate IP address
-			if strings.Contains(delegate.IPRequest, "/") {
-				_, _, err := net.ParseCIDR(delegate.IPRequest)
-				if err != nil {
-					return nil, logging.Errorf("failed to parse CIDR %q", delegate.MacRequest)
+		if delegate.IPRequest != nil {
+			for _, ipRequest := range delegate.IPRequest {
+				// validate IP address
+				if strings.Contains(ipRequest, "/") {
+					_, _, err := net.ParseCIDR(ipRequest)
+					if err != nil {
+						return nil, logging.Errorf("failed to parse CIDR %q", ipRequest)
+					}
+				} else if net.ParseIP(ipRequest) == nil {
+					return nil, logging.Errorf("failed to parse IP address %q", ipRequest)
 				}
-			} else if net.ParseIP(delegate.IPRequest) == nil {
-				return nil, logging.Errorf("failed to parse IP address %q", delegate.IPRequest)
 			}
 
-			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, delegate.IPRequest)
-			logging.Debugf("Set IP address %q to %q", delegate.IPRequest, ifName)
+			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, strings.Join(delegate.IPRequest, ","))
+			logging.Debugf("Set IP addresses %v to interface %q", delegate.IPRequest, ifName)
 		}
 		if os.Setenv("CNI_ARGS", cniArgs) != nil {
-			return nil, logging.Errorf("cannot set %q mac to %q and ip to %q", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
+			return nil, logging.Errorf("cannot set %q mac to %q and ips to %v", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
 		}
 	}
 

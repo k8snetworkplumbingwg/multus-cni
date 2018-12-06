@@ -74,9 +74,9 @@ type NetworkStatus struct {
 type DelegateNetConf struct {
 	Conf          types.NetConf
 	ConfList      types.NetConfList
-	IfnameRequest string `json:"ifnameRequest,omitempty"`
-	MacRequest    string `json:"macRequest,omitempty"`
-	IPRequest     string `json:"ipRequest,omitempty"`
+	IfnameRequest string   `json:"ifnameRequest,omitempty"`
+	MacRequest    string   `json:"macRequest,omitempty"`
+	IPRequest     []string `json:"ipRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
@@ -122,7 +122,7 @@ type NetworkSelectionElement struct {
 	Namespace string `json:"namespace,omitempty"`
 	// IPRequest contains an optional requested IP address for this network
 	// attachment
-	IPRequest string `json:"ips,omitempty"`
+	IPRequest []string `json:"ips,omitempty"`
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
 	MacRequest string `json:"mac,omitempty"`
