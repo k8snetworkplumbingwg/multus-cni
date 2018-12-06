@@ -46,7 +46,7 @@ type NetConf struct {
 	LogLevel        string                   `json:"logLevel"`
 	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
-	ReadinessIndicatorFile string `json:readinessindicatorfile`
+	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 }
 
 type RuntimeConfig struct {
