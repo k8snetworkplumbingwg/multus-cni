@@ -24,8 +24,8 @@ import (
 
 	testutils "github.com/intel/multus-cni/testing"
 
-	"github.com/intel/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/intel/multus-cni/types"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

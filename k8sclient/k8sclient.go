@@ -38,7 +38,7 @@ import (
 
 const (
 	resourceNameAnnot = "k8s.v1.cni.cncf.io/resourceName"
-	defaultNetAnnot = "v1.multus-cni.io/default-network"
+	defaultNetAnnot   = "v1.multus-cni.io/default-network"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -432,7 +432,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	if err != nil {
 		return 0, nil, logging.Errorf("tryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
 	}
-	if delegate != nil{
+	if delegate != nil {
 		logging.Debugf("tryLoadK8sDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
 
 		conf.Delegates[0] = delegate

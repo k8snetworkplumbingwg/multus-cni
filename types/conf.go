@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	defaultCNIDir             = "/var/lib/cni/multus"
-	defaultConfDir            = "/etc/cni/multus/net.d"
-	defaultBinDir             = "/opt/cni/bin"
+	defaultCNIDir                 = "/var/lib/cni/multus"
+	defaultConfDir                = "/etc/cni/multus/net.d"
+	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
 )
 
