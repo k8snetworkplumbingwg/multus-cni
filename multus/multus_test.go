@@ -28,7 +28,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/020"
-	"github.com/containernetworking/cni/pkg/version"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 
@@ -52,7 +52,7 @@ type fakePlugin struct {
 }
 
 type fakeExec struct {
-	version.PluginDecoder
+	cniversion.PluginDecoder
 
 	addIndex int
 	delIndex int
