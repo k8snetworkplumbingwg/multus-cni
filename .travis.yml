@@ -3,10 +3,15 @@ language: go
 # for the detail
 # sudo: requried
 dist: trusty
+
+go:
+  - 1.11.x
+
 env:
   global:
     - REGISTRY_USER=${REGISTRY_USER}
     - REGISTRY_PASS=${REGISTRY_PASS}
+    - MULTUS_GOPATH=${PWD}/gopath
     - secure: "${REGISTRY_SECURE}"
 
 before_install:
@@ -17,31 +22,34 @@ install:
   - go get -u golang.org/x/lint/golint
 
 before_script:
-  - golint ./multus/... | grep -v ALL_CAPS | xargs -r false
-  - go fmt ./multus/...
-  - go vet ./multus/...
+  # Make gopath... to run golint/go fmt/go vet
+  - |-
+    if [ ! -h gopath/src/github.com/intel/multus-cni ]; then
+        mkdir -p gopath/src/github.com/intel
+        ln -s ../../../.. gopath/src/github.com/intel/multus-cni || exit 255
+    fi
+  - env GOPATH=${MULTUS_GOPATH} golint gopath/src/github.com/intel/multus-cni/multus/... | grep -v ALL_CAPS | xargs -r false
+  - env GOPATH=${MULTUS_GOPATH} go fmt gopath/src/github.com/intel/multus-cni/...
+  - go tool vet */*.go
 #  - gocyclo -over 15 ./multus
 
 script:
   - ./build
   - sudo ./test.sh
-  - $GOPATH/bin/goveralls  -coverprofile=coverage.out -service=travis-ci
+  - |-
+    GOV_GOPATH=${PWD}/gopath
+    pushd gopath/src/github.com/intel/multus-cni
+    env GOPATH=${GOV_GOPATH} ${GOPATH}/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+    popd
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
   - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
   - docker build -t nfvpe/multus .
 
-before_deploy:
-  - go get -u github.com/laher/goxc
-  - mkdir -p $TRAVIS_BUILD_DIR/dist
-  - goxc -d=$TRAVIS_BUILD_DIR/dist -pv=$TRAVIS_TAG -bc=linux -tasks=clean-destination,xc,archive,rmbin
-
 deploy:
-  - provider: releases
-    api_key:
-      secure: "${DEPLOY_SECURE}"
-    file_glob: true
-    file: "$TRAVIS_BUILD_DIR/dist/*/*.gz"
+  # Release on versioned tag (e.g. v1.0)
+  - provider: script
     skip_cleanup: true
+    script: curl -sL https://git.io/goreleaser | bash
     on:
       tags: true
       all_branches: true

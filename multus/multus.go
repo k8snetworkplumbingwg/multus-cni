@@ -20,6 +20,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -32,7 +33,7 @@ import (
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/version"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	k8s "github.com/intel/multus-cni/k8sclient"
 	"github.com/intel/multus-cni/logging"
@@ -41,11 +42,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
+var version = "master@git"
+var commit = "unknown commit"
+var date = "unknown date"
+
 var defaultReadinessBackoff = wait.Backoff{
 	Steps:    4,
 	Duration: 250 * time.Millisecond,
 	Factor:   4.0,
 	Jitter:   0.1,
+}
+
+func printVersionString() string {
+	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
+		version, commit, date)
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
@@ -441,6 +451,20 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 }
 
 func main() {
+
+	// Init command line flags to clear vendored packages' one, especially in init()
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	// add version flag
+	versionOpt := false
+	flag.BoolVar(&versionOpt, "version", false, "Show application version")
+	flag.BoolVar(&versionOpt, "v", false, "Show application version")
+	flag.Parse()
+	if versionOpt == true {
+		fmt.Printf("%s\n", printVersionString())
+		return
+	}
+
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
 			result, err := cmdAdd(args, nil, nil)
@@ -457,5 +481,5 @@ func main() {
 			return result.Print()
 		},
 		func(args *skel.CmdArgs) error { return cmdDel(args, nil, nil) },
-		version.All, "meta-plugin that delegates to other CNI plugins")
+		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }
