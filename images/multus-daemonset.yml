@@ -128,6 +128,19 @@ spec:
       - operator: Exists
         effect: NoSchedule
       serviceAccountName: multus
+      initContainers:
+      - name: install-cni-binaries
+        image: rancher/coreos-flannel-cni:v0.3.0
+        command:
+          - /bin/sh
+          - -ce
+          - |
+            mkdir -p /host/opt/cni/bin/
+            cp -va /opt/cni/bin/* /host/opt/cni/bin/
+            echo "Wrote CNI binaries to /host/opt/cni/bin/"
+        volumeMounts:
+        - name: cnibin
+          mountPath: /host/opt/cni/bin
       containers:
       - name: kube-multus
         image: nfvpe/multus:latest
