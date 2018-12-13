@@ -122,15 +122,16 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 
-	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
-	if err != nil {
-		return nil, logging.Errorf("error convert the type.Result to current.Result: %v", err)
-	}
-
 	netstatus := &NetworkStatus{}
 	netstatus.Name = netName
 	netstatus.Default = defaultNet
+
+	// Convert whatever the IPAM result was into the current Result type
+	result, err := current.NewResultFromResult(r)
+	if err != nil {
+		logging.Errorf("error convert the type.Result to current.Result: %v", err)
+		return netstatus, nil
+	}
 
 	for _, ifs := range result.Interfaces {
 		//Only pod interfaces can have sandbox information
