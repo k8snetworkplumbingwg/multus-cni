@@ -178,5 +178,7 @@ fi
 
 echo "Entering sleep... (success)"
 
-# Sleep forever.
-sleep infinity
+# Sleep until container is stopped.
+trap : TERM INT
+(while true; do sleep 3600; done) &
+wait
