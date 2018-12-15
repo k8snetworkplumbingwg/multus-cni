@@ -1,0 +1,20 @@
+# This Dockerfile is used to build the image available on DockerHub
+FROM golang:1.11-alpine AS build
+
+RUN apk add --update bash alpine-sdk
+RUN apk add --update linux-headers
+
+ADD . /usr/src/multus-cni
+
+WORKDIR /usr/src/multus-cni
+
+RUN ./build && file bin/multus
+
+FROM alpine:3.8
+
+RUN apk add --update --no-cache bash
+
+COPY --from=build /usr/src/multus-cni/bin/ /usr/src/multus-cni/bin/
+COPY --from=build /usr/src/multus-cni/images/ /usr/src/multus-cni/images/
+
+ENTRYPOINT /usr/src/multus-cni/images/entrypoint.sh
