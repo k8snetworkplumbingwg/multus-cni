@@ -27,5 +27,5 @@ export GO15VENDOREXPERIMENT=1
 export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
 
-echo "Building plugins"
-go install -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
+echo "Building multus-cni plugin"
+CGO_ENABLED=0 go install -tags netgo -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
