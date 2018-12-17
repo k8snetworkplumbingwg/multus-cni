@@ -66,7 +66,7 @@ done
 # Create array of known locations
 declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
-  arr+=($MULTUS_BIN_FILE)
+  arr+=($MULTUS_CONF_FILE)
 fi
 
 
