@@ -3,15 +3,15 @@
 # Always exit on errors.
 set -e
 
-# Set our known directories.
-CNI_CONF_DIR="/host/etc/cni/net.d"
-CNI_BIN_DIR="/host/opt/cni/bin"
-MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
-MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
-MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
-MULTUS_NAMESPACE_ISOLATION=false
-MULTUS_LOG_LEVEL=""
-MULTUS_LOG_FILE=""
+# Set reasonable defaults
+[ -z "${CNI_CONF_DIR}" ] && CNI_CONF_DIR="/host/etc/cni/net.d"
+[ -z "${CNI_BIN_DIR}" ] && CNI_BIN_DIR="/host/opt/cni/bin"
+[ -z "${MULTUS_CONF_FILE}" ] && MULTUS_CONF_FILE="/opt/multus-cni/70-multus.conf"
+[ -z "${MULTUS_BIN_FILE}" ] && MULTUS_BIN_FILE="/opt/multus-cni/multus"
+[ -z "${MULTUS_KUBECONFIG_FILE_HOST}" ] && MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
+[ -z "${MULTUS_NAMESPACE_ISOLATION}" ] && MULTUS_NAMESPACE_ISOLATION=false
+[ -z "${MULTUS_LOG_LEVEL}" ] && MULTUS_LOG_LEVEL=""
+[ -z "${MULTUS_LOG_FILE}" ] && MULTUS_LOG_FILE=""
 
 # Give help text for parameters.
 function usage()
@@ -33,6 +33,13 @@ function usage()
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
+}
+
+function check_loc() {
+  if [ ! -e "$1" ]; then
+    echo "Location '$1' does not exist"
+    exit 1;
+  fi
 }
 
 # Parse parameters given as arguments to this script.
@@ -75,22 +82,14 @@ while [ "$1" != "" ]; do
     shift
 done
 
+mountpoint -q ${CNI_CONF_DIR} || fail "${CNI_CONF_DIR} is not a mount point"
+mountpoint -q ${CNI_BIN_DIR} || fail "${CNI_BIN_DIR} is not a mount point"
 
-# Create array of known locations
-declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
-if [ "$MULTUS_CONF_FILE" != "auto" ]; then
-  arr+=($MULTUS_CONF_FILE)
-fi
-
-
-# Loop through and verify each location each.
-for i in "${arr[@]}"
-do
-  if [ ! -e "$i" ]; then
-    echo "Location $i does not exist"
-    exit 1;
-  fi
-done
+# Go through and verify each location each (whitespace-safe)
+check_loc "$CNI_CONF_DIR"
+check_loc "$CNI_BIN_DIR"
+check_loc "$MULTUS_BIN_FILE"
+check_loc "$MULTUS_CONF_FILE"
 
 # Copy files into place and atomically move into final binary name
 cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
@@ -239,4 +238,4 @@ fi
 echo "Entering sleep... (success)"
 
 # Sleep forever.
-sleep infinity
+trap : TERM INT; (while true; do sleep 1000; done) & wait
