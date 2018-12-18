@@ -47,6 +47,8 @@ type NetConf struct {
 	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
+	// Option to isolate the usage of CR's to the namespace in which a pod resides.
+	NamespaceIsolation bool `json:"namespaceIsolation"`
 }
 
 type RuntimeConfig struct {
@@ -74,7 +76,7 @@ type DelegateNetConf struct {
 	ConfList      types.NetConfList
 	IfnameRequest string `json:"ifnameRequest,omitempty"`
 	MacRequest    string `json:"macRequest,omitempty"`
-	IPRequest string `json:"ipRequest,omitempty"`
+	IPRequest     string `json:"ipRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
