@@ -38,7 +38,7 @@ import (
 
 const (
 	resourceNameAnnot = "k8s.v1.cni.cncf.io/resourceName"
-	defaultNetAnnot = "v1.multus-cni.io/default-network"
+	defaultNetAnnot   = "v1.multus-cni.io/default-network"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -432,13 +432,13 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	if err != nil {
 		return 0, nil, logging.Errorf("tryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
 	}
-	if delegate != nil{
+	if delegate != nil {
 		logging.Debugf("tryLoadK8sDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
 
 		conf.Delegates[0] = delegate
 	}
 
-	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir)
+	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir, conf.NamespaceIsolation)
 	if err != nil {
 		if _, ok := err.(*NoK8sNetworkError); ok {
 			return 0, clientInfo, nil
@@ -491,7 +491,7 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 	return &defaultKubeClient{client: client}, nil
 }
 
-func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string) ([]*types.DelegateNetConf, error) {
+func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string, confnamespaceisolation bool) ([]*types.DelegateNetConf, error) {
 	logging.Debugf("GetPodNetwork: %v, %v, %v", k8sclient, k8sArgs, confdir)
 
 	netAnnot, defaultNamespace, podID, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
@@ -519,6 +519,15 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	for _, net := range networks {
+
+		// The pods namespace (stored as defaultNamespace, does not equal the annotation's target namespace in net.Namespace)
+		// In the case that this is a mismatch when namespaceisolation is enabled, this should be an error.
+		if confnamespaceisolation {
+			if defaultNamespace != net.Namespace {
+				return nil, logging.Errorf("GetPodNetwork: namespace isolation violation: podnamespace: %v / target namespace: %v", defaultNamespace, net.Namespace)
+			}
+		}
+
 		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetPodNetwork: failed getting the delegate: %v", err)

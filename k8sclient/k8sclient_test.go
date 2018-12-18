@@ -24,8 +24,8 @@ import (
 
 	testutils "github.com/intel/multus-cni/testing"
 
-	"github.com/intel/multus-cni/types"
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/intel/multus-cni/types"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -82,7 +82,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(2))
@@ -115,7 +115,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("GetPodNetwork: failed getting the delegate: getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: resource not found"))
 	})
@@ -159,7 +159,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(3))
@@ -186,7 +186,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
 	})
@@ -216,7 +216,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(2))
@@ -242,7 +242,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fKubeClient.PodCount).To(Equal(1))
 		Expect(fKubeClient.NetCount).To(Equal(1))
@@ -273,7 +273,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir)
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError(fmt.Sprintf("GetPodNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
@@ -545,5 +545,47 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(numK8sDelegates).To(Equal(0))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet1"))
+	})
+
+	It("Errors when namespace isolation is violated", func() {
+		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"delegates": [{
+			"name": "weave1",
+				"cniVersion": "0.2.0",
+				"type": "weave-net"
+			}],
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml",
+			"namespaceIsolation": true
+		}`
+
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		net1 := `{
+	"name": "net1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = GetPodNetwork(kubeClient, k8sArgs, tmpDir, netConf.NamespaceIsolation)
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("GetPodNetwork: namespace isolation violation: podnamespace: test / target namespace: kube-system"))
+
 	})
 })
