@@ -17,7 +17,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
         "portMappings": true
     },    
     "readinessindicatorfile": "",
-    
+    "namespaceIsolation": false,
 "Note1":"NOTE: you can set clusterNetwork+defaultNetworks OR delegates!!",
     "clusterNetwork": "defaultCRD",
     "defaultNetworks": ["sidecarCRD", "flannel"],
@@ -40,6 +40,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
 * `logFile` (string, optional): file path for log file. multus puts log in given file
 * `logLevel` (string, optional): logging level ("debug", "error" or "panic")
+* `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
 * `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready
 
@@ -107,3 +108,140 @@ You may configure the logging level by using the `LogLevel` option in your CNI c
     "LogLevel": "debug",
 ```
 
+### Namespace Isolation
+
+The functionality provided by the `namespaceIsolation` configuration option enables a mode where Multus only allows pods to access custom resources (the `NetworkAttachmentDefinitions`) within the namespace where that pod resides. In other words, the `NetworkAttachmentDefinitions` are isolated to usage within the namespace in which they're created. 
+
+For example, if a pod is created in the namespace called `development`, Multus will not allow networks to be attached when defined by custom resources created in a different namespace, say in the `default` network.
+
+Consider the situation where you have a system that has users of different privilege levels -- as an example, a platform which has two administrators: a Senior Administrator and a Junior Administrator. The Senior Administrator may have access to all namespaces, and some network configurations as used by Multus are considered to be privileged in that they allow access to some protected resources available on the network. However, the Junior Administrator has access to only a subset of namespaces, and therefore it should be assumed that the Junior Administrator cannot create pods in their limited subset of namespaces. The `namespaceIsolation` feature provides for this isolation, allowing pods created in given namespaces to only access custom resources in the same namespace as the pod.
+
+Namespace Isolation is disabled by default.
+
+#### Configuration example
+
+```
+  "namespaceIsolation": true,
+```
+
+#### Usage example
+
+Let's setup an example where we:
+
+* Create a custom resource in a namespace called `privileged`
+* Create a pod in a namespace called `development`, and have annotations that reference a custom resource in the `privileged` namespace. The creation of this pod should be disallowed by Multus (as we'll have the use of the custom resources limited only to those custom resources created within the same namespace as the pod).
+
+Given the above scenario with a Junior & Senior Administrator. You may assume that the Senior Administrator has access to all namespaces, whereas the Junior Administrator has access only to the `development` namespace.
+
+Firstly, we show that we have a number of namespaces available:
+
+```
+# List the available namespaces
+[user@kube-master ~]$ kubectl get namespaces
+NAME          STATUS   AGE
+default       Active   7h27m
+development   Active   3h
+kube-public   Active   7h27m
+kube-system   Active   7h27m
+privileged    Active   4s
+```
+
+We'll create a `NetworkAttachmentDefinition` in the `privileged` namespace.
+
+```
+# Show the network attachment definition we're creating.
+[user@kube-master ~]$ cat cr.yml
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.1.0/24",
+        "rangeStart": "192.168.1.200",
+        "rangeEnd": "192.168.1.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.1.1"
+      }
+    }'
+
+# Create that network attachment definition in the privileged namespace
+[user@kube-master ~]$ kubectl create -f cr.yml -n privileged
+networkattachmentdefinition.k8s.cni.cncf.io/macvlan-conf created
+
+# List the available network attachment definitions in the privileged namespace.
+[user@kube-master ~]$ kubectl get networkattachmentdefinition.k8s.cni.cncf.io -n privileged
+NAME           AGE
+macvlan-conf   11s
+```
+
+Next, we'll create a pod with an annotation that references the privileged namespace. Pay particular attention to the annotation that reads `k8s.v1.cni.cncf.io/networks: privileged/macvlan-conf` -- where it contains a reference to a `namespace/configuration-name` formatted network attachment name. In this case referring to the `macvlan-conf` in the namespace called `privileged`.
+
+```
+# Show the yaml for a pod.
+[user@kube-master ~]$ cat example.pod.yml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: samplepod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: privileged/macvlan-conf
+spec:
+  containers:
+  - name: samplepod
+    command: ["/bin/bash", "-c", "sleep 2000000000000"]
+    image: dougbtv/centos-network
+
+# Create that pod.
+[user@kube-master ~]$ kubectl create -f example.pod.yml -n development
+pod/samplepod created
+```
+
+You'll note that pod fails to spawn successfully. If you check the Multus logs, you'll see an entry such as:
+
+```
+2018-12-18T21:41:32Z [error] GetPodNetwork: namespace isolation violation: podnamespace: development / target namespace: privileged
+```
+
+This error expresses that the pod resides in the namespace named `development` but refers to a `NetworkAttachmentDefinition` outside of that namespace, in this case, the namespace named `privileged`.
+
+In a positive example, you'd instead create the `NetworkAttachmentDefinition` in the `development` namespace, and you'd have an annotation that either A. does not reference a namespace, or B. refers to the same annotation.
+
+A positive example may be:
+
+```
+# Create the same NetworkAttachmentDefinition as above, however in the development namespace
+[user@kube-master ~]$ kubectl create -f cr.yml -n development
+networkattachmentdefinition.k8s.cni.cncf.io/macvlan-conf created
+
+# Show the yaml for a sample pod which references macvlan-conf without a namspace/ format
+[user@kube-master ~]$ cat positive.example.pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: samplepod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: macvlan-conf
+spec:
+  containers:
+  - name: samplepod
+    command: ["/bin/bash", "-c", "sleep 2000000000000"]
+    image: dougbtv/centos-network
+
+# Create that pod.
+[user@kube-master ~]$ kubectl create -f positive.example.pod -n development
+pod/samplepod created
+
+# We can see that this pod has been launched successfully.
+[user@kube-master ~]$ kubectl get pods -n development
+NAME        READY   STATUS    RESTARTS   AGE
+samplepod   1/1     Running   0          31s
+```
