@@ -172,7 +172,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		return nil, logging.Errorf("cannot set %q ifname to %q: %v", delegate.Conf.Type, ifName, err)
 	}
 
-	if delegate.MacRequest != "" || delegate.IPRequest != "" {
+	if delegate.MacRequest != "" || delegate.IPRequest != "" || delegate.ExtraFields != nil {
 		if cniArgs != "" {
 			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
 		} else {
@@ -203,8 +203,23 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, delegate.IPRequest)
 			logging.Debugf("Set IP address %q to %q", delegate.IPRequest, ifName)
 		}
+
+		if delegate.ExtraFields != nil {
+			invalidChars := "; | ="
+			for key, value := range delegate.ExtraFields {
+				if strings.ContainsAny(key, invalidChars) {
+					return nil, logging.Errorf("Key %q contains %q character/s which is invalid", key, invalidChars)
+				}
+				if strings.ContainsAny(value, invalidChars) {
+					return nil, logging.Errorf("Value %q contains %q character/s which is invalid", value, invalidChars)
+				}
+				cniArgs = fmt.Sprintf("%s;%s=%s", cniArgs, key, value)
+				logging.Debugf("Set %q %q to %q", key, value, ifName)
+			}
+		}
+
 		if os.Setenv("CNI_ARGS", cniArgs) != nil {
-			return nil, logging.Errorf("cannot set %q mac to %q and ip to %q", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
+			return nil, logging.Errorf("cannot set %q CNI_ARGS", delegate.Conf.Type)
 		}
 	}
 

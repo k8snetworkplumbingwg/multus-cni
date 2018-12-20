@@ -74,11 +74,12 @@ type DelegateNetConf struct {
 	ConfList      types.NetConfList
 	IfnameRequest string `json:"ifnameRequest,omitempty"`
 	MacRequest    string `json:"macRequest,omitempty"`
-	IPRequest string `json:"ipRequest,omitempty"`
+	IPRequest     string `json:"ipRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
 	ConfListPlugin bool `json:"-"`
+	ExtraFields map[string]string
 
 	// Raw JSON
 	Bytes []byte
@@ -127,6 +128,10 @@ type NetworkSelectionElement struct {
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interface,omitempty"`
+	// All key names that do not include a period character are reserved to ensure this specification
+	// may be extended in the future. Keys other than the reserved ones will be stored in the
+	// ExtraFields map
+	ExtraFields      map[string]string
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes

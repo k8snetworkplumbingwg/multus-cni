@@ -192,6 +192,7 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 
 func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
 	var networks []*types.NetworkSelectionElement
+	var extraNetworksInfo []map[string]string
 
 	logging.Debugf("parsePodNetworkAnnotation: %s, %s", podNetworks, defaultNamespace)
 	if podNetworks == "" {
@@ -202,6 +203,8 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
 			return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
 		}
+
+		json.Unmarshal([]byte(podNetworks), &extraNetworksInfo)
 	} else {
 		// Comma-delimited list of network attachment object names
 		for _, item := range strings.Split(podNetworks, ",") {
@@ -222,10 +225,25 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		}
 	}
 
-	for _, net := range networks {
+	for i, net := range networks {
 		if net.Namespace == "" {
 			net.Namespace = defaultNamespace
 		}
+		var netExtraFields map[string]string
+		if extraNetworksInfo != nil {
+			netExtraFields = extraNetworksInfo[i]
+		}
+
+		// All key names that do not include a period character are reserved
+		for key := range netExtraFields {
+			for _,reservedKeys := range []string{"name","namespace","ips","mac","interface"} {
+				if strings.Contains(key, reservedKeys) {
+					delete(netExtraFields, key)
+				}
+			}
+		}
+
+		networks[i].ExtraFields = netExtraFields
 	}
 
 	return networks, nil
@@ -259,7 +277,6 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 			if confList.Name == name || name == "" {
 				return confList.Bytes, nil
 			}
-
 		} else {
 			conf, err := libcni.ConfFromFile(confFile)
 			if err != nil {

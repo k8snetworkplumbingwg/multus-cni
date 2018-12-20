@@ -251,7 +251,8 @@ var _ = Describe("multus operations", func() {
 			 "ips":"1.2.3.4/24"},
 		{"name":"net2",
 		 "mac": "c2:11:22:33:44:66",
-		 "ips": "10.0.0.1"}
+		 "ips": "10.0.0.1",
+		 "OrgFooBarKeyName": "value"}
 ]`
 		fakePod := testhelpers.NewFakePod("testpod", podNet, "")
 		net1 := `{
@@ -300,7 +301,7 @@ var _ = Describe("multus operations", func() {
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 		}, nil)
-		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;MAC=c2:11:22:33:44:66;IP=10.0.0.1"}, "net2", net2, &types020.Result{
+		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;MAC=c2:11:22:33:44:66;IP=10.0.0.1;OrgFooBarKeyName=value"}, "net2", net2, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),

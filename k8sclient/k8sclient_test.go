@@ -125,8 +125,9 @@ var _ = Describe("k8sclient operations", func() {
 {"name":"net1"},
 {
   "name":"net2",
-  "ipRequest": "1.2.3.4",
-  "macRequest": "aa:bb:cc:dd:ee:ff"
+  "ips": "1.2.3.4",
+  "mac": "aa:bb:cc:dd:ee:ff",
+  "OrgFooBarKeyName": "value"
 },
 {
   "name":"net3",
@@ -167,10 +168,16 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(len(delegates)).To(Equal(3))
 		Expect(delegates[0].Conf.Name).To(Equal("net1"))
 		Expect(delegates[0].Conf.Type).To(Equal("mynet"))
+		Expect(delegates[0].ExtraFields).To(BeEmpty())
 		Expect(delegates[1].Conf.Name).To(Equal("net2"))
 		Expect(delegates[1].Conf.Type).To(Equal("mynet2"))
+		Expect(delegates[1].MacRequest).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(delegates[1].IPRequest).To(Equal("1.2.3.4"))
+		Expect(len(delegates[1].ExtraFields)).To(Equal(1))
+		Expect(delegates[1].ExtraFields["OrgFooBarKeyName"]).To(Equal("value"))
 		Expect(delegates[2].Conf.Name).To(Equal("net3"))
 		Expect(delegates[2].Conf.Type).To(Equal("mynet3"))
+		Expect(delegates[2].ExtraFields).To(BeEmpty())
 	})
 
 	It("fails when the JSON format annotation is invalid", func() {
