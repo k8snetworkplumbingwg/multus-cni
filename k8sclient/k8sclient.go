@@ -151,26 +151,34 @@ func getPodNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (string,
 
 func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
 	var netNsName string
+	// please note that Linux kernel network interface names accept any octet, so there's
+	// basically no restriction on what a Linux kernel network interface name can be.
+	// In particular, network interface names may contain "@" and "/" themselves, so we
+	// must be careful while splittling the elements netNsName, networkName, and netIfName.
 	var netIfName string
 	var networkName string
 
 	logging.Debugf("parsePodNetworkObjectName: %s", podnetwork)
-	slashItems := strings.Split(podnetwork, "/")
-	if len(slashItems) == 2 {
-		netNsName = strings.TrimSpace(slashItems[0])
-		networkName = slashItems[1]
-	} else if len(slashItems) == 1 {
-		networkName = slashItems[0]
-	} else {
-		return "", "", "", logging.Errorf("Invalid network object (failed at '/')")
-	}
-
-	atItems := strings.Split(networkName, "@")
-	networkName = strings.TrimSpace(atItems[0])
+	// Start splitting with the network interface name, as this is the last element, and
+	// it may contain "/"s which then must not be used for splitting off the namespace.
+	atItems := strings.SplitN(podnetwork, "@", 2)
 	if len(atItems) == 2 {
 		netIfName = strings.TrimSpace(atItems[1])
-	} else if len(atItems) != 1 {
-		return "", "", "", logging.Errorf("Invalid network object (failed at '@')")
+	}
+	// note: SplitN cannot return 0 items, so we always get the combined (optional)
+	// namespace and network names as the first split element.
+	netNsNetworkName := strings.TrimSpace(atItems[0])
+
+	// Only now we check for an optional namespace after we're sure there is no
+	// "stray" slash anymore belonging to an odd network interface name.
+	slashItems := strings.Split(netNsNetworkName, "/")
+	if len(slashItems) == 2 {
+		netNsName = strings.TrimSpace(slashItems[0])
+		networkName = strings.TrimSpace(slashItems[1])
+	} else if len(slashItems) == 1 {
+		networkName = strings.TrimSpace(slashItems[0])
+	} else {
+		return "", "", "", logging.Errorf("Invalid network object (failed at '/')")
 	}
 
 	// Check and see if each item matches the specification for valid attachment name.
@@ -178,7 +186,7 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	// [a-z0-9]([-a-z0-9]*[a-z0-9])?
 	// And we allow at (@), and forward slash (/) (units separated by commas)
 	// It must start and end alphanumerically.
-	allItems := []string{netNsName, networkName, netIfName}
+	allItems := []string{netNsName, networkName}
 	for i := range allItems {
 		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
 		if !matched && len([]rune(allItems[i])) > 0 {

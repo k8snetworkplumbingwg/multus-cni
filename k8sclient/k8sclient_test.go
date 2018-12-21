@@ -50,6 +50,54 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("correctly parses pod network attachment annotation syntax: network name syntax", func() {
+		ns, net, nif, err := parsePodNetworkObjectName("foonet")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ns).To(Equal(""))
+		Expect(net).To(Equal("foonet"))
+		Expect(nif).To(Equal(""))
+
+		ns, net, nif, err = parsePodNetworkObjectName("foo.net")
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ 'foo.net'"))
+	})
+
+	It("correctly parses pod network attachment annotation syntax: namespace name syntax", func() {
+		ns, net, nif, err := parsePodNetworkObjectName("bazns/foonet")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ns).To(Equal("bazns"))
+		Expect(net).To(Equal("foonet"))
+		Expect(nif).To(Equal(""))
+
+		ns, net, nif, err = parsePodNetworkObjectName("bazns/foonet/else")
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("Invalid network object (failed at '/')"))
+
+		ns, net, nif, err = parsePodNetworkObjectName("baz.ns/foonet")
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ 'baz.ns'"))
+	})
+
+	It("correctly parses pod network attachment annotation syntax: interface name syntax", func() {
+		ns, net, nif, err := parsePodNetworkObjectName("foonet@nif1/@")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ns).To(Equal(""))
+		Expect(net).To(Equal("foonet"))
+		Expect(nif).To(Equal("nif1/@"))
+
+		ns, net, nif, err = parsePodNetworkObjectName("bazns/foonet@nif1/@")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ns).To(Equal("bazns"))
+		Expect(net).To(Equal("foonet"))
+		Expect(nif).To(Equal("nif1/@"))
+
+		ns, net, nif, err = parsePodNetworkObjectName("baz@ns/foonet@nif1/@")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ns).To(Equal(""))
+		Expect(net).To(Equal("baz"))
+		Expect(nif).To(Equal("ns/foonet@nif1/@"))
+	})
+
 	It("retrieves delegates from kubernetes using simple format annotation", func() {
 		fakePod := testutils.NewFakePod("testpod", "net1,net2", "")
 		net1 := `{
@@ -118,31 +166,6 @@ var _ = Describe("k8sclient operations", func() {
 		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("GetPodNetwork: failed getting the delegate: getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: resource not found"))
-	})
-
-	It("accepts odd, yet valid Linux network interface names", func() {
-		fakePod := testutils.NewFakePod("testpod", "net1@foo.bar", "")
-		net1 := `{
-			"name": "net1",
-			"type": "mynet1",
-			"cniVersion": "0.2.0"
-}`
-		
-		args := &skel.CmdArgs{
-			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-		}
-
-		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
-
-		kubeClient, err := GetK8sClient("", fKubeClient)
-		Expect(err).NotTo(HaveOccurred())
-		k8sArgs, err := GetK8sArgs(args)
-		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(len(delegates)).To(Equal(1))
 	})
 
 	It("retrieves delegates from kubernetes using JSON format annotation", func() {
