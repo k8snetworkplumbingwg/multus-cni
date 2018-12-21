@@ -120,6 +120,31 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).To(MatchError("GetPodNetwork: failed getting the delegate: getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: resource not found"))
 	})
 
+	It("accepts odd, yet valid Linux network interface names", func() {
+		fakePod := testutils.NewFakePod("testpod", "net1@foo.bar", "")
+		net1 := `{
+			"name": "net1",
+			"type": "mynet1",
+			"cniVersion": "0.2.0"
+}`
+		
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetPodNetwork(kubeClient, k8sArgs, tmpDir, false)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(delegates)).To(Equal(1))
+	})
+
 	It("retrieves delegates from kubernetes using JSON format annotation", func() {
 		fakePod := testutils.NewFakePod("testpod", `[
 {"name":"net1"},
