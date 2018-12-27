@@ -438,7 +438,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 		conf.Delegates[0] = delegate
 	}
 
-	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir)
+	delegates, err := GetPodNetwork(kubeClient, k8sArgs, conf.ConfDir, conf.NamespaceIsolation)
 	if err != nil {
 		if _, ok := err.(*NoK8sNetworkError); ok {
 			return 0, clientInfo, nil
@@ -491,7 +491,7 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 	return &defaultKubeClient{client: client}, nil
 }
 
-func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string) ([]*types.DelegateNetConf, error) {
+func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string, confnamespaceisolation bool) ([]*types.DelegateNetConf, error) {
 	logging.Debugf("GetPodNetwork: %v, %v, %v", k8sclient, k8sArgs, confdir)
 
 	netAnnot, defaultNamespace, podID, err := getPodNetworkAnnotation(k8sclient, k8sArgs)
@@ -519,6 +519,15 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string)
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	for _, net := range networks {
+
+		// The pods namespace (stored as defaultNamespace, does not equal the annotation's target namespace in net.Namespace)
+		// In the case that this is a mismatch when namespaceisolation is enabled, this should be an error.
+		if confnamespaceisolation {
+			if defaultNamespace != net.Namespace {
+				return nil, logging.Errorf("GetPodNetwork: namespace isolation violation: podnamespace: %v / target namespace: %v", defaultNamespace, net.Namespace)
+			}
+		}
+
 		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, podID, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetPodNetwork: failed getting the delegate: %v", err)

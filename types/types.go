@@ -47,6 +47,8 @@ type NetConf struct {
 	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
+	// Option to isolate the usage of CR's to the namespace in which a pod resides.
+	NamespaceIsolation bool `json:"namespaceIsolation"`
 }
 
 type RuntimeConfig struct {
