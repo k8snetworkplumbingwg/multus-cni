@@ -286,7 +286,7 @@ EOF
 
 #### Lauch pod with text annotation for NetworkAttachmentDefinition in different namespace
 
-You can also specify NetworkAttachmentDefinition with its namespace as adding `/<namespace>`
+You can also specify NetworkAttachmentDefinition with its namespace as adding `<namespace>/`
 
 ```
 # Execute following command at Kubernetes master
@@ -320,7 +320,7 @@ kind: Pod
 metadata:
   name: pod-case-02
   annotations:
-    k8s.v1.cni.cncf.io/networks: macvlan-conf-3/testns1
+    k8s.v1.cni.cncf.io/networks: testns1/macvlan-conf-3
 spec:
   containers:
   - name: pod-case-02
