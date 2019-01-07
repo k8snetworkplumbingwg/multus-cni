@@ -1,0 +1,20 @@
+# This dockerfile is specific to building Multus for OpenShift
+FROM openshift/origin-release:golang-1.10 as builder
+
+ADD . /usr/src/multus-cni
+
+WORKDIR /usr/src/multus-cni
+RUN ./build
+
+FROM openshift/origin-base
+RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
+COPY --from=builder /usr/src/multus-cni/images/70-multus.conf /usr/src/multus-cni/images
+COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
+ADD ./images/entrypoint.sh /
+
+LABEL io.k8s.display-name="Multus CNI" \
+      io.k8s.description="This is a component of OpenShift Container Platform and provides a meta CNI plugin." \
+      io.openshift.tags="openshift" \
+      maintainer="Doug Smith <dosmith@redhat.com>"
+
+ENTRYPOINT ["/entrypoint.sh"]
