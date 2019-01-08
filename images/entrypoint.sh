@@ -158,19 +158,29 @@ fi
 
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
-  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
-  if [ "$MASTER_PLUGIN" == "" ]; then
-    echo "Error: Multus could not be configured: no master plugin was found."
-    exit 1;
-  elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
-    echo "Warning: Multus is already configured: auto configuration skipped."
-  else
-    MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
-    KUBECONFIG_LOCATION_LINE=""
-    if [ $WRITE_KUBE_CONFIG_FILE = true ] ; then
-      KUBECONFIG_LOCATION_LINE="\"kubeconfig\": \"$MULTUS_KUBECONFIG_FILE_HOST\","
-    fi
-    CONF=$(cat <<-EOF
+  found_master=false
+  tries=0
+  while [ found_master = false ]; do
+    MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
+    if [ "$MASTER_PLUGIN" == "" ]; then
+      if [ $tries -lt 600 ]; then
+        ((tries++))
+        sleep 1;
+      else
+        echo "Error: Multus could not be configured: no master plugin was found."
+        exit 1;
+      fi
+    elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
+      found_master=true
+      echo "Warning: Multus is already configured: auto configuration skipped."
+    else
+      found_master=true
+      MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+      KUBECONFIG_LOCATION_LINE=""
+      if [ $WRITE_KUBE_CONFIG_FILE = true ] ; then
+        KUBECONFIG_LOCATION_LINE="\"kubeconfig\": \"$MULTUS_KUBECONFIG_FILE_HOST\","
+      fi
+      CONF=$(cat <<-EOF
 			{
 				"name": "multus-cni-network",
 				"type": "multus",
@@ -180,9 +190,10 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 				]
 			}
 			EOF
-		)
-    echo $CONF > $CNI_CONF_DIR/00-multus.conf
-  fi
+  		)
+      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+    fi
+  done
 fi
 
 # ---------------------- end Generate "00-multus.conf".
