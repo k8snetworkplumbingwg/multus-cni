@@ -164,6 +164,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
     MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
+        echo "Attemping to find master plugin configuration, attempt $tries"
         ((tries++))
         sleep 1;
       else
@@ -192,6 +193,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 			EOF
   		)
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      echo "Config file created @ $CNI_CONF_DIR/00-multus.conf"
     fi
   done
 fi
