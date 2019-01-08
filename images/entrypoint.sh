@@ -9,6 +9,7 @@ CNI_BIN_DIR="/host/opt/cni/bin"
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
+WRITE_KUBE_CONFIG_FILE=false
 
 # Give help text for parameters.
 function usage()
@@ -27,6 +28,7 @@ function usage()
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
+    echo -e "\t--multus-write-kubeconfig=$WRITE_KUBE_CONFIG_FILE"
 }
 
 # Parse parameters given as arguments to this script.
@@ -52,6 +54,9 @@ while [ "$1" != "" ]; do
             ;;
         --multus-kubeconfig-file-host)
             MULTUS_KUBECONFIG_FILE_HOST=$VALUE
+            ;;
+        --multus-write-kubeconfig)
+            WRITE_KUBE_CONFIG_FILE=$VALUE
             ;;
         *)
             echo "ERROR: unknown parameter \"$PARAM\""
@@ -118,9 +123,10 @@ if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
   # to skip TLS verification for now.  We should eventually support
   # writing more complete kubeconfig files. This is only used
   # if the provided CNI network config references it.
-  touch $MULTUS_KUBECONFIG
-  chmod ${KUBECONFIG_MODE:-600} $MULTUS_KUBECONFIG
-  cat > $MULTUS_KUBECONFIG <<EOF
+  if [ $WRITE_KUBE_CONFIG_FILE = true ] ; then
+    touch $MULTUS_KUBECONFIG
+    chmod ${KUBECONFIG_MODE:-600} $MULTUS_KUBECONFIG
+    cat > $MULTUS_KUBECONFIG <<EOF
 # Kubeconfig file for Multus CNI plugin.
 apiVersion: v1
 kind: Config
@@ -140,6 +146,7 @@ contexts:
     user: multus
 current-context: multus-context
 EOF
+fi
 
 else
   echo "WARNING: Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
@@ -159,11 +166,15 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
     echo "Warning: Multus is already configured: auto configuration skipped."
   else
     MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+    KUBECONFIG_LOCATION_LINE=""
+    if [ $WRITE_KUBE_CONFIG_FILE = true ] ; then
+      KUBECONFIG_LOCATION_LINE="\"kubeconfig\": \"$MULTUS_KUBECONFIG_FILE_HOST\","
+    fi
     CONF=$(cat <<-EOF
 			{
 				"name": "multus-cni-network",
 				"type": "multus",
-				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
+				$KUBECONFIG_LOCATION_LINE
 				"delegates": [
 					$MASTER_PLUGIN_JSON
 				]
