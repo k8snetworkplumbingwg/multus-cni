@@ -160,7 +160,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
   found_master=false
   tries=0
-  while [ found_master = false ]; do
+  while [ $found_master = false ]; do
     MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
