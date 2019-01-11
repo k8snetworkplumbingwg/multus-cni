@@ -503,4 +503,56 @@ var _ = Describe("multus operations", func() {
 		_, err := cmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	It("executes clusterNetwork delegate", func() {
+		fakePod := testhelpers.NewFakePod("testpod", "", "kube-system/net1")
+		net1 := `{
+	"name": "net1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			StdinData: []byte(`{
+    "name": "node-cni-network",
+    "type": "multus",
+	"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	"defaultNetworks": [],
+	"clusterNetwork": "net1",
+    "delegates": []
+}`),
+		}
+
+		fExec := &fakeExec{}
+		fExec.addPlugin(nil, "eth0", net1, expectedResult1, nil)
+
+		fKubeClient := testhelpers.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		result, err := cmdAdd(args, fExec, fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		Expect(fKubeClient.PodCount).To(Equal(3))
+		Expect(fKubeClient.NetCount).To(Equal(2))
+		r := result.(*types020.Result)
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		os.Setenv("CNI_COMMAND", "DEL")
+		os.Setenv("CNI_IFNAME", "eth0")
+		err = cmdDel(args, fExec, fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+	})
 })
