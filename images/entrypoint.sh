@@ -84,8 +84,9 @@ do
   fi
 done
 
-# Copy files into proper places.
-cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR
+# Copy files into place and atomically move into final binary name
+cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
+mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus 
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
 fi
