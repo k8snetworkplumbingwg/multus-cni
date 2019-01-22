@@ -88,4 +88,40 @@ var _ = Describe("config operations", func() {
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 	})
+
+	It("has defaults set for network readiness", func() {
+		conf := `{
+    "name": "defaultnetwork",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/kubelet.conf",
+    "delegates": [{
+      "cniVersion": "0.3.0",
+      "name": "defaultnetwork",
+      "type": "flannel",
+      "isDefaultGateway": true
+    }]
+}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.ReadinessIndicatorFile).To(Equal(""))
+	})
+
+	It("honors overrides for network readiness", func() {
+		conf := `{
+    "name": "defaultnetwork",
+    "type": "multus",
+    "readinessindicatorfile": "/etc/cni/net.d/foo",
+    "kubeconfig": "/etc/kubernetes/kubelet.conf",
+    "delegates": [{
+      "cniVersion": "0.3.0",
+      "name": "defaultnetwork",
+      "type": "flannel",
+      "isDefaultGateway": true
+    }]
+}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.ReadinessIndicatorFile).To(Equal("/etc/cni/net.d/foo"))
+	})
+
 })

@@ -9,6 +9,7 @@ CNI_BIN_DIR="/host/opt/cni/bin"
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
+MULTUS_NAMESPACE_ISOLATION=false
 
 # Give help text for parameters.
 function usage()
@@ -27,6 +28,7 @@ function usage()
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
+    echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
 }
 
 # Parse parameters given as arguments to this script.
@@ -53,6 +55,9 @@ while [ "$1" != "" ]; do
         --multus-kubeconfig-file-host)
             MULTUS_KUBECONFIG_FILE_HOST=$VALUE
             ;;
+        --namespace-isolation)
+            MULTUS_NAMESPACE_ISOLATION=$VALUE
+            ;;
         *)
             echo "ERROR: unknown parameter \"$PARAM\""
             usage
@@ -66,7 +71,7 @@ done
 # Create array of known locations
 declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
-  arr+=($MULTUS_BIN_FILE)
+  arr+=($MULTUS_CONF_FILE)
 fi
 
 
@@ -158,11 +163,16 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
     echo "Warning: Multus is already configured: auto configuration skipped."
   else
+    ISOLATION_STRING=""
+    if [ "$MULTUS_NAMESPACE_ISOLATION" == true ]; then
+      ISOLATION_STRING="\"namespaceIsolation\": true,"
+    fi
     MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
     CONF=$(cat <<-EOF
 			{
 				"name": "multus-cni-network",
 				"type": "multus",
+        $ISOLATION_STRING
 				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
 				"delegates": [
 					$MASTER_PLUGIN_JSON

@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	defaultCNIDir  = "/var/lib/cni/multus"
-	defaultConfDir = "/etc/cni/multus/net.d"
-	defaultBinDir  = "/opt/cni/bin"
+	defaultCNIDir                 = "/var/lib/cni/multus"
+	defaultConfDir                = "/etc/cni/multus/net.d"
+	defaultBinDir                 = "/opt/cni/bin"
+	defaultReadinessIndicatorFile = ""
 )
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -50,18 +51,20 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // Convert raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
+	var err error
+	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
+
 	// If deviceID is present, inject this into delegate config
 	if deviceID != "" {
-		if updatedBytes, err := delegateAddDeviceID(bytes, deviceID); err != nil {
+		var updatedBytes []byte
+		if updatedBytes, err = delegateAddDeviceID(bytes, deviceID); err != nil {
 			return nil, logging.Errorf("error in LoadDelegateNetConf - delegateAddDeviceID unable to update delegate config: %v", err)
-		} else {
-			bytes = updatedBytes
 		}
+		bytes = updatedBytes
 	}
 
 	delegateConf := &DelegateNetConf{}
-	logging.Debugf("LoadDelegateNetConf: %s, %s", string(bytes), ifnameRequest)
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
 	}
@@ -73,8 +76,16 @@ func LoadDelegateNetConf(bytes []byte, ifnameRequest, deviceID string) (*Delegat
 		}
 	}
 
-	if ifnameRequest != "" {
-		delegateConf.IfnameRequest = ifnameRequest
+	if net != nil {
+		if net.InterfaceRequest != "" {
+			delegateConf.IfnameRequest = net.InterfaceRequest
+		}
+		if net.MacRequest != "" {
+			delegateConf.MacRequest = net.MacRequest
+		}
+		if net.IPRequest != "" {
+			delegateConf.IPRequest = net.IPRequest
+		}
 	}
 
 	delegateConf.Bytes = bytes
@@ -109,7 +120,7 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc 
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
-	logging.Debugf("LoadNetworkStatus: %v, %s, %s", r, netName, defaultNet)
+	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
@@ -184,8 +195,8 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	// the master plugin. Kubernetes CRD delegates are then appended to
 	// the existing delegate list and all delegates executed in-order.
 
-	if len(netconf.RawDelegates) == 0 {
-		return nil, logging.Errorf("at least one delegate must be specified")
+	if len(netconf.RawDelegates) == 0 && netconf.ClusterNetwork == "" {
+		return nil, logging.Errorf("at least one delegate/defaultNetwork must be specified")
 	}
 
 	if netconf.CNIDir == "" {
@@ -200,21 +211,32 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		netconf.BinDir = defaultBinDir
 	}
 
-	for idx, rawConf := range netconf.RawDelegates {
-		bytes, err := json.Marshal(rawConf)
-		if err != nil {
-			return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
-		}
-		delegateConf, err := LoadDelegateNetConf(bytes, "", "")
-		if err != nil {
-			return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
-		}
-		netconf.Delegates = append(netconf.Delegates, delegateConf)
+	if netconf.ReadinessIndicatorFile == "" {
+		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
 	}
-	netconf.RawDelegates = nil
 
-	// First delegate is always the master plugin
-	netconf.Delegates[0].MasterPlugin = true
+	// get RawDelegates and put delegates field
+	if netconf.ClusterNetwork == "" {
+		// for Delegates
+		if len(netconf.RawDelegates) == 0 {
+			return nil, logging.Errorf("at least one delegate must be specified")
+		}
+		for idx, rawConf := range netconf.RawDelegates {
+			bytes, err := json.Marshal(rawConf)
+			if err != nil {
+				return nil, logging.Errorf("error marshalling delegate %d config: %v", idx, err)
+			}
+			delegateConf, err := LoadDelegateNetConf(bytes, nil, "")
+			if err != nil {
+				return nil, logging.Errorf("failed to load delegate %d config: %v", idx, err)
+			}
+			netconf.Delegates = append(netconf.Delegates, delegateConf)
+		}
+		netconf.RawDelegates = nil
+
+		// First delegate is always the master plugin
+		netconf.Delegates[0].MasterPlugin = true
+	}
 
 	return netconf, nil
 }

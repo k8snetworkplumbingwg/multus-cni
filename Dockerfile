@@ -1,10 +1,13 @@
+# This Dockerfile is used to build the image available on DockerHub
 FROM centos:centos7
 
 # Add everything
 ADD . /usr/src/multus-cni
 
 ENV INSTALL_PKGS "git golang"
-RUN yum install -y $INSTALL_PKGS && \
+RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
+    curl -s https://mirror.go-repo.io/centos/go-repo.repo | tee /etc/yum.repos.d/go-repo.repo && \
+    yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     cd /usr/src/multus-cni && \
     ./build && \
@@ -14,14 +17,6 @@ RUN yum install -y $INSTALL_PKGS && \
 
 WORKDIR /
 
-LABEL io.k8s.display-name="Multus CNI" \
-      io.k8s.description="This is a component of OpenShift Container Platform and provides a meta CNI plugin." \
-      io.openshift.tags="openshift" \
-      maintainer="Doug Smith <dosmith@redhat.com>"
-
 ADD ./images/entrypoint.sh /
 
-# does it require a root user?
-# USER 1001
-
-ENTRYPOINT [/entrypoint.sh]
+ENTRYPOINT ["/entrypoint.sh"]

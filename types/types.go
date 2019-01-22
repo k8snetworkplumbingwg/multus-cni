@@ -36,13 +36,19 @@ type NetConf struct {
 	CNIDir  string `json:"cniDir"`
 	BinDir  string `json:"binDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
-	RawDelegates  []map[string]interface{} `json:"delegates"`
-	Delegates     []*DelegateNetConf       `json:"-"`
-	NetStatus     []*NetworkStatus         `json:"-"`
-	Kubeconfig    string                   `json:"kubeconfig"`
-	LogFile       string                   `json:"logFile"`
-	LogLevel      string                   `json:"logLevel"`
-	RuntimeConfig *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	RawDelegates    []map[string]interface{} `json:"delegates"`
+	Delegates       []*DelegateNetConf       `json:"-"`
+	NetStatus       []*NetworkStatus         `json:"-"`
+	Kubeconfig      string                   `json:"kubeconfig"`
+	ClusterNetwork  string                   `json:"clusterNetwork"`
+	DefaultNetworks []string                 `json:"defaultNetworks"`
+	LogFile         string                   `json:"logFile"`
+	LogLevel        string                   `json:"logLevel"`
+	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	// Default network readiness options
+	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
+	// Option to isolate the usage of CR's to the namespace in which a pod resides.
+	NamespaceIsolation bool `json:"namespaceIsolation"`
 }
 
 type RuntimeConfig struct {
@@ -69,6 +75,8 @@ type DelegateNetConf struct {
 	Conf          types.NetConf
 	ConfList      types.NetConfList
 	IfnameRequest string `json:"ifnameRequest,omitempty"`
+	MacRequest    string `json:"macRequest,omitempty"`
+	IPRequest     string `json:"ipRequest,omitempty"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
@@ -114,13 +122,13 @@ type NetworkSelectionElement struct {
 	Namespace string `json:"namespace,omitempty"`
 	// IPRequest contains an optional requested IP address for this network
 	// attachment
-	IPRequest string `json:"ipRequest,omitempty"`
+	IPRequest string `json:"ips,omitempty"`
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
-	MacRequest string `json:"macRequest,omitempty"`
+	MacRequest string `json:"mac,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
-	InterfaceRequest string `json:"interfaceRequest,omitempty"`
+	InterfaceRequest string `json:"interface,omitempty"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes

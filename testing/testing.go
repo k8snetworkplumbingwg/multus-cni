@@ -103,7 +103,7 @@ func (f *FakeKubeClient) AddPod(pod *v1.Pod) {
 	f.pods[key] = pod
 }
 
-func NewFakePod(name string, netAnnotation string) *v1.Pod {
+func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -115,13 +115,19 @@ func NewFakePod(name string, netAnnotation string) *v1.Pod {
 			},
 		},
 	}
+	annotations := make(map[string]string)
+
 	if netAnnotation != "" {
 		netAnnotation = strings.Replace(netAnnotation, "\n", "", -1)
 		netAnnotation = strings.Replace(netAnnotation, "\t", "", -1)
-		pod.ObjectMeta.Annotations = map[string]string{
-			"k8s.v1.cni.cncf.io/networks": netAnnotation,
-		}
+		annotations["k8s.v1.cni.cncf.io/networks"] = netAnnotation
 	}
+
+	if defaultNetAnnotation != "" {
+		annotations["v1.multus-cni.io/default-network"] = defaultNetAnnotation
+	}
+
+	pod.ObjectMeta.Annotations = annotations
 	return pod
 }
 

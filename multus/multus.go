@@ -20,24 +20,44 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
-	"github.com/containernetworking/cni/pkg/version"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	k8s "github.com/intel/multus-cni/k8sclient"
 	"github.com/intel/multus-cni/logging"
 	"github.com/intel/multus-cni/types"
 	"github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
+
+var version = "master@git"
+var commit = "unknown commit"
+var date = "unknown date"
+
+var defaultReadinessBackoff = wait.Backoff{
+	Steps:    4,
+	Duration: 250 * time.Millisecond,
+	Factor:   4.0,
+	Jitter:   0.1,
+}
+
+func printVersionString() string {
+	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
+		version, commit, date)
+}
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	logging.Debugf("saveScratchNetConf: %s, %s, %s", containerID, dataDir, string(netconf))
@@ -133,11 +153,12 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 	return result, nil
 }
 
-func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) error {
+func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, exec invoke.Exec) error {
 	logging.Debugf("conflistDel: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
-	binDirs := []string{binDir}
-	cniNet := libcni.CNIConfig{Path: binDirs}
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append(binDirs, binDir)
+	cniNet := libcni.NewCNIConfig(binDirs, exec)
 
 	confList, err := libcni.ConfListFromBytes(rawnetconflist)
 	if err != nil {
@@ -152,7 +173,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string) e
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string, cniArgs string) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v, %s", exec, ifName, delegate, rt, binDir)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, logging.Errorf("Multus: error in setting CNI_IFNAME")
@@ -160,6 +181,42 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 
 	if err := validateIfName(os.Getenv("CNI_NETNS"), ifName); err != nil {
 		return nil, logging.Errorf("cannot set %q ifname to %q: %v", delegate.Conf.Type, ifName, err)
+	}
+
+	if delegate.MacRequest != "" || delegate.IPRequest != "" {
+		if cniArgs != "" {
+			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
+		} else {
+			cniArgs = "IgnoreUnknown=true"
+		}
+		if delegate.MacRequest != "" {
+			// validate Mac address
+			_, err := net.ParseMAC(delegate.MacRequest)
+			if err != nil {
+				return nil, logging.Errorf("failed to parse mac address %q", delegate.MacRequest)
+			}
+
+			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
+			logging.Debugf("Set MAC address %q to %q", delegate.MacRequest, ifName)
+		}
+
+		if delegate.IPRequest != "" {
+			// validate IP address
+			if strings.Contains(delegate.IPRequest, "/") {
+				_, _, err := net.ParseCIDR(delegate.IPRequest)
+				if err != nil {
+					return nil, logging.Errorf("failed to parse CIDR %q", delegate.MacRequest)
+				}
+			} else if net.ParseIP(delegate.IPRequest) == nil {
+				return nil, logging.Errorf("failed to parse IP address %q", delegate.IPRequest)
+			}
+
+			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, delegate.IPRequest)
+			logging.Debugf("Set IP address %q to %q", delegate.IPRequest, ifName)
+		}
+		if os.Setenv("CNI_ARGS", cniArgs) != nil {
+			return nil, logging.Errorf("cannot set %q mac to %q and ip to %q", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
+		}
 	}
 
 	if delegate.ConfListPlugin != false {
@@ -186,7 +243,7 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 	}
 
 	if delegateConf.ConfListPlugin != false {
-		err := conflistDel(rt, delegateConf.Bytes, binDir)
+		err := conflistDel(rt, delegateConf.Bytes, binDir, exec)
 		if err != nil {
 			return logging.Errorf("Multus: error in invoke Conflist Del - %q: %v", delegateConf.ConfList.Name, err)
 		}
@@ -207,16 +264,24 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 		return logging.Errorf("Multus: error in setting CNI_COMMAND to DEL")
 	}
 
+	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
 		ifName := getIfname(delegates[idx], argIfname, idx)
 		rt.IfName = ifName
+		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, ifName, delegates[idx], rt, binDir); err != nil {
-			return err
+			errorstrings = append(errorstrings, err.Error())
 		}
+	}
+
+	// Check if we had any errors, and send them all back.
+	if len(errorstrings) > 0 {
+		return fmt.Errorf(strings.Join(errorstrings, " / "))
 	}
 
 	return nil
 }
+
 func mergeWithResult(srcObj, dstObj cnitypes.Result) (cnitypes.Result, error) {
 	srcObj, err := updateRoutes(srcObj)
 	if err != nil {
@@ -302,7 +367,7 @@ func updateRoutes(rObj cnitypes.Result) (cnitypes.Result, error) {
 
 // fixInterfaces fixes bad result returned by CNI plugin
 // some plugins(for example calico) return empty Interfaces list but
-// in IPConfig sets Interface index to 0. In such case it should be nil 
+// in IPConfig sets Interface index to 0. In such case it should be nil
 func fixInterfaces(rObj cnitypes.Result) (cnitypes.Result, error) {
 	result, err := current.NewResultFromResult(rObj)
 	if err != nil {
@@ -328,7 +393,26 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		return nil, logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
-	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, n, kubeClient)
+	wait.ExponentialBackoff(defaultReadinessBackoff, func() (bool, error) {
+		_, err := os.Stat(n.ReadinessIndicatorFile)
+		switch {
+		case err == nil:
+			return true, nil
+		default:
+			return false, nil
+		}
+	})
+
+	if n.ClusterNetwork != "" {
+		err = k8s.GetDefaultNetworks(k8sArgs, n, kubeClient)
+		if err != nil {
+			return nil, logging.Errorf("Multus: Failed to get clusterNetwork/defaultNetworks: %v", err)
+		}
+		// First delegate is always the master plugin
+		n.Delegates[0].MasterPlugin = true
+	}
+
+	numK8sDelegates, kc, err := k8s.TryLoadPodDelegates(k8sArgs, n, kubeClient)
 	if err != nil {
 		return nil, logging.Errorf("Multus: Err in loading K8s Delegates k8s args: %v", err)
 	}
@@ -344,11 +428,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	var netStatus []*types.NetworkStatus
 	var rt *libcni.RuntimeConf
 	lastIdx := 0
+	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		lastIdx = idx
 		ifName := getIfname(delegate, args.IfName, idx)
 		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
-		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir)
+		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			break
 		}
@@ -370,6 +455,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			}
 		}
 	}
+
 	if err != nil {
 		// Ignore errors; DEL must be idempotent anyway
 		_ = delPlugins(exec, args.IfName, n.Delegates, lastIdx, rt, n.BinDir)
@@ -385,6 +471,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			}
 		}
 	}
+
 	return result, nil
 }
 
@@ -428,7 +515,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		return logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
-	numK8sDelegates, kc, err := k8s.TryLoadK8sDelegates(k8sArgs, in, kubeClient)
+	numK8sDelegates, kc, err := k8s.TryLoadPodDelegates(k8sArgs, in, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -464,6 +551,20 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 }
 
 func main() {
+
+	// Init command line flags to clear vendored packages' one, especially in init()
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	// add version flag
+	versionOpt := false
+	flag.BoolVar(&versionOpt, "version", false, "Show application version")
+	flag.BoolVar(&versionOpt, "v", false, "Show application version")
+	flag.Parse()
+	if versionOpt == true {
+		fmt.Printf("%s\n", printVersionString())
+		return
+	}
+
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
 			result, err := cmdAdd(args, nil, nil)
@@ -480,5 +581,5 @@ func main() {
 			return result.Print()
 		},
 		func(args *skel.CmdArgs) error { return cmdDel(args, nil, nil) },
-		version.All, "meta-plugin that delegates to other CNI plugins")
+		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }

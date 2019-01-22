@@ -55,25 +55,26 @@ metadata:
     tier: node
     app: flannel
 data:
-  cni-conf.json: |
-    {
-      "name": "cbr0",
-      "plugins": [
-        {
-          "type": "flannel",
-          "delegate": {
-            "hairpinMode": true,
-            "isDefaultGateway": true
-          }
-        },
-        {
-          "type": "portmap",
-          "capabilities": {
-            "portMappings": true
-          }
-        }
-      ]
-    }
+  # ------------------------------- Intentionally removed, Multus daemonset configures /etc/cni/net.d
+  #cni-conf.json: |
+  #  {
+  #    "name": "cbr0",
+  #    "plugins": [
+  #      {
+  #        "type": "flannel",
+  #        "delegate": {
+  #          "hairpinMode": true,
+  #          "isDefaultGateway": true
+  #        }
+  #      },
+  #      {
+  #        "type": "portmap",
+  #        "capabilities": {
+  #          "portMappings": true
+  #        }
+  #      }
+  #    ]
+  #  }
   net-conf.json: |
     {
       "Network": "10.244.0.0/16",
@@ -101,8 +102,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/arch: amd64
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       serviceAccountName: flannel
       # ------------------------------- Intentionally removed, Multus daemonset configures /etc/cni/net.d
@@ -181,8 +181,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/arch: arm64
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       serviceAccountName: flannel
       initContainers:
@@ -260,8 +259,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/arch: arm
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       serviceAccountName: flannel
       initContainers:
@@ -339,8 +337,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/arch: ppc64le
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       serviceAccountName: flannel
       initContainers:
@@ -418,8 +415,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/arch: s390x
       tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
         effect: NoSchedule
       serviceAccountName: flannel
       initContainers:
