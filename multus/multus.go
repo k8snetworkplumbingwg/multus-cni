@@ -282,6 +282,8 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
+// Merge code based on CNI-Genie's code
+// https://github.com/Huawei-PaaS/CNI-Genie/blob/master/genie/genie-controller.go#L882
 func mergeWithResult(srcObj, dstObj cnitypes.Result) (cnitypes.Result, error) {
 	srcObj, err := updateRoutes(srcObj)
 	if err != nil {
