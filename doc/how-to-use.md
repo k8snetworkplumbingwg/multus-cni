@@ -23,7 +23,7 @@ As a [quickstart](quickstart.md), you may apply these YAML files (included in th
 
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 
-If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition) section.
+If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
 ### Set up conf file in /etc/cni/net.d/ (Installed automatically by Daemonset)
 
