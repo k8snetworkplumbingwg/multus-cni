@@ -88,20 +88,20 @@ func SetNetworkStatus(k *clientInfo, netStatus []*types.NetworkStatus) error {
 		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", k.Podname, err)
 	}
 
-	var ns string
+	var networkStatuses string
 	if netStatus != nil {
 		var networkStatus []string
-		for _, nets := range netStatus {
-			data, err := json.MarshalIndent(nets, "", "    ")
+		for _, status := range netStatus {
+			data, err := json.MarshalIndent(status, "", "    ")
 			if err != nil {
 				return logging.Errorf("SetNetworkStatus: error with Marshal Indent: %v", err)
 			}
 			networkStatus = append(networkStatus, string(data))
 		}
 
-		ns = fmt.Sprintf("[%s]", strings.Join(networkStatus, ","))
+		networkStatuses = fmt.Sprintf("[%s]", strings.Join(networkStatus, ","))
 	}
-	_, err = setPodNetworkAnnotation(k.Client, k.Podnamespace, pod, ns)
+	_, err = setPodNetworkAnnotation(k.Client, k.Podnamespace, pod, networkStatuses)
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: failed to update the pod %v in out of cluster comm: %v", k.Podname, err)
 	}
