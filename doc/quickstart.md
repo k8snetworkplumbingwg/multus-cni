@@ -105,6 +105,8 @@ spec:
 EOF
 ```
 
+*NOTE*: This example uses `eth0` as the `master` parameter, this master parameter should match the interface name on the hosts in your cluster.
+
 You can see which configurations you've created using `kubectl` here's how you can do that:
 
 ```
