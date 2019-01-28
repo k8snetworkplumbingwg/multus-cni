@@ -32,6 +32,13 @@ We apply these files as such:
 $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 ```
 
+Note: For crio runtime use multus-crio-daemonset.yml (crio uses /usr/libexec/cni as default path for plugin directory). Before deploying daemonsets,delete all default network plugin configuration files under /etc/cni/net.d
+If the runtime is cri-o, then apply these files. 
+
+```
+$ cat ./images/{multus-crio-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+```
+
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](doc/quickstart.md)
 
 ## Additional installation Options
