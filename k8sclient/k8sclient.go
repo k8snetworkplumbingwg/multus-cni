@@ -609,6 +609,14 @@ func getNetDelegate(client KubeClient, netname, confdir, namespace string) (*typ
 	return nil, logging.Errorf("getNetDelegate: cannot find network: %v", netname)
 }
 
+// GetNamespaceNetwork returns namespace default network if provded otherwise cluster network
+func GetNamespaceNetwork(k8sArgs *types.K8sArgs, conf *types.NetConf) string {
+	if v, ok := conf.NamespaceNetwork[string(k8sArgs.K8S_POD_NAMESPACE)]; ok {
+		return v
+	}
+	return conf.ClusterNetwork
+}
+
 // GetDefaultNetwork parses 'defaultNetwork' config, gets network json and put it into netconf.Delegates.
 func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) error {
 	logging.Debugf("GetDefaultNetworks: %v, %v, %v", k8sArgs, conf, kubeClient)
@@ -626,7 +634,8 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 		return nil
 	}
 
-	delegate, err := getNetDelegate(kubeClient, conf.ClusterNetwork, conf.ConfDir, conf.MultusNamespace)
+	namespaceDefaultNet := GetNamespaceNetwork(k8sArgs, conf)
+	delegate, err := getNetDelegate(kubeClient, namespaceDefaultNet, conf.ConfDir, conf.MultusNamespace)
 	if err != nil {
 		return err
 	}

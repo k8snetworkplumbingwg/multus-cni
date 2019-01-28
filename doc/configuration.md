@@ -15,11 +15,15 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
     "logLevel": "debug",
     "capabilities": {
         "portMappings": true
-    },    
+    },
     "readinessindicatorfile": "",
     "namespaceIsolation": false,
 "Note1":"NOTE: you can set clusterNetwork+defaultNetworks OR delegates!!",
     "clusterNetwork": "defaultCRD",
+    "namespaceNetwork": {
+        "test": "weave-net",
+        "default": "macvlan"
+    },
     "defaultNetworks": ["sidecarCRD", "flannel"],
     "systemNamespaces": ["kube-system", "admin"],
     "multusNamespace": "kube-system",
@@ -49,6 +53,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
 
 * `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
+* `namespaceNetwork` (map, optional): default network for a namespace, takes clusterNetwork value if not provided
 * `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
@@ -114,7 +119,7 @@ You may configure the logging level by using the `LogLevel` option in your CNI c
 
 ### Namespace Isolation
 
-The functionality provided by the `namespaceIsolation` configuration option enables a mode where Multus only allows pods to access custom resources (the `NetworkAttachmentDefinitions`) within the namespace where that pod resides. In other words, the `NetworkAttachmentDefinitions` are isolated to usage within the namespace in which they're created. 
+The functionality provided by the `namespaceIsolation` configuration option enables a mode where Multus only allows pods to access custom resources (the `NetworkAttachmentDefinitions`) within the namespace where that pod resides. In other words, the `NetworkAttachmentDefinitions` are isolated to usage within the namespace in which they're created.
 
 For example, if a pod is created in the namespace called `development`, Multus will not allow networks to be attached when defined by custom resources created in a different namespace, say in the `default` network.
 
