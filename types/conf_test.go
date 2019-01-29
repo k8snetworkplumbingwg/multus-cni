@@ -124,4 +124,11 @@ var _ = Describe("config operations", func() {
 		Expect(netConf.ReadinessIndicatorFile).To(Equal("/etc/cni/net.d/foo"))
 	})
 
+	It("check CheckSystemNamespaces() works fine", func() {
+		b1 := CheckSystemNamespaces("foobar", []string{"barfoo", "bafoo", "foobar"})
+		Expect(b1).To(Equal(true))
+		b2 := CheckSystemNamespaces("foobar1", []string{"barfoo", "bafoo", "foobar"})
+		Expect(b2).To(Equal(false))
+	})
+
 })

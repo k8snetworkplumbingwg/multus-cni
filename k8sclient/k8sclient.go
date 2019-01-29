@@ -539,17 +539,17 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string,
 	return delegates, nil
 }
 
-func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*types.DelegateNetConf, error) {
+func getDefaultNetDelegateCRD(client KubeClient, net, confdir, namespace string) (*types.DelegateNetConf, error) {
 	logging.Debugf("getDefaultNetDelegate: %v, %v, %s", client, net, confdir)
-	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", "kube-system", net)
+	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, net)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		return nil, logging.Errorf("getDefaultNetDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
+		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
 	}
 
 	customResource := &types.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
-		return nil, logging.Errorf("getDefaultNetDelegate: failed to get the netplugin data: %v", err)
+		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get the netplugin data: %v", err)
 	}
 
 	configBytes, err := cniConfigFromNetworkResource(customResource, confdir)
@@ -565,10 +565,10 @@ func getDefaultNetDelegateCRD(client KubeClient, net string, confdir string) (*t
 	return delegate, nil
 }
 
-func getNetDelegate(client KubeClient, netname string, confdir string) (*types.DelegateNetConf, error) {
+func getNetDelegate(client KubeClient, netname, confdir, namespace string) (*types.DelegateNetConf, error) {
 	logging.Debugf("getNetDelegate: %v, %v, %v", client, netname, confdir)
 	// option1) search CRD object for the network
-	delegate, err := getDefaultNetDelegateCRD(client, netname, confdir)
+	delegate, err := getDefaultNetDelegateCRD(client, netname, confdir, namespace)
 	if err == nil {
 		return delegate, nil
 	}
@@ -626,7 +626,7 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 		return nil
 	}
 
-	delegate, err := getNetDelegate(kubeClient, conf.ClusterNetwork, conf.ConfDir)
+	delegate, err := getNetDelegate(kubeClient, conf.ClusterNetwork, conf.ConfDir, conf.MultusNamespace)
 	if err != nil {
 		return err
 	}
@@ -634,9 +634,9 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 	delegates = append(delegates, delegate)
 
 	// Pod in kube-system namespace does not have default network for now.
-	if string(k8sArgs.K8S_POD_NAMESPACE) != "kube-system" {
+	if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), conf.SystemNamespaces) {
 		for _, netname := range conf.DefaultNetworks {
-			delegate, err := getNetDelegate(kubeClient, netname, conf.ConfDir)
+			delegate, err := getNetDelegate(kubeClient, netname, conf.ConfDir, conf.MultusNamespace)
 			if err != nil {
 				return err
 			}

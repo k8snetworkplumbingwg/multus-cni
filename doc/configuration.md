@@ -21,6 +21,8 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 "Note1":"NOTE: you can set clusterNetwork+defaultNetworks OR delegates!!",
     "clusterNetwork": "defaultCRD",
     "defaultNetworks": ["sidecarCRD", "flannel"],
+    "systemNamespaces": ["kube-system", "admin"],
+    "multusNamespace": "kube-system",
 "Note2":"NOTE: If you use clusterNetwork/defaultNetworks, delegates is ignored",
     "delegates": [{
         "type": "weave-net",
@@ -48,6 +50,8 @@ User should chose following parameters combination (`clusterNetwork`+`defaultNet
 
 * `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
 * `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
+* `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
+* `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
 * `delegates` ([]map,required): number of delegate details in the Multus
 
 ### Network selection flow of clusterNetwork/defaultNetworks
