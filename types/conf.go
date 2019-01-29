@@ -31,6 +31,7 @@ const (
 	defaultConfDir                = "/etc/cni/multus/net.d"
 	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
+	defaultMultusNamespace         = "kube-system"
 )
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -216,6 +217,14 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
 	}
 
+	if len(netconf.SystemNamespaces) == 0 {
+		netconf.SystemNamespaces = []string{"kube-system"}
+	}
+
+	if netconf.MultusNamespace == "" {
+		netconf.MultusNamespace = defaultMultusNamespace
+	}
+
 	// get RawDelegates and put delegates field
 	if netconf.ClusterNetwork == "" {
 		// for Delegates
@@ -265,4 +274,14 @@ func delegateAddDeviceID(inBytes []byte, deviceID string) ([]byte, error) {
 		return nil, logging.Errorf("delegateAddDeviceID: failed to re-marshal Spec.Config: %v", err)
 	}
 	return configBytes, nil
+}
+
+// CheckSystemNamespaces checks whether given namespace is in systemNamespaces or not.
+func CheckSystemNamespaces(namespace string, systemNamespaces []string) bool {
+	for _, nsname := range systemNamespaces {
+		if namespace == nsname {
+			return true
+		}
+	}
+	return false
 }
