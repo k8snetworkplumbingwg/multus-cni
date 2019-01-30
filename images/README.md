@@ -17,10 +17,6 @@ You may wish to deploy Multus as a daemonset, you can do so by starting with the
 ```
 $ kubectl create -f ./images/multus-daemonset.yml
 ```
-Note: For crio runtime use multus-crio-daemonset.yml (crio uses /usr/libexec/cni as default path for plugin directory). Before deploying daemonsets,delete all default network plugin configuration files under /etc/cni/net.d
-```
-$ kubectl create -f ./images/multus-crio-daemonset.yml
-```
 
 Note: The likely best practice here is to build your own image given the Dockerfile, and then push it to your preferred registry, and change the `image` fields in the Daemonset YAML to reference that image.
 
