@@ -8,9 +8,9 @@ RUN ./build
 
 FROM openshift/origin-base
 RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
-COPY --from=builder /usr/src/multus-cni/images/70-multus.conf /usr/src/multus-cni/images
-COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
-ADD ./images/entrypoint.sh /
+COPY --from=builder /usr/src/multus-cni/images/70-multus.conf /opt/multus-cni/
+COPY --from=builder /usr/src/multus-cni/bin/multus /opt/multus-cni/
+ADD ./images/entrypoint.sh /opt/multus-cni/
 
 LABEL io.k8s.display-name="Multus CNI" \
       io.k8s.description="This is a component of OpenShift Container Platform and provides a meta CNI plugin." \
