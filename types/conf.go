@@ -93,7 +93,7 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
-func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) (*libcni.RuntimeConf, error) {
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) *libcni.RuntimeConf {
 
 	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
@@ -116,7 +116,7 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc 
 			"portMappings": rc.PortMaps,
 		}
 	}
-	return rt, nil
+	return rt
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
