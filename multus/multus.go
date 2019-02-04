@@ -316,16 +316,20 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 
 	var result, tmpResult cnitypes.Result
 	var netStatus []*types.NetworkStatus
-	var rt *libcni.RuntimeConf
-	lastIdx := 0
 	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
-		lastIdx = idx
 		ifName := getIfname(delegate, args.IfName, idx)
-		rt, _ = types.LoadCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
+		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
 		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
-			break
+			// If the add failed, tear down all networks we already added
+			netName := delegate.Conf.Name
+			if netName == "" {
+				netName = delegate.ConfList.Name
+			}
+			// Ignore errors; DEL must be idempotent anyway
+			_ = delPlugins(exec, args.IfName, n.Delegates, idx, rt, n.BinDir)
+			return nil, logging.Errorf("Multus: Err adding pod to network %q: %v", netName, err)
 		}
 
 		// Master plugin result is always used if present
@@ -338,18 +342,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
 				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
 				if err != nil {
-					return nil, logging.Errorf("Multus: Err in setting  networks status: %v", err)
+					return nil, logging.Errorf("Multus: Err in setting network status: %v", err)
 				}
 
 				netStatus = append(netStatus, delegateNetStatus)
 			}
 		}
-	}
-
-	if err != nil {
-		// Ignore errors; DEL must be idempotent anyway
-		_ = delPlugins(exec, args.IfName, n.Delegates, lastIdx, rt, n.BinDir)
-		return nil, logging.Errorf("Multus: Err in tearing down failed plugins: %v", err)
 	}
 
 	//set the network status annotation in apiserver, only in case Multus as kubeconfig
@@ -436,7 +434,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		}
 	}
 
-	rt, _ := types.LoadCNIRuntimeConf(args, k8sArgs, "", in.RuntimeConfig)
+	rt := types.CreateCNIRuntimeConf(args, k8sArgs, "", in.RuntimeConfig)
 	return delPlugins(exec, args.IfName, in.Delegates, len(in.Delegates)-1, rt, in.BinDir)
 }
 
