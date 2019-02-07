@@ -12,6 +12,7 @@ set -e
 [ -z "${MULTUS_NAMESPACE_ISOLATION}" ] && MULTUS_NAMESPACE_ISOLATION=false
 [ -z "${MULTUS_LOG_LEVEL}" ] && MULTUS_LOG_LEVEL=""
 [ -z "${MULTUS_LOG_FILE}" ] && MULTUS_LOG_FILE=""
+[ -z "${EXIT_WHEN_DONE}" ] && EXIT_WHEN_DONE=false
 
 # Give help text for parameters.
 function usage()
@@ -33,6 +34,7 @@ function usage()
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
+    echo -e "\t--exit-when-done=$EXIT_WHEN_DONE"
 }
 
 function check_loc() {
@@ -74,6 +76,8 @@ while [ "$1" != "" ]; do
             ;;
         --multus-log-file)
             MULTUS_LOG_FILE=$VALUE
+        --exit-when-done)
+            EXIT_WHEN_DONE=$VALUE
             ;;
         *)
             echo "WARNING: unknown parameter \"$PARAM\""
@@ -234,6 +238,11 @@ EOF
 fi
 
 # ---------------------- end Generate "00-multus.conf".
+
+if [ "$EXIT_WHEN_DONE" == "true" ]; then
+  echo "Done (success)."
+  exit 0
+fi
 
 echo "Entering sleep... (success)"
 
