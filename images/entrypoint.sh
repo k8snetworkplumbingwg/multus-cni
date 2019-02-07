@@ -127,7 +127,7 @@ kind: Config
 clusters:
 - name: local
   cluster:
-    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://$[{KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}
+    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://[${KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}
     $TLS_CFG
 users:
 - name: multus
