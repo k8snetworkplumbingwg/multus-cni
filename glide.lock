@@ -1,13 +1,11 @@
-hash: 0c4ea2a342364d2ff3b43242730cb3b1db3b7e8456f6cf43da3c51dbb67e18da
-updated: 2018-07-27T03:29:02.093332104+01:00
+hash: 4288149814e91e63396f7874b87151aca74047110f0d1f43027b60dd6014988f
+updated: 2019-01-09T10:19:29.688011713Z
 imports:
 - name: github.com/containernetworking/cni
   version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
   subpackages:
   - libcni
   - pkg/invoke
-  - pkg/ip
-  - pkg/ipam
   - pkg/skel
   - pkg/types
   - pkg/types/020
@@ -16,6 +14,8 @@ imports:
 - name: github.com/containernetworking/plugins
   version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
   subpackages:
+  - pkg/ip
+  - pkg/ipam
   - pkg/ns
   - pkg/testutils
 - name: github.com/ghodss/yaml
@@ -23,7 +23,9 @@ imports:
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
+  - gogoproto
   - proto
+  - protoc-gen-gogo/descriptor
   - sortkeys
 - name: github.com/golang/glog
   version: 44145f04b68cf362d9c4df2182967c2275eaefed
@@ -53,6 +55,8 @@ imports:
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
 - name: github.com/json-iterator/go
   version: f2b4162afba35581b6d4a50d3b8f34e33c144682
+- name: github.com/Microsoft/go-winio
+  version: 78439966b38d69bf38227fbf57ac8a6fee70f69a
 - name: github.com/modern-go/concurrent
   version: bacd9c7ef1dd9b15be4a9909b8ac7a4e313eec94
 - name: github.com/modern-go/reflect2
@@ -61,6 +65,7 @@ imports:
   version: 7f8ab55aaf3b86885aa55b762e803744d1674700
   subpackages:
   - config
+  - extensions/table
   - internal/codelocation
   - internal/containernode
   - internal/failer
@@ -91,15 +96,15 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/pkg/errors
-  version: 816c9085562cd7ee03e7f8188a1cfd942858cded
+  version: ffb6e22f01932bf7ac35e0bad9be11f01d1c8685
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: github.com/vishvananda/netlink
-  version: 6e453822d85ef5721799774b654d4d02fed62afb
+  version: b2de5d10e38ecce8607e6b438b6d174f389a004e
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
-  version: 54f0e4339ce73702a0607f49922aaa1e749b418d
+  version: be1fbeda19366dea804f00efff2dd73a1642fdcc
 - name: golang.org/x/crypto
   version: 49796115aa4b964c318aad4f3084fdb41e9aa067
   subpackages:
@@ -111,7 +116,9 @@ imports:
   - http2
   - http2/hpack
   - idna
+  - internal/timeseries
   - lex/httplex
+  - trace
 - name: golang.org/x/sys
   version: 95c6576299259db960f6c5b9b69ea52422860fce
   subpackages:
@@ -128,6 +135,40 @@ imports:
   version: f51c12702a4d776e4c1fa9b0fabab841babae631
   subpackages:
   - rate
+- name: google.golang.org/genproto
+  version: 09f6ed296fc66555a25fe4ce95173148778dfa85
+  subpackages:
+  - googleapis/rpc/status
+- name: google.golang.org/grpc
+  version: 168a6198bcb0ef175f7dacec0b8691fc141dc9b8
+  subpackages:
+  - balancer
+  - balancer/base
+  - balancer/roundrobin
+  - codes
+  - connectivity
+  - credentials
+  - encoding
+  - encoding/proto
+  - grpclb/grpc_lb_v1/messages
+  - grpclog
+  - health
+  - health/grpc_health_v1
+  - internal
+  - internal/backoff
+  - internal/channelz
+  - internal/grpcrand
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - resolver
+  - resolver/dns
+  - resolver/passthrough
+  - stats
+  - status
+  - tap
+  - transport
 - name: gopkg.in/inf.v0
   version: 3887ee99ecf07df5b447e9b00d9c0b2adaa9f3e4
 - name: gopkg.in/yaml.v2
@@ -135,6 +176,7 @@ imports:
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
+  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1
@@ -258,4 +300,12 @@ imports:
   - util/homedir
   - util/integer
   - util/retry
+- name: k8s.io/klog
+  version: 8139d8cb77af419532b33dfa7dd09fbc5f1d344f
+- name: k8s.io/kubernetes
+  version: ddf47ac13c1a9483ea035a79cd7c10005ff21a6d
+  subpackages:
+  - pkg/kubelet/apis/podresources
+  - pkg/kubelet/apis/podresources/v1alpha1
+  - pkg/kubelet/util
 testImports: []
