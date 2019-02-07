@@ -245,6 +245,62 @@ var _ = Describe("multus operations", func() {
 
 	})
 
+	It("executes delegates and cleans up on failure", func() {
+		expectedConf1 := `{
+    "name": "weave1",
+    "cniVersion": "0.2.0",
+    "type": "weave-net"
+}`
+		expectedConf2 := `{
+    "name": "other1",
+    "cniVersion": "0.2.0",
+    "type": "other-plugin"
+}`
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(fmt.Sprintf(`{
+    "name": "node-cni-network",
+    "type": "multus",
+    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "defaultnetworkwaitseconds": 3,
+    "delegates": [%s,%s]
+}`, expectedConf1, expectedConf2)),
+		}
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		// This plugin invocation should fail
+		err := fmt.Errorf("expected plugin failure")
+		fExec.addPlugin(nil, "net1", expectedConf2, nil, err)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		_, err = cmdAdd(args, fExec, nil)
+		Expect(fExec.addIndex).To(Equal(2))
+		Expect(fExec.delIndex).To(Equal(2))
+		Expect(err).To(MatchError("Multus: Err adding pod to network \"other1\": Multus: error in invoke Delegate add - \"other-plugin\": expected plugin failure"))
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+
+	})
+
 	It("executes delegates with interface name and MAC and IP addr", func() {
 		podNet := `[{"name":"net1",
 			 "interface": "test1",
