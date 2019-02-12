@@ -482,6 +482,10 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 		return nil, nil
 	}
 
+	// Specify that we use gRPC
+	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+
 	// creates the clientset
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
