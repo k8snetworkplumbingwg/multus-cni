@@ -204,7 +204,12 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 
 	if strings.IndexAny(podNetworks, "[{\"") >= 0 {
 		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
-			return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
+			// Try to unmarshal as one element
+			var network *types.NetworkSelectionElement
+			if err := json.Unmarshal([]byte(podNetworks), &network); err != nil {
+				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
+			}
+			networks = append(networks, network)
 		}
 	} else {
 		// Comma-delimited list of network attachment object names
@@ -445,6 +450,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	if delegate != nil {
 		logging.Debugf("tryLoadK8sDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
 
+		delegate.MasterPlugin = true
 		conf.Delegates[0] = delegate
 	}
 
@@ -602,7 +608,7 @@ func getNetDelegate(client KubeClient, netname, confdir, namespace string) (*typ
 		return delegate, nil
 	}
 
-	// option3) search directry
+	// option3) search directory
 	fInfo, err := os.Stat(netname)
 	if err == nil {
 		if fInfo.IsDir() {
@@ -687,6 +693,16 @@ func tryLoadK8sPodDefaultNetwork(kubeClient KubeClient, pod *v1.Pod, conf *types
 	}
 	if len(networks) > 1 {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: more than one default network is specified: %s", netAnnot)
+	}
+
+	if networks[0].Name == "" {
+		// This add extra data to the default network like mac ips and ifname
+		delegate, err := types.LoadDelegateNetConf(conf.Delegates[0].Bytes, networks[0], "")
+		if err != nil {
+			return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed loading default delegate with data: %v", err)
+		}
+
+		return delegate, nil
 	}
 
 	delegate, _, err := getKubernetesDelegate(kubeClient, networks[0], conf.ConfDir, pod, nil)

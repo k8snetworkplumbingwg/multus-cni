@@ -274,3 +274,20 @@ annotations:
  v1.multus-cni.io/default-network: calico-conf
 ...
 ```
+
+### Pass additional parameters to the default cluster network
+
+User may want to pass additional parameters for the default network like mac, ip address, etc...
+
+You are able to do it by passing a map in the default network annotation.
+
+Example:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+name: pod-example
+annotations:
+ v1.multus-cni.io/default-network: '{"mac":"aa:bb:cc:dd:ee:ff"}'
+...
+```

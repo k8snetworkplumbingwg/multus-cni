@@ -131,8 +131,8 @@ var _ = Describe("k8sclient operations", func() {
 {"name":"net1"},
 {
   "name":"net2",
-  "ipRequest": "1.2.3.4",
-  "macRequest": "aa:bb:cc:dd:ee:ff"
+  "ips": "1.2.3.4",
+  "mac": "aa:bb:cc:dd:ee:ff"
 },
 {
   "name":"net3",
@@ -565,6 +565,113 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(numK8sDelegates).To(Equal(0))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet1"))
+	})
+
+	It("adds extra data to the default network", func() {
+		fakePod := testutils.NewFakePod("testpod", "", `{"mac": "aa:bb:cc:dd:ee:ff"}`)
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"type": "mynet2",
+				"name": "net2"
+			}]
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		numK8sDelegates, _, err := TryLoadPodDelegates(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(numK8sDelegates).To(Equal(0))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+		Expect(netConf.Delegates[0].MacRequest).To(Equal("aa:bb:cc:dd:ee:ff"))
+	})
+
+	It("add extra data to default network taken from a CRD", func() {
+		fakePod := testutils.NewFakePod("testpod", "", `{"mac": "aa:bb:cc:dd:ee:ff"}`)
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "myCRD1",
+			"defaultNetworks": ["myCRD2"],
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig("kube-system", "myCRD1", "{\"type\": \"mynet\"}")
+		fKubeClient.AddNetConfig("kube-system", "myCRD2", "{\"type\": \"mynet2\"}")
+		fKubeClient.AddPod(fakePod)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		numK8sDelegates, _, err := TryLoadPodDelegates(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(numK8sDelegates).To(Equal(0))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet"))
+		Expect(netConf.Delegates[0].MacRequest).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(netConf.Delegates[1].Conf.Name).To(Equal("myCRD2"))
+		Expect(netConf.Delegates[1].Conf.Type).To(Equal("mynet2"))
+	})
+
+	It("adds extra data to the default network requested in the annotation", func() {
+		fakePod := testutils.NewFakePod("testpod", "", `{"name": "myCRD1", "mac": "aa:bb:cc:dd:ee:ff"}`)
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"type": "mynet2",
+				"name": "net2"
+			}]
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddNetConfig("kube-system", "myCRD1", "{\"type\": \"mynet\"}")
+		fKubeClient.AddPod(fakePod)
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		numK8sDelegates, _, err := TryLoadPodDelegates(k8sArgs, netConf, kubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(numK8sDelegates).To(Equal(0))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet"))
+		Expect(netConf.Delegates[0].MacRequest).To(Equal("aa:bb:cc:dd:ee:ff"))
 	})
 
 	It("Errors when namespace isolation is violated", func() {
