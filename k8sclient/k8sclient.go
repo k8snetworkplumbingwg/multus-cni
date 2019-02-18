@@ -499,10 +499,6 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string,
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, logging.Errorf("GetK8sNetwork: failed to get resourceMap for PodUID: %v %v", podID, err)
-	}
-
 	if len(netAnnot) == 0 {
 		return nil, &NoK8sNetworkError{"no kubernetes network found"}
 	}
