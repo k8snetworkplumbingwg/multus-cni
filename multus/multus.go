@@ -349,7 +349,11 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 
 		//create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
-			if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
+			// For non-master plugin, IPAM should be configured in the delegate, for cases where IPAM is
+			// not required, like DPDK, skip the network status
+			if !delegate.MasterPlugin && delegate.Conf.IPAM.Type == "" {
+				logging.Debugf("IPAM is not requested for the delegate %s", delegate.Conf.Name)
+			} else if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
 				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
 				if err != nil {
 					return nil, logging.Errorf("Multus: Err in setting network status: %v", err)
