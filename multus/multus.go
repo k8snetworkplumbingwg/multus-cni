@@ -392,11 +392,15 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
 		_, ok := err.(ns.NSPathNotExistErr)
 		if ok {
-			return nil
+			logging.Debugf("cmdDel: WARNING netns may not exist, netns: %s, err: %s", netns, err)
+		} else {
+			return fmt.Errorf("failed to open netns %q: %v", netns, err)
 		}
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
-	defer netns.Close()
+
+	if netns != nil {
+		defer netns.Close()
+	}
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
 	if err != nil {
