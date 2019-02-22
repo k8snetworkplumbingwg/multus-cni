@@ -480,6 +480,7 @@ var _ = Describe("k8sclient operations", func() {
 			"name":"node-cni-network",
 			"type":"multus",
 			"clusterNetwork": "net2",
+			"multusNamespace" : "kube-system",
 			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
 		}`
 		netConf, err := types.LoadNetConf([]byte(conf))
@@ -490,7 +491,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddNetConfig("default", "net1", "{\"type\": \"mynet1\"}")
+		fKubeClient.AddNetConfig("kube-system", "net1", "{\"type\": \"mynet1\"}")
 		fKubeClient.AddNetConfig("kube-system", "net2", "{\"type\": \"mynet2\"}")
 		fKubeClient.AddPod(fakePod)
 		kubeClient, err := GetK8sClient("", fKubeClient)
@@ -534,7 +535,7 @@ var _ = Describe("k8sclient operations", func() {
 
 		fKubeClient := testutils.NewFakeKubeClient()
 		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("default", "net1", "{\"type\": \"mynet1\"}")
+		fKubeClient.AddNetConfig("kube-system", "net1", "{\"type\": \"mynet1\"}")
 		kubeClient, err := GetK8sClient("", fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		k8sArgs, err := GetK8sArgs(args)
