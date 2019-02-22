@@ -544,7 +544,7 @@ func GetPodNetwork(k8sclient KubeClient, k8sArgs *types.K8sArgs, confdir string,
 }
 
 func getDefaultNetDelegateCRD(client KubeClient, net, confdir, namespace string) (*types.DelegateNetConf, error) {
-	logging.Debugf("getDefaultNetDelegate: %v, %v, %s", client, net, confdir)
+	logging.Debugf("getDefaultNetDelegateCRD: %v, %v, %s, %s", client, net, confdir, namespace)
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, net)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
@@ -570,7 +570,7 @@ func getDefaultNetDelegateCRD(client KubeClient, net, confdir, namespace string)
 }
 
 func getNetDelegate(client KubeClient, netname, confdir, namespace string) (*types.DelegateNetConf, error) {
-	logging.Debugf("getNetDelegate: %v, %v, %v", client, netname, confdir)
+	logging.Debugf("getNetDelegate: %v, %v, %v, %s", client, netname, confdir, namespace)
 	// option1) search CRD object for the network
 	delegate, err := getDefaultNetDelegateCRD(client, netname, confdir, namespace)
 	if err == nil {
@@ -681,8 +681,8 @@ func tryLoadK8sPodDefaultNetwork(k8sArgs *types.K8sArgs, conf *types.NetConf, ku
 		return nil, nil
 	}
 
-	// The CRD object of default network should only be defined in default namespace
-	networks, err := parsePodNetworkAnnotation(netAnnot, "default")
+	// The CRD object of default network should only be defined in multusNamespace
+	networks, err := parsePodNetworkAnnotation(netAnnot, conf.MultusNamespace)
 	if err != nil {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed to parse CRD object: %v", err)
 	}
