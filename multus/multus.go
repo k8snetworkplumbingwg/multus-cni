@@ -417,6 +417,15 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		return logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}
 
+	if in.ClusterNetwork != "" {
+		err = k8s.GetDefaultNetworks(k8sArgs, in, kubeClient)
+		if err != nil {
+			return logging.Errorf("Multus: Failed to get clusterNetwork/defaultNetworks: %v", err)
+		}
+		// First delegate is always the master plugin
+		in.Delegates[0].MasterPlugin = true
+	}
+
 	numK8sDelegates, kc, err := k8s.TryLoadPodDelegates(k8sArgs, in, kubeClient)
 	if err != nil {
 		return err
