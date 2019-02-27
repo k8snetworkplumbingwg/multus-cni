@@ -157,12 +157,10 @@ fi
 
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
-  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
+  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
   if [ "$MASTER_PLUGIN" == "" ]; then
     echo "Error: Multus could not be configured: no master plugin was found."
     exit 1;
-  elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
-    echo "Warning: Multus is already configured: auto configuration skipped."
   else
     ISOLATION_STRING=""
     if [ "$MULTUS_NAMESPACE_ISOLATION" == true ]; then
