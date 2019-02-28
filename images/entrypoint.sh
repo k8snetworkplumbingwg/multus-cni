@@ -159,12 +159,14 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
   found_master=false
   tries=0
-  while [ ! $found_master ]; do
+  while [ $found_master == false ]; do
     MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
-        echo "Attemping to find master plugin configuration, attempt $tries"
-        ((tries++))
+        if ! ((n % 5)); then
+          echo "Attemping to find master plugin configuration, attempt $tries"
+        fi
+        let "tries+=1"
         sleep 1;
       else
         echo "Error: Multus could not be configured: no master plugin was found."
