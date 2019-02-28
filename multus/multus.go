@@ -218,18 +218,30 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		}
 	}
 
-	if delegate.ConfListPlugin != false {
-		result, err := conflistAdd(rt, delegate.Bytes, binDir, exec)
+	var result cnitypes.Result
+	var err error
+	if delegate.ConfListPlugin {
+		result, err = conflistAdd(rt, delegate.Bytes, binDir, exec)
 		if err != nil {
 			return nil, logging.Errorf("Multus: error in invoke Conflist add - %q: %v", delegate.ConfList.Name, err)
 		}
-
-		return result, nil
+	} else {
+		result, err = invoke.DelegateAdd(delegate.Conf.Type, delegate.Bytes, exec)
+		if err != nil {
+			return nil, logging.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Conf.Type, err)
+		}
 	}
 
-	result, err := invoke.DelegateAdd(delegate.Conf.Type, delegate.Bytes, exec)
-	if err != nil {
-		return nil, logging.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Conf.Type, err)
+	if logging.GetLoggingLevel() >= logging.VerboseLevel {
+		data, _ := json.Marshal(result)
+		var confName string
+		if delegate.ConfListPlugin {
+			confName = delegate.ConfList.Name
+		} else {
+			confName = delegate.Conf.Name
+		}
+
+		logging.Verbosef("Add: %s:%s:%s:%s %s", rt.Args[1][1], rt.Args[2][1], confName, rt.IfName, string(data))
 	}
 
 	return result, nil
@@ -241,20 +253,29 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 		return logging.Errorf("Multus: error in setting CNI_IFNAME")
 	}
 
-	if delegateConf.ConfListPlugin != false {
-		err := conflistDel(rt, delegateConf.Bytes, binDir, exec)
+	if logging.GetLoggingLevel() >= logging.VerboseLevel {
+		var confName string
+		if delegateConf.ConfListPlugin {
+			confName = delegateConf.ConfList.Name
+		} else {
+			confName = delegateConf.Conf.Name
+		}
+		logging.Verbosef("Del: %s:%s:%s:%s %s", rt.Args[1][1], rt.Args[2][1], confName, rt.IfName, string(delegateConf.Bytes))
+	}
+
+	var err error
+	if delegateConf.ConfListPlugin {
+		err = conflistDel(rt, delegateConf.Bytes, binDir, exec)
 		if err != nil {
 			return logging.Errorf("Multus: error in invoke Conflist Del - %q: %v", delegateConf.ConfList.Name, err)
 		}
-
-		return err
+	} else {
+		if err = invoke.DelegateDel(delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
+			return logging.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Conf.Type, err)
+		}
 	}
 
-	if err := invoke.DelegateDel(delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
-		return logging.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Conf.Type, err)
-	}
-
-	return nil
+	return err
 }
 
 func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateNetConf, lastIdx int, rt *libcni.RuntimeConf, binDir string) error {
