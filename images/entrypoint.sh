@@ -163,7 +163,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
     MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
-        if ! ((n % 5)); then
+        if ! (($tries % 5)); then
           echo "Attemping to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
