@@ -157,30 +157,39 @@ fi
 
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
-  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
-  if [ "$MASTER_PLUGIN" == "" ]; then
-    echo "Error: Multus could not be configured: no master plugin was found."
-    exit 1;
-  else
-    ISOLATION_STRING=""
-    if [ "$MULTUS_NAMESPACE_ISOLATION" == true ]; then
-      ISOLATION_STRING="\"namespaceIsolation\": true,"
+  found_master=false
+  tries=0
+  while [ $found_master == false ]; do
+    MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    if [ "$MASTER_PLUGIN" == "" ]; then
+      if [ $tries -lt 600 ]; then
+        if ! (($tries % 5)); then
+          echo "Attemping to find master plugin configuration, attempt $tries"
+        fi
+        let "tries+=1"
+        sleep 1;
+      else
+        echo "Error: Multus could not be configured: no master plugin was found."
+        exit 1;
+      fi
+    else
+      found_master=true
+      MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+      CONF=$(cat <<-EOF
+{
+  "name": "multus-cni-network",
+  "type": "multus",
+  "kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
+  "delegates": [
+    $MASTER_PLUGIN_JSON
+  ]
+}
+EOF
+      )
+      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      echo "Config file created @ $CNI_CONF_DIR/00-multus.conf"
     fi
-    MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
-    CONF=$(cat <<-EOF
-			{
-				"name": "multus-cni-network",
-				"type": "multus",
-        $ISOLATION_STRING
-				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
-				"delegates": [
-					$MASTER_PLUGIN_JSON
-				]
-			}
-			EOF
-		)
-    echo $CONF > $CNI_CONF_DIR/00-multus.conf
-  fi
+  done
 fi
 
 # ---------------------- end Generate "00-multus.conf".
