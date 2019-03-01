@@ -79,23 +79,21 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("correctly parses pod network attachment annotation syntax: interface name syntax", func() {
-		ns, net, nif, err := parsePodNetworkObjectName("foonet@nif1/@")
+		ns, net, nif, err := parsePodNetworkObjectName("foonet@ifn@me")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ns).To(Equal(""))
 		Expect(net).To(Equal("foonet"))
-		Expect(nif).To(Equal("nif1/@"))
+		Expect(nif).To(Equal("ifn@me"))
 
-		ns, net, nif, err = parsePodNetworkObjectName("bazns/foonet@nif1/@")
+		ns, net, nif, err = parsePodNetworkObjectName("bazns/foonet@ifn@me")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ns).To(Equal("bazns"))
 		Expect(net).To(Equal("foonet"))
-		Expect(nif).To(Equal("nif1/@"))
+		Expect(nif).To(Equal("ifn@me"))
 
-		ns, net, nif, err = parsePodNetworkObjectName("baz@ns/foonet@nif1/@")
-		Expect(err).NotTo(HaveOccurred())
-		Expect(ns).To(Equal(""))
-		Expect(net).To(Equal("baz"))
-		Expect(nif).To(Equal("ns/foonet@nif1/@"))
+		ns, net, nif, err = parsePodNetworkObjectName("bazns/foonet@if/name")
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError("Invalid network object (failed at '/')"))
 	})
 
 	It("retrieves delegates from kubernetes using simple format annotation", func() {

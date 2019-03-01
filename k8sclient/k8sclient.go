@@ -151,34 +151,48 @@ func getPodNetworkAnnotation(client KubeClient, k8sArgs *types.K8sArgs) (string,
 
 func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
 	var netNsName string
-	// please note that Linux kernel network interface names accept any octet, so there's
-	// basically no restriction on what a Linux kernel network interface name can be.
-	// In particular, network interface names may contain "@" and "/" themselves, so we
-	// must be careful while splittling the elements netNsName, networkName, and netIfName.
+	// Please note that Linux kernel network interface names allow almost any
+	// octet in them, except for "/", ":", and white space characters. As the
+	// Linux kernel uses its own isspace() -- see
+	// https://elixir.bootlin.com/linux/latest/source/include/linux/ctype.h
+	// and https://elixir.bootlin.com/linux/latest/source/lib/ctype.c for its
+	// implementation -- this boils down to no Unicode, no POSIX, no whatever
+	// but to just Linux kernel isspace() and exactly: HT/^I (0x09), LF/^J
+	// (0x0A), VT/^K (0x0B), FF/^L (0x0C), CR/^M (0x0D), SP/" " (0x20), NBSP
+	// (0xA0). But not NEL/0x85, which Go's Unicode.IsSpace() would accept.
+	// Also, Linux does not accept the interface names "." and ".." as such,
+	// as they would conflict with the directory structure of (virtual)
+	// filesystems.
+	//
+	// However, we won't check here for invalid network interface names, but
+	// leave that task to the Linux kernel. However, the important takeaway of
+	// the discussion above is: network interface names may contain "@"s, so
+	// we must be careful when splitting the elements netNsName, networkName,
+	// and netIfName, to not fail because of more "@"s than expected...
 	var netIfName string
 	var networkName string
 
 	logging.Debugf("parsePodNetworkObjectName: %s", podnetwork)
-	// Start splitting with the network interface name, as this is the last element, and
-	// it may contain "/"s which then must not be used for splitting off the namespace.
-	atItems := strings.SplitN(podnetwork, "@", 2)
-	if len(atItems) == 2 {
-		netIfName = strings.TrimSpace(atItems[1])
-	}
-	// note: SplitN cannot return 0 items, so we always get the combined (optional)
-	// namespace and network names as the first split element.
-	netNsNetworkName := strings.TrimSpace(atItems[0])
-
-	// Only now we check for an optional namespace after we're sure there is no
-	// "stray" slash anymore belonging to an odd network interface name.
-	slashItems := strings.Split(netNsNetworkName, "/")
+	// Luckily, Linux network interface names are not allowed to contain "/"s,
+	// so we can easily separate the namespace name here from the rest.
+	slashItems := strings.Split(podnetwork, "/")
 	if len(slashItems) == 2 {
 		netNsName = strings.TrimSpace(slashItems[0])
-		networkName = strings.TrimSpace(slashItems[1])
+		networkName = slashItems[1]
 	} else if len(slashItems) == 1 {
-		networkName = strings.TrimSpace(slashItems[0])
+		networkName = slashItems[0]
 	} else {
 		return "", "", "", logging.Errorf("Invalid network object (failed at '/')")
+	}
+
+	// Linux network interface names are allowed to contain "@"s, so
+	// "network@ifn@me" is deemed valid with "network" and "ifn@me".
+	atItems := strings.SplitN(networkName, "@", 2)
+	networkName = strings.TrimSpace(atItems[0])
+	if len(atItems) == 2 {
+		netIfName = strings.TrimSpace(atItems[1])
+	} else if len(atItems) != 1 {
+		return "", "", "", logging.Errorf("Invalid network object (failed at '@')")
 	}
 
 	// Check and see if each item matches the specification for valid attachment name.
