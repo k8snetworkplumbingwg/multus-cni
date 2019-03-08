@@ -130,14 +130,8 @@ spec:
       serviceAccountName: multus
       initContainers:
       - name: install-cni-binaries
-        image: rancher/coreos-flannel-cni:v0.3.0
-        command:
-          - /bin/sh
-          - -ce
-          - |
-            mkdir -p /host/opt/cni/bin/
-            cp -va /opt/cni/bin/* /host/opt/cni/bin/
-            echo "Wrote CNI binaries to /host/opt/cni/bin/"
+        image: micwy/cni-plugin-installer:v0.7.5-SNAPSHOT-20190227-afd7391938547
+        imagePullPolicy: Always
         volumeMounts:
         - name: cnibin
           mountPath: /host/opt/cni/bin
