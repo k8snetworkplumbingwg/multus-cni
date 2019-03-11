@@ -29,6 +29,7 @@ type Level uint32
 const (
 	PanicLevel Level = iota
 	ErrorLevel
+	VerboseLevel
 	DebugLevel
 	MaxLevel
 	UnknownLevel
@@ -44,6 +45,8 @@ func (l Level) String() string {
 	switch l {
 	case PanicLevel:
 		return "panic"
+	case VerboseLevel:
+		return "verbose"
 	case ErrorLevel:
 		return "error"
 	case DebugLevel:
@@ -76,6 +79,10 @@ func Debugf(format string, a ...interface{}) {
 	Printf(DebugLevel, format, a...)
 }
 
+func Verbosef(format string, a ...interface{}) {
+	Printf(VerboseLevel, format, a...)
+}
+
 func Errorf(format string, a ...interface{}) error {
 	Printf(ErrorLevel, format, a...)
 	return fmt.Errorf(format, a...)
@@ -88,10 +95,16 @@ func Panicf(format string, a ...interface{}) {
 	Printf(PanicLevel, "========= Stack trace output end ========")
 }
 
-func GetLoggingLevel(levelStr string) Level {
+func GetLoggingLevel() Level {
+	return loggingLevel
+}
+
+func getLoggingLevel(levelStr string) Level {
 	switch strings.ToLower(levelStr) {
 	case "debug":
 		return DebugLevel
+	case "verbose":
+		return VerboseLevel
 	case "error":
 		return ErrorLevel
 	case "panic":
@@ -102,7 +115,7 @@ func GetLoggingLevel(levelStr string) Level {
 }
 
 func SetLogLevel(levelStr string) {
-	level := GetLoggingLevel(levelStr)
+	level := getLoggingLevel(levelStr)
 	if level < MaxLevel {
 		loggingLevel = level
 	}
