@@ -81,12 +81,18 @@ func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs)
 	c.Podname = string(k8sArgs.K8S_POD_NAME)
 }
 
-func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus) error {
+func SetNetworkStatus(kubeClient KubeClient,conf *types.NetConf, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus,) error {
 
-	logging.Debugf("SetNetworkStatus: %v, %v, %v", client, k8sArgs, netStatus)
+	logging.Debugf("SetNetworkStatus: %v, %v, %v", kubeClient, k8sArgs, netStatus)
+	var err error
+	kubeClient, err = GetK8sClient(conf.Kubeconfig, kubeClient)
+	if err != nil {
+		return err
+	}
+
 	podName := string(k8sArgs.K8S_POD_NAME)
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
-	pod, err := client.GetPod(podNamespace, podName)
+	pod, err := kubeClient.GetPod(podNamespace, podName)
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", podName, err)
 	}
@@ -104,7 +110,7 @@ func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*ty
 
 		networkStatuses = fmt.Sprintf("[%s]", strings.Join(networkStatus, ","))
 	}
-	_, err = setPodNetworkAnnotation(client, podNamespace, pod, networkStatuses)
+	_, err = setPodNetworkAnnotation(kubeClient, podNamespace, pod, networkStatuses)
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: failed to update the pod %v in out of cluster comm: %v", podName, err)
 	}
