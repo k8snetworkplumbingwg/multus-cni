@@ -81,9 +81,21 @@ func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs)
 	c.Podname = string(k8sArgs.K8S_POD_NAME)
 }
 
-func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus) error {
-
+func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus, conf *types.NetConf) error {
 	logging.Debugf("SetNetworkStatus: %v, %v, %v", client, k8sArgs, netStatus)
+
+	client, err := GetK8sClient(conf.Kubeconfig, client)
+	if err != nil {
+		return err
+	}
+	if client == nil {
+		if len(conf.Delegates) == 0 {
+			// No available kube client and no delegates, we can't do anything
+			return logging.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+		}
+		return nil
+	}
+
 	podName := string(k8sArgs.K8S_POD_NAME)
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	pod, err := client.GetPod(podNamespace, podName)
