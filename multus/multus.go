@@ -486,7 +486,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if in.Kubeconfig != "" {
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
-			err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, n)
+			err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)
 			if err != nil {
 				// error happen but continue to delete
 				logging.Errorf("Multus: Err unset the networks status: %v", err)
