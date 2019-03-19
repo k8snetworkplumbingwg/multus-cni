@@ -91,7 +91,7 @@ func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*ty
 	if client == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
-			return logging.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+			return logging.Errorf("must have either Kubernetes config or delegates, refer to Multus documentation for usage instructions")
 		}
 		return nil
 	}
