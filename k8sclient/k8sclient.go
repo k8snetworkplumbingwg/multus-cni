@@ -82,17 +82,18 @@ func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs)
 }
 
 func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus, conf *types.NetConf) error {
-	logging.Debugf("SetNetworkStatus: %v, %v, %v", client, k8sArgs, netStatus)
+	logging.Debugf("SetNetworkStatus: %v, %v, %v, %v", client, k8sArgs, netStatus, conf)
 
 	client, err := GetK8sClient(conf.Kubeconfig, client)
 	if err != nil {
-		return err
+		return logging.Errorf("SetNetworkStatus: %v", err)
 	}
 	if client == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
 			return logging.Errorf("must have either Kubernetes config or delegates, refer to Multus documentation for usage instructions")
 		}
+		logging.Debugf("SetNetworkStatus: kube client info is not defined, skip network status setup")
 		return nil
 	}
 
