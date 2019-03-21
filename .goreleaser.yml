@@ -18,5 +18,7 @@ checksum:
   name_template: 'checksums.txt'
 snapshot:
   name_template: "{{ .Tag }}-snapshot"
-release:
-  draft: true
+#release:
+#  draft: true
+changelog:
+  skip: true
