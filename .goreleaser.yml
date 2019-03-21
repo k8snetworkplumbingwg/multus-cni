@@ -20,3 +20,5 @@ snapshot:
   name_template: "{{ .Tag }}-snapshot"
 release:
   draft: true
+changelog:
+  skip: true

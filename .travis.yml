@@ -48,7 +48,7 @@ script:
 deploy:
   # Release on versioned tag (e.g. v1.0)
   - provider: script
-    skip_cleanup: true
+    #skip_cleanup: true
     script: curl -sL https://git.io/goreleaser | bash
     on:
       tags: true
@@ -56,13 +56,16 @@ deploy:
       condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
   # Push images to Dockerhub on tag
   - provider: script
+    skip_cleanup: true
     script: >
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
+      docker tag nfvpe/multus nfvpe/multus:stable;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus; 
+      docker push nfvpe/multus;
+      docker push nfvpe/multus:stable;
       docker push nfvpe/multus:$TRAVIS_TAG;
-      echo foo'
+      echo done'
     on:
       tags: true
       all_branches: true
@@ -75,8 +78,9 @@ deploy:
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:snapshot;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push nfvpe/multus:snapshot; 
-      echo foo'
+      docker push nfvpe/multus:snapshot;
+      docker push nfvpe/multus:latest;
+      echo done'
 
 after_success:
   # put build tgz to bintray
