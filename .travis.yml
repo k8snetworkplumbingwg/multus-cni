@@ -59,8 +59,10 @@ deploy:
     script: >
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
+      docker tag nfvpe/multus nfvpe/multus:stable;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus; 
+      docker push nfvpe/multus;
+      docker push nfvpe/multus:stable;
       docker push nfvpe/multus:$TRAVIS_TAG;
       echo foo'
     on:
@@ -75,7 +77,8 @@ deploy:
       bash -c '
       docker tag nfvpe/multus nfvpe/multus:snapshot;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push nfvpe/multus:snapshot; 
+      docker push nfvpe/multus:snapshot;
+      docker push nfvpe/multus:latest;
       echo foo'
 
 after_success:
