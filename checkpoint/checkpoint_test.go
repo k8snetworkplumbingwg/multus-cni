@@ -10,6 +10,9 @@ import (
 	"testing"
 
 	"github.com/intel/multus-cni/types"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sTypes "k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -74,7 +77,7 @@ var _ = BeforeSuite(func() {
 var _ = Describe("Kubelet checkpoint data read operations", func() {
 	Context("Using /tmp/kubelet_internal_checkpoint file", func() {
 		var (
-			cp            Checkpoint
+			cp            types.ResourceClient
 			err           error
 			resourceMap   map[string]*types.ResourceInfo
 			resourceInfo  *types.ResourceInfo
@@ -87,7 +90,15 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 		})
 
 		It("should return a ResourceMap instance", func() {
-			rmap, err := cp.GetComputeDeviceMap("970a395d-bb3b-11e8-89df-408d5c537d23")
+			podUID := k8sTypes.UID("970a395d-bb3b-11e8-89df-408d5c537d23")
+			fakePod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fakePod",
+					Namespace: "podNamespace",
+					UID:       podUID,
+				},
+			}
+			rmap, err := cp.GetPodResourceMap(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(rmap).NotTo(BeEmpty())
 			resourceMap = rmap
