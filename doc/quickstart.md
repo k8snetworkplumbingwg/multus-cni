@@ -27,6 +27,12 @@ We'll apply files to `kubectl` from this repo. The files we're applying here spe
 $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 ```
 
+Note: For crio runtime use multus-crio-daemonset.yml (crio uses /usr/libexec/cni as default path for plugin directory). Before deploying daemonsets,delete all default network plugin configuration files under /etc/cni/net.d
+If the runtime is cri-o, then apply these files. 
+
+```
+$ cat ./images/{multus-crio-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+```
 ### Validating your installation
 
 Generally, the first step in validating your installation is to look at the `STATUS` field of your nodes, you can check it out by looking at:
@@ -104,6 +110,8 @@ spec:
     }'
 EOF
 ```
+
+*NOTE*: This example uses `eth0` as the `master` parameter, this master parameter should match the interface name on the hosts in your cluster.
 
 You can see which configurations you've created using `kubectl` here's how you can do that:
 

@@ -10,6 +10,8 @@ MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
+MULTUS_LOG_LEVEL=""
+MULTUS_LOG_FILE=""
 
 # Give help text for parameters.
 function usage()
@@ -17,7 +19,7 @@ function usage()
     echo -e "This is an entrypoint script for Multus CNI to overlay its binary and "
     echo -e "configuration into locations in a filesystem. The configuration & binary file "
     echo -e "will be copied to the corresponding configuration directory. When "
-    echo -e "`--multus-conf-file=auto` is used, 00-multus.conf will be automatically "
+    echo -e "'--multus-conf-file=auto' is used, 00-multus.conf will be automatically "
     echo -e "generated from the CNI configuration file of the master plugin (the first file "
     echo -e "in lexicographical order in cni-conf-dir)."
     echo -e ""
@@ -29,6 +31,8 @@ function usage()
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
+    echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
+    echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
 }
 
 # Parse parameters given as arguments to this script.
@@ -58,10 +62,14 @@ while [ "$1" != "" ]; do
         --namespace-isolation)
             MULTUS_NAMESPACE_ISOLATION=$VALUE
             ;;
+        --multus-log-level)
+            MULTUS_LOG_LEVEL=$VALUE
+            ;;
+        --multus-log-file)
+            MULTUS_LOG_FILE=$VALUE
+            ;;
         *)
-            echo "ERROR: unknown parameter \"$PARAM\""
-            usage
-            exit 1
+            echo "WARNING: unknown parameter \"$PARAM\""
             ;;
     esac
     shift
@@ -84,8 +92,9 @@ do
   fi
 done
 
-# Copy files into proper places.
-cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR
+# Copy files into place and atomically move into final binary name
+cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
+mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus 
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
 fi
@@ -156,32 +165,73 @@ fi
 
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   echo "Generating Multus configuration file ..."
-  MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | head -1)"
-  if [ "$MASTER_PLUGIN" == "" ]; then
-    echo "Error: Multus could not be configured: no master plugin was found."
-    exit 1;
-  elif [ "$MASTER_PLUGIN" == "00-multus.conf" ]; then
-    echo "Warning: Multus is already configured: auto configuration skipped."
-  else
-    ISOLATION_STRING=""
-    if [ "$MULTUS_NAMESPACE_ISOLATION" == true ]; then
-      ISOLATION_STRING="\"namespaceIsolation\": true,"
+  found_master=false
+  tries=0
+  while [ $found_master == false ]; do
+    MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    if [ "$MASTER_PLUGIN" == "" ]; then
+      if [ $tries -lt 600 ]; then
+        if ! (($tries % 5)); then
+          echo "Attemping to find master plugin configuration, attempt $tries"
+        fi
+        let "tries+=1"
+        sleep 1;
+      else
+        echo "Error: Multus could not be configured: no master plugin was found."
+        exit 1;
+      fi
+    else
+
+      found_master=true
+
+      ISOLATION_STRING=""
+      if [ "$MULTUS_NAMESPACE_ISOLATION" == true ]; then
+        ISOLATION_STRING="\"namespaceIsolation\": true,"
+      fi
+
+      LOG_LEVEL_STRING=""
+      if [ ! -z "${MULTUS_LOG_LEVEL// }" ]; then
+        case "$MULTUS_LOG_LEVEL" in
+          debug)
+              ;;
+          error)
+              ;;
+          panic)
+              ;;
+          verbose)
+              ;;
+          *)
+              echo "ERROR: Log levels should be one of: debug/verbose/error/panic, did not understand $MULTUS_LOG_LEVEL"
+              usage
+              exit 1     
+        esac
+        LOG_LEVEL_STRING="\"logLevel\": \"$MULTUS_LOG_LEVEL\","
+      fi
+
+      LOG_FILE_STRING=""
+      if [ ! -z "${MULTUS_LOG_FILE// }" ]; then
+        LOG_FILE_STRING="\"logFile\": \"$MULTUS_LOG_FILE\","
+      fi
+
+      MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+      CONF=$(cat <<-EOF
+  			{
+  				"name": "multus-cni-network",
+  				"type": "multus",
+          $ISOLATION_STRING
+          $LOG_LEVEL_STRING
+          $LOG_FILE_STRING
+  				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
+  				"delegates": [
+  					$MASTER_PLUGIN_JSON
+  				]
+  			}
+EOF
+  		)
+      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      echo "Config file created @ $CNI_CONF_DIR/00-multus.conf"
     fi
-    MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
-    CONF=$(cat <<-EOF
-			{
-				"name": "multus-cni-network",
-				"type": "multus",
-        $ISOLATION_STRING
-				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
-				"delegates": [
-					$MASTER_PLUGIN_JSON
-				]
-			}
-			EOF
-		)
-    echo $CONF > $CNI_CONF_DIR/00-multus.conf
-  fi
+  done
 fi
 
 # ---------------------- end Generate "00-multus.conf".

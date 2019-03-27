@@ -19,11 +19,11 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 *Via Daemonset method*
 
-As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage yoru cluster). 
+As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster). 
 
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 
-If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition) section.
+If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
 ### Set up conf file in /etc/cni/net.d/ (Installed automatically by Daemonset)
 
@@ -119,7 +119,7 @@ Create kubeconfig at master node as following commands:
 
 ```
 # Execute following command at Kubernetes master
-$ mkdir -p /etc/cni/multus.d
+$ mkdir -p /etc/cni/net.d/multus.d
 $ SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
 $ SERVICEACCOUNT_TOKEN=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data.token' | base64 -d )
 $ KUBERNETES_SERVICE_PROTO=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)

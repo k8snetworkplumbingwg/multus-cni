@@ -117,6 +117,8 @@ metadata:
     tier: node
     app: flannel2
 spec:
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:

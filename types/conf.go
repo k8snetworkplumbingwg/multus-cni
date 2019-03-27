@@ -31,6 +31,7 @@ const (
 	defaultConfDir                = "/etc/cni/multus/net.d"
 	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
+	defaultMultusNamespace        = "kube-system"
 )
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -55,15 +56,6 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	var err error
 	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
 
-	// If deviceID is present, inject this into delegate config
-	if deviceID != "" {
-		var updatedBytes []byte
-		if updatedBytes, err = delegateAddDeviceID(bytes, deviceID); err != nil {
-			return nil, logging.Errorf("error in LoadDelegateNetConf - delegateAddDeviceID unable to update delegate config: %v", err)
-		}
-		bytes = updatedBytes
-	}
-
 	delegateConf := &DelegateNetConf{}
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
@@ -73,6 +65,19 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	if delegateConf.Conf.Type == "" {
 		if err := LoadDelegateNetConfList(bytes, delegateConf); err != nil {
 			return nil, logging.Errorf("error in LoadDelegateNetConf: %v", err)
+		}
+		if deviceID != "" {
+			bytes, err = addDeviceIDInConfList(bytes, deviceID)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add deviceID in NetConfList bytes: %v", err)
+			}
+		}
+	} else {
+		if deviceID != "" {
+			bytes, err = delegateAddDeviceID(bytes, deviceID)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add deviceID in NetConf bytes: %v", err)
+			}
 		}
 	}
 
@@ -93,7 +98,7 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
-func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) (*libcni.RuntimeConf, error) {
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) *libcni.RuntimeConf {
 
 	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
@@ -116,21 +121,22 @@ func LoadCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc 
 			"portMappings": rc.PortMaps,
 		}
 	}
-	return rt, nil
+	return rt
 }
 
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 
-	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
-	if err != nil {
-		return nil, logging.Errorf("error convert the type.Result to current.Result: %v", err)
-	}
-
 	netstatus := &NetworkStatus{}
 	netstatus.Name = netName
 	netstatus.Default = defaultNet
+
+	// Convert whatever the IPAM result was into the current Result type
+	result, err := current.NewResultFromResult(r)
+	if err != nil {
+		logging.Errorf("error convert the type.Result to current.Result: %v", err)
+		return netstatus, nil
+	}
 
 	for _, ifs := range result.Interfaces {
 		//Only pod interfaces can have sandbox information
@@ -215,6 +221,14 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
 	}
 
+	if len(netconf.SystemNamespaces) == 0 {
+		netconf.SystemNamespaces = []string{"kube-system"}
+	}
+
+	if netconf.MultusNamespace == "" {
+		netconf.MultusNamespace = defaultMultusNamespace
+	}
+
 	// get RawDelegates and put delegates field
 	if netconf.ClusterNetwork == "" {
 		// for Delegates
@@ -263,5 +277,51 @@ func delegateAddDeviceID(inBytes []byte, deviceID string) ([]byte, error) {
 	if err != nil {
 		return nil, logging.Errorf("delegateAddDeviceID: failed to re-marshal Spec.Config: %v", err)
 	}
+	logging.Debugf("delegateAddDeviceID(): updated configBytes %s", string(configBytes))
 	return configBytes, nil
+}
+
+// addDeviceIDInConfList injects deviceID information in delegate bytes
+func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addDeviceIDInConfList(): failed to unmarshal inBytes: %v", err)
+	}
+
+	pList, ok := rawConfig["plugins"]
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to get plugin list")
+	}
+
+	pMap, ok := pList.([]interface{})
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to typecast plugin list")
+	}
+
+	firstPlugin, ok := pMap[0].(map[string]interface{})
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to typecast pMap")
+	}
+	// Inject deviceID
+	firstPlugin["deviceID"] = deviceID
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addDeviceIDInConfList(): failed to re-marshal: %v", err)
+	}
+	logging.Debugf("addDeviceIDInConfList(): updated configBytes %s", string(configBytes))
+	return configBytes, nil
+}
+
+// CheckSystemNamespaces checks whether given namespace is in systemNamespaces or not.
+func CheckSystemNamespaces(namespace string, systemNamespaces []string) bool {
+	for _, nsname := range systemNamespaces {
+		if namespace == nsname {
+			return true
+		}
+	}
+	return false
 }

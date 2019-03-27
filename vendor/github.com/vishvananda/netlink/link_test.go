@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vishvananda/netlink/nl"
 	"github.com/vishvananda/netns"
 )
 
@@ -169,6 +170,19 @@ func testLinkAddDel(t *testing.T, link Link) {
 		}
 	}
 
+	if _, ok := link.(*Gretap); ok {
+		_, ok := result.(*Gretap)
+		if !ok {
+			t.Fatal("Result of create is not a Gretap")
+		}
+	}
+	if _, ok := link.(*Gretun); ok {
+		_, ok := result.(*Gretun)
+		if !ok {
+			t.Fatal("Result of create is not a Gretun")
+		}
+	}
+
 	if err = LinkDel(link); err != nil {
 		t.Fatal(err)
 	}
@@ -278,6 +292,27 @@ func TestLinkAddDelGretap(t *testing.T) {
 		PMtuDisc:  1,
 		Local:     net.IPv4(127, 0, 0, 1),
 		Remote:    net.IPv4(127, 0, 0, 1)})
+}
+
+func TestLinkAddDelGretun(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	testLinkAddDel(t, &Gretun{
+		LinkAttrs: LinkAttrs{Name: "foo"},
+		Local:     net.IPv4(127, 0, 0, 1),
+		Remote:    net.IPv4(127, 0, 0, 1)})
+}
+
+func TestLinkAddDelGretunPointToMultiPoint(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	testLinkAddDel(t, &Gretun{
+		LinkAttrs: LinkAttrs{Name: "foo"},
+		Local:     net.IPv4(127, 0, 0, 1),
+		IKey:      1234,
+		OKey:      1234})
 }
 
 func TestLinkAddDelGretapFlowBased(t *testing.T) {
@@ -856,6 +891,20 @@ func TestLinkSet(t *testing.T) {
 		t.Fatal("MTU not changed!")
 	}
 
+	err = LinkSetTxQLen(link, 500)
+	if err != nil {
+		t.Fatalf("Could not set txqlen: %v", err)
+	}
+
+	link, err = LinkByName("bar")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if link.Attrs().TxQLen != 500 {
+		t.Fatal("txqlen not changed!")
+	}
+
 	addr, err := net.ParseMAC("00:12:34:56:78:AB")
 	if err != nil {
 		t.Fatal(err)
@@ -989,6 +1038,37 @@ func TestLinkSubscribe(t *testing.T) {
 	}
 }
 
+func TestLinkSubscribeWithOptions(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	ch := make(chan LinkUpdate)
+	done := make(chan struct{})
+	defer close(done)
+	var lastError error
+	defer func() {
+		if lastError != nil {
+			t.Fatalf("Fatal error received during subscription: %v", lastError)
+		}
+	}()
+	if err := LinkSubscribeWithOptions(ch, done, LinkSubscribeOptions{
+		ErrorCallback: func(err error) {
+			lastError = err
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	link := &Veth{LinkAttrs{Name: "foo", TxQLen: testTxQLen, MTU: 1400}, "bar"}
+	if err := LinkAdd(link); err != nil {
+		t.Fatal(err)
+	}
+
+	if !expectLinkUpdate(ch, "foo", false) {
+		t.Fatal("Add update not received as expected")
+	}
+}
+
 func TestLinkSubscribeAt(t *testing.T) {
 	skipUnlessRoot(t)
 
@@ -1107,6 +1187,9 @@ func TestLinkXdp(t *testing.T) {
 		t.Skipf("Loading bpf program failed: %s", err)
 	}
 	if err := LinkSetXdpFd(testXdpLink, fd); err != nil {
+		t.Fatal(err)
+	}
+	if err := LinkSetXdpFdWithFlags(testXdpLink, fd, nl.XDP_FLAGS_UPDATE_IF_NOEXIST); err != syscall.EBUSY {
 		t.Fatal(err)
 	}
 	if err := LinkSetXdpFd(testXdpLink, -1); err != nil {

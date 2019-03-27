@@ -103,6 +103,11 @@ func (f *FakeKubeClient) AddPod(pod *v1.Pod) {
 	f.pods[key] = pod
 }
 
+func (f *FakeKubeClient) DeletePod(pod *v1.Pod) {
+	key := fmt.Sprintf("%s/%s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
+	delete(f.pods, key)
+}
+
 func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

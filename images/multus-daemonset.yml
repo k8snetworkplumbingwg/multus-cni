@@ -59,11 +59,6 @@ metadata:
   name: multus
   namespace: kube-system
 ---
-# ------------------------------------------------------
-# Currently unused!
-# If you wish to customize, mount this in the 
-# daemonset @ /usr/src/multus-cni/images/70-multus.conf
-# ------------------------------------------------------
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -77,13 +72,29 @@ data:
     {
       "name": "multus-cni-network",
       "type": "multus",
+      "capabilities": {
+        "portMappings": true
+      },
       "delegates": [
         {
-          "type": "flannel",
-          "name": "flannel.1",
-          "delegate": {
-            "isDefaultGateway": true
-          }
+          "cniVersion": "0.3.1",
+          "name": "default-cni-network",
+          "plugins": [
+            {
+              "type": "flannel",
+              "name": "flannel.1",
+                "delegate": {
+                  "isDefaultGateway": true,
+                  "hairpinMode": true
+                }
+              },
+              {
+                "type": "portmap",
+                "capabilities": {
+                  "portMappings": true
+                }
+              }
+          ]
         }
       ],
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
@@ -104,6 +115,8 @@ metadata:
     tier: node
     app: multus
 spec:
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -119,7 +132,10 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: nfvpe/multus:latest
+        image: nfvpe/multus:v3.2
+        command: ["/entrypoint.sh"]
+        args:
+        - "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
         resources:
           requests:
             cpu: "100m"
@@ -134,6 +150,8 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
+        - name: multus-cfg
+          mountPath: /tmp/multus-conf
       volumes:
         - name: cni
           hostPath:
@@ -144,3 +162,6 @@ spec:
         - name: multus-cfg
           configMap:
             name: multus-cni-config
+            items:
+            - key: cni-conf.json
+              path: 70-multus.conf

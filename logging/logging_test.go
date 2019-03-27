@@ -50,6 +50,8 @@ var _ = Describe("logging operations", func() {
 		Expect(loggingLevel).To(Equal(DebugLevel))
 		SetLogLevel("Error")
 		Expect(loggingLevel).To(Equal(ErrorLevel))
+		SetLogLevel("VERbose")
+		Expect(loggingLevel).To(Equal(VerboseLevel))
 		SetLogLevel("PANIC")
 		Expect(loggingLevel).To(Equal(PanicLevel))
 	})
