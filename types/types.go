@@ -20,6 +20,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,9 +51,9 @@ type NetConf struct {
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.
 	NamespaceIsolation bool `json:"namespaceIsolation"`
 	// Option to set system namespaces (to avoid to add defaultNetworks)
-	SystemNamespaces []string		`json:"systemNamespaces"`
+	SystemNamespaces []string `json:"systemNamespaces"`
 	// Option to set the namespace that multus-cni uses (clusterNetwork/defaultNetworks)
-	MultusNamespace  string			`json:"multusNamespace"`
+	MultusNamespace string `json:"multusNamespace"`
 }
 
 type RuntimeConfig struct {
@@ -148,4 +149,10 @@ type K8sArgs struct {
 type ResourceInfo struct {
 	Index     int
 	DeviceIDs []string
+}
+
+// ResourceClient provides a kubelet Pod resource handle
+type ResourceClient interface {
+	// GetPodResourceMap returns an instance of a map of Pod ResourceInfo given a (Pod name, namespace) tuple
+	GetPodResourceMap(*v1.Pod) (map[string]*ResourceInfo, error)
 }

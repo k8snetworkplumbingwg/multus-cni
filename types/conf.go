@@ -31,7 +31,7 @@ const (
 	defaultConfDir                = "/etc/cni/multus/net.d"
 	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
-	defaultMultusNamespace         = "kube-system"
+	defaultMultusNamespace        = "kube-system"
 )
 
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -56,15 +56,6 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	var err error
 	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
 
-	// If deviceID is present, inject this into delegate config
-	if deviceID != "" {
-		var updatedBytes []byte
-		if updatedBytes, err = delegateAddDeviceID(bytes, deviceID); err != nil {
-			return nil, logging.Errorf("error in LoadDelegateNetConf - delegateAddDeviceID unable to update delegate config: %v", err)
-		}
-		bytes = updatedBytes
-	}
-
 	delegateConf := &DelegateNetConf{}
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("error in LoadDelegateNetConf - unmarshalling delegate config: %v", err)
@@ -74,6 +65,19 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	if delegateConf.Conf.Type == "" {
 		if err := LoadDelegateNetConfList(bytes, delegateConf); err != nil {
 			return nil, logging.Errorf("error in LoadDelegateNetConf: %v", err)
+		}
+		if deviceID != "" {
+			bytes, err = addDeviceIDInConfList(bytes, deviceID)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add deviceID in NetConfList bytes: %v", err)
+			}
+		}
+	} else {
+		if deviceID != "" {
+			bytes, err = delegateAddDeviceID(bytes, deviceID)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add deviceID in NetConf bytes: %v", err)
+			}
 		}
 	}
 
@@ -273,6 +277,42 @@ func delegateAddDeviceID(inBytes []byte, deviceID string) ([]byte, error) {
 	if err != nil {
 		return nil, logging.Errorf("delegateAddDeviceID: failed to re-marshal Spec.Config: %v", err)
 	}
+	logging.Debugf("delegateAddDeviceID(): updated configBytes %s", string(configBytes))
+	return configBytes, nil
+}
+
+// addDeviceIDInConfList injects deviceID information in delegate bytes
+func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addDeviceIDInConfList(): failed to unmarshal inBytes: %v", err)
+	}
+
+	pList, ok := rawConfig["plugins"]
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to get plugin list")
+	}
+
+	pMap, ok := pList.([]interface{})
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to typecast plugin list")
+	}
+
+	firstPlugin, ok := pMap[0].(map[string]interface{})
+	if !ok {
+		return nil, logging.Errorf("addDeviceIDInConfList(): unable to typecast pMap")
+	}
+	// Inject deviceID
+	firstPlugin["deviceID"] = deviceID
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addDeviceIDInConfList(): failed to re-marshal: %v", err)
+	}
+	logging.Debugf("addDeviceIDInConfList(): updated configBytes %s", string(configBytes))
 	return configBytes, nil
 }
 

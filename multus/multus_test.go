@@ -27,7 +27,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/020"
+	types020 "github.com/containernetworking/cni/pkg/types/020"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
@@ -227,7 +227,7 @@ var _ = Describe("multus operations", func() {
 		result, err := cmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
@@ -375,7 +375,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(2))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -454,7 +454,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(2))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -514,7 +514,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(1))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
@@ -614,7 +614,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(2))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "DEL")
@@ -683,7 +683,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(1))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
@@ -761,7 +761,7 @@ var _ = Describe("multus operations", func() {
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
 		Expect(fKubeClient.NetCount).To(Equal(1))
-		r := result.(*types020.Result)
+		r, _ := result.GetAsVersion("0.2.0")
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
