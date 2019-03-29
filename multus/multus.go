@@ -479,6 +479,12 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return logging.Errorf("Multus: failed to load netconf: %v", err)
 		}
+		// check plugins field and enable ConfListPlugin if there is
+		for _, v := range in.Delegates {
+			if len(v.ConfList.Plugins) != 0 {
+				v.ConfListPlugin = true
+			}
+		}
 		// First delegate is always the master plugin
 		in.Delegates[0].MasterPlugin = true
 	}
