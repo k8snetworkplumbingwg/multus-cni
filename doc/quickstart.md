@@ -33,6 +33,8 @@ If the runtime is cri-o, then apply these files.
 ```
 $ cat ./images/{multus-crio-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 ```
+
+NOTE: The pod cidr in flannel-daemonset.yml is 10.244.0.0/16. You have to specify `--pod-network-cidr=10.244.0.0/16` if you use kubeadm to install kubernetes
 ### Validating your installation
 
 Generally, the first step in validating your installation is to look at the `STATUS` field of your nodes, you can check it out by looking at:
