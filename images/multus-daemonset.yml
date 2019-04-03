@@ -68,6 +68,14 @@ metadata:
     tier: node
     app: multus
 data:
+  # NOTE: If you'd prefer to manually apply a configuration file, you may create one here.
+  # In the case you'd like to customize the Multus installation, you should change the arguments to the Multus pod
+  # change the "args" line below from
+  # - "--multus-conf-file=auto"
+  # to:
+  # "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
+  # Additionally -- you should ensure that the name "70-multus.conf" is the alphabetically first name in the
+  # /etc/cni/net.d/ directory on each node, otherwise, it will not be used by the Kubelet.
   cni-conf.json: |
     {
       "name": "multus-cni-network",
@@ -99,12 +107,6 @@ data:
       ],
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
     }
-# -------------- for openshift.
-# "delegates": [{
-#   "type": "openshift-sdn",
-#   "name:" "openshift.1",
-#   "masterplugin": true
-# }],
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
@@ -135,7 +137,7 @@ spec:
         image: nfvpe/multus:v3.2
         command: ["/entrypoint.sh"]
         args:
-        - "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
+        - "--multus-conf-file=auto"
         resources:
           requests:
             cpu: "100m"
