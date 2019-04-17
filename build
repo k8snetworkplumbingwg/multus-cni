@@ -14,4 +14,4 @@ export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
 
 echo "Building plugins"
-CGO_ENABLED=0 go install "$@" ${REPO_PATH}/multus
+CGO_ENABLED=0 go install "$@" -tags no_openssl ${REPO_PATH}/multus
