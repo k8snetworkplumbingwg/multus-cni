@@ -26,6 +26,7 @@ fi
 export GO15VENDOREXPERIMENT=1
 export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
+export CGO_ENABLED=0
 
 echo "Building plugins"
-go install -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
+go install -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
