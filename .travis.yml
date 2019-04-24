@@ -4,6 +4,15 @@ language: go
 # sudo: requried
 dist: trusty
 
+matrix:
+  include:
+  - name: amd64
+    os: linux
+    env: ARCH=amd64
+  - name: ppc64le
+    os: linux-ppc64le
+    env: ARCH=ppc64le
+
 go:
   - 1.11.x
 
@@ -16,6 +25,11 @@ env:
 
 before_install:
   - sudo apt-get update -qq
+  - sudo apt-get install --only-upgrade docker-ce
+  - sudo mkdir -p ~/.docker
+  - sudo echo '{"experimental":"enabled"}' | sudo tee ~/.docker/config.json
+  - sudo echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
+  - sudo service docker restart
   - go get github.com/mattn/goveralls
 
 install:
@@ -59,12 +73,16 @@ deploy:
     skip_cleanup: true
     script: >
       bash -c '
-      docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
-      docker tag nfvpe/multus nfvpe/multus:stable;
-      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus;
-      docker push nfvpe/multus:stable;
-      docker push nfvpe/multus:$TRAVIS_TAG;
+      docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
+      for tag in latest stable $TRAVIS_TAG
+      do
+         docker tag nfvpe/multus nfvpe/multus:$tag-$ARCH;
+         docker push nfvpe/multus:$tag-$ARCH;
+         docker manifest create -a nfvpe/multus:$tag nfvpe/multus:$tag-amd64 nfvpe/multus:$tag-ppc64le;
+         docker manifest annotate nfvpe/multus:$tag nfvpe/multus:$tag-amd64 --os linux --arch amd64;
+         docker manifest annotate nfvpe/multus:$tag nfvpe/multus:$tag-ppc64le --os linux --arch ppc64le;
+         docker manifest push nfvpe/multus:$tag -p;
+      done
       echo done'
     on:
       tags: true
@@ -76,10 +94,16 @@ deploy:
       branch: master
     script: >
       bash -c '
-      docker tag nfvpe/multus nfvpe/multus:snapshot;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push nfvpe/multus:snapshot;
-      docker push nfvpe/multus:latest;
+      for tag in latest snapshot
+      do
+         docker tag nfvpe/multus nfvpe/multus:$tag-$ARCH;
+         docker push nfvpe/multus:$tag-$ARCH;
+         docker manifest create -a nfvpe/multus:$tag nfvpe/multus:$tag-amd64 nfvpe/multus:$tag-ppc64le;
+         docker manifest annotate nfvpe/multus:$tag nfvpe/multus:$tag-amd64 --os linux --arch amd64;
+         docker manifest annotate nfvpe/multus:$tag nfvpe/multus:$tag-ppc64le --os linux --arch ppc64le;
+         docker manifest push nfvpe/multus:$tag -p;
+      done
       echo done'
 
 after_success:
