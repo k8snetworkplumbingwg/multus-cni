@@ -16,6 +16,7 @@
 package types
 
 import (
+	"encoding/json"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -129,6 +130,96 @@ var _ = Describe("config operations", func() {
 		Expect(b1).To(Equal(true))
 		b2 := CheckSystemNamespaces("foobar1", []string{"barfoo", "bafoo", "foobar"})
 		Expect(b2).To(Equal(false))
+	})
+
+	It("assigns deviceID in delegated conf", func() {
+		conf := `{
+    "name": "second-network",
+    "type": "sriov"
+}`
+		type sriovNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			DeviceID string `json:"deviceID"`
+		}
+		sriovConf := &sriovNetConf{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sriovConf.DeviceID).To(Equal("0000:00:00.0"))
+	})
+
+	It("assigns deviceID in delegated conf list", func() {
+		conf := `{
+    "name": "second-network",
+    "plugins": [
+      {
+        "type": "sriov"
+      }
+    ]
+}`
+		type sriovNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			DeviceID string `json:"deviceID"`
+		}
+		type sriovNetConfList struct {
+			Plugins []*sriovNetConf `json:"plugins"`
+		}
+		sriovConfList := &sriovNetConfList{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConfList)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(sriovConfList.Plugins[0].DeviceID).To(Equal("0000:00:00.1"))
+	})
+
+	It("assigns pciBusID in delegated conf", func() {
+		conf := `{
+    "name": "second-network",
+    "type": "host-device"
+}`
+		type hostDeviceNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			PCIBusID string `json:"pciBusID"`
+		}
+		hostDeviceConf := &hostDeviceNetConf{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.2")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(hostDeviceConf.PCIBusID).To(Equal("0000:00:00.2"))
+	})
+
+	It("assigns pciBusID in delegated conf list", func() {
+		conf := `{
+    "name": "second-network",
+    "plugins": [
+      {
+        "type": "host-device"
+      }
+    ]
+}`
+		type hostDeviceNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			PCIBusID string `json:"pciBusID"`
+		}
+		type hostDeviceNetConfList struct {
+			Plugins []*hostDeviceNetConf `json:"plugins"`
+		}
+		hostDeviceConfList := &hostDeviceNetConfList{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(hostDeviceConfList.Plugins[0].PCIBusID).To(Equal("0000:00:00.3"))
 	})
 
 })
