@@ -7,6 +7,7 @@ set -e
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
+MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
@@ -31,6 +32,7 @@ function usage()
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
+    echo -e "\t--multus-autoconfig-dir=$MULTUS_AUTOCONF_DIR (used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
 }
@@ -67,6 +69,9 @@ while [ "$1" != "" ]; do
             ;;
         --multus-log-file)
             MULTUS_LOG_FILE=$VALUE
+            ;;
+        --multus-autoconfig-dir)
+            MULTUS_AUTOCONF_DIR=$VALUE
             ;;
         *)
             echo "WARNING: unknown parameter \"$PARAM\""
@@ -168,7 +173,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   found_master=false
   tries=0
   while [ $found_master == false ]; do
-    MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
         if ! (($tries % 5)); then
@@ -213,7 +218,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         LOG_FILE_STRING="\"logFile\": \"$MULTUS_LOG_FILE\","
       fi
 
-      MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+      MASTER_PLUGIN_JSON="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN)"
       CONF=$(cat <<-EOF
   			{
   				"name": "multus-cni-network",
