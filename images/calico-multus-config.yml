@@ -1,0 +1,50 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-cni-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+data:
+  cni-conf.json: |
+    {
+      "name": "multus-cni-network",
+      "type": "multus",
+      "capabilities": {
+        "portMappings": true
+      },
+      "delegates": [
+        {
+          "cniVersion": "0.3.1",
+          "name": "default-cni-network",
+          "plugins": [
+            {
+              "name": "k8s-pod-network",
+              "cniVersion": "0.3.0",
+              "type": "calico",
+              "log_level": "info",
+              "datastore_type": "kubernetes",
+              "nodename": "__KUBERNETES_NODE_NAME__",
+              "mtu": 1440,
+              "ipam": {
+                "type": "calico-ipam"
+              },
+              "policy": {
+                "type": "k8s"
+              },
+              "kubernetes": {
+                "kubeconfig": "/etc/cni/multus/calico/net.d/calico-kubeconfig"
+              }
+            },
+            {
+              "type": "portmap",
+              "snat": true,
+              "capabilities": {"portMappings": true}
+            }
+          ]
+        }
+      ],
+      "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
+    }

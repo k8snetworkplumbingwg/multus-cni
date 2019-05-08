@@ -29,7 +29,7 @@ Firstly, clone this GitHub repository. We'll apply files to `kubectl` from this 
 We apply these files as such:
 
 ```
-$ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+$ cat ./images/{flannel-multus-config.yml,multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](doc/quickstart.md)
