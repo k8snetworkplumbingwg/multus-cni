@@ -13,7 +13,7 @@ Two things we'll refer to a number of times through this document are:
 
 ## Installation
 
-Our recommended quickstart method to deploy Multus is to deploy using a Daemonset. This method is provided in this guide along with [Flannel](https://github.com/coreos/flannel). Flannel is deployed as a pod-to-pod network that is used as our "default network" -- this provides connectivity between pods in your cluster. Each additional network attachment (i.e. for multiple interfaces in pods) is made in addition to this default network. This guide generally assumes a new Kubernetes cluster that hasn't yet had any networking configured. If it's your first time using Multus, you might consider using a fresh cluster to learn with, and then later configure it to work with an existing cluster.
+Our recommended quickstart method to deploy Multus is to deploy using a Daemonset. This guide generally assumes a new Kubernetes cluster that has had any networking configured already. If it's your first time using Multus, you might consider using a fresh cluster to learn with, and then later configure it to work with an existing cluster.
 
 Firstly, clone this GitHub repository. 
 
@@ -21,20 +21,19 @@ Firstly, clone this GitHub repository.
 git clone https://github.com/intel/multus-cni.git && cd multus-cni
 ```
 
-We'll apply files to `kubectl` from this repo. The files we're applying here specify a "Daemonset" (pods that run on each node in the cluster), this Daemonset handles installing the Multus CNI binary, dropping a default configuration on each node in the cluster -- and then also installs Flannel to use as a default network.
+We'll apply files to `kubectl` from this repo. The files we're applying here specify a "Daemonset" (pods that run on each node in the cluster), this Daemonset handles installing the Multus CNI binary, with create new CNI config file, based on your current installed CNI configuration file in the cluster.
 
 ```
-$ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+$ kubectl -f ./images/multus-daemonset.yml
 ```
 
-Note: For crio runtime use multus-crio-daemonset.yml (crio uses /usr/libexec/cni as default path for plugin directory). Before deploying daemonsets,delete all default network plugin configuration files under /etc/cni/net.d
+Note: For crio runtime use `image/multus-crio-daemonset.yml` (crio uses /usr/libexec/cni as default path for plugin directory). Before deploying daemonsets,delete all default network plugin configuration files under /etc/cni/net.d
 If the runtime is cri-o, then apply these files. 
 
 ```
-$ cat ./images/{multus-crio-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+$ kubectl -f ./images/multus-crio-daemonset.yml
 ```
 
-**NOTE**: The pod cidr in flannel-daemonset.yml is 10.244.0.0/16. If you're using `kubeadm` to install Kubernetes, you may have to specify `--pod-network-cidr=10.244.0.0/16` as a parameter to `kubeadm init`.
 ### Validating your installation
 
 Generally, the first step in validating your installation is to look at the `STATUS` field of your nodes, you can check it out by looking at:

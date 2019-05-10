@@ -6,7 +6,7 @@ set -e
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
-MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
+MULTUS_CONF_FILE="auto"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
