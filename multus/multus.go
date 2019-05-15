@@ -19,6 +19,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -155,7 +156,7 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 		return nil, logging.Errorf("error in converting the raw bytes to conflist: %v", err)
 	}
 
-	result, err := cniNet.AddNetworkList(confList, rt)
+	result, err := cniNet.AddNetworkList(context.Background(), confList, rt)
 	if err != nil {
 		return nil, logging.Errorf("error in getting result from AddNetworkList: %v", err)
 	}
@@ -175,7 +176,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 		return logging.Errorf("error in converting the raw bytes to conflist: %v", err)
 	}
 
-	err = cniNet.DelNetworkList(confList, rt)
+	err = cniNet.DelNetworkList(context.Background(), confList, rt)
 	if err != nil {
 		return logging.Errorf("error in getting result from DelNetworkList: %v", err)
 	}
@@ -237,7 +238,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			return nil, logging.Errorf("Multus: error in invoke Conflist add - %q: %v", delegate.ConfList.Name, err)
 		}
 	} else {
-		result, err = invoke.DelegateAdd(delegate.Conf.Type, delegate.Bytes, exec)
+		result, err = invoke.DelegateAdd(context.Background(), delegate.Conf.Type, delegate.Bytes, exec)
 		if err != nil {
 			return nil, logging.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Conf.Type, err)
 		}
@@ -281,7 +282,7 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 			return logging.Errorf("Multus: error in invoke Conflist Del - %q: %v", delegateConf.ConfList.Name, err)
 		}
 	} else {
-		if err = invoke.DelegateDel(delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
+		if err = invoke.DelegateDel(context.Background(), delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
 			return logging.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Conf.Type, err)
 		}
 	}

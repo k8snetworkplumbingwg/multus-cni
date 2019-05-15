@@ -115,7 +115,7 @@ func (l *DHCPLease) Stop() {
 }
 
 func (l *DHCPLease) acquire() error {
-	c, err := newDHCPClient(l.link)
+	c, err := newDHCPClient(l.link, l.clientID)
 	if err != nil {
 		return err
 	}
@@ -128,8 +128,12 @@ func (l *DHCPLease) acquire() error {
 		}
 	}
 
+	opts := make(dhcp4.Options)
+	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+	opts[dhcp4.OptionParameterRequestList] = []byte{byte(dhcp4.OptionRouter), byte(dhcp4.OptionSubnetMask)}
+
 	pkt, err := backoffRetry(func() (*dhcp4.Packet, error) {
-		ok, ack, err := c.Request()
+		ok, ack, err := DhcpRequest(c, opts)
 		switch {
 		case err != nil:
 			return nil, err
@@ -238,14 +242,17 @@ func (l *DHCPLease) downIface() {
 }
 
 func (l *DHCPLease) renew() error {
-	c, err := newDHCPClient(l.link)
+	c, err := newDHCPClient(l.link, l.clientID)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
+	opts := make(dhcp4.Options)
+	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+
 	pkt, err := backoffRetry(func() (*dhcp4.Packet, error) {
-		ok, ack, err := c.Renew(*l.ack)
+		ok, ack, err := DhcpRenew(c, *l.ack, opts)
 		switch {
 		case err != nil:
 			return nil, err
@@ -266,13 +273,16 @@ func (l *DHCPLease) renew() error {
 func (l *DHCPLease) release() error {
 	log.Printf("%v: releasing lease", l.clientID)
 
-	c, err := newDHCPClient(l.link)
+	c, err := newDHCPClient(l.link, l.clientID)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
-	if err = c.Release(*l.ack); err != nil {
+	opts := make(dhcp4.Options)
+	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+
+	if err = DhcpRelease(c, *l.ack, opts); err != nil {
 		return fmt.Errorf("failed to send DHCPRELEASE")
 	}
 
@@ -344,7 +354,7 @@ func backoffRetry(f func() (*dhcp4.Packet, error)) (*dhcp4.Packet, error) {
 	return nil, errNoMoreTries
 }
 
-func newDHCPClient(link netlink.Link) (*dhcp4client.Client, error) {
+func newDHCPClient(link netlink.Link, clientID string) (*dhcp4client.Client, error) {
 	pktsock, err := dhcp4client.NewPacketSock(link.Attrs().Index)
 	if err != nil {
 		return nil, err

@@ -111,6 +111,46 @@ func forwardPorts(config *PortMapConf, containerIP net.IP) error {
 	return nil
 }
 
+func checkPorts(config *PortMapConf, containerIP net.IP) error {
+
+	dnatChain := genDnatChain(config.Name, config.ContainerID)
+	fillDnatRules(&dnatChain, config, containerIP)
+
+	ip4t := maybeGetIptables(false)
+	ip6t := maybeGetIptables(true)
+	if ip4t == nil && ip6t == nil {
+		return fmt.Errorf("neither iptables nor ip6tables usable")
+	}
+
+	if ip4t != nil {
+		exists, err := chainExists(ip4t, dnatChain.table, dnatChain.name)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return err
+		}
+		if err := dnatChain.check(ip4t); err != nil {
+			return fmt.Errorf("could not check ipv4 dnat: %v", err)
+		}
+	}
+
+	if ip6t != nil {
+		exists, err := chainExists(ip6t, dnatChain.table, dnatChain.name)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return err
+		}
+		if err := dnatChain.check(ip6t); err != nil {
+			return fmt.Errorf("could not check ipv6 dnat: %v", err)
+		}
+	}
+
+	return nil
+}
+
 // genToplevelDnatChain creates the top-level summary chain that we'll
 // add our chain to. This is easy, because creating chains is idempotent.
 // IMPORTANT: do not change this, or else upgrading plugins will require
@@ -255,6 +295,10 @@ func genMarkMasqChain(markBit int) chain {
 		table:       "nat",
 		name:        MarkMasqChainName,
 		entryChains: []string{"POSTROUTING"},
+		// Only this entry chain needs to be prepended, because otherwise it is
+		// stomped on by the masquerading rules created by the CNI ptp and bridge
+		// plugins.
+		prependEntry: true,
 		entryRules: [][]string{{
 			"-m", "comment",
 			"--comment", "CNI portfwd requiring masquerade",

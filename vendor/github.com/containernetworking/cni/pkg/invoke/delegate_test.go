@@ -15,6 +15,7 @@
 package invoke_test
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net"
@@ -36,6 +37,7 @@ var _ = Describe("Delegate", func() {
 		debugFileName  string
 		debugBehavior  *debug.Debug
 		expectedResult *current.Result
+		ctx            context.Context
 	)
 
 	BeforeEach(func() {
@@ -67,7 +69,7 @@ var _ = Describe("Delegate", func() {
 		}
 		Expect(debugBehavior.WriteDebug(debugFileName)).To(Succeed())
 		pluginName = "noop"
-
+		ctx = context.TODO()
 		os.Setenv("CNI_ARGS", "DEBUG="+debugFileName)
 		os.Setenv("CNI_PATH", filepath.Dir(pathToPlugin))
 		os.Setenv("CNI_NETNS", "/tmp/some/netns/path")
@@ -89,7 +91,7 @@ var _ = Describe("Delegate", func() {
 		})
 
 		It("finds and execs the named plugin", func() {
-			result, err := invoke.DelegateAdd(pluginName, netConf, nil)
+			result, err := invoke.DelegateAdd(ctx, pluginName, netConf, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).To(Equal(expectedResult))
 
@@ -105,7 +107,7 @@ var _ = Describe("Delegate", func() {
 			})
 
 			It("aborts and returns a useful error", func() {
-				_, err := invoke.DelegateAdd(pluginName, netConf, nil)
+				_, err := invoke.DelegateAdd(ctx, pluginName, netConf, nil)
 				Expect(err).To(MatchError("CNI_COMMAND is not ADD"))
 			})
 		})
@@ -116,36 +118,35 @@ var _ = Describe("Delegate", func() {
 			})
 
 			It("returns a useful error", func() {
-				_, err := invoke.DelegateAdd(pluginName, netConf, nil)
+				_, err := invoke.DelegateAdd(ctx, pluginName, netConf, nil)
 				Expect(err).To(MatchError(HavePrefix("failed to find plugin")))
 			})
 		})
 	})
 
-	Describe("DelegateGet", func() {
+	Describe("DelegateCheck", func() {
 		BeforeEach(func() {
-			os.Setenv("CNI_COMMAND", "GET")
+			os.Setenv("CNI_COMMAND", "CHECK")
 		})
 
 		It("finds and execs the named plugin", func() {
-			result, err := invoke.DelegateGet(pluginName, netConf, nil)
+			err := invoke.DelegateCheck(ctx, pluginName, netConf, nil)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(expectedResult))
 
 			pluginInvocation, err := debug.ReadDebug(debugFileName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(pluginInvocation.Command).To(Equal("GET"))
+			Expect(pluginInvocation.Command).To(Equal("CHECK"))
 			Expect(pluginInvocation.CmdArgs.IfName).To(Equal("eth7"))
 		})
 
-		Context("if the delegation isn't part of an existing GET command", func() {
+		Context("if the delegation isn't part of an existing CHECK command", func() {
 			BeforeEach(func() {
 				os.Setenv("CNI_COMMAND", "NOPE")
 			})
 
 			It("aborts and returns a useful error", func() {
-				_, err := invoke.DelegateGet(pluginName, netConf, nil)
-				Expect(err).To(MatchError("CNI_COMMAND is not GET"))
+				err := invoke.DelegateCheck(ctx, pluginName, netConf, nil)
+				Expect(err).To(MatchError("CNI_COMMAND is not CHECK"))
 			})
 		})
 
@@ -155,7 +156,7 @@ var _ = Describe("Delegate", func() {
 			})
 
 			It("returns a useful error", func() {
-				_, err := invoke.DelegateGet(pluginName, netConf, nil)
+				err := invoke.DelegateCheck(ctx, pluginName, netConf, nil)
 				Expect(err).To(MatchError(HavePrefix("failed to find plugin")))
 			})
 		})
@@ -167,7 +168,7 @@ var _ = Describe("Delegate", func() {
 		})
 
 		It("finds and execs the named plugin", func() {
-			err := invoke.DelegateDel(pluginName, netConf, nil)
+			err := invoke.DelegateDel(ctx, pluginName, netConf, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			pluginInvocation, err := debug.ReadDebug(debugFileName)
@@ -182,7 +183,7 @@ var _ = Describe("Delegate", func() {
 			})
 
 			It("aborts and returns a useful error", func() {
-				err := invoke.DelegateDel(pluginName, netConf, nil)
+				err := invoke.DelegateDel(ctx, pluginName, netConf, nil)
 				Expect(err).To(MatchError("CNI_COMMAND is not DEL"))
 			})
 		})
@@ -193,7 +194,7 @@ var _ = Describe("Delegate", func() {
 			})
 
 			It("returns a useful error", func() {
-				err := invoke.DelegateDel(pluginName, netConf, nil)
+				err := invoke.DelegateDel(ctx, pluginName, netConf, nil)
 				Expect(err).To(MatchError(HavePrefix("failed to find plugin")))
 			})
 		})

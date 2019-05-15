@@ -18,7 +18,7 @@ $ ./dhcp daemon
 
 If given `-pidfile <path>` arguments after 'daemon', the dhcp plugin will write
 its PID to the given file.
-If given `-hostprefix <prefix>` arguments after 'daemon', the dhcp plugin will use this prefix for netns as `<prefix>/<original netns>`. It could be used in case of running dhcp daemon as container.
+If given `-hostprefix <prefix>` arguments after 'daemon', the dhcp plugin will use this prefix for DHCP socket as `<prefix>/run/cni/dhcp.sock`. You can use this prefix for references to the host filesystem, e.g. to access netns and the unix socket.
 
 Alternatively, you can use systemd socket activation protocol.
 Be sure that the .socket file uses /run/cni/dhcp.sock as the socket path.

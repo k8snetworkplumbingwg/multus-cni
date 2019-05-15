@@ -1,4 +1,4 @@
-// Copyright 2016 CNI authors
+// Copyright 2016-2018 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -112,6 +112,7 @@ var _ = Describe("Linux namespace operations", func() {
 					Expect(hostNSInode).To(Equal(origNSInode))
 					return nil
 				})
+				Expect(err).NotTo(HaveOccurred())
 				return nil
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -224,6 +225,7 @@ var _ = Describe("Linux namespace operations", func() {
 	Describe("IsNSorErr", func() {
 		It("should detect a namespace", func() {
 			createdNetNS, err := testutils.NewNS()
+			Expect(err).NotTo(HaveOccurred())
 			defer testutils.UnmountNS(createdNetNS)
 			err = ns.IsNSorErr(createdNetNS.Path())
 			Expect(err).NotTo(HaveOccurred())

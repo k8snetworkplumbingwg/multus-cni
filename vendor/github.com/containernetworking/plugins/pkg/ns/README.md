@@ -24,13 +24,13 @@ err = targetNs.Do(func(hostNs ns.NetNS) error {
 
 Note this requirement to wrap every network call is very onerous - any libraries you call might call out to network services such as DNS, and all such calls need to be protected after you call `ns.Do()`. All goroutines spawned from within the `ns.Do` will not inherit the new namespace. The CNI plugins all exit very soon after calling `ns.Do()` which helps to minimize the problem.
 
-When a new thread is spawned in Linux, it inherits the namepaces of its parent. In versions of go **prior to 1.10**, if the runtime spawns a new OS thread, it picks the parent randomly. If the chosen parent thread has been moved to a new namespace (even temporarily), the new OS thread will be permanently "stuck in the wrong namespace", and goroutines will non-deterministically switch namespaces as they are rescheduled.
+When a new thread is spawned in Linux, it inherits the namespace of its parent. In versions of go **prior to 1.10**, if the runtime spawns a new OS thread, it picks the parent randomly. If the chosen parent thread has been moved to a new namespace (even temporarily), the new OS thread will be permanently "stuck in the wrong namespace", and goroutines will non-deterministically switch namespaces as they are rescheduled.
 
 In short, **there was no safe way to change network namespaces, even temporarily, from within a long-lived, multithreaded Go process**. If you wish to do this, you must use go 1.10 or greater. 
 
 
 ### Creating network namespaces
-Earlier versions of this library managed namespace creation, but as CNI does not actually utilize this feature (and it was essentialy unmaintained), it was removed. If you're writing a container runtime, you should implement namespace management yourself. However, there are some gotchas when doing so, especially around handling `/var/run/netns`. A reasonably correct reference implementation, borrowed from `rkt`, can be found in `pkg/testutils/netns_linux.go` if you're in need of a source of inspiration.
+Earlier versions of this library managed namespace creation, but as CNI does not actually utilize this feature (and it was essentially unmaintained), it was removed. If you're writing a container runtime, you should implement namespace management yourself. However, there are some gotchas when doing so, especially around handling `/var/run/netns`. A reasonably correct reference implementation, borrowed from `rkt`, can be found in `pkg/testutils/netns_linux.go` if you're in need of a source of inspiration.
 
 
 ### Further Reading

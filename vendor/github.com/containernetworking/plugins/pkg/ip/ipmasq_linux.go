@@ -22,7 +22,7 @@ import (
 )
 
 // SetupIPMasq installs iptables rules to masquerade traffic
-// coming from ipn and going outside of it
+// coming from ip of ipn and going outside of ipn
 func SetupIPMasq(ipn *net.IPNet, chain string, comment string) error {
 	isV6 := ipn.IP.To4() == nil
 
@@ -70,7 +70,8 @@ func SetupIPMasq(ipn *net.IPNet, chain string, comment string) error {
 		return err
 	}
 
-	return ipt.AppendUnique("nat", "POSTROUTING", "-s", ipn.String(), "-j", chain, "-m", "comment", "--comment", comment)
+	// Packets from the specific IP of this network will hit the chain
+	return ipt.AppendUnique("nat", "POSTROUTING", "-s", ipn.IP.String(), "-j", chain, "-m", "comment", "--comment", comment)
 }
 
 // TeardownIPMasq undoes the effects of SetupIPMasq
@@ -89,6 +90,12 @@ func TeardownIPMasq(ipn *net.IPNet, chain string, comment string) error {
 		return fmt.Errorf("failed to locate iptables: %v", err)
 	}
 
+	err = ipt.Delete("nat", "POSTROUTING", "-s", ipn.IP.String(), "-j", chain, "-m", "comment", "--comment", comment)
+	if err != nil && !isNotExist(err) {
+		return err
+	}
+
+	// for downward compatibility
 	err = ipt.Delete("nat", "POSTROUTING", "-s", ipn.String(), "-j", chain, "-m", "comment", "--comment", comment)
 	if err != nil && !isNotExist(err) {
 		return err

@@ -20,14 +20,17 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/vishvananda/netlink"
+
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/vishvananda/netlink"
+	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
 
 type NetConf struct {
@@ -137,6 +140,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if err != nil {
 		return err
 	}
+
+	// Invoke ipam del if err to avoid ip leak
+	defer func() {
+		if err != nil {
+			ipam.ExecDel(n.IPAM.Type, args.StdinData)
+		}
+	}()
+
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
 	if err != nil {
@@ -192,5 +203,130 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("vlan"))
+}
+
+func cmdCheck(args *skel.CmdArgs) error {
+	conf := NetConf{}
+	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
+		return fmt.Errorf("failed to load netconf: %v", err)
+	}
+
+	netns, err := ns.GetNS(args.Netns)
+	if err != nil {
+		return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
+	}
+	defer netns.Close()
+
+	// run the IPAM plugin and get back the config to apply
+	err = ipam.ExecCheck(conf.IPAM.Type, args.StdinData)
+	if err != nil {
+		return err
+	}
+	if conf.NetConf.RawPrevResult == nil {
+		return fmt.Errorf("ptp: Required prevResult missing")
+	}
+	if err := version.ParsePrevResult(&conf.NetConf); err != nil {
+		return err
+	}
+	// Convert whatever the IPAM result was into the current Result type
+	result, err := current.NewResultFromResult(conf.PrevResult)
+	if err != nil {
+		return err
+	}
+
+	var contMap current.Interface
+	// Find interfaces for name whe know, that of host-device inside container
+	for _, intf := range result.Interfaces {
+		if args.IfName == intf.Name {
+			if args.Netns == intf.Sandbox {
+				contMap = *intf
+				continue
+			}
+		}
+	}
+
+	// The namespace must be the same as what was configured
+	if args.Netns != contMap.Sandbox {
+		return fmt.Errorf("Sandbox in prevResult %s doesn't match configured netns: %s",
+			contMap.Sandbox, args.Netns)
+	}
+
+	m, err := netlink.LinkByName(conf.Master)
+	if err != nil {
+		return fmt.Errorf("failed to lookup master %q: %v", conf.Master, err)
+	}
+
+	//
+	// Check prevResults for ips, routes and dns against values found in the container
+	if err := netns.Do(func(_ ns.NetNS) error {
+
+		// Check interface against values found in the container
+		err := validateCniContainerInterface(contMap, m.Attrs().Index, conf.VlanId, conf.MTU)
+		if err != nil {
+			return err
+		}
+
+		err = ip.ValidateExpectedInterfaceIPs(args.IfName, result.IPs)
+		if err != nil {
+			return err
+		}
+
+		err = ip.ValidateExpectedRoute(result.Routes)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateCniContainerInterface(intf current.Interface, masterIndex int, vlanId int, mtu int) error {
+
+	var link netlink.Link
+	var err error
+
+	if intf.Name == "" {
+		return fmt.Errorf("Container interface name missing in prevResult: %v", intf.Name)
+	}
+	link, err = netlink.LinkByName(intf.Name)
+	if err != nil {
+		return fmt.Errorf("ptp: Container Interface name in prevResult: %s not found", intf.Name)
+	}
+	if intf.Sandbox == "" {
+		return fmt.Errorf("ptp: Error: Container interface %s should not be in host namespace", link.Attrs().Name)
+	}
+
+	vlan, isVlan := link.(*netlink.Vlan)
+	if !isVlan {
+		return fmt.Errorf("Error: Container interface %s not of type vlan", link.Attrs().Name)
+	}
+
+	// TODO This works when unit testing via cnitool; fails with ./test.sh
+	//if masterIndex != vlan.Attrs().ParentIndex {
+	//   return fmt.Errorf("Container vlan Master %d does not match expected value: %d", vlan.Attrs().ParentIndex, masterIndex)
+	//}
+
+	if intf.Mac != "" {
+		if intf.Mac != link.Attrs().HardwareAddr.String() {
+			return fmt.Errorf("vlan: Interface %s Mac %s doesn't match container Mac: %s", intf.Name, intf.Mac, link.Attrs().HardwareAddr)
+		}
+	}
+
+	if vlanId != vlan.VlanId {
+		return fmt.Errorf("Error: Tuning link %s configured promisc is %v, current value is %d",
+			intf.Name, vlanId, vlan.VlanId)
+	}
+
+	if mtu != 0 {
+		if mtu != link.Attrs().MTU {
+			return fmt.Errorf("Error: Tuning configured MTU of %s is %d, current value is %d",
+				intf.Name, mtu, link.Attrs().MTU)
+		}
+	}
+
+	return nil
 }
