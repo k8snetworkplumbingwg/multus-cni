@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
@@ -30,11 +31,13 @@ const (
 	EnvNetDir         = "NETCONFPATH"
 	EnvCapabilityArgs = "CAP_ARGS"
 	EnvCNIArgs        = "CNI_ARGS"
+	EnvCNIIfname      = "CNI_IFNAME"
 
 	DefaultNetDir = "/etc/cni/net.d"
 
-	CmdAdd = "add"
-	CmdDel = "del"
+	CmdAdd   = "add"
+	CmdCheck = "check"
+	CmdDel   = "del"
 )
 
 func parseArgs(args string) ([][2]string, error) {
@@ -54,7 +57,7 @@ func parseArgs(args string) ([][2]string, error) {
 }
 
 func main() {
-	if len(os.Args) < 3 {
+	if len(os.Args) < 4 {
 		usage()
 		return
 	}
@@ -85,6 +88,11 @@ func main() {
 		}
 	}
 
+	ifName, ok := os.LookupEnv(EnvCNIIfname)
+	if !ok {
+		ifName = "eth0"
+	}
+
 	netns := os.Args[3]
 	netns, err = filepath.Abs(netns)
 	if err != nil {
@@ -100,29 +108,33 @@ func main() {
 	rt := &libcni.RuntimeConf{
 		ContainerID:    containerID,
 		NetNS:          netns,
-		IfName:         "eth0",
+		IfName:         ifName,
 		Args:           cniArgs,
 		CapabilityArgs: capabilityArgs,
 	}
 
 	switch os.Args[1] {
 	case CmdAdd:
-		result, err := cninet.AddNetworkList(netconf, rt)
+		result, err := cninet.AddNetworkList(context.TODO(), netconf, rt)
 		if result != nil {
 			_ = result.Print()
 		}
 		exit(err)
+	case CmdCheck:
+		err := cninet.CheckNetworkList(context.TODO(), netconf, rt)
+		exit(err)
 	case CmdDel:
-		exit(cninet.DelNetworkList(netconf, rt))
+		exit(cninet.DelNetworkList(context.TODO(), netconf, rt))
 	}
 }
 
 func usage() {
 	exe := filepath.Base(os.Args[0])
 
-	fmt.Fprintf(os.Stderr, "%s: Add or remove network interfaces from a network namespace\n", exe)
-	fmt.Fprintf(os.Stderr, "  %s %s <net> <netns>\n", exe, CmdAdd)
-	fmt.Fprintf(os.Stderr, "  %s %s <net> <netns>\n", exe, CmdDel)
+	fmt.Fprintf(os.Stderr, "%s: Add, check, or remove network interfaces from a network namespace\n", exe)
+	fmt.Fprintf(os.Stderr, "  %s add   <net> <netns>\n", exe)
+	fmt.Fprintf(os.Stderr, "  %s check <net> <netns>\n", exe)
+	fmt.Fprintf(os.Stderr, "  %s del   <net> <netns>\n", exe)
 	os.Exit(1)
 }
 

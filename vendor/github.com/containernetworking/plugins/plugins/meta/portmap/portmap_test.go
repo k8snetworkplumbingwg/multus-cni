@@ -68,7 +68,7 @@ var _ = Describe("portmapping configuration", func() {
 		]
 	}
 }`)
-			c, err := parseConfig(configBytes, "container")
+			c, _, err := parseConfig(configBytes, "container")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(c.CNIVersion).To(Equal("0.3.1"))
 			Expect(c.ConditionsV4).To(Equal(&[]string{"a", "b"}))
@@ -91,7 +91,7 @@ var _ = Describe("portmapping configuration", func() {
 	"conditionsV4": ["a", "b"],
 	"conditionsV6": ["c", "d"]
 }`)
-			c, err := parseConfig(configBytes, "container")
+			c, _, err := parseConfig(configBytes, "container")
 			Expect(err).NotTo(HaveOccurred())
 			Expect(c.CNIVersion).To(Equal("0.3.1"))
 			Expect(c.ConditionsV4).To(Equal(&[]string{"a", "b"}))
@@ -115,7 +115,7 @@ var _ = Describe("portmapping configuration", func() {
 		]
 	}
 }`)
-			_, err := parseConfig(configBytes, "container")
+			_, _, err := parseConfig(configBytes, "container")
 			Expect(err).To(MatchError("Invalid host port number: 0"))
 		})
 
@@ -143,7 +143,7 @@ var _ = Describe("portmapping configuration", func() {
 		]
 	}
 }`)
-			_, err := parseConfig(configBytes, "container")
+			_, _, err := parseConfig(configBytes, "container")
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -175,7 +175,7 @@ var _ = Describe("portmapping configuration", func() {
 	"conditionsV6": ["c", "d"]
 }`)
 
-				conf, err := parseConfig(configBytes, "foo")
+				conf, _, err := parseConfig(configBytes, "foo")
 				Expect(err).NotTo(HaveOccurred())
 				conf.ContainerID = containerID
 
@@ -271,7 +271,7 @@ var _ = Describe("portmapping configuration", func() {
 	"conditionsV6": ["c", "d"]
 }`)
 
-				conf, err := parseConfig(configBytes, "foo")
+				conf, _, err := parseConfig(configBytes, "foo")
 				Expect(err).NotTo(HaveOccurred())
 				conf.ContainerID = containerID
 
@@ -323,6 +323,7 @@ var _ = Describe("portmapping configuration", func() {
 						"--mark", "0x20/0x20",
 						"-j", "MASQUERADE",
 					}},
+					prependEntry: true,
 				}))
 			})
 		})

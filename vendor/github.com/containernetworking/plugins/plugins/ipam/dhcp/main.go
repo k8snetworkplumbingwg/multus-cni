@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -26,25 +27,32 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
 
-const socketPath = "/run/cni/dhcp.sock"
+const defaultSocketPath = "/run/cni/dhcp.sock"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "daemon" {
 		var pidfilePath string
 		var hostPrefix string
+		var socketPath string
 		daemonFlags := flag.NewFlagSet("daemon", flag.ExitOnError)
 		daemonFlags.StringVar(&pidfilePath, "pidfile", "", "optional path to write daemon PID to")
-		daemonFlags.StringVar(&hostPrefix, "hostprefix", "", "optional prefix to netns")
+		daemonFlags.StringVar(&hostPrefix, "hostprefix", "", "optional prefix to host root")
+		daemonFlags.StringVar(&socketPath, "socketpath", "", "optional dhcp server socketpath")
 		daemonFlags.Parse(os.Args[2:])
 
-		if err := runDaemon(pidfilePath, hostPrefix); err != nil {
+		if socketPath == "" {
+			socketPath = defaultSocketPath
+		}
+
+		if err := runDaemon(pidfilePath, hostPrefix, socketPath); err != nil {
 			log.Printf(err.Error())
 			os.Exit(1)
 		}
 	} else {
-		skel.PluginMain(cmdAdd, cmdDel, version.All)
+		skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("dhcp"))
 	}
 }
 
@@ -72,7 +80,50 @@ func cmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
+func cmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement
+	//return fmt.Errorf("not implemented")
+	// Plugin must return result in same version as specified in netconf
+	versionDecoder := &version.ConfigDecoder{}
+	//confVersion, err := versionDecoder.Decode(args.StdinData)
+	_, err := versionDecoder.Decode(args.StdinData)
+	if err != nil {
+		return err
+	}
+
+	result := &current.Result{}
+	if err := rpcCall("DHCP.Allocate", args, result); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type SocketPathConf struct {
+	DaemonSocketPath string `json:"daemonSocketPath,omitempty"`
+}
+
+type TempNetConf struct {
+	IPAM SocketPathConf `json:"ipam,omitempty"`
+}
+
+func getSocketPath(stdinData []byte) (string, error) {
+	conf := TempNetConf{}
+	if err := json.Unmarshal(stdinData, &conf); err != nil {
+		return "", fmt.Errorf("error parsing socket path conf: %v", err)
+	}
+	if conf.IPAM.DaemonSocketPath == "" {
+		return defaultSocketPath, nil
+	}
+	return conf.IPAM.DaemonSocketPath, nil
+}
+
 func rpcCall(method string, args *skel.CmdArgs, result interface{}) error {
+	socketPath, err := getSocketPath(args.StdinData)
+	if err != nil {
+		return fmt.Errorf("error obtaining socketPath: %v", err)
+	}
+
 	client, err := rpc.DialHTTP("unix", socketPath)
 	if err != nil {
 		return fmt.Errorf("error dialing DHCP daemon: %v", err)

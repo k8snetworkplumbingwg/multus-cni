@@ -1,8 +1,8 @@
-hash: 4288149814e91e63396f7874b87151aca74047110f0d1f43027b60dd6014988f
-updated: 2019-01-09T10:19:29.688011713Z
+hash: 51c5c611e1db067eccc443c03a60c1f961b29aed9f85b081826ce229b5c63d8a
+updated: 2019-05-15T17:03:46.44233316+09:00
 imports:
 - name: github.com/containernetworking/cni
-  version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
+  version: 7d76556571b6cf1ab90d7026a73092ac8d5e0c23
   subpackages:
   - libcni
   - pkg/invoke
@@ -12,7 +12,7 @@ imports:
   - pkg/types/current
   - pkg/version
 - name: github.com/containernetworking/plugins
-  version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
+  version: 0950a3607bf5e8a57c6a655c7e573e6aab0dc650
   subpackages:
   - pkg/ip
   - pkg/ipam
@@ -65,7 +65,6 @@ imports:
   version: 7f8ab55aaf3b86885aa55b762e803744d1674700
   subpackages:
   - config
-  - extensions/table
   - internal/codelocation
   - internal/containernode
   - internal/failer
@@ -96,7 +95,7 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/pkg/errors
-  version: ffb6e22f01932bf7ac35e0bad9be11f01d1c8685
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: github.com/spf13/pflag
   version: 583c0c0531f06d5278b7d917446061adc344b5cd
 - name: github.com/vishvananda/netlink
@@ -176,7 +175,6 @@ imports:
 - name: k8s.io/api
   version: 2d6f90ab1293a1fb871cf149423ebb72aa7423aa
   subpackages:
-  - admission/v1beta1
   - admissionregistration/v1alpha1
   - admissionregistration/v1beta1
   - apps/v1

@@ -15,14 +15,29 @@
 package ipam
 
 import (
+	"context"
+	"fmt"
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/types"
+	"os"
 )
 
 func ExecAdd(plugin string, netconf []byte) (types.Result, error) {
-	return invoke.DelegateAdd(plugin, netconf)
+	return invoke.DelegateAdd(context.TODO(), plugin, netconf, nil)
+}
+
+func ExecCheck(plugin string, netconf []byte) error {
+	return invoke.DelegateCheck(context.TODO(), plugin, netconf, nil)
 }
 
 func ExecDel(plugin string, netconf []byte) error {
-	return invoke.DelegateDel(plugin, netconf)
+	cmd := os.Getenv("CNI_COMMAND")
+	if cmd == "" {
+		return fmt.Errorf("environment variable CNI_COMMAND must be specified.")
+	}
+	// Set CNI_COMMAND to DEL explicity.  We might be deleting due to an ADD gone wrong.
+	// restore CNI_COMMAND to original value upon return.
+	os.Setenv("CNI_COMMAND", "DEL")
+	defer os.Setenv("CNI_COMMAND", cmd)
+	return invoke.DelegateDel(context.TODO(), plugin, netconf, nil)
 }

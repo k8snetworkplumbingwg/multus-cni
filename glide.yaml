@@ -3,13 +3,13 @@ ignore:
 - bytes
 import:
 - package: github.com/containernetworking/cni
-  version: 07c1a6da47b7fbf8b357f4949ecce2113e598491
+  version: v0.7.0
   subpackages:
   - pkg/skel
   - pkg/types
   - pkg/version
 - package: github.com/containernetworking/plugins
-  version: 2b8b1ac0af4568e928d96ccc5f47b075416eeabd
+  version: v0.8.0
   subpackages:
   - pkg/ip
   - pkg/ipam

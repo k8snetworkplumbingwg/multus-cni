@@ -26,7 +26,7 @@ The traffic of the container interface will be routed through the interface of t
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "ptp"
-* `ipMasq` (boolean, optional): set up IP Masquerade on the host for traffic originating from this network and destined outside of it. Defaults to false.
+* `ipMasq` (boolean, optional): set up IP Masquerade on the host for traffic originating from ip of this network and destined outside of this network. Defaults to false.
 * `mtu` (integer, optional): explicitly set MTU to the specified value. Defaults to value chosen by the kernel.
 * `ipam` (dictionary, required): IPAM configuration to be used for this network.
 * `dns` (dictionary, optional): DNS information to return as described in the [Result](https://github.com/containernetworking/cni/blob/master/SPEC.md#result).
