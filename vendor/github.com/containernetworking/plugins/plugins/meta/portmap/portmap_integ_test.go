@@ -16,6 +16,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -121,7 +122,7 @@ var _ = Describe("portmap integration tests", func() {
 				return nil
 			}
 			netDeleted = true
-			return cniConf.DelNetworkList(configList, &runtimeConfig)
+			return cniConf.DelNetworkList(context.TODO(), configList, &runtimeConfig)
 		}
 
 		// we'll also manually check the iptables chains
@@ -130,7 +131,7 @@ var _ = Describe("portmap integration tests", func() {
 		dnatChainName := genDnatChain("cni-portmap-unit-test", runtimeConfig.ContainerID).name
 
 		// Create the network
-		resI, err := cniConf.AddNetworkList(configList, &runtimeConfig)
+		resI, err := cniConf.AddNetworkList(context.TODO(), configList, &runtimeConfig)
 		Expect(err).NotTo(HaveOccurred())
 		defer deleteNetwork()
 
@@ -163,6 +164,12 @@ var _ = Describe("portmap integration tests", func() {
 		hostIP := getLocalIP()
 		fmt.Fprintf(GinkgoWriter, "hostIP: %s:%d, contIP: %s:%d\n",
 			hostIP, hostPort, contIP, containerPort)
+
+		// dump iptables-save output for debugging
+		cmd = exec.Command("iptables-save")
+		cmd.Stderr = GinkgoWriter
+		cmd.Stdout = GinkgoWriter
+		Expect(cmd.Run()).To(Succeed())
 
 		// Sanity check: verify that the container is reachable directly
 		contOK := testEchoServer(contIP.String(), containerPort, "")

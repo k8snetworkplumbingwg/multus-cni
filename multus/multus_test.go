@@ -16,6 +16,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -97,7 +98,7 @@ func gatherCNIEnv() []string {
 	return filtered
 }
 
-func (f *fakeExec) ExecPlugin(pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
+func (f *fakeExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
 	cmd := os.Getenv("CNI_COMMAND")
 	var index int
 	switch cmd {

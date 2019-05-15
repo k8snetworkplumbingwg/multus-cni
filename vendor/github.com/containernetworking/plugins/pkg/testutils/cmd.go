@@ -81,6 +81,21 @@ func CmdAddWithArgs(args *skel.CmdArgs, f func() error) (types.Result, []byte, e
 	return CmdAdd(args.Netns, args.ContainerID, args.IfName, args.StdinData, f)
 }
 
+func CmdCheck(cniNetns, cniContainerID, cniIfname string, conf []byte, f func() error) error {
+	os.Setenv("CNI_COMMAND", "CHECK")
+	os.Setenv("CNI_PATH", os.Getenv("PATH"))
+	os.Setenv("CNI_NETNS", cniNetns)
+	os.Setenv("CNI_IFNAME", cniIfname)
+	os.Setenv("CNI_CONTAINERID", cniContainerID)
+	defer envCleanup()
+
+	return f()
+}
+
+func CmdCheckWithArgs(args *skel.CmdArgs, f func() error) error {
+	return CmdCheck(args.Netns, args.ContainerID, args.IfName, args.StdinData, f)
+}
+
 func CmdDel(cniNetns, cniContainerID, cniIfname string, f func() error) error {
 	os.Setenv("CNI_COMMAND", "DEL")
 	os.Setenv("CNI_PATH", os.Getenv("PATH"))
