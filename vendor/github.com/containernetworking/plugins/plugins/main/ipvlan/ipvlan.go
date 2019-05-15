@@ -20,24 +20,21 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/vishvananda/netlink"
+
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+
 	"github.com/containernetworking/plugins/pkg/ip"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/vishvananda/netlink"
+	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
 
 type NetConf struct {
 	types.NetConf
-
-	// support chaining for master interface and IP decisions
-	// occurring prior to running ipvlan plugin
-	RawPrevResult *map[string]interface{} `json:"prevResult"`
-	PrevResult    *current.Result         `json:"-"`
-
 	Master string `json:"master"`
 	Mode   string `json:"mode"`
 	MTU    int    `json:"mtu"`
@@ -50,33 +47,35 @@ func init() {
 	runtime.LockOSThread()
 }
 
-func loadConf(bytes []byte) (*NetConf, string, error) {
+func loadConf(bytes []byte, cmdCheck bool) (*NetConf, string, error) {
 	n := &NetConf{}
 	if err := json.Unmarshal(bytes, n); err != nil {
 		return nil, "", fmt.Errorf("failed to load netconf: %v", err)
 	}
+
+	if cmdCheck {
+		return n, n.CNIVersion, nil
+	}
+
+	var result *current.Result
+	var err error
 	// Parse previous result
-	if n.RawPrevResult != nil {
-		resultBytes, err := json.Marshal(n.RawPrevResult)
-		if err != nil {
-			return nil, "", fmt.Errorf("could not serialize prevResult: %v", err)
-		}
-		res, err := version.NewResult(n.CNIVersion, resultBytes)
-		if err != nil {
+	if n.NetConf.RawPrevResult != nil {
+		if err = version.ParsePrevResult(&n.NetConf); err != nil {
 			return nil, "", fmt.Errorf("could not parse prevResult: %v", err)
 		}
-		n.RawPrevResult = nil
-		n.PrevResult, err = current.NewResultFromResult(res)
+
+		result, err = current.NewResultFromResult(n.PrevResult)
 		if err != nil {
 			return nil, "", fmt.Errorf("could not convert result to current version: %v", err)
 		}
 	}
 	if n.Master == "" {
-		if n.PrevResult == nil {
+		if result == nil {
 			return nil, "", fmt.Errorf(`"master" field is required. It specifies the host interface name to virtualize`)
 		}
-		if len(n.PrevResult.Interfaces) == 1 && n.PrevResult.Interfaces[0].Name != "" {
-			n.Master = n.PrevResult.Interfaces[0].Name
+		if len(result.Interfaces) == 1 && result.Interfaces[0].Name != "" {
+			n.Master = result.Interfaces[0].Name
 		} else {
 			return nil, "", fmt.Errorf("chained master failure. PrevResult lacks a single named interface")
 		}
@@ -94,6 +93,19 @@ func modeFromString(s string) (netlink.IPVlanMode, error) {
 		return netlink.IPVLAN_MODE_L3S, nil
 	default:
 		return 0, fmt.Errorf("unknown ipvlan mode: %q", s)
+	}
+}
+
+func modeToString(mode netlink.IPVlanMode) (string, error) {
+	switch mode {
+	case netlink.IPVLAN_MODE_L2:
+		return "l2", nil
+	case netlink.IPVLAN_MODE_L3:
+		return "l3", nil
+	case netlink.IPVLAN_MODE_L3S:
+		return "l3s", nil
+	default:
+		return "", fmt.Errorf("unknown ipvlan mode: %q", mode)
 	}
 }
 
@@ -156,7 +168,7 @@ func createIpvlan(conf *NetConf, ifName string, netns ns.NetNS) (*current.Interf
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
-	n, cniVersion, err := loadConf(args.StdinData)
+	n, cniVersion, err := loadConf(args.StdinData, false)
 	if err != nil {
 		return err
 	}
@@ -175,14 +187,30 @@ func cmdAdd(args *skel.CmdArgs) error {
 	var result *current.Result
 	// Configure iface from PrevResult if we have IPs and an IPAM
 	// block has not been configured
-	if n.IPAM.Type == "" && n.PrevResult != nil && len(n.PrevResult.IPs) > 0 {
-		result = n.PrevResult
-	} else {
+	haveResult := false
+	if n.IPAM.Type == "" && n.PrevResult != nil {
+		result, err = current.NewResultFromResult(n.PrevResult)
+		if err != nil {
+			return err
+		}
+		if len(result.IPs) > 0 {
+			haveResult = true
+		}
+	}
+	if !haveResult {
 		// run the IPAM plugin and get back the config to apply
 		r, err := ipam.ExecAdd(n.IPAM.Type, args.StdinData)
 		if err != nil {
 			return err
 		}
+
+		// Invoke ipam del if err to avoid ip leak
+		defer func() {
+			if err != nil {
+				ipam.ExecDel(n.IPAM.Type, args.StdinData)
+			}
+		}()
+
 		// Convert whatever the IPAM result was into the current Result type
 		result, err = current.NewResultFromResult(r)
 		if err != nil {
@@ -213,7 +241,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 }
 
 func cmdDel(args *skel.CmdArgs) error {
-	n, _, err := loadConf(args.StdinData)
+	n, _, err := loadConf(args.StdinData, false)
 	if err != nil {
 		return err
 	}
@@ -245,5 +273,130 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("ipvlan"))
+}
+
+func cmdCheck(args *skel.CmdArgs) error {
+
+	n, _, err := loadConf(args.StdinData, true)
+	if err != nil {
+		return err
+	}
+	netns, err := ns.GetNS(args.Netns)
+	if err != nil {
+		return fmt.Errorf("failed to open netns %q: %v", args.Netns, err)
+	}
+	defer netns.Close()
+
+	if n.IPAM.Type != "" {
+		// run the IPAM plugin and get back the config to apply
+		err = ipam.ExecCheck(n.IPAM.Type, args.StdinData)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Parse previous result.
+	if n.NetConf.RawPrevResult == nil {
+		return fmt.Errorf("Required prevResult missing")
+	}
+
+	if err := version.ParsePrevResult(&n.NetConf); err != nil {
+		return err
+	}
+
+	result, err := current.NewResultFromResult(n.PrevResult)
+	if err != nil {
+		return err
+	}
+
+	var contMap current.Interface
+	// Find interfaces for names whe know, ipvlan inside container
+	for _, intf := range result.Interfaces {
+		if args.IfName == intf.Name {
+			if args.Netns == intf.Sandbox {
+				contMap = *intf
+				continue
+			}
+		}
+	}
+
+	// The namespace must be the same as what was configured
+	if args.Netns != contMap.Sandbox {
+		return fmt.Errorf("Sandbox in prevResult %s doesn't match configured netns: %s",
+			contMap.Sandbox, args.Netns)
+	}
+
+	m, err := netlink.LinkByName(n.Master)
+	if err != nil {
+		return fmt.Errorf("failed to lookup master %q: %v", n.Master, err)
+	}
+
+	// Check prevResults for ips, routes and dns against values found in the container
+	if err := netns.Do(func(_ ns.NetNS) error {
+
+		// Check interface against values found in the container
+		err := validateCniContainerInterface(contMap, m.Attrs().Index, n.Mode)
+		if err != nil {
+			return err
+		}
+
+		err = ip.ValidateExpectedInterfaceIPs(args.IfName, result.IPs)
+		if err != nil {
+			return err
+		}
+
+		err = ip.ValidateExpectedRoute(result.Routes)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateCniContainerInterface(intf current.Interface, masterIndex int, modeExpected string) error {
+
+	var link netlink.Link
+	var err error
+
+	if intf.Name == "" {
+		return fmt.Errorf("Container interface name missing in prevResult: %v", intf.Name)
+	}
+	link, err = netlink.LinkByName(intf.Name)
+	if err != nil {
+		return fmt.Errorf("Container Interface name in prevResult: %s not found", intf.Name)
+	}
+	if intf.Sandbox == "" {
+		return fmt.Errorf("Error: Container interface %s should not be in host namespace", link.Attrs().Name)
+	}
+
+	ipv, isIPVlan := link.(*netlink.IPVlan)
+	if !isIPVlan {
+		return fmt.Errorf("Error: Container interface %s not of type ipvlan", link.Attrs().Name)
+	}
+
+	mode, err := modeFromString(modeExpected)
+	if ipv.Mode != mode {
+		currString, err := modeToString(ipv.Mode)
+		if err != nil {
+			return err
+		}
+		confString, err := modeToString(mode)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("Container IPVlan mode %s does not match expected value: %s", currString, confString)
+	}
+
+	if intf.Mac != "" {
+		if intf.Mac != link.Attrs().HardwareAddr.String() {
+			return fmt.Errorf("Interface %s Mac %s doesn't match container Mac: %s", intf.Name, intf.Mac, link.Attrs().HardwareAddr)
+		}
+	}
+
+	return nil
 }

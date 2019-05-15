@@ -45,7 +45,7 @@ var _ = Describe("IPAM config", func() {
 			Name: "mynet",
 			Type: "host-local",
 			Ranges: []RangeSet{
-				RangeSet{
+				{
 					{
 						RangeStart: net.IP{10, 1, 2, 9},
 						RangeEnd:   net.IP{10, 1, 2, 20},
@@ -372,7 +372,7 @@ var _ = Describe("IPAM config", func() {
 					"type": "host-local",
 					"ranges": [
 						[{"subnet": "10.1.2.0/24"}],
-						[{"subnet": "2001:db8:1::/24"}]
+						[{"subnet": "2001:db8:1::/48"}]
 					]
 				}
 			}`

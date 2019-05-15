@@ -12,6 +12,7 @@ import (
 var _ = Describe("IpforwardLinux", func() {
 	It("echo1 must not write the file if content is 1", func() {
 		file, err := ioutil.TempFile(os.TempDir(), "containernetworking")
+		Expect(err).NotTo(HaveOccurred())
 		defer os.Remove(file.Name())
 		err = echo1(file.Name())
 		Expect(err).NotTo(HaveOccurred())

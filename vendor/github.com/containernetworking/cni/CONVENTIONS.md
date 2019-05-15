@@ -58,8 +58,9 @@ But the runtime would fill in the mappings so the plugin itself would receive so
 | Area  | Purpose | Capability | Spec and Example | Runtime implementations | Plugin Implementations |
 | ----- | ------- | -----------| ---------------- | ----------------------- | ---------------------  |
 | port mappings | Pass mapping from ports on the host to ports in the container network namespace. | `portMappings` | A list of portmapping entries.<br/>  <pre>[<br/>  { "hostPort": 8080, "containerPort": 80, "protocol": "tcp" },<br />  { "hostPort": 8000, "containerPort": 8001, "protocol": "udp" }<br />  ]<br /></pre> | kubernetes | CNI `portmap` plugin |
-| ip ranges | Dynamically configure the IP range(s) for address allocation. Runtimes that manage IP pools, but not individual IP addresses, can pass these to plugins. | `ipRanges` | The same as the `ranges` key for `host-local` - a list of lists of subnets. The outer list is the number of IPs to allocate, and the inner list is a pool of subnets for each allocation. <br/><pre>[<br/> [<br/>  { "subnet": "10.1.2.0/24", "rangeStart": "10.1.2.3", "rangeEnd": 10.1.2.99", "gateway": "10.1.2.254" } <br/>  ]<br/>]</pre> | none | cni `host-local` plugin |
-| bandwidth limits | Dynamically configure interface bandwidth limits | `bandwidth` | Desired bandwidth limits. Rates are in bits per second, burst values are in bits. <pre> { "ingressRate": 2048, "ingressBurst": 1600, "egressRate": 4096, "egressBurst": 1600 } </pre> | none | cni `bandwidth` plugin |
+| ip ranges | Dynamically configure the IP range(s) for address allocation. Runtimes that manage IP pools, but not individual IP addresses, can pass these to plugins. | `ipRanges` | The same as the `ranges` key for `host-local` - a list of lists of subnets. The outer list is the number of IPs to allocate, and the inner list is a pool of subnets for each allocation. <br/><pre>[<br/> [<br/>  { "subnet": "10.1.2.0/24", "rangeStart": "10.1.2.3", "rangeEnd": 10.1.2.99", "gateway": "10.1.2.254" } <br/>  ]<br/>]</pre> | none | CNI `host-local` plugin |
+| bandwidth limits | Dynamically configure interface bandwidth limits | `bandwidth` | Desired bandwidth limits. Rates are in bits per second, burst values are in bits. <pre> { "ingressRate": 2048, "ingressBurst": 1600, "egressRate": 4096, "egressBurst": 1600 } </pre> | none | CNI `bandwidth` plugin |
+| Dns | Dymaically configure dns according to runtime | `dns` | Dictionary containing a list of `servers` (string entries), a list of `searches` (string entries), a list of `options` (string entries). <pre>{ <br> "searches" : [ "internal.yoyodyne.net", "corp.tyrell.net" ] <br> "servers": [ "8.8.8.8", "10.0.0.10" ] <br />} </pre> | kubernetes | CNI `win-bridge` plugin, CNI `win-overlay` plugin |
 
 
 ## "args" in network config
@@ -72,7 +73,7 @@ But the runtime would fill in the mappings so the plugin itself would receive so
 
 This method of passing information to a plugin is recommended when the information is optional and the plugin can choose to ignore it. It's often that case that such information is passed to all plugins by the runtime without regard for whether the plugin can understand it.
 
-The conventions documented here are all namepaced under `cni` so they don't conflict with any existing `args`.
+The conventions documented here are all namespaced under `cni` so they don't conflict with any existing `args`.
 
 For example:
 ```json
@@ -94,17 +95,17 @@ For example:
 | Area  | Purpose| Spec and Example | Runtime implementations | Plugin Implementations |
 | ----- | ------ | ------------     | ----------------------- | ---------------------- |
 | labels | Pass`key=value` labels to plugins | <pre>"labels" : [<br />  { "key" : "app", "value" : "myapp" },<br />  { "key" : "env", "value" : "prod" }<br />] </pre> | none | none |
-| ips   | Request static IPs | <pre>"ips": ["10.2.2.42", "2001:db8::5"]</pre> | none | host-local |
+| ips   | Request static IPs | Spec:<pre>"ips": ["\<ip\>[/\<prefix\>]", ...]</pre>Examples:<pre>"ips": ["10.2.2.42/24", "2001:db8::5"]</pre>The plugin may require the IP address to include a prefix length. | none | host-local |
 
 ## CNI_ARGS
 CNI_ARGS formed part of the original CNI spec and have been present since the initial release.
 > `CNI_ARGS`: Extra arguments passed in by the user at invocation time. Alphanumeric key-value pairs separated by semicolons; for example, "FOO=BAR;ABC=123"
 
-The use of `CNI_ARGS` is deprecated and "args" should be used instead.
+The use of `CNI_ARGS` is deprecated and "args" should be used instead. If a runtime passes an equivalent key via `args` (eg the `ips` `args` Area and the `CNI_ARGS` `IP` Field) and the plugin understands `args`, the plugin must ignore the CNI_ARGS Field.
 
 | Field  | Purpose| Spec and Example | Runtime implementations | Plugin Implementations |
 | ------ | ------ | ---------------- | ----------------------- | ---------------------- |
-| IP     | Request a specific IP from IPAM plugins | IP=192.168.10.4 | *rkt* supports passing additional arguments to plugins and the [documentation](https://coreos.com/rkt/docs/latest/networking/overriding-defaults.html) suggests IP can be used. | host-local (since version v0.2.0) supports the field for IPv4 only - [documentation](https://github.com/containernetworking/cni/blob/master/Documentation/host-local.md#supported-arguments).|
+| IP     | Request a specific IP from IPAM plugins | Spec:<pre>IP=\<ip\>[/\<prefix\>]</pre>Example: <pre>IP=192.168.10.4/24</pre>The plugin may require the IP addresses to include a prefix length. | *rkt* supports passing additional arguments to plugins and the [documentation](https://coreos.com/rkt/docs/latest/networking/overriding-defaults.html) suggests IP can be used. | host-local (since version v0.2.0) supports the field for IPv4 only - [documentation](https://github.com/containernetworking/plugins/tree/master/plugins/ipam/host-local#supported-arguments).|
 
 ## Chained Plugins
 If plugins are agnostic about the type of interface created, they SHOULD work in a chained mode and configure existing interfaces. Plugins MAY also create the desired interface when not run in a chain.

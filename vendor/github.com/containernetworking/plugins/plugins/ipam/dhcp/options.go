@@ -98,7 +98,7 @@ func parseCIDRRoutes(opts dhcp4.Options) []*types.Route {
 			}
 			routes = append(routes, rt)
 
-			opt = opt[octets+5 : len(opt)]
+			opt = opt[octets+5:]
 		}
 	}
 	return routes
