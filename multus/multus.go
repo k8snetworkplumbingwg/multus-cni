@@ -417,14 +417,10 @@ func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 }
 
 func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) error {
-	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
+	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
 		return err
-	}
-
-	if args.Netns == "" {
-		return nil
 	}
 
 	netnsfound := true
@@ -436,7 +432,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		_, ok := err.(ns.NSPathNotExistErr)
 		if ok {
 			netnsfound = false
-			logging.Debugf("cmdDel: WARNING netns may not exist, netns: %s, err: %s", netns, err)
+			logging.Debugf("cmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
 			return fmt.Errorf("failed to open netns %q: %v", netns, err)
 		}
