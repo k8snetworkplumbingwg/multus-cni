@@ -44,6 +44,9 @@ while [ "$1" != "" ]; do
             usage
             exit
             ;;
+        --cni-version)
+            CNI_VERSION=$VALUE
+            ;;
         --cni-conf-dir)
             CNI_CONF_DIR=$VALUE
             ;;
@@ -213,9 +216,15 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         LOG_FILE_STRING="\"logFile\": \"$MULTUS_LOG_FILE\","
       fi
 
+      CNI_VERSION_STRING=""
+      if [ ! -z "${CNI_VERSION// }" ]; then
+        CNI_VERSION_STRING="\"cniVersion\": \"$CNI_VERSION\","
+      fi
+
       MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
       CONF=$(cat <<-EOF
   			{
+          $CNI_VERSION_STRING
   				"name": "multus-cni-network",
   				"type": "multus",
           $ISOLATION_STRING
