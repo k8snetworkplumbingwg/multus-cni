@@ -530,5 +530,7 @@ Used only with `--multus-conf-file=auto`. Allows you to specify an alternate pat
 
 Used only with `--multus-conf-file=auto`. See the documentation for logging for which values are permitted.
 
+Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to speicfy CNI spec version.
 
+    --cni-version=
 

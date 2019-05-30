@@ -483,6 +483,14 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		in.Delegates[0].MasterPlugin = true
 	}
 
+	// set CNIVersion in delegate CNI config if there is no CNIVersion and multus conf have CNIVersion.
+	for _, v := range in.Delegates {
+		if v.ConfListPlugin == true && v.ConfList.CNIVersion == "" && in.CNIVersion != "" {
+			v.ConfList.CNIVersion = in.CNIVersion
+			v.Bytes, err = json.Marshal(v.ConfList)
+		}
+	}
+
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if in.Kubeconfig != "" {
 		if netnsfound {
