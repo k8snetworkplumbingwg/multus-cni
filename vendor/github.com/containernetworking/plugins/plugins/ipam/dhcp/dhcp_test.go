@@ -1,4 +1,4 @@
-// Copyright 2015 CNI authors
+// Copyright 2015-2018 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -38,12 +40,29 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func dhcpServerStart(netns ns.NetNS, leaseIP, serverIP net.IP, stopCh <-chan bool) (*sync.WaitGroup, error) {
+func getTmpDir() (string, error) {
+	tmpDir, err := ioutil.TempDir(cniDirPrefix, "dhcp")
+	if err == nil {
+		tmpDir = filepath.ToSlash(tmpDir)
+	}
+
+	return tmpDir, err
+}
+
+func dhcpServerStart(netns ns.NetNS, leaseIP, serverIP net.IP, numLeases int, stopCh <-chan bool) (*sync.WaitGroup, error) {
 	// Add the expected IP to the pool
 	lp := memorypool.MemoryPool{}
-	err := lp.AddLease(leasepool.Lease{IP: dhcp4.IPAdd(net.IPv4(192, 168, 1, 5), 0)})
-	if err != nil {
-		return nil, fmt.Errorf("error adding IP to DHCP pool: %v", err)
+
+	Expect(numLeases).To(BeNumerically(">", 0))
+	// Currently tests only need at most 2
+	Expect(numLeases).To(BeNumerically("<=", 2))
+
+	// tests expect first lease to be at address 192.168.1.5
+	for i := 5; i < numLeases+5; i++ {
+		err := lp.AddLease(leasepool.Lease{IP: dhcp4.IPAdd(net.IPv4(192, 168, 1, byte(i)), 0)})
+		if err != nil {
+			return nil, fmt.Errorf("error adding IP to DHCP pool: %v", err)
+		}
 	}
 
 	dhcpServer, err := dhcp4server.New(
@@ -96,17 +115,12 @@ func dhcpServerStart(netns ns.NetNS, leaseIP, serverIP net.IP, stopCh <-chan boo
 const (
 	hostVethName string = "dhcp0"
 	contVethName string = "eth0"
-	pidfilePath  string = "/var/run/cni/dhcp-client.pid"
+	cniDirPrefix string = "/var/run/cni"
 )
 
 var _ = BeforeSuite(func() {
-	os.Remove(socketPath)
-	os.Remove(pidfilePath)
-})
-
-var _ = AfterSuite(func() {
-	os.Remove(socketPath)
-	os.Remove(pidfilePath)
+	err := os.MkdirAll(cniDirPrefix, 0700)
+	Expect(err).NotTo(HaveOccurred())
 })
 
 var _ = Describe("DHCP Operations", func() {
@@ -114,9 +128,16 @@ var _ = Describe("DHCP Operations", func() {
 	var dhcpServerStopCh chan bool
 	var dhcpServerDone *sync.WaitGroup
 	var clientCmd *exec.Cmd
+	var socketPath string
+	var tmpDir string
+	var err error
 
 	BeforeEach(func() {
 		dhcpServerStopCh = make(chan bool)
+
+		tmpDir, err = getTmpDir()
+		Expect(err).NotTo(HaveOccurred())
+		socketPath = filepath.Join(tmpDir, "dhcp.sock")
 
 		// Create a new NetNS so we don't modify the host
 		var err error
@@ -157,6 +178,7 @@ var _ = Describe("DHCP Operations", func() {
 					Mask: net.IPv4Mask(0, 0, 0, 0),
 				},
 			})
+			Expect(err).NotTo(HaveOccurred())
 
 			cont, err := netlink.LinkByName(contVethName)
 			Expect(err).NotTo(HaveOccurred())
@@ -179,14 +201,13 @@ var _ = Describe("DHCP Operations", func() {
 		})
 
 		// Start the DHCP server
-		dhcpServerDone, err = dhcpServerStart(originalNS, net.IPv4(192, 168, 1, 5), serverIP.IP, dhcpServerStopCh)
+		dhcpServerDone, err = dhcpServerStart(originalNS, net.IPv4(192, 168, 1, 5), serverIP.IP, 1, dhcpServerStopCh)
 		Expect(err).NotTo(HaveOccurred())
 
 		// Start the DHCP client daemon
-		os.MkdirAll(pidfilePath, 0755)
 		dhcpPluginPath, err := exec.LookPath("dhcp")
 		Expect(err).NotTo(HaveOccurred())
-		clientCmd = exec.Command(dhcpPluginPath, "daemon")
+		clientCmd = exec.Command(dhcpPluginPath, "daemon", "-socketpath", socketPath)
 		err = clientCmd.Start()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(clientCmd.Process).NotTo(BeNil())
@@ -206,19 +227,19 @@ var _ = Describe("DHCP Operations", func() {
 
 		Expect(originalNS.Close()).To(Succeed())
 		Expect(targetNS.Close()).To(Succeed())
-		os.Remove(socketPath)
-		os.Remove(pidfilePath)
+		defer os.RemoveAll(tmpDir)
 	})
 
 	It("configures and deconfigures a link with ADD/DEL", func() {
-		conf := `{
+		conf := fmt.Sprintf(`{
     "cniVersion": "0.3.1",
     "name": "mynet",
     "type": "ipvlan",
     "ipam": {
-        "type": "dhcp"
+        "type": "dhcp",
+	"daemonSocketPath": "%s"
     }
-}`
+}`, socketPath)
 
 		args := &skel.CmdArgs{
 			ContainerID: "dummy",
@@ -253,14 +274,15 @@ var _ = Describe("DHCP Operations", func() {
 	})
 
 	It("correctly handles multiple DELs for the same container", func() {
-		conf := `{
+		conf := fmt.Sprintf(`{
     "cniVersion": "0.3.1",
     "name": "mynet",
     "type": "ipvlan",
     "ipam": {
-        "type": "dhcp"
+        "type": "dhcp",
+	"daemonSocketPath": "%s"
     }
-}`
+}`, socketPath)
 
 		args := &skel.CmdArgs{
 			ContainerID: "dummy",
@@ -308,6 +330,283 @@ var _ = Describe("DHCP Operations", func() {
 			}()
 		}
 		wg.Wait()
+
+		err = originalNS.Do(func(ns.NetNS) error {
+			return testutils.CmdDelWithArgs(args, func() error {
+				return cmdDel(args)
+			})
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+})
+
+const (
+	hostBridgeName string = "dhcpbr0"
+	hostVethName0  string = "br-eth0"
+	contVethName0  string = "eth0"
+	hostVethName1  string = "br-eth1"
+	contVethName1  string = "eth1"
+)
+
+func dhcpSetupOriginalNS() (chan bool, net.IPNet, string, ns.NetNS, ns.NetNS, error) {
+	var originalNS, targetNS ns.NetNS
+	var dhcpServerStopCh chan bool
+	var socketPath string
+	var br *netlink.Bridge
+	var tmpDir string
+	var err error
+
+	dhcpServerStopCh = make(chan bool)
+
+	tmpDir, err = getTmpDir()
+	Expect(err).NotTo(HaveOccurred())
+	socketPath = filepath.Join(tmpDir, "dhcp.sock")
+
+	// Create a new NetNS so we don't modify the host
+	originalNS, err = testutils.NewNS()
+	Expect(err).NotTo(HaveOccurred())
+
+	targetNS, err = testutils.NewNS()
+	Expect(err).NotTo(HaveOccurred())
+
+	serverIP := net.IPNet{
+		IP:   net.IPv4(192, 168, 1, 1),
+		Mask: net.IPv4Mask(255, 255, 255, 0),
+	}
+
+	// Use (original) NS
+	err = originalNS.Do(func(ns.NetNS) error {
+		defer GinkgoRecover()
+
+		// Create bridge in the "host" (original) NS
+		br = &netlink.Bridge{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: hostBridgeName,
+			},
+		}
+
+		err = netlink.LinkAdd(br)
+		Expect(err).NotTo(HaveOccurred())
+
+		address := &netlink.Addr{IPNet: &net.IPNet{
+			IP:   net.IPv4(192, 168, 1, 1),
+			Mask: net.IPv4Mask(255, 255, 255, 0),
+		}}
+		err = netlink.AddrAdd(br, address)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetUp(br)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.RouteAdd(&netlink.Route{
+			LinkIndex: br.Attrs().Index,
+			Scope:     netlink.SCOPE_UNIVERSE,
+			Dst: &net.IPNet{
+				IP:   net.IPv4(0, 0, 0, 0),
+				Mask: net.IPv4Mask(0, 0, 0, 0),
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Create veth pair eth0
+		vethLinkAttrs := netlink.NewLinkAttrs()
+		vethLinkAttrs.Name = hostVethName0
+
+		veth := &netlink.Veth{
+			LinkAttrs: vethLinkAttrs,
+			PeerName:  contVethName0,
+		}
+		err = netlink.LinkAdd(veth)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetUp(veth)
+		Expect(err).NotTo(HaveOccurred())
+
+		bridgeLink, err := netlink.LinkByName(hostBridgeName)
+		Expect(err).NotTo(HaveOccurred())
+
+		hostVethLink, err := netlink.LinkByName(hostVethName0)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetMaster(hostVethLink, bridgeLink.(*netlink.Bridge))
+		Expect(err).NotTo(HaveOccurred())
+
+		cont, err := netlink.LinkByName(contVethName0)
+		Expect(err).NotTo(HaveOccurred())
+		err = netlink.LinkSetNsFd(cont, int(targetNS.Fd()))
+		Expect(err).NotTo(HaveOccurred())
+
+		// Create veth path - eth1
+		vethLinkAttrs1 := netlink.NewLinkAttrs()
+		vethLinkAttrs1.Name = hostVethName1
+
+		veth1 := &netlink.Veth{
+			LinkAttrs: vethLinkAttrs1,
+			PeerName:  contVethName1,
+		}
+		err = netlink.LinkAdd(veth1)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetUp(veth1)
+		Expect(err).NotTo(HaveOccurred())
+
+		bridgeLink, err = netlink.LinkByName(hostBridgeName)
+		Expect(err).NotTo(HaveOccurred())
+
+		hostVethLink1, err := netlink.LinkByName(hostVethName1)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetMaster(hostVethLink1, bridgeLink.(*netlink.Bridge))
+		Expect(err).NotTo(HaveOccurred())
+
+		cont1, err := netlink.LinkByName(contVethName1)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = netlink.LinkSetNsFd(cont1, int(targetNS.Fd()))
+		Expect(err).NotTo(HaveOccurred())
+
+		return nil
+	})
+
+	return dhcpServerStopCh, serverIP, socketPath, originalNS, targetNS, err
+}
+
+var _ = Describe("DHCP Lease Unavailable Operations", func() {
+	var originalNS, targetNS ns.NetNS
+	var dhcpServerStopCh chan bool
+	var dhcpServerDone *sync.WaitGroup
+	var clientCmd *exec.Cmd
+	var socketPath string
+	var tmpDir string
+	var serverIP net.IPNet
+	var err error
+
+	BeforeEach(func() {
+		dhcpServerStopCh, serverIP, socketPath, originalNS, targetNS, err = dhcpSetupOriginalNS()
+		Expect(err).NotTo(HaveOccurred())
+
+		// Move the container side to the container's NS
+		err = targetNS.Do(func(_ ns.NetNS) error {
+			defer GinkgoRecover()
+
+			link, err := netlink.LinkByName(contVethName0)
+			Expect(err).NotTo(HaveOccurred())
+			err = netlink.LinkSetUp(link)
+			Expect(err).NotTo(HaveOccurred())
+
+			link1, err := netlink.LinkByName(contVethName1)
+			Expect(err).NotTo(HaveOccurred())
+			err = netlink.LinkSetUp(link1)
+			Expect(err).NotTo(HaveOccurred())
+			return nil
+		})
+
+		// Start the DHCP server
+		dhcpServerDone, err = dhcpServerStart(originalNS, net.IPv4(192, 168, 1, 5), serverIP.IP, 1, dhcpServerStopCh)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Start the DHCP client daemon
+		dhcpPluginPath, err := exec.LookPath("dhcp")
+		Expect(err).NotTo(HaveOccurred())
+		clientCmd = exec.Command(dhcpPluginPath, "daemon", "-socketpath", socketPath)
+		err = clientCmd.Start()
+		Expect(err).NotTo(HaveOccurred())
+		Expect(clientCmd.Process).NotTo(BeNil())
+
+		// Wait up to 15 seconds for the client socket
+		Eventually(func() bool {
+			_, err := os.Stat(socketPath)
+			return err == nil
+		}, time.Second*15, time.Second/4).Should(BeTrue())
+	})
+
+	AfterEach(func() {
+		dhcpServerStopCh <- true
+		dhcpServerDone.Wait()
+		clientCmd.Process.Kill()
+		clientCmd.Wait()
+
+		Expect(originalNS.Close()).To(Succeed())
+		Expect(targetNS.Close()).To(Succeed())
+		defer os.RemoveAll(tmpDir)
+	})
+
+	It("Configures multiple links with multiple ADD with second lease unavailable", func() {
+		conf := fmt.Sprintf(`{
+	    "cniVersion": "0.3.1",
+	    "name": "mynet",
+	    "type": "bridge",
+	    "bridge": "%s",
+	    "ipam": {
+	        "type": "dhcp",
+		"daemonSocketPath": "%s"
+	    }
+	}`, hostBridgeName, socketPath)
+
+		args := &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       targetNS.Path(),
+			IfName:      contVethName0,
+			StdinData:   []byte(conf),
+		}
+
+		var addResult *current.Result
+		err := originalNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			r, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			addResult, err = current.GetResult(r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(addResult.IPs)).To(Equal(1))
+			Expect(addResult.IPs[0].Address.String()).To(Equal("192.168.1.5/24"))
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		args = &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       targetNS.Path(),
+			IfName:      contVethName1,
+			StdinData:   []byte(conf),
+		}
+
+		err = originalNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			_, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).To(HaveOccurred())
+			println(err.Error())
+			Expect(err.Error()).To(Equal("error calling DHCP.Allocate: no more tries"))
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		args = &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       targetNS.Path(),
+			IfName:      contVethName1,
+			StdinData:   []byte(conf),
+		}
+
+		err = originalNS.Do(func(ns.NetNS) error {
+			return testutils.CmdDelWithArgs(args, func() error {
+				return cmdDel(args)
+			})
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		args = &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       targetNS.Path(),
+			IfName:      contVethName0,
+			StdinData:   []byte(conf),
+		}
 
 		err = originalNS.Do(func(ns.NetNS) error {
 			return testutils.CmdDelWithArgs(args, func() error {

@@ -24,14 +24,14 @@ import (
 
 func validateRoutes(t *testing.T, routes []*types.Route) {
 	expected := []*types.Route{
-		&types.Route{
+		{
 			Dst: net.IPNet{
 				IP:   net.IPv4(10, 0, 0, 0),
 				Mask: net.CIDRMask(8, 32),
 			},
 			GW: net.IPv4(10, 1, 2, 3),
 		},
-		&types.Route{
+		{
 			Dst: net.IPNet{
 				IP:   net.IPv4(192, 168, 1, 0),
 				Mask: net.CIDRMask(24, 32),

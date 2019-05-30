@@ -9,3 +9,4 @@ plugins/main/vlan
 plugins/meta/portmap
 plugins/meta/tuning
 plugins/meta/bandwidth
+plugins/meta/firewall

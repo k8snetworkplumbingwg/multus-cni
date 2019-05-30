@@ -4,6 +4,20 @@ set -e
 ORG_PATH="github.com/intel"
 REPO_PATH="${ORG_PATH}/multus-cni"
 
+# Add version/commit/date into binary
+# In case of TravisCI, need to check error code of 'git describe'.
+set +e
+git describe --tags --abbrev=0 > /dev/null 2>&1
+if [ "$?" != "0" ]; then
+	VERSION="master"
+else
+	VERSION=$(git describe --tags --abbrev=0)
+fi
+set -e
+DATE=$(date --iso-8601=seconds)
+COMMIT=$(git rev-parse --verify HEAD)
+LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
+
 if [ ! -h gopath/src/${REPO_PATH} ]; then
 	mkdir -p gopath/src/${ORG_PATH}
 	ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
@@ -14,4 +28,4 @@ export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
 
 echo "Building plugins"
-CGO_ENABLED=0 go install "$@" -tags no_openssl ${REPO_PATH}/multus
+go install -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus

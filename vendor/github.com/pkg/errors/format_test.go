@@ -516,7 +516,7 @@ type wrapper struct {
 	want []string
 }
 
-func prettyBlocks(blocks []string) string {
+func prettyBlocks(blocks []string, prefix ...string) string {
 	var out []string
 
 	for _, b := range blocks {

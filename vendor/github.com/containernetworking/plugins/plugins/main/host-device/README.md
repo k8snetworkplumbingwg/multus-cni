@@ -1,5 +1,5 @@
 # host-device
-Move an already-existing device in to a container.
+Move an already-existing device into a container.
 
 This simple plugin will move the requested device from the host's network namespace
 to the container's. Nothing else will be done - no IPAM, no addresses.
@@ -16,6 +16,7 @@ A sample configuration might look like:
 ```json
 {
 	"cniVersion": "0.3.1",
+	"type": "host-device",
 	"device": "enp0s1"
 }
 ```

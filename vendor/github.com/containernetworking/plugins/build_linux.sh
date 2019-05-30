@@ -19,12 +19,14 @@ export GO="${GO:-go}"
 
 mkdir -p "${PWD}/bin"
 
-echo "Building plugins"
-PLUGINS="plugins/meta/* plugins/main/* plugins/ipam/* plugins/sample"
+echo "Building plugins ${GOOS}"
+PLUGINS="plugins/meta/* plugins/main/* plugins/ipam/*"
 for d in $PLUGINS; do
 	if [ -d "$d" ]; then
 		plugin="$(basename "$d")"
-		echo "  $plugin"
-		$GO build -o "${PWD}/bin/$plugin" "$@" "$REPO_PATH"/$d
+		if [ $plugin != "windows" ]; then
+			echo "  $plugin"
+			$GO build -o "${PWD}/bin/$plugin" "$@" "$REPO_PATH"/$d
+		fi
 	fi
 done

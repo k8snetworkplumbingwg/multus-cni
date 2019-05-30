@@ -45,7 +45,7 @@ func (s *FakeStore) Close() error {
 	return nil
 }
 
-func (s *FakeStore) Reserve(id string, ip net.IP, rangeID string) (bool, error) {
+func (s *FakeStore) Reserve(id string, ifname string, ip net.IP, rangeID string) (bool, error) {
 	key := ip.String()
 	if _, ok := s.ipMap[key]; !ok {
 		s.ipMap[key] = id
@@ -68,7 +68,7 @@ func (s *FakeStore) Release(ip net.IP) error {
 	return nil
 }
 
-func (s *FakeStore) ReleaseByID(id string) error {
+func (s *FakeStore) ReleaseByID(id string, ifname string) error {
 	toDelete := []string{}
 	for k, v := range s.ipMap {
 		if v == id {

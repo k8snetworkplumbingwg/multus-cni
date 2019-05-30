@@ -1,4 +1,4 @@
-## How to use multus-cni?
+## Multus CNI usage guide
 
 ### Prerequisites
 
@@ -7,7 +7,7 @@
 
 Your Kubelet(s) must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for more details.
 
-### Install multus
+### Install Multus
 
 Generally we recommend two options: Manually place a Multus binary in your `/opt/cni/bin`, or use our [quick-start method](quickstart.md) -- which creates a daemonset that has an opinionated way of how to install & configure Multus CNI (recommended).
 
@@ -468,3 +468,69 @@ $ kubectl exec -it pod-case-06 -- ip -d address
 | eth0 | Default network interface (flannel) |
 | macvlan1 | macvlan interface (macvlan-conf-1) |
 | net2 | macvlan interface (macvlan-conf-2) |
+
+## Entrypoint Parameters
+
+Multus CNI, when installed using the daemonset-style installation uses an entrypoint script which copies the Multus binary into place, places CNI configurations. This entrypoint takes a variety of parameters for customization.
+
+Typically, you'd modified the daemonset YAML itself to specify these parameters.
+
+For example, the `command` and `args` parameters in the `containers` section of the DaemonSet may look something like:
+
+```
+  command: ["/entrypoint.sh"]
+  args:
+  - "--multus-conf-file=auto"
+  - "--namespace-isolation=true"
+  - "--multus-log-level=verbose"
+```
+
+Note that some of the defaults have directories inside the root directory named `/host/`, this is because it is deployed as a container and we have host file system locations mapped into this directory inside the container. If you use other directories, you may have to change the mounted volumes.
+
+### Entrypoint script parameters
+
+Each parameter is shown with the default as the value.
+
+    --cni-conf-dir=/host/etc/cni/net.d
+
+This is the configuration directory where Multus will write its configuration file.
+
+    --cni-bin-dir=/host/opt/cni/bin
+
+This the directory in which the Multus binary will be installed.
+
+    --namespace-isolation=false
+
+Setting this option to true enables the Namespace isolation feature, which insists that custom resources must be created in the same namespace as the pods, otherwise it will refuse to attach those definitions as additional interfaces.
+
+    --multus-bin-file=/usr/src/multus-cni/bin/multus
+
+This option lets you set which binary executable to copy from the container onto the host (into the directory specified by `--cni-bin-dir`), allowing one to copy an alternate version or build of Multus CNI.
+
+    --multus-conf-file=/usr/src/multus-cni/images/70-multus.conf
+
+The `--multus-conf-file` is one of two options; it can be set to a source file to be copied into the location specified by `--cni-conf-dir`. Or, to a value of `auto`, that is: `--multus-conf-file=auto`.
+
+The automatic configuration option is used to automatically generate Multus configurations given existing on-disk CNI configurations for your default network.
+
+In the case that `--multus-conf-file=auto` -- The entrypoint script will look at the `--multus-autoconfig-dir` (by default, the same as the `--cni-conf-dir`). Multus will wait (600 seconds) until there's a CNI configuration file there, and it will take the alphabetically first configuration there, and it will wrap that configuration into a Multus configuration.
+
+    --multus-autoconfig-dir=/host/etc/cni/net.d
+
+Used only with `--multus-conf-file=auto`. This option allows one to set which directory will be used to generate configuration files.
+
+This can be used if you have your CNI configuration stored in an alternate location, or, you have constraints on race conditions where you'd like to generate your default network configuration first, and then only have Multus write its configuration when it finds that configuration -- allowing only Multus to write the CNI configuration in the `--cni-conf-dir`, therefore notifying the Kubelet that the node is in a ready state.
+
+    --multus-kubeconfig-file-host=/etc/cni/net.d/multus.d/multus.kubeconfig
+
+Used only with `--multus-conf-file=auto`. Allows you to specify an alternate path to the Kubeconfig.
+
+    --multus-log-level=
+    --multus-log-file=
+
+Used only with `--multus-conf-file=auto`. See the documentation for logging for which values are permitted.
+
+Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to speicfy CNI spec version.
+
+    --cni-version=
+

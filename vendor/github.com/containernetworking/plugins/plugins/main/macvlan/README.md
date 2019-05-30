@@ -23,10 +23,10 @@ Since each macvlan interface has its own MAC address, it makes it easy to use wi
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "macvlan"
-* `master` (string, required): name of the host interface to enslave
-* `mode` (string, optional): one of "bridge", "private", "vepa", "passthrough". Defaults to "bridge".
+* `master` (string, optional): name of the host interface to enslave. Defaults to default route interace.
+* `mode` (string, optional): one of "bridge", "private", "vepa", "passthru". Defaults to "bridge".
 * `mtu` (integer, optional): explicitly set MTU to the specified value. Defaults to the value chosen by the kernel.
-* `ipam` (dictionary, required): IPAM configuration to be used for this network.
+* `ipam` (dictionary, required): IPAM configuration to be used for this network. For interface only without ip address, create empty dictionary.
 
 ## Notes
 

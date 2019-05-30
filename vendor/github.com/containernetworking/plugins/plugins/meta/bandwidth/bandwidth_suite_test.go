@@ -167,6 +167,7 @@ func createVeth(hostNamespace string, hostVethIfName string, containerNamespace 
 	Expect(err).NotTo(HaveOccurred())
 
 	containerNs, err := ns.GetNS(containerNamespace)
+	Expect(err).NotTo(HaveOccurred())
 	err = containerNs.Do(func(_ ns.NetNS) error {
 		peerAddr := &net.IPNet{
 			IP:   hostIP,
