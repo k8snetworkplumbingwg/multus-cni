@@ -26,8 +26,13 @@ are very busy and read the mailing lists.
 ## Getting Started
 
 - Fork the repository on GitHub
-- Read the [README](README.md) for build and test instructions
 - Play with the project, submit bugs, submit pull requests!
+
+
+## Building
+
+Each plugin is compiled simply with `go build`.  Two scripts, `build_linux.sh` and `build_windows.sh`,
+are supplied which will build all the plugins for their respective OS.
 
 ## Contribution workflow
 
@@ -61,10 +66,12 @@ git clone https://github.com/containernetworking/plugins
 Next, boot the virtual machine and SSH in to run the tests:
 
 ```bash
+cd ~/workspace/plugins
 vagrant up
 vagrant ssh
 # you're now in a shell in a virtual machine
 sudo su
+go get github.com/onsi/ginkgo/ginkgo
 cd /go/src/github.com/containernetworking/plugins
 
 # to run the full test suite

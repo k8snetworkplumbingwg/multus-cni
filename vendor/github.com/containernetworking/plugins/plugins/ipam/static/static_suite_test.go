@@ -23,5 +23,5 @@ import (
 
 func TestStatic(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Static Suite")
+	RunSpecs(t, "plugins/ipam/static")
 }

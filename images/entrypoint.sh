@@ -7,6 +7,7 @@ set -e
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
+MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
@@ -31,8 +32,24 @@ function usage()
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
+    echo -e "\t--multus-autoconfig-dir=$MULTUS_AUTOCONF_DIR (used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
+}
+
+function log()
+{
+    echo "$(date --iso-8601=seconds) ${1}"
+}
+
+function error()
+{
+    log "ERR:  {$1}"
+}
+
+function warn()
+{
+    log "WARN: {$1}"
 }
 
 # Parse parameters given as arguments to this script.
@@ -43,6 +60,9 @@ while [ "$1" != "" ]; do
         -h | --help)
             usage
             exit
+            ;;
+        --cni-version)
+            CNI_VERSION=$VALUE
             ;;
         --cni-conf-dir)
             CNI_CONF_DIR=$VALUE
@@ -68,8 +88,11 @@ while [ "$1" != "" ]; do
         --multus-log-file)
             MULTUS_LOG_FILE=$VALUE
             ;;
+        --multus-autoconfig-dir)
+            MULTUS_AUTOCONF_DIR=$VALUE
+            ;;
         *)
-            echo "WARNING: unknown parameter \"$PARAM\""
+            warn "unknown parameter \"$PARAM\""
             ;;
     esac
     shift
@@ -87,7 +110,7 @@ fi
 for i in "${arr[@]}"
 do
   if [ ! -e "$i" ]; then
-    echo "Location $i does not exist"
+    warn "Location $i does not exist"
     exit 1;
   fi
 done
@@ -116,10 +139,10 @@ SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
 if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
   # We're running as a k8d pod - expect some variables.
   if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
-    echo "KUBERNETES_SERVICE_HOST not set"; exit 1;
+    error "KUBERNETES_SERVICE_HOST not set"; exit 1;
   fi
   if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
-    echo "KUBERNETES_SERVICE_PORT not set"; exit 1;
+    error "KUBERNETES_SERVICE_PORT not set"; exit 1;
   fi
 
   if [ "$SKIP_TLS_VERIFY" == "true" ]; then
@@ -156,7 +179,7 @@ current-context: multus-context
 EOF
 
 else
-  echo "WARNING: Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
+  warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
 fi
 
 # ---------------------- end Generate a "kube-config".
@@ -164,20 +187,20 @@ fi
 # ------------------------------- Generate "00-multus.conf"
 
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
-  echo "Generating Multus configuration file ..."
+  log "Generating Multus configuration file ..."
   found_master=false
   tries=0
   while [ $found_master == false ]; do
-    MASTER_PLUGIN="$(ls $CNI_CONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
         if ! (($tries % 5)); then
-          echo "Attemping to find master plugin configuration, attempt $tries"
+          log "Attemping to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
         sleep 1;
       else
-        echo "Error: Multus could not be configured: no master plugin was found."
+        error "Multus could not be configured: no master plugin was found."
         exit 1;
       fi
     else
@@ -201,7 +224,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           verbose)
               ;;
           *)
-              echo "ERROR: Log levels should be one of: debug/verbose/error/panic, did not understand $MULTUS_LOG_LEVEL"
+              error "Log levels should be one of: debug/verbose/error/panic, did not understand $MULTUS_LOG_LEVEL"
               usage
               exit 1     
         esac
@@ -213,9 +236,15 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         LOG_FILE_STRING="\"logFile\": \"$MULTUS_LOG_FILE\","
       fi
 
-      MASTER_PLUGIN_JSON="$(cat $CNI_CONF_DIR/$MASTER_PLUGIN)"
+      CNI_VERSION_STRING=""
+      if [ ! -z "${CNI_VERSION// }" ]; then
+        CNI_VERSION_STRING="\"cniVersion\": \"$CNI_VERSION\","
+      fi
+
+      MASTER_PLUGIN_JSON="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN)"
       CONF=$(cat <<-EOF
   			{
+          $CNI_VERSION_STRING
   				"name": "multus-cni-network",
   				"type": "multus",
           $ISOLATION_STRING
@@ -229,14 +258,15 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 EOF
   		)
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
-      echo "Config file created @ $CNI_CONF_DIR/00-multus.conf"
+      log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
+      echo $CONF
     fi
   done
 fi
 
 # ---------------------- end Generate "00-multus.conf".
 
-echo "Entering sleep... (success)"
+log "Entering sleep... (success)"
 
 # Sleep forever.
 sleep infinity

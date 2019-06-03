@@ -1,54 +1,123 @@
 {
 	"ImportPath": "github.com/containernetworking/plugins",
 	"GoVersion": "go1.7",
-	"GodepVersion": "v79",
+	"GodepVersion": "v80",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/Microsoft/go-winio",
+			"Comment": "v0.4.11",
+			"Rev": "97e4973ce50b2ff5f09635a57e2b88a037aae829"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim",
+			"Comment": "v0.7.6",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/guid",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hcs",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hcserror",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/hns",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/interop",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/longpath",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/mergemaps",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/safefile",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/schema1",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/timeout",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim/internal/wclayer",
+			"Comment": "v0.7.4",
+			"Rev": "e44e499d29527b244d6858772f1b9090eeaddc4e"
+		},
+		{
 			"ImportPath": "github.com/alexflint/go-filemutex",
 			"Rev": "72bdc8eae2aef913234599b837f5dda445ca9bd9"
 		},
 		{
+			"ImportPath": "github.com/buger/jsonparser",
+			"Rev": "f4dd9f5a6b441265aefc1d44872a6f8c10f42b37"
+		},
+		{
 			"ImportPath": "github.com/containernetworking/cni/libcni",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/invoke",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/skel",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/types",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/types/020",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/types/current",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/containernetworking/cni/pkg/version",
-			"Comment": "v0.6.0-rc1",
-			"Rev": "a2da8f8d7fd8e6dc25f336408a8ac86f050fbd88"
+			"Comment": "v0.7.0",
+			"Rev": "7d76556571b6cf1ab90d7026a73092ac8d5e0c23"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-iptables/iptables",
-			"Comment": "v0.3.0",
-			"Rev": "b5b1876b170881a8259f036445ee89c8669db386"
+			"Comment": "v0.4.1",
+			"Rev": "78b5fff24e6df8886ef8eca9411f683a884349a5"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/activation",
@@ -65,11 +134,28 @@
 		},
 		{
 			"ImportPath": "github.com/d2g/dhcp4server",
-			"Rev": "1b74244053681c90de5cf1af3d6b5c93b74e3abb"
+			"Rev": "477b11cea4dcc56af002849238d4f9c1e093c744"
+		},
+		{
+			"ImportPath": "github.com/d2g/dhcp4server/leasepool",
+			"Rev": "477b11cea4dcc56af002849238d4f9c1e093c744"
+		},
+		{
+			"ImportPath": "github.com/d2g/dhcp4server/leasepool/memorypool",
+			"Rev": "477b11cea4dcc56af002849238d4f9c1e093c744"
+		},
+		{
+			"ImportPath": "github.com/godbus/dbus",
+			"Comment": "v4.1.0-6-g885f9cc",
+			"Rev": "885f9cc04c9c1a6a61a2008e211d36c5737be3f5"
 		},
 		{
 			"ImportPath": "github.com/j-keck/arping",
 			"Rev": "2cf9dc699c5640a7e2c81403a44127bf28033600"
+		},
+		{
+			"ImportPath": "github.com/juju/errors",
+			"Rev": "22422dad46e14561a0854ad42497a75af9b61909"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-shellwords",
@@ -231,32 +317,51 @@
 			"Rev": "7ff1ba29eca231991280817541cb3903f6be15d1"
 		},
 		{
+			"ImportPath": "github.com/sirupsen/logrus",
+			"Comment": "v1.0.6",
+			"Rev": "3e01752db0189b9157070a0e1668a620f9a85da2"
+		},
+		{
 			"ImportPath": "github.com/vishvananda/netlink",
-			"Rev": "6e453822d85ef5721799774b654d4d02fed62afb"
+			"Comment": "v1.0.0-40-g023a6da",
+			"Rev": "023a6dafdcdfa7068ac83b260ab7f03cd4131aca"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netlink/nl",
-			"Rev": "6e453822d85ef5721799774b654d4d02fed62afb"
+			"Comment": "v1.0.0-40-g023a6da",
+			"Rev": "023a6dafdcdfa7068ac83b260ab7f03cd4131aca"
 		},
 		{
 			"ImportPath": "github.com/vishvananda/netns",
-			"Rev": "54f0e4339ce73702a0607f49922aaa1e749b418d"
+			"Rev": "13995c7128ccc8e51e9a6bd2b551020a27180abd"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh/terminal",
+			"Rev": "7c1a557ab941a71c619514f229f0b27ccb0c27cf"
 		},
 		{
 			"ImportPath": "golang.org/x/net/bpf",
-			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+			"Rev": "49bb7cea24b1df9410e1712aa6433dae904ff66a"
 		},
 		{
 			"ImportPath": "golang.org/x/net/internal/iana",
-			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+			"Rev": "49bb7cea24b1df9410e1712aa6433dae904ff66a"
 		},
 		{
 			"ImportPath": "golang.org/x/net/ipv4",
-			"Rev": "e90d6d0afc4c315a0d87a568ae68577cc15149a0"
+			"Rev": "49bb7cea24b1df9410e1712aa6433dae904ff66a"
 		},
 		{
 			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "076b546753157f758b316e59bcb51e6807c04057"
+			"Rev": "66b7b1311ac80bbafcd2daeef9a5e6e2cd1e2399"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/windows",
+			"Rev": "66b7b1311ac80bbafcd2daeef9a5e6e2cd1e2399"
+		},
+		{
+			"ImportPath": "golang.org/x/net/internal/socket",
+			"Rev": "49bb7cea24b1df9410e1712aa6433dae904ff66a"
 		}
 	]
 }

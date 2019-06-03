@@ -25,6 +25,8 @@ import (
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+
+	bv "github.com/containernetworking/plugins/pkg/utils/buildversion"
 )
 
 // PluginConf is whatever you expect your configuration json to be. This is whatever
@@ -92,13 +94,22 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
+	// Remove this if this is an "originating" plugin
 	if conf.PrevResult == nil {
 		return fmt.Errorf("must be called as chained plugin")
 	}
 
+	// Uncomment if this is an "originating" plugin
+
+	//if conf.PrevResult != nil {
+	//		return fmt.Errorf("must be called as the first plugin")
+	//	}
+
 	// This is some sample code to generate the list of container-side IPs.
 	// We're casting the prevResult to a 0.3.0 response, which can also include
 	// host-side IPs (but doesn't when converted from a 0.2.0 response).
+	//
+	// You don't need this if you are writing an "originating" plugin.
 	containerIPs := make([]net.IP, 0, len(conf.PrevResult.IPs))
 	if conf.CNIVersion != "0.3.0" {
 		for _, ip := range conf.PrevResult.IPs {
@@ -123,6 +134,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return fmt.Errorf("got no container IPs")
 	}
 
+	// Implement your plugin here
+
 	// Pass through the result for the next plugin
 	return types.PrintResult(conf.PrevResult, conf.CNIVersion)
 }
@@ -141,5 +154,11 @@ func cmdDel(args *skel.CmdArgs) error {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.PluginSupports("", "0.1.0", "0.2.0", version.Current()))
+	// replace TODO with your plugin name
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, bv.BuildString("TODO"))
+}
+
+func cmdCheck(args *skel.CmdArgs) error {
+	// TODO: implement
+	return fmt.Errorf("not implemented")
 }

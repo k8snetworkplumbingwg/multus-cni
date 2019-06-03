@@ -41,7 +41,7 @@ func NewIPAllocator(s *RangeSet, store backend.Store, id int) *IPAllocator {
 }
 
 // Get alocates an IP
-func (a *IPAllocator) Get(id string, requestedIP net.IP) (*current.IPConfig, error) {
+func (a *IPAllocator) Get(id string, ifname string, requestedIP net.IP) (*current.IPConfig, error) {
 	a.store.Lock()
 	defer a.store.Unlock()
 
@@ -62,7 +62,7 @@ func (a *IPAllocator) Get(id string, requestedIP net.IP) (*current.IPConfig, err
 			return nil, fmt.Errorf("requested ip %s is subnet's gateway", requestedIP.String())
 		}
 
-		reserved, err := a.store.Reserve(id, requestedIP, a.rangeID)
+		reserved, err := a.store.Reserve(id, ifname, requestedIP, a.rangeID)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (a *IPAllocator) Get(id string, requestedIP net.IP) (*current.IPConfig, err
 				break
 			}
 
-			reserved, err := a.store.Reserve(id, reservedIP.IP, a.rangeID)
+			reserved, err := a.store.Reserve(id, ifname, reservedIP.IP, a.rangeID)
 			if err != nil {
 				return nil, err
 			}
@@ -110,11 +110,11 @@ func (a *IPAllocator) Get(id string, requestedIP net.IP) (*current.IPConfig, err
 }
 
 // Release clears all IPs allocated for the container with given ID
-func (a *IPAllocator) Release(id string) error {
+func (a *IPAllocator) Release(id string, ifname string) error {
 	a.store.Lock()
 	defer a.store.Unlock()
 
-	return a.store.ReleaseByID(id)
+	return a.store.ReleaseByID(id, ifname)
 }
 
 type RangeIter struct {
