@@ -73,9 +73,10 @@ data:
   # change the "args" line below from
   # - "--multus-conf-file=auto"
   # to:
-  # "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
+  # "--multus-conf-file=/tmp/expanded-conf/00-multus.conf"
   # Additionally -- you should ensure that the name "70-multus.conf" is the alphabetically first name in the
   # /etc/cni/net.d/ directory on each node, otherwise, it will not be used by the Kubelet.
+  # NOTE: The string __KUBERNETES_NODE_NAME__ will be replaced by the node name.
   cni-conf.json: |
     {
       "name": "multus-cni-network",
@@ -132,6 +133,20 @@ spec:
       - operator: Exists
         effect: NoSchedule
       serviceAccountName: multus
+      initContainers:
+      - name: expander
+        image: busybox
+        command: ['sh', '-c', 'sed  "s/__KUBERNETES_NODE_NAME__/$MY_NODE_NAME/g" /tmp/multus-conf/00-multus.conf > /tmp/expanded-conf/00-multus.conf']
+        volumeMounts:
+          - name: multus-cfg
+            mountPath: /tmp/multus-conf
+          - name: expanded-cfg
+            mountPath: /tmp/expanded-conf
+        env:
+          - name: MY_NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
       containers:
       - name: kube-multus
         image: nfvpe/multus:v3.2
@@ -152,8 +167,8 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
+        - name: expanded-cfg
+          mountPath: /tmp/expanded-conf
       volumes:
         - name: cni
           hostPath:
@@ -166,4 +181,6 @@ spec:
             name: multus-cni-config
             items:
             - key: cni-conf.json
-              path: 70-multus.conf
+              path: 00-multus.conf
+        - name: expanded-cfg
+          emptyDir: {}
