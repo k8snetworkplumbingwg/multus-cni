@@ -159,7 +159,7 @@ metadata:
 spec:
   containers:
   - name: samplepod
-    command: ["/bin/bash", "-c", "sleep 2000000000000"]
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
     image: dougbtv/centos-network
 EOF
 ```
@@ -191,7 +191,7 @@ metadata:
 spec:
   containers:
   - name: samplepod
-    command: ["/bin/bash", "-c", "sleep 2000000000000"]
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
     image: dougbtv/centos-network
 EOF
 ```
