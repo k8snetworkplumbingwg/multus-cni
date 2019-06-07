@@ -5,13 +5,13 @@ language: go
 dist: trusty
 
 go:
-  - 1.11.x
+  - 1.12.x
 
 env:
   global:
+    - GO111MODULE=on
     - REGISTRY_USER=${REGISTRY_USER}
     - REGISTRY_PASS=${REGISTRY_PASS}
-    - MULTUS_GOPATH=${PWD}/gopath
     - secure: "${REGISTRY_SECURE}"
 
 before_install:
@@ -23,26 +23,18 @@ install:
 
 before_script:
   # Make gopath... to run golint/go fmt/go vet
-  - |-
-    if [ ! -h gopath/src/github.com/intel/multus-cni ]; then
-        mkdir -p gopath/src/github.com/intel
-        ln -s ../../../.. gopath/src/github.com/intel/multus-cni || exit 255
-    fi
-  - env GOPATH=${MULTUS_GOPATH} golint gopath/src/github.com/intel/multus-cni/multus/... | grep -v ALL_CAPS | xargs -r false
-  - env GOPATH=${MULTUS_GOPATH} go fmt gopath/src/github.com/intel/multus-cni/...
-  - go tool vet */*.go
+  # Suppress golint for fixing lint later.
+  #- golint ... | grep -v ALL_CAPS | xargs -r false
+  - go fmt ./...
+  - go vet ./...
 #  - gocyclo -over 15 ./multus
 
 script:
   - ./build
-  - sudo ./test.sh
-  - |-
-    GOV_GOPATH=${PWD}/gopath
-    pushd gopath/src/github.com/intel/multus-cni
-    env GOPATH=${GOV_GOPATH} ${GOPATH}/bin/goveralls -coverprofile=coverage.out -service=travis-ci
-    popd
+  - sudo env PATH=${PATH} ./test.sh
+  - goveralls -coverprofile=coverage.out -service=travis-ci
   - mkdir -p ${TRAVIS_BUILD_DIR}/dist
-  - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" --exclude="vendor" .
+  - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" .
   - docker build -t nfvpe/multus .
 
 deploy:
