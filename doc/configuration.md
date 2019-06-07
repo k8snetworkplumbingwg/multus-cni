@@ -41,7 +41,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `binDir` (string, optional): directory for CNI plugins which multus calls. default `/opt/cni/bin`
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
 * `logFile` (string, optional): file path for log file. multus puts log in given file
-* `logLevel` (string, optional): logging level ("debug", "error" or "panic")
+* `logLevel` (string, optional): logging level ("debug", "error", "verbose", or "panic")
 * `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
 * `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready
@@ -103,6 +103,7 @@ The default logging level is set as `panic` -- this will log only the most criti
 The available logging level values, in decreasing order of verbosity are:
 
 * `debug`
+* `verbose`
 * `error`
 * `panic`
 
