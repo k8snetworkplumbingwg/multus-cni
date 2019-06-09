@@ -29,6 +29,8 @@ kubectl get nodes
 
 In the case that your default network is ready
 
+Your network interface will need to be in promiscuous mode.
+
 ## Installation
 
 Our recommended quickstart method to deploy Multus is to deploy using a Daemonset (a method of running pods on each nodes in your cluster), this spins up pods which install a Multus binary and configure Multus for usage.
