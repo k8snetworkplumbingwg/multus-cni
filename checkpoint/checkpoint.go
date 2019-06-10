@@ -93,7 +93,6 @@ func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resource
 	if podID == "" {
 		return nil, logging.Errorf("GetPodResourceMap(): invalid Pod cannot be empty")
 	}
-
 	for _, pod := range cp.podEntires {
 		if pod.PodUID == podID {
 			entry, ok := resourceMap[pod.ResourceName]
