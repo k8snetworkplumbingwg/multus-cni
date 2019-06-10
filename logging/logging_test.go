@@ -67,4 +67,10 @@ var _ = Describe("logging operations", func() {
 		SetLogStderr(!currentVal)
 		Expect(loggingStderr).NotTo(Equal(currentVal))
 	})
+
+	// Tests public getter
+	It("Check getter for logging level with current level", func() {
+		currentLevel := loggingLevel
+		Expect(currentLevel).To(Equal(GetLoggingLevel()))
+	})
 })
