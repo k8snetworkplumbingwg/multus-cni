@@ -23,7 +23,7 @@ LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.dat
 export CGO_ENABLED=0
 
 # this if... will be removed when gomodules goes default
-if [ $GO111MODULE == "off" ]; then
+if [ "$GO111MODULE" == "off" ]; then
 	echo "Building plugin without go module"
 	echo "Warning: this will be deprecated in near future so please use go modules!"
 

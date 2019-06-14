@@ -2,7 +2,7 @@
 set -e
 
 # this if... will be removed when gomodules goes default
-if [ $GO111MODULE == "off" ]; then
+if [ "$GO111MODULE" == "off" ]; then
 	echo "Warning: this will be deprecated in near future so please use go modules!"
 
 	ORG_PATH="github.com/intel"
