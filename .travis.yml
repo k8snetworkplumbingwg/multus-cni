@@ -24,7 +24,7 @@ install:
 before_script:
   # Make gopath... to run golint/go fmt/go vet
   # Suppress golint for fixing lint later.
-  #- golint ... | grep -v ALL_CAPS | xargs -r false
+  #- golint ./... | grep -v vendor | grep -v ALL_CAPS | xargs -r false
   - go fmt ./...
   - go vet ./...
 #  - gocyclo -over 15 ./multus
