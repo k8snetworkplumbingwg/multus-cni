@@ -52,6 +52,24 @@ var _ = Describe("config operations", func() {
 		Expect(len(netConf.RuntimeConfig.PortMaps)).To(Equal(1))
 	})
 
+	It("fails to load invalid multus configuration", func() {
+		conf := `{
+	  "name": "node-cni-network",
+	  "type": "multus",
+	  "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	  "delegates": [{
+	      "type": "weave-net"
+	  }],
+	"runtimeConfig": {
+	    "portMappings": [
+	      {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	    ]
+		}`
+		// missing end bracket
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("succeeds if only delegates are set", func() {
 		conf := `{
     "name": "node-cni-network",
