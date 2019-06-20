@@ -105,21 +105,6 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			resourceMap = rmap
 		})
 
-		// It("should return a ResourceMap instance", func() {
-		// 	podUID := k8sTypes.UID("970a395d-bb3b-11e8-89df-408d5c537d23")
-		// 	fakePod := &v1.Pod{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      "fakePod",
-		// 			Namespace: "podNamespace",
-		// 			UID:       podUID,
-		// 		},
-		// 	}
-		// 	rmap, err := cp.GetPodResourceMap(fakePod)
-		// 	Expect(err).NotTo(HaveOccurred())
-		// 	Expect(rmap).NotTo(BeEmpty())
-		// 	resourceMap = rmap
-		// })
-
 		It("resourceMap should have value for \"intel.com/sriov_net_A\"", func() {
 			rInfo, ok := resourceMap[resourceAnnot]
 			Expect(ok).To(BeTrue())
