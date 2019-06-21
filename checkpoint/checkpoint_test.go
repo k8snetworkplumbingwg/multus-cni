@@ -195,12 +195,6 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			// resourceMap = rmap
 		})
 	})
-
-	It("Check public GetCheckpoint for basic functionality", func() {
-		cp, err := GetCheckpoint()
-		Expect(err).NotTo(HaveOccurred())
-		Expect(cp).To(Equal(&checkpoint{fileName: checkPointfile}))
-	})
 })
 
 var _ = AfterSuite(func() {
