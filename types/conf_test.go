@@ -66,7 +66,7 @@ var _ = Describe("config operations", func() {
 	    ]
 		}`
 		// missing end bracket
-		netConf, err := LoadNetConf([]byte(conf))
+		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 	})
 
