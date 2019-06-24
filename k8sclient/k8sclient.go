@@ -47,7 +47,8 @@ type NoK8sNetworkError struct {
 	message string
 }
 
-type clientInfo struct {
+// ClientInfo contains information given from k8s client
+type ClientInfo struct {
 	Client       KubeClient
 	Podnamespace string
 	Podname      string
@@ -74,13 +75,14 @@ func (d *defaultKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
 	return d.client.Core().Pods(pod.Namespace).UpdateStatus(pod)
 }
 
-func setKubeClientInfo(c *clientInfo, client KubeClient, k8sArgs *types.K8sArgs) {
+func setKubeClientInfo(c *ClientInfo, client KubeClient, k8sArgs *types.K8sArgs) {
 	logging.Debugf("setKubeClientInfo: %v, %v, %v", c, client, k8sArgs)
 	c.Client = client
 	c.Podnamespace = string(k8sArgs.K8S_POD_NAMESPACE)
 	c.Podname = string(k8sArgs.K8S_POD_NAME)
 }
 
+// SetNetworkStatus sets network status into Pod annotation
 func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*types.NetworkStatus, conf *types.NetConf) error {
 	logging.Debugf("SetNetworkStatus: %v, %v, %v, %v", client, k8sArgs, netStatus, conf)
 
@@ -392,12 +394,14 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 	return delegate, resourceMap, nil
 }
 
+// KubeClient is abstraction layer for k8s client (used testing package)
 type KubeClient interface {
 	GetRawWithPath(path string) ([]byte, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error)
 }
 
+// GetK8sArgs gets k8s related args from CNI args
 func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 	k8sArgs := &types.K8sArgs{}
 
@@ -410,11 +414,11 @@ func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 	return k8sArgs, nil
 }
 
-// Attempts to load Kubernetes-defined delegates and add them to the Multus config.
+// TryLoadPodDelegates attempts to load Kubernetes-defined delegates and add them to the Multus config.
 // Returns the number of Kubernetes-defined delegates added or an error.
-func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (int, *clientInfo, error) {
+func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) (int, *ClientInfo, error) {
 	var err error
-	clientInfo := &clientInfo{}
+	clientInfo := &ClientInfo{}
 
 	logging.Debugf("TryLoadPodDelegates: %v, %v, %v", k8sArgs, conf, kubeClient)
 	kubeClient, err = GetK8sClient(conf.Kubeconfig, kubeClient)
@@ -467,6 +471,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	return 0, clientInfo, nil
 }
 
+// GetK8sClient gets client info from kubeconfig
 func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) {
 	logging.Debugf("GetK8sClient: %s, %v", kubeconfig, kubeClient)
 	// If we get a valid kubeClient (eg from testcases) just return that
@@ -509,6 +514,7 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 	return &defaultKubeClient{client: client}, nil
 }
 
+// GetPodNetwork gets net-attach-def annotation from pod
 func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 	logging.Debugf("GetPodNetwork: %v", pod)
 
@@ -526,6 +532,7 @@ func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 	return networks, nil
 }
 
+// GetNetworkDelegates returns delegatenetconf from net-attach-def annotation in pod
 func GetNetworkDelegates(k8sclient KubeClient, pod *v1.Pod, networks []*types.NetworkSelectionElement, confdir string, confnamespaceIsolation bool) ([]*types.DelegateNetConf, error) {
 	logging.Debugf("GetNetworkDelegates: %v, %v, %v, %v, %v", k8sclient, pod, networks, confdir, confnamespaceIsolation)
 	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
@@ -627,7 +634,7 @@ func getNetDelegate(client KubeClient, netname, confdir, namespace string) (*typ
 	return nil, logging.Errorf("getNetDelegate: cannot find network: %v", netname)
 }
 
-// GetDefaultNetwork parses 'defaultNetwork' config, gets network json and put it into netconf.Delegates.
+// GetDefaultNetworks parses 'defaultNetwork' config, gets network json and put it into netconf.Delegates.
 func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient KubeClient) error {
 	logging.Debugf("GetDefaultNetworks: %v, %v, %v", k8sArgs, conf, kubeClient)
 	var delegates []*types.DelegateNetConf

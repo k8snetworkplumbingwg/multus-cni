@@ -24,9 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 )
 
+// FakeKubeClient is stub KubeClient for testing
 type FakeKubeClient struct {
 	pods     map[string]*v1.Pod
 	PodCount int
@@ -34,6 +35,7 @@ type FakeKubeClient struct {
 	NetCount int
 }
 
+// NewFakeKubeClient creates FakeKubeClient for testing
 func NewFakeKubeClient() *FakeKubeClient {
 	return &FakeKubeClient{
 		pods: make(map[string]*v1.Pod),
@@ -41,6 +43,7 @@ func NewFakeKubeClient() *FakeKubeClient {
 	}
 }
 
+// GetRawWithPath returns k8s raw data from its path
 func (f *FakeKubeClient) GetRawWithPath(path string) ([]byte, error) {
 	obj, ok := f.nets[path]
 	if !ok {
@@ -50,6 +53,7 @@ func (f *FakeKubeClient) GetRawWithPath(path string) ([]byte, error) {
 	return []byte(obj), nil
 }
 
+// AddNetConfig adds net-attach-def into its client
 func (f *FakeKubeClient) AddNetConfig(namespace, name, data string) {
 	cr := fmt.Sprintf(`{
   "apiVersion": "k8s.cni.cncf.io/v1",
@@ -67,6 +71,7 @@ func (f *FakeKubeClient) AddNetConfig(namespace, name, data string) {
 	f.nets[fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
 }
 
+// AddNetFile puts config file as net-attach-def
 func (f *FakeKubeClient) AddNetFile(namespace, name, filePath, fileData string) {
 	cr := fmt.Sprintf(`{
   "apiVersion": "k8s.cni.cncf.io/v1",
@@ -79,9 +84,10 @@ func (f *FakeKubeClient) AddNetFile(namespace, name, filePath, fileData string) 
 	f.nets[fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
 
 	err := ioutil.WriteFile(filePath, []byte(fileData), 0600)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 }
 
+// GetPod query pod by namespace/pod and return it if exists
 func (f *FakeKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	key := fmt.Sprintf("%s/%s", namespace, name)
 	pod, ok := f.pods[key]
@@ -92,22 +98,26 @@ func (f *FakeKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// UpdatePodStatus update pod status
 func (f *FakeKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
 	key := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
 	f.pods[key] = pod
 	return f.pods[key], nil
 }
 
+// AddPod adds pod into fake client
 func (f *FakeKubeClient) AddPod(pod *v1.Pod) {
 	key := fmt.Sprintf("%s/%s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
 	f.pods[key] = pod
 }
 
+// DeletePod remove pod from fake client
 func (f *FakeKubeClient) DeletePod(pod *v1.Pod) {
 	key := fmt.Sprintf("%s/%s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
 	delete(f.pods, key)
 }
 
+// NewFakePod creates fake Pod object
 func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) *v1.Pod {
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -136,9 +146,10 @@ func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) 
 	return pod
 }
 
+// EnsureCIDR parses/verify CIDR ip string and convert to net.IPNet
 func EnsureCIDR(cidr string) *net.IPNet {
 	ip, net, err := net.ParseCIDR(cidr)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	net.IP = ip
 	return net
 }

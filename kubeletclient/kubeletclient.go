@@ -30,12 +30,12 @@ func GetResourceClient() (types.ResourceClient, error) {
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
 	if hasKubeletAPIEndpoint() {
-		logging.Printf(logging.VerboseLevel, "GetResourceClient(): using Kubelet resource API endpoint")
+		logging.Verbosef("GetResourceClient(): using Kubelet resource API endpoint")
 		return getKubeletClient()
-	} else {
-		logging.Printf(logging.VerboseLevel, "GetResourceClient(): using Kubelet device plugin checkpoint")
-		return checkpoint.GetCheckpoint()
 	}
+
+	logging.Verbosef("GetResourceClient(): using Kubelet device plugin checkpoint")
+	return checkpoint.GetCheckpoint()
 }
 
 func getKubeletClient() (types.ResourceClient, error) {

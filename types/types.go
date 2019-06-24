@@ -56,10 +56,12 @@ type NetConf struct {
 	MultusNamespace string `json:"multusNamespace"`
 }
 
+// RuntimeConfig specifies CNI RuntimeConfig
 type RuntimeConfig struct {
 	PortMaps []PortMapEntry `json:"portMappings,omitempty"`
 }
 
+// PortMapEntry for CNI PortMapEntry
 type PortMapEntry struct {
 	HostPort      int    `json:"hostPort"`
 	ContainerPort int    `json:"containerPort"`
@@ -67,6 +69,7 @@ type PortMapEntry struct {
 	HostIP        string `json:"hostIP,omitempty"`
 }
 
+// NetworkStatus is for network status annotation for pod
 type NetworkStatus struct {
 	Name      string    `json:"name"`
 	Interface string    `json:"interface,omitempty"`
@@ -76,6 +79,7 @@ type NetworkStatus struct {
 	DNS       types.DNS `json:"dns,omitempty"`
 }
 
+// DelegateNetConf for net-attach-def for pod
 type DelegateNetConf struct {
 	Conf          types.NetConf
 	ConfList      types.NetConfList
@@ -91,6 +95,7 @@ type DelegateNetConf struct {
 	Bytes []byte
 }
 
+// NetworkAttachmentDefinition represents net-attach-def of K8s NPWG spec
 type NetworkAttachmentDefinition struct {
 	metav1.TypeMeta `json:",inline"`
 	// Note that ObjectMeta is mandatory, as an object
@@ -107,6 +112,7 @@ type NetworkAttachmentDefinition struct {
 	Spec NetworkAttachmentDefinitionSpec `json:"spec"`
 }
 
+// NetworkAttachmentDefinitionSpec represents net-attach-def spec of K8s NPWG spec
 type NetworkAttachmentDefinitionSpec struct {
 	// Config contains a standard JSON-encoded CNI configuration
 	// or configuration list which defines the plugin chain to

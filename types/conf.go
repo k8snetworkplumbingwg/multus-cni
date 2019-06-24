@@ -34,9 +34,10 @@ const (
 	defaultMultusNamespace        = "kube-system"
 )
 
+// LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
-
 	logging.Debugf("LoadDelegateNetConfList: %s, %v", string(bytes), delegateConf)
+
 	if err := json.Unmarshal(bytes, &delegateConf.ConfList); err != nil {
 		return logging.Errorf("err in unmarshalling delegate conflist: %v", err)
 	}
@@ -51,7 +52,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 	return nil
 }
 
-// Convert raw CNI JSON into a DelegateNetConf structure
+// LoadDelegateNetConf converts raw CNI JSON into a DelegateNetConf structure
 func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
 	var err error
 	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
@@ -98,9 +99,10 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
+// CreateCNIRuntimeConf create CNI RuntimeConf
 func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) *libcni.RuntimeConf {
-
 	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
+
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	// Todo
 	// ingress, egress and bandwidth capability features as same as kubelet.
@@ -124,6 +126,7 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 	return rt
 }
 
+// LoadNetworkStatus create network status from CNI result
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 
@@ -162,6 +165,7 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 
 }
 
+// LoadNetConf converts inputs (i.e. stdin) to NetConf
 func LoadNetConf(bytes []byte) (*NetConf, error) {
 	netconf := &NetConf{}
 

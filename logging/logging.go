@@ -26,6 +26,7 @@ import (
 // Level type
 type Level uint32
 
+// PanicLevel...MaxLevel indicates the logging level
 const (
 	PanicLevel Level = iota
 	ErrorLevel
@@ -55,7 +56,7 @@ func (l Level) String() string {
 	return "unknown"
 }
 
-func Printf(level Level, format string, a ...interface{}) {
+func printf(level Level, format string, a ...interface{}) {
 	header := "%s [%s] "
 	t := time.Now()
 	if level > loggingLevel {
@@ -75,26 +76,31 @@ func Printf(level Level, format string, a ...interface{}) {
 	}
 }
 
+// Debugf prints logging if logging level >= debug
 func Debugf(format string, a ...interface{}) {
-	Printf(DebugLevel, format, a...)
+	printf(DebugLevel, format, a...)
 }
 
+// Verbosef prints logging if logging level >= verbose
 func Verbosef(format string, a ...interface{}) {
-	Printf(VerboseLevel, format, a...)
+	printf(VerboseLevel, format, a...)
 }
 
+// Errorf prints logging if logging level >= error
 func Errorf(format string, a ...interface{}) error {
-	Printf(ErrorLevel, format, a...)
+	printf(ErrorLevel, format, a...)
 	return fmt.Errorf(format, a...)
 }
 
+// Panicf prints logging plus stack trace. This should be used only for unrecoverble error
 func Panicf(format string, a ...interface{}) {
-	Printf(PanicLevel, format, a...)
-	Printf(PanicLevel, "========= Stack trace output ========")
-	Printf(PanicLevel, "%+v", errors.New("Multus Panic"))
-	Printf(PanicLevel, "========= Stack trace output end ========")
+	printf(PanicLevel, format, a...)
+	printf(PanicLevel, "========= Stack trace output ========")
+	printf(PanicLevel, "%+v", errors.New("Multus Panic"))
+	printf(PanicLevel, "========= Stack trace output end ========")
 }
 
+// GetLoggingLevel gets current logging level
 func GetLoggingLevel() Level {
 	return loggingLevel
 }
@@ -114,6 +120,7 @@ func getLoggingLevel(levelStr string) Level {
 	return UnknownLevel
 }
 
+// SetLogLevel sets logging level
 func SetLogLevel(levelStr string) {
 	level := getLoggingLevel(levelStr)
 	if level < MaxLevel {
@@ -121,10 +128,12 @@ func SetLogLevel(levelStr string) {
 	}
 }
 
+// SetLogStderr sets flag for logging stderr output
 func SetLogStderr(enable bool) {
 	loggingStderr = enable
 }
 
+// SetLogFile sets logging file
 func SetLogFile(filename string) {
 	if filename == "" {
 		return
