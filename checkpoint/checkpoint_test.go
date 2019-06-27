@@ -128,9 +128,6 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 		var (
 			cp  types.ResourceClient
 			err error
-			// resourceMap map[string]*types.ResourceInfo
-			// resourceInfo  *types.ResourceInfo
-			// resourceAnnot = "intel.com/sriov_net_A"
 		)
 
 		It("should not get a Checkpoint instance from file given bad filepath", func() {
@@ -178,7 +175,7 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			fakeCheckpoint.WriteToFile([]byte(badSampleData))
 			_, err = getCheckpoint(fakeTempFile)
 			Expect(err).To(HaveOccurred())
-			fakeCheckpoint.WriteToFile([]byte(sampleData)) // do i need to rewrite the good data?
+			fakeCheckpoint.WriteToFile([]byte(sampleData))
 		})
 
 		It("should not return a ResourceMap instance", func() {
@@ -195,7 +192,6 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			rmap, err := cp.GetPodResourceMap(fakePod)
 			Expect(err).To(HaveOccurred())
 			Expect(rmap).To(BeEmpty())
-			// resourceMap = rmap
 		})
 	})
 })
