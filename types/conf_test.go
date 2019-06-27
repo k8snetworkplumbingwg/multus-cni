@@ -98,7 +98,6 @@ var _ = Describe("config operations", func() {
 	    ]
 		}`
 		// Error in conf json: missing end bracket
-
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 		_, err = LoadDelegateNetConf([]byte(conf), nil, "")
