@@ -13,6 +13,7 @@ MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
 MULTUS_LOG_LEVEL=""
 MULTUS_LOG_FILE=""
+OVERRIDE_NETWORK_NAME=false
 
 # Give help text for parameters.
 function usage()
@@ -35,6 +36,7 @@ function usage()
     echo -e "\t--multus-autoconfig-dir=$MULTUS_AUTOCONF_DIR (used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
+    echo -e "\t--override-network-name=false (used only with --multus-conf-file=auto)"
 }
 
 function log()
@@ -90,6 +92,9 @@ while [ "$1" != "" ]; do
             ;;
         --multus-autoconfig-dir)
             MULTUS_AUTOCONF_DIR=$VALUE
+            ;;
+        --override-network-name)
+            OVERRIDE_NETWORK_NAME=$VALUE
             ;;
         *)
             warn "unknown parameter \"$PARAM\""
@@ -241,11 +246,18 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         CNI_VERSION_STRING="\"cniVersion\": \"$CNI_VERSION\","
       fi
 
+      if [ "$OVERRIDE_NETWORK_NAME" == "true" ]; then
+        MASTER_PLUGIN_NET_NAME="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
+            python -c 'import json,sys;print json.load(sys.stdin)["name"]')"
+      else
+        MASTER_PLUGIN_NET_NAME="multus-cni-network"
+      fi
+
       MASTER_PLUGIN_JSON="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN)"
       CONF=$(cat <<-EOF
   			{
           $CNI_VERSION_STRING
-  				"name": "multus-cni-network",
+				"name": "$MASTER_PLUGIN_NET_NAME",
   				"type": "multus",
           $ISOLATION_STRING
           $LOG_LEVEL_STRING
@@ -260,6 +272,8 @@ EOF
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
+      mv ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN} ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old
+      log "Original master file moved to ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old"
     fi
   done
 fi
