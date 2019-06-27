@@ -192,7 +192,6 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			rmap, err := cp.GetPodResourceMap(fakePod)
 			Expect(err).To(HaveOccurred())
 			Expect(rmap).To(BeEmpty())
-			// resourceMap = rmap
 		})
 	})
 })
