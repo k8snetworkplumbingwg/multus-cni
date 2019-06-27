@@ -322,6 +322,11 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	}
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
+	fmt.Println("--")
+	fmt.Println("k8sArgs")
+	fmt.Println(k8sArgs)
+	fmt.Println("--")
+	fmt.Println()
 	if err != nil {
 		return nil, logging.Errorf("Multus: Err in getting k8s args: %v", err)
 	}

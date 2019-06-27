@@ -17,7 +17,14 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
 	"testing"
+
+	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/testutils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,6 +36,29 @@ func TestConf(t *testing.T) {
 }
 
 var _ = Describe("config operations", func() {
+	var testNS ns.NetNS
+	var tmpDir string
+
+	BeforeEach(func() {
+		// Create a new NetNS so we don't modify the host
+		var err error
+		testNS, err = testutils.NewNS()
+		Expect(err).NotTo(HaveOccurred())
+		os.Setenv("CNI_NETNS", testNS.Path())
+		os.Setenv("CNI_PATH", "/some/path")
+
+		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		Expect(testNS.Close()).To(Succeed())
+		os.Unsetenv("CNI_PATH")
+		os.Unsetenv("CNI_ARGS")
+		err := os.RemoveAll(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("parses a valid multus configuration", func() {
 		conf := `{
     "name": "node-cni-network",
@@ -52,7 +82,7 @@ var _ = Describe("config operations", func() {
 		Expect(len(netConf.RuntimeConfig.PortMaps)).To(Equal(1))
 	})
 
-	It("fails to load invalid multus configuration", func() {
+	It("fails to load invalid multus configuration (bad json)", func() {
 		conf := `{
 	  "name": "node-cni-network",
 	  "type": "multus",
@@ -65,9 +95,67 @@ var _ = Describe("config operations", func() {
 	      {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
 	    ]
 		}`
-		// missing end bracket
+		// Error in conf json: missing end bracket
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
+		_, err = LoadDelegateNetConf([]byte(conf), nil, "")
+		Expect(err).To(HaveOccurred())
+		err = LoadDelegateNetConfList([]byte(conf), &DelegateNetConf{})
+		Expect(err).To(HaveOccurred())
+		_, err = addDeviceIDInConfList([]byte(conf), "")
+		Expect(err).To(HaveOccurred())
+		_, err = delegateAddDeviceID([]byte(conf), "")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("checks if logFile and logLevel are set correctly", func() {
+		conf := `{
+	    "name": "node-cni-network",
+			"type": "multus",
+			"logLevel": "debug",
+			"logFile": "/var/log/multus.log",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "type": "weave-net"
+	    }],
+		"runtimeConfig": {
+	      "portMappings": [
+	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	      ]
+	    }
+
+	}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.LogLevel).To(Equal("debug"))
+		Expect(netConf.LogFile).To(Equal("/var/log/multus.log"))
+	})
+
+	It("prevResult with no errors", func() {
+		conf := `{
+	    "name": "node-cni-network",
+			"type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"prevResult": {
+				"ips": [
+					{
+						"version": "4",
+						"address": "10.0.0.5/32",
+						"interface": 2
+					}
+			]},
+			"delegates": [{
+	        "type": "weave-net"
+			}],
+		"runtimeConfig": {
+	      "portMappings": [
+	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	      ]
+	    }
+
+	}`
+		_, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("succeeds if only delegates are set", func() {
@@ -106,6 +194,62 @@ var _ = Describe("config operations", func() {
 }`
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails when delegate field exists but fields are named incorrectly", func() {
+		conf := `{
+	    "name": "node-cni-network",
+			"type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"prevResult": {
+				"ips": [
+					{
+						"version": "4",
+						"address": "10.0.0.5/32",
+						"interface": 2
+					}
+			]},
+			"delegates": [{
+	        "thejohn": "weave-net"
+			}],
+		"runtimeConfig": {
+	      "portMappings": [
+	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	      ]
+	    }
+
+	}`
+		// missing replaced delegate field "type" with "thejohn"
+		_, err := LoadNetConf([]byte(conf))
+		Expect(err).To(HaveOccurred())
+
+		// This part of the test is not working.
+		// conf = `{
+		//     "name": "node-cni-network",
+		// 		"type": "multus",
+		//     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+		// 		"prevResult": {
+		// 			"ips": [
+		// 				{
+		// 					"version": "4",
+		// 					"address": "10.0.0.5/32",
+		// 					"interface": 2
+		// 				}
+		// 		]},
+		// 		"delegates": [{
+		//       "name": "meme1"
+		//   	}],
+		// 	"runtimeConfig": {
+		//       "portMappings": [
+		//         {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+		//       ]
+		//     }
+
+		// }`
+		// fmt.Printf("\n\n\n\n\n YA YEET \n\n\n\n\n")
+		// _, err = LoadNetConf([]byte(conf))
+		// fmt.Printf("\n\n\n\n\n YEET YA \n\n\n\n\n")
+		// Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("has defaults set for network readiness", func() {
@@ -238,6 +382,67 @@ var _ = Describe("config operations", func() {
 		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(hostDeviceConfList.Plugins[0].PCIBusID).To(Equal("0000:00:00.3"))
+	})
+
+	It("creates a valid CNI runtime config", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+    "name": "node-cni-network",
+    "type": "multus",
+    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "defaultnetworkwaitseconds": 3,
+    "delegates": [{
+        "name": "weave1",
+        "cniVersion": "0.2.0",
+        "type": "weave-net"
+    },{
+        "name": "other1",
+        "cniVersion": "0.2.0",
+        "type": "other-plugin"
+    }]
+}`),
+		}
+
+		k8sArgs := &K8sArgs{K8S_POD_NAME: "dummy", K8S_POD_NAMESPACE: "dummythicc", K8S_POD_INFRA_CONTAINER_ID: "123456789"}
+
+		rc := &RuntimeConfig{}
+		meme := make([]PortMapEntry, 2)
+		rc.PortMaps = meme
+
+		rc.PortMaps[0].HostPort = 0
+		rc.PortMaps[0].ContainerPort = 1
+		rc.PortMaps[0].Protocol = "sampleProtocol"
+		rc.PortMaps[0].HostIP = "sampleHostIP"
+		rc.PortMaps[1].HostPort = 1
+		rc.PortMaps[1].ContainerPort = 2
+		rc.PortMaps[1].Protocol = "anotherSampleProtocol"
+		rc.PortMaps[1].HostIP = "anotherSampleHostIP"
+
+		rt := CreateCNIRuntimeConf(args, k8sArgs, "", rc)
+		fmt.Println("rt.ContainerID: ", rt.ContainerID)
+		Expect(rt.ContainerID).To(Equal("123456789"))
+		Expect(rt.NetNS).To(Equal(args.Netns))
+		Expect(rt.IfName).To(Equal(""))
+		Expect(rt.CapabilityArgs["portMappings"]).To(Equal(rc.PortMaps))
+	})
+
+	It("creates a network status from valid CNI result", func() {
+		conf := `{
+    "name": "second-network",
+    "type": "host-device"
+}`
+
+		tmpResult := dfalkfjsaf
+		tmpNetName := "sampleNetName"
+		tmpMasterPlugin := true
+
+		LoadNetworkStatus(tmpResult, tmpNetName, tmpMasterPlugin)
+		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConf)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(hostDeviceConf.PCIBusID).To(Equal("0000:00:00.2"))
 	})
 
 })

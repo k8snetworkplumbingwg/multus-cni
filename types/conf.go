@@ -17,6 +17,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -45,6 +46,9 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 	if delegateConf.ConfList.Plugins == nil {
 		return logging.Errorf("delegate must have the 'type'or 'Plugin' field")
 	}
+
+	fmt.Println("here's da ting: ", delegateConf.ConfList.Plugins[0].Type)
+
 	if delegateConf.ConfList.Plugins[0].Type == "" {
 		return logging.Errorf("a plugin delegate must have the 'type' field")
 	}
