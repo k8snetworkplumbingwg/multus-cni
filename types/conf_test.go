@@ -18,13 +18,17 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
+	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
+	testhelpers "github.com/intel/multus-cni/testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -406,7 +410,7 @@ var _ = Describe("config operations", func() {
 }`),
 		}
 
-		k8sArgs := &K8sArgs{K8S_POD_NAME: "dummy", K8S_POD_NAMESPACE: "dummythicc", K8S_POD_INFRA_CONTAINER_ID: "123456789"}
+		k8sArgs := &K8sArgs{K8S_POD_NAME: "dummy", K8S_POD_NAMESPACE: "namespacedummy", K8S_POD_INFRA_CONTAINER_ID: "123456789"}
 
 		rc := &RuntimeConfig{}
 		meme := make([]PortMapEntry, 2)
@@ -429,20 +433,119 @@ var _ = Describe("config operations", func() {
 		Expect(rt.CapabilityArgs["portMappings"]).To(Equal(rc.PortMaps))
 	})
 
-	It("creates a network status from valid CNI result", func() {
+	It("can loadnetworkstatus", func() {
+		result := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+
 		conf := `{
-    "name": "second-network",
-    "type": "host-device"
+    "name": "node-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+    "delegates": [{
+        "type": "weave-net"
+    }],
+  "runtimeConfig": {
+      "portMappings": [
+        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+      ]
+    }
+ 
 }`
 
-		tmpResult := dfalkfjsaf
-		tmpNetName := "sampleNetName"
-		tmpMasterPlugin := true
-
-		LoadNetworkStatus(tmpResult, tmpNetName, tmpMasterPlugin)
-		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConf)
+		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(hostDeviceConf.PCIBusID).To(Equal("0000:00:00.2"))
+
+		delegateNetStatus, err := LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+
+		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("cannot loadnetworkstatus given incompatible CNIVersion", func() {
+
+		result := &Result{
+			CNIVersion: "1.2.3",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+
+		conf := `{
+    "name": "node-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+    "delegates": [{
+        "type": "weave-net"
+    }],
+  "runtimeConfig": {
+      "portMappings": [
+        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+      ]
+    }
+ 
+}`
+
+		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		Expect(err).NotTo(HaveOccurred())
+		fmt.Println("result.Version: ", result.Version())
+		delegateNetStatus, err := LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+
+		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+
+		Expect(err).To(HaveOccurred())
 	})
 
 })
+
+type Result struct {
+	CNIVersion string             `json:"cniVersion,omitempty"`
+	IP4        *types020.IPConfig `json:"ip4,omitempty"`
+	IP6        *types020.IPConfig `json:"ip6,omitempty"`
+	DNS        types.DNS          `json:"dns,omitempty"`
+}
+
+func (r *Result) Version() string {
+	return r.CNIVersion
+}
+
+func (r *Result) GetAsVersion(version string) (types.Result, error) {
+	for _, supportedVersion := range types020.SupportedVersions {
+		if version == supportedVersion {
+			r.CNIVersion = version
+			return r, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot convert version %q to %s", types020.SupportedVersions, version)
+}
+
+func (r *Result) Print() error {
+	return r.PrintTo(os.Stdout)
+}
+
+func (r *Result) PrintTo(writer io.Writer) error {
+	data, err := json.MarshalIndent(r, "", "    ")
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(data)
+	return err
+}
+
+// String returns a formatted string in the form of "[IP4: $1,][ IP6: $2,] DNS: $3" where
+// $1 represents the receiver's IPv4, $2 represents the receiver's IPv6 and $3 the
+// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
+func (r *Result) String() string {
+	var str string
+	if r.IP4 != nil {
+		str = fmt.Sprintf("IP4:%+v, ", *r.IP4)
+	}
+	if r.IP6 != nil {
+		str += fmt.Sprintf("IP6:%+v, ", *r.IP6)
+	}
+	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
+}
