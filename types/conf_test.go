@@ -100,6 +100,7 @@ var _ = Describe("config operations", func() {
 	    ]
 		}`
 		// Error in conf json: missing end bracket
+
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 		_, err = LoadDelegateNetConf([]byte(conf), nil, "")
@@ -223,37 +224,8 @@ var _ = Describe("config operations", func() {
 	    }
 
 	}`
-		// missing replaced delegate field "type" with "thejohn"
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
-
-		// This part of the test is not working.
-		// conf = `{
-		//     "name": "node-cni-network",
-		// 		"type": "multus",
-		//     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-		// 		"prevResult": {
-		// 			"ips": [
-		// 				{
-		// 					"version": "4",
-		// 					"address": "10.0.0.5/32",
-		// 					"interface": 2
-		// 				}
-		// 		]},
-		// 		"delegates": [{
-		//       "name": "meme1"
-		//   	}],
-		// 	"runtimeConfig": {
-		//       "portMappings": [
-		//         {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-		//       ]
-		//     }
-
-		// }`
-		// fmt.Printf("\n\n\n\n\n YA YEET \n\n\n\n\n")
-		// _, err = LoadNetConf([]byte(conf))
-		// fmt.Printf("\n\n\n\n\n YEET YA \n\n\n\n\n")
-		// Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("has defaults set for network readiness", func() {
