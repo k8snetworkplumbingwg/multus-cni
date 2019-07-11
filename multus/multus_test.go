@@ -28,11 +28,12 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/020"
+	types020 "github.com/containernetworking/cni/pkg/types/020"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 
+	"github.com/intel/multus-cni/logging"
 	testhelpers "github.com/intel/multus-cni/testing"
 
 	. "github.com/onsi/ginkgo"
@@ -176,21 +177,23 @@ var _ = Describe("multus operations", func() {
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "defaultnetworkfile": "/tmp/foo.multus.conf",
-    "defaultnetworkwaitseconds": 3,
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    },{
-        "name": "other1",
-        "cniVersion": "0.2.0",
-        "type": "other-plugin"
-    }]
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "0.2.0",
+	        "type": "other-plugin"
+	    }]
+	}`),
 		}
+
+		logging.SetLogLevel("verbose")
 
 		// Touch the default network file.
 		configPath := "/tmp/foo.multus.conf"
@@ -204,10 +207,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
@@ -217,10 +220,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf2 := `{
-    "name": "other1",
-    "cniVersion": "0.2.0",
-    "type": "other-plugin"
-}`
+	    "name": "other1",
+	    "cniVersion": "0.2.0",
+	    "type": "other-plugin"
+	}`
 		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -243,31 +246,267 @@ var _ = Describe("multus operations", func() {
 			errRemove := os.Remove(configPath)
 			Expect(errRemove).NotTo(HaveOccurred())
 		}
+	})
 
+	It("executes delegates given faulty namespace", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       "fsdadfad",
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "0.2.0",
+	        "type": "other-plugin"
+	    }]
+	}`),
+		}
+		// Netns is given garbage value
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		expectedResult2 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
+			},
+		}
+		expectedConf2 := `{
+	    "name": "other1",
+	    "cniVersion": "0.2.0",
+	    "type": "other-plugin"
+	}`
+		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		result, err := cmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		r := result.(*types020.Result)
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		os.Setenv("CNI_COMMAND", "DEL")
+		os.Setenv("CNI_IFNAME", "eth0")
+		err = cmdDel(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+	})
+
+	It("returns the previous result using cmdGet", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "0.2.0",
+	        "type": "other-plugin"
+	    }]
+	}`),
+		}
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		expectedResult2 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
+			},
+		}
+		expectedConf2 := `{
+	    "name": "other1",
+	    "cniVersion": "0.2.0",
+	    "type": "other-plugin"
+	}`
+		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		result, err := cmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		r := result.(*types020.Result)
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		result, err = cmdGet(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		os.Setenv("CNI_COMMAND", "DEL")
+		os.Setenv("CNI_IFNAME", "eth0")
+		err = cmdDel(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+	})
+
+	It("fails to load NetConf with bad json in cmdAdd/Del", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "0.2.0",
+	        "type": "other-plugin"
+	    }]
+	`),
+		}
+		// Missing close bracket in StdinData
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		expectedResult2 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
+			},
+		}
+		expectedConf2 := `{
+	    "name": "other1",
+	    "cniVersion": "0.2.0",
+	    "type": "other-plugin"
+	}`
+		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		_, err := cmdAdd(args, fExec, nil)
+		Expect(err).To(HaveOccurred())
+
+		err = cmdDel(args, fExec, nil)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails to save NetConf with bad filepath", func() {
+		meme := []byte(`meme`)
+		err := saveScratchNetConf("123456789", "", meme)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails to delete delegates with bad filepath", func() {
+		err := deleteDelegates("123456789", "bad!file!~?Path$^")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("delete delegates given good filepath", func() {
+		os.MkdirAll("/opt/cni/bin", 0755)
+		d1 := []byte("blah")
+		ioutil.WriteFile("/opt/cni/bin/123456789", d1, 0644)
+
+		err := deleteDelegates("123456789", "/opt/cni/bin")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("executes delegates and cleans up on failure", func() {
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		expectedConf2 := `{
-    "name": "other1",
-    "cniVersion": "0.2.0",
-    "type": "other-plugin"
-}`
+	    "name": "other1",
+	    "cniVersion": "0.2.0",
+	    "type": "other-plugin"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			StdinData: []byte(fmt.Sprintf(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "defaultnetworkfile": "/tmp/foo.multus.conf",
-    "defaultnetworkwaitseconds": 3,
-    "delegates": [%s,%s]
-}`, expectedConf1, expectedConf2)),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [%s,%s]
+	}`, expectedConf1, expectedConf2)),
 		}
 
 		// Touch the default network file.
@@ -302,40 +541,98 @@ var _ = Describe("multus operations", func() {
 
 	})
 
+	It("executes delegates and cleans up on failure with missing name field", func() {
+		expectedConf1 := `{
+		    "name": "weave1",
+		    "cniVersion": "0.2.0",
+		    "type": "weave-net"
+		}`
+		expectedConf2 := `{
+		    "name": "",
+		    "cniVersion": "0.2.0",
+		    "type": "other-plugin"
+		}`
+		// took out the name in expectedConf2, expecting a new value to be filled in by cmdAdd
+
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(fmt.Sprintf(`{
+		    "name": "node-cni-network",
+		    "type": "multus",
+		    "defaultnetworkfile": "/tmp/foo.multus.conf",
+		    "defaultnetworkwaitseconds": 3,
+		    "delegates": [%s,%s]
+		}`, expectedConf1, expectedConf2)),
+		}
+
+		// Touch the default network file.
+		configPath := "/tmp/foo.multus.conf"
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		// This plugin invocation should fail
+		err := fmt.Errorf("expected plugin failure")
+		fExec.addPlugin(nil, "net1", expectedConf2, nil, err)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		_, err = cmdAdd(args, fExec, nil)
+		Expect(fExec.addIndex).To(Equal(2))
+		Expect(fExec.delIndex).To(Equal(2))
+		Expect(err).To(HaveOccurred())
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+
+	})
+
 	It("executes delegates with interface name and MAC and IP addr", func() {
 		podNet := `[{"name":"net1",
-			 "interface": "test1",
-			 "ips":"1.2.3.4/24"},
-		{"name":"net2",
-		 "mac": "c2:11:22:33:44:66",
-		 "ips": "10.0.0.1"}
-]`
+				 "interface": "test1",
+				 "ips":"1.2.3.4/24"},
+			{"name":"net2",
+			 "mac": "c2:11:22:33:44:66",
+			 "ips": "10.0.0.1"}
+	]`
 		fakePod := testhelpers.NewFakePod("testpod", podNet, "")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		net2 := `{
-	"name": "net2",
-	"type": "mynet2",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net2",
+		"type": "mynet2",
+		"cniVersion": "0.2.0"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    }]
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`),
 		}
 
 		fExec := &fakeExec{}
@@ -346,10 +643,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;IP=1.2.3.4/24"}, "test1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
@@ -384,35 +681,35 @@ var _ = Describe("multus operations", func() {
 	It("executes delegates and kubernetes networks", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "net1,net2", "")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		net2 := `{
-	"name": "net2",
-	"type": "mynet2",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net2",
+		"type": "mynet2",
+		"cniVersion": "0.2.0"
+	}`
 		net3 := `{
-	"name": "net3",
-	"type": "mynet3",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net3",
+		"type": "mynet3",
+		"cniVersion": "0.2.0"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    }]
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`),
 		}
 
 		fExec := &fakeExec{}
@@ -423,10 +720,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
@@ -463,25 +760,25 @@ var _ = Describe("multus operations", func() {
 	It("executes kubernetes networks and delete it after pod removal", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    }]
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`),
 		}
 
 		fExec := &fakeExec{}
@@ -492,10 +789,78 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
+			},
+		}, nil)
+
+		fKubeClient := testhelpers.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		result, err := cmdAdd(args, fExec, fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		Expect(fKubeClient.PodCount).To(Equal(2))
+		Expect(fKubeClient.NetCount).To(Equal(1))
+		r := result.(*types020.Result)
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		os.Setenv("CNI_COMMAND", "DEL")
+		os.Setenv("CNI_IFNAME", "eth0")
+		// set fKubeClient to nil to emulate no pod info
+		fKubeClient.DeletePod(fakePod)
+		err = cmdDel(args, fExec, fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+	})
+
+	It("executes kubernetes networks and delete it after pod removal", func() {
+		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`),
+		}
+
+		fExec := &fakeExec{}
+		expectedResult1 := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
@@ -534,38 +899,38 @@ var _ = Describe("multus operations", func() {
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "delegates": [{
-        "cniVersion": "0.3.1",
-        "name": "mynet-confList",
-		"plugins": [
-			{
-				"type": "firstPlugin",
-                "capabilities": {"portMappings": true}
-            }
-		]
-	}],
-	"runtimeConfig": {
-        "portMappings": [
-            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-		]
-    }
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "delegates": [{
+	        "cniVersion": "0.3.1",
+	        "name": "mynet-confList",
+			"plugins": [
+				{
+					"type": "firstPlugin",
+	                "capabilities": {"portMappings": true}
+	            }
+			]
+		}],
+		"runtimeConfig": {
+	        "portMappings": [
+	            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			]
+	    }
+	}`),
 		}
 
 		fExec := &fakeExec{}
 		expectedConf1 := `{
-    "capabilities": {"portMappings": true},
-	"name": "mynet-confList",
-    "cniVersion": "0.3.1",
-    "type": "firstPlugin",
-    "runtimeConfig": {
-	    "portMappings": [
-            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-		]
-    }
-}`
+	    "capabilities": {"portMappings": true},
+		"name": "mynet-confList",
+	    "cniVersion": "0.3.1",
+	    "type": "firstPlugin",
+	    "runtimeConfig": {
+		    "portMappings": [
+	            {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			]
+	    }
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -576,10 +941,10 @@ var _ = Describe("multus operations", func() {
 	It("executes clusterNetwork delegate", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "", "kube-system/net1")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		expectedResult1 := &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
@@ -592,13 +957,13 @@ var _ = Describe("multus operations", func() {
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "defaultNetworks": [],
-    "clusterNetwork": "net1",
-    "delegates": []
-}`),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "defaultNetworks": [],
+	    "clusterNetwork": "net1",
+	    "delegates": []
+	}`),
 		}
 
 		fExec := &fakeExec{}
@@ -632,26 +997,26 @@ var _ = Describe("multus operations", func() {
 
 		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(fmt.Sprintf(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "cniDir": "%s",
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    }]
-}`, tmpCNIDir)),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "cniDir": "%s",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`, tmpCNIDir)),
 		}
 
 		fExec := &fakeExec{}
@@ -662,10 +1027,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
@@ -710,26 +1075,26 @@ var _ = Describe("multus operations", func() {
 
 		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
 		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
 			StdinData: []byte(fmt.Sprintf(`{
-    "name": "node-cni-network",
-    "type": "multus",
-    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-    "cniDir": "%s",
-    "delegates": [{
-        "name": "weave1",
-        "cniVersion": "0.2.0",
-        "type": "weave-net"
-    }]
-}`, tmpCNIDir)),
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "cniDir": "%s",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.2.0",
+	        "type": "weave-net"
+	    }]
+	}`, tmpCNIDir)),
 		}
 
 		fExec := &fakeExec{}
@@ -740,10 +1105,10 @@ var _ = Describe("multus operations", func() {
 			},
 		}
 		expectedConf1 := `{
-    "name": "weave1",
-    "cniVersion": "0.2.0",
-    "type": "weave-net"
-}`
+	    "name": "weave1",
+	    "cniVersion": "0.2.0",
+	    "type": "weave-net"
+	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
 		fExec.addPlugin(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
