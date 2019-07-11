@@ -45,6 +45,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 	if delegateConf.ConfList.Plugins == nil {
 		return logging.Errorf("delegate must have the 'type'or 'Plugin' field")
 	}
+
 	if delegateConf.ConfList.Plugins[0].Type == "" {
 		return logging.Errorf("a plugin delegate must have the 'type' field")
 	}
@@ -129,7 +130,6 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 // LoadNetworkStatus create network status from CNI result
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
-
 	netstatus := &NetworkStatus{}
 	netstatus.Name = netName
 	netstatus.Default = defaultNet
@@ -138,9 +138,8 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 	result, err := current.NewResultFromResult(r)
 	if err != nil {
 		logging.Errorf("error convert the type.Result to current.Result: %v", err)
-		return netstatus, nil
+		return netstatus, err
 	}
-
 	for _, ifs := range result.Interfaces {
 		//Only pod interfaces can have sandbox information
 		if ifs.Sandbox != "" {
