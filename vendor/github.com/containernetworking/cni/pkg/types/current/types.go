@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/containernetworking/cni/pkg/types"
-	types020 "github.com/containernetworking/cni/pkg/types/020"
+	"github.com/containernetworking/cni/pkg/types/020"
 )
 
 const ImplementedSpecVersion string = "0.4.0"
