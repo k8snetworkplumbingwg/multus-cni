@@ -159,7 +159,7 @@ func EnsureCIDR(cidr string) *net.IPNet {
 	return net
 }
 
-// Implements Result interface
+// Result is stub Result for testing
 type Result struct {
 	CNIVersion string             `json:"cniVersion,omitempty"`
 	IP4        *types020.IPConfig `json:"ip4,omitempty"`
@@ -167,10 +167,12 @@ type Result struct {
 	DNS        types.DNS          `json:"dns,omitempty"`
 }
 
+// Version returns current CNIVersion of the given Result
 func (r *Result) Version() string {
 	return r.CNIVersion
 }
 
+// GetAsVersion returns a Result object given a version
 func (r *Result) GetAsVersion(version string) (types.Result, error) {
 	for _, supportedVersion := range types020.SupportedVersions {
 		if version == supportedVersion {
@@ -181,10 +183,12 @@ func (r *Result) GetAsVersion(version string) (types.Result, error) {
 	return nil, fmt.Errorf("cannot convert version %q to %s", types020.SupportedVersions, version)
 }
 
+// Print prints a Result's information to std out
 func (r *Result) Print() error {
 	return r.PrintTo(os.Stdout)
 }
 
+// PrintTo prints a Result's information to the provided writer
 func (r *Result) PrintTo(writer io.Writer) error {
 	data, err := json.MarshalIndent(r, "", "    ")
 	if err != nil {
