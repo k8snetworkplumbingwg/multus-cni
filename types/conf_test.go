@@ -214,7 +214,7 @@ var _ = Describe("config operations", func() {
 			]
 		},
 		"delegates": [{
-			"thejohn": "weave-net"
+			"_not_type": "weave-net"
 		}],
 	"runtimeConfig": {
 		"portMappings": [
