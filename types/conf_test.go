@@ -203,27 +203,27 @@ var _ = Describe("config operations", func() {
 
 	It("fails when delegate field exists but fields are named incorrectly", func() {
 		conf := `{
-	    "name": "node-cni-network",
-			"type": "multus",
-	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-			"prevResult": {
-				"ips": [
-					{
-						"version": "4",
-						"address": "10.0.0.5/32",
-						"interface": 2
-					}
-			]},
-			"delegates": [{
-	        "thejohn": "weave-net"
-			}],
-		"runtimeConfig": {
-	      "portMappings": [
-	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-	      ]
-	    }
-
-	}`
+	"name": "node-cni-network",
+		"type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+		"prevResult": {
+			"ips": [
+				{
+					"version": "4",
+					"address": "10.0.0.5/32",
+					"interface": 2
+				}
+			]
+		},
+		"delegates": [{
+			"_not_type": "weave-net"
+		}],
+	"runtimeConfig": {
+		"portMappings": [
+			{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	    ]
+	}
+}`
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 	})
