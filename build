@@ -28,4 +28,4 @@ export GOBIN=${PWD}/bin
 export GOPATH=${PWD}/gopath
 
 echo "Building plugins"
-go install -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
+go install -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
