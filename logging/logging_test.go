@@ -45,6 +45,12 @@ var _ = Describe("logging operations", func() {
 		// check file existance
 	})
 
+	It("Check file setter with bad filepath", func() {
+		SetLogFile("/invalid/filepath")
+		Expect(loggingFp).NotTo(Equal(nil))
+		// check file existance
+	})
+
 	It("Check loglevel setter", func() {
 		SetLogLevel("debug")
 		Expect(loggingLevel).To(Equal(DebugLevel))
