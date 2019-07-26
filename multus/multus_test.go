@@ -270,7 +270,6 @@ var _ = Describe("multus operations", func() {
 	}`),
 		}
 		// Netns is given garbage value
-		fmt.Println("args.Netns: ", args.Netns)
 
 		// Touch the default network file.
 		configPath := "/tmp/foo.multus.conf"
@@ -478,6 +477,7 @@ var _ = Describe("multus operations", func() {
 	})
 
 	It("delete delegates given good filepath", func() {
+		os.MkdirAll("/opt/cni/bin", 0755)
 		d1 := []byte("blah")
 		ioutil.WriteFile("/opt/cni/bin/123456789", d1, 0644)
 

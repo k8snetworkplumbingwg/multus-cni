@@ -203,27 +203,27 @@ var _ = Describe("config operations", func() {
 
 	It("fails when delegate field exists but fields are named incorrectly", func() {
 		conf := `{
-	    "name": "node-cni-network",
-			"type": "multus",
-	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-			"prevResult": {
-				"ips": [
-					{
-						"version": "4",
-						"address": "10.0.0.5/32",
-						"interface": 2
-					}
-			]},
-			"delegates": [{
-	        "thejohn": "weave-net"
-			}],
-		"runtimeConfig": {
-	      "portMappings": [
-	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-	      ]
-	    }
-
-	}`
+	"name": "node-cni-network",
+		"type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+		"prevResult": {
+			"ips": [
+				{
+					"version": "4",
+					"address": "10.0.0.5/32",
+					"interface": 2
+				}
+			]
+		},
+		"delegates": [{
+			"_not_type": "weave-net"
+		}],
+	"runtimeConfig": {
+		"portMappings": [
+			{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	    ]
+	}
+}`
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
 	})
@@ -385,8 +385,8 @@ var _ = Describe("config operations", func() {
 		k8sArgs := &K8sArgs{K8S_POD_NAME: "dummy", K8S_POD_NAMESPACE: "namespacedummy", K8S_POD_INFRA_CONTAINER_ID: "123456789"}
 
 		rc := &RuntimeConfig{}
-		meme := make([]PortMapEntry, 2)
-		rc.PortMaps = meme
+		tempportmap := make([]PortMapEntry, 2)
+		rc.PortMaps = tempportmap
 
 		rc.PortMaps[0].HostPort = 0
 		rc.PortMaps[0].ContainerPort = 1
@@ -425,7 +425,6 @@ var _ = Describe("config operations", func() {
         {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
       ]
     }
- 
 }`
 
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
@@ -440,7 +439,7 @@ var _ = Describe("config operations", func() {
 
 	It("cannot loadnetworkstatus given incompatible CNIVersion", func() {
 
-		result := &Result{
+		result := &testhelpers.Result{
 			CNIVersion: "1.2.3",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
@@ -459,7 +458,6 @@ var _ = Describe("config operations", func() {
         {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
       ]
     }
- 
 }`
 
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")

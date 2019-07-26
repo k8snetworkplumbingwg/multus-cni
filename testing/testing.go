@@ -16,14 +16,19 @@
 package testing
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/containernetworking/cni/pkg/types"
+	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/onsi/gomega"
 )
 
@@ -152,4 +157,57 @@ func EnsureCIDR(cidr string) *net.IPNet {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	net.IP = ip
 	return net
+}
+
+// Result is stub Result for testing
+type Result struct {
+	CNIVersion string             `json:"cniVersion,omitempty"`
+	IP4        *types020.IPConfig `json:"ip4,omitempty"`
+	IP6        *types020.IPConfig `json:"ip6,omitempty"`
+	DNS        types.DNS          `json:"dns,omitempty"`
+}
+
+// Version returns current CNIVersion of the given Result
+func (r *Result) Version() string {
+	return r.CNIVersion
+}
+
+// GetAsVersion returns a Result object given a version
+func (r *Result) GetAsVersion(version string) (types.Result, error) {
+	for _, supportedVersion := range types020.SupportedVersions {
+		if version == supportedVersion {
+			r.CNIVersion = version
+			return r, nil
+		}
+	}
+	return nil, fmt.Errorf("cannot convert version %q to %s", types020.SupportedVersions, version)
+}
+
+// Print prints a Result's information to std out
+func (r *Result) Print() error {
+	return r.PrintTo(os.Stdout)
+}
+
+// PrintTo prints a Result's information to the provided writer
+func (r *Result) PrintTo(writer io.Writer) error {
+	data, err := json.MarshalIndent(r, "", "    ")
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(data)
+	return err
+}
+
+// String returns a formatted string in the form of "[IP4: $1,][ IP6: $2,] DNS: $3" where
+// $1 represents the receiver's IPv4, $2 represents the receiver's IPv6 and $3 the
+// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
+func (r *Result) String() string {
+	var str string
+	if r.IP4 != nil {
+		str = fmt.Sprintf("IP4:%+v, ", *r.IP4)
+	}
+	if r.IP6 != nil {
+		str += fmt.Sprintf("IP6:%+v, ", *r.IP6)
+	}
+	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
 }
