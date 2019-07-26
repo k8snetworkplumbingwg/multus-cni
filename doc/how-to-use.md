@@ -2,7 +2,7 @@
 
 ### Prerequisites
 
-* Kubelet configured to use CNI 
+* Kubelet configured to use CNI
 * Kubernetes version with CRD support (generally )
 
 Your Kubelet(s) must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for more details.
@@ -19,7 +19,7 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 *Via Daemonset method*
 
-As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster). 
+As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 
@@ -402,7 +402,7 @@ EOF
 
 #### Lauch pod with json annotation with interface
 
-You can also specify interface name as adding `"interfaceRequest": "<ifname>"`.
+You can also specify interface name as adding `"interface": "<ifname>"`.
 
 ```
 # Execute following command at Kubernetes master
@@ -414,7 +414,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
             { "name" : "macvlan-conf-1",
-              "interfaceRequest": "macvlan1" },
+              "interface": "macvlan1" },
             { "name" : "macvlan-conf-2" }
     ]'
 spec:
@@ -533,4 +533,3 @@ Used only with `--multus-conf-file=auto`. See the documentation for logging for 
 Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to speicfy CNI spec version.
 
     --cni-version=
-
