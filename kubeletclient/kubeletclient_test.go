@@ -115,6 +115,10 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			_, err := GetResourceClient()
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("should fail ", func() {
+
+		})
 	})
 
 	Context("GetPodResourceMap() with valid pod name and namespace", func() {
