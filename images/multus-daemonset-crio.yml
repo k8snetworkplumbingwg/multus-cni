@@ -170,3 +170,66 @@ spec:
             items:
             - key: cni-conf.json
               path: 70-multus.conf
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-multus-ds-ppc64le
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: multus
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/arch: ppc64le
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      serviceAccountName: multus
+      containers:
+      - name: kube-multus
+        # crio support requires multus:latest for now. support 3.3 or later.
+        image: nfvpe/multus:latest-ppc64le
+        command: ["/entrypoint.sh"]
+        args:
+        - "--cni-bin-dir=/host/usr/libexec/cni"
+        - "--multus-conf-file=auto"
+        - "--override-network-name=true"
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: cni
+          mountPath: /host/etc/cni/net.d
+        - name: cnibin
+          mountPath: /host/usr/libexec/cni
+        - name: multus-cfg
+          mountPath: /tmp/multus-conf
+      volumes:
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: cnibin
+          hostPath:
+            path: /usr/libexec/cni
+        - name: multus-cfg
+          configMap:
+            name: multus-cni-config
+            items:
+            - key: cni-conf.json
+              path: 70-multus.conf
