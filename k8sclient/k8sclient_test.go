@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	types020 "github.com/containernetworking/cni/pkg/types/020"
+	testhelpers "github.com/intel/multus-cni/testing"
 	testutils "github.com/intel/multus-cni/testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -610,5 +612,188 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError("GetPodNetwork: namespace isolation violation: podnamespace: test / target namespace: kube-system"))
 
+	})
+
+	It("Returns proper error message", func() {
+		// getPodNetwork will give us the error, then this test will use that error on the top func boi
+		err := &NoK8sNetworkError{"no kubernetes network found"}
+		Expect(err.Error()).To(Equal("no kubernetes network found"))
+	})
+
+	It("Sets pod network annotations without error", func() {
+		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+		net1 := `{
+	"name": "net1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		Expect(err).NotTo(HaveOccurred())
+
+		networkstatus := "test status"
+		_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	/* Still figuring this one out. need to make "setPodNetworkAnnotation throw an error */
+	It("Fails to set pod network annotations without error", func() {
+		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		Expect(err).NotTo(HaveOccurred())
+
+		networkstatus := "test status"
+		_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Sets network status without error", func() {
+		result := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+
+		conf := `{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "type": "weave-net"
+	    }],
+	  "runtimeConfig": {
+	      "portMappings": [
+	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	      ]
+	    }
+	}`
+
+		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		Expect(err).NotTo(HaveOccurred())
+
+		delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+		Expect(err).NotTo(HaveOccurred())
+
+		netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = SetNetworkStatus(kubeClient, k8sArgs, netstatus, netConf)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("Fails to set network status without error", func() {
+		result := &types020.Result{
+			CNIVersion: "0.2.0",
+			IP4: &types020.IPConfig{
+				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+		}
+
+		conf := `{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "type": "weave-net"
+	    }],
+	  "runtimeConfig": {
+	      "portMappings": [
+	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+	      ]
+	    }
+	}`
+
+		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		Expect(err).NotTo(HaveOccurred())
+
+		delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+		Expect(err).NotTo(HaveOccurred())
+
+		netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
+		Expect(err).To(HaveOccurred())
 	})
 })

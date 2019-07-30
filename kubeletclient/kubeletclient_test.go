@@ -116,9 +116,14 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		// It("should fail ", func() {
-		// 	fmt.Println("i am groot")
-		// })
+		It("should fail with missing file", func() {
+			// os.Mkdir("tempdir", 0644)
+			kubeletSocket = "Andrew Bays"
+			// os.Rename(socketName, "tempdir/tempname.sock")
+			_, err := GetResourceClient()
+			Expect(err).To(HaveOccurred())
+			// os.Rename("tempdir/tempname.sock", socketName)
+		})
 	})
 
 	Context("GetPodResourceMap() with valid pod name and namespace", func() {
