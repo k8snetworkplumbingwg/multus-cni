@@ -176,6 +176,33 @@ You should note that there's 3 interfaces:
 * `eth0` our default network
 * `net1` the new interface we created with the macvlan configuration.
 
+### Network Status Annotations
+
+For additional confirmation, use `kubectl describe pod samplepod` and there will be an annotations section, similar to the following:
+
+```
+Annotations:        k8s.v1.cni.cncf.io/networks: macvlan-conf
+                    k8s.v1.cni.cncf.io/networks-status:
+                      [{
+                          "name": "cbr0",
+                          "ips": [
+                              "10.244.1.73"
+                          ],
+                          "default": true,
+                          "dns": {}
+                      },{
+                          "name": "macvlan-conf",
+                          "interface": "net1",
+                          "ips": [
+                              "192.168.1.205"
+                          ],
+                          "mac": "86:1d:96:ff:55:0d",
+                          "dns": {}
+                      }]
+```
+
+This metadata tells us that we have two CNI plugins running successfully.
+
 ### What if I want more interfaces?
 
 You can add more interfaces to a pod by creating more custom resources and then referring to them in pod's annotation. You can also reuse configurations, so for example, to attach two macvlan interfaces to a pod, you could create a pod like so:

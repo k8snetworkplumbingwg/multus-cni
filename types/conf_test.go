@@ -468,4 +468,48 @@ var _ = Describe("config operations", func() {
 		Expect(err).To(HaveOccurred())
 	})
 
+	Context("using UnmarshalJSON", func() {
+		It("succeeds with valid json", func() {
+			networkselectionelement := &NetworkSelectionElement{
+				Name:             "kube-system",
+				Namespace:        "net1",
+				InterfaceRequest: "",
+			}
+			conf := `{
+	"name": "kube-system",
+	"namespace": "net1",
+	"interfaceRequest": "",
+	"ips": "10.18.89.129",
+	"mac": "CB-32-97-FF-D6-79",
+	"interface": ""
+}`
+			err := networkselectionelement.UnmarshalJSON([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("fails to parse invalid json", func() {
+			networkselectionelement := &NetworkSelectionElement{
+				Name:             "kube-system",
+				Namespace:        "net1",
+				InterfaceRequest: "",
+			}
+			err := networkselectionelement.UnmarshalJSON([]byte("invalidjson~"))
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("fails with missing name parameter", func() {
+			networkselectionelement := &NetworkSelectionElement{
+				Name:             "kube-system",
+				Namespace:        "net1",
+				InterfaceRequest: "",
+			}
+			// conf json does not include "name"
+			conf := `{
+	"namespace": "net1",
+	"interfaceRequest": ""
+}`
+			err := networkselectionelement.UnmarshalJSON([]byte(conf))
+			Expect(err).To(HaveOccurred())
+		})
+	})
 })
