@@ -650,36 +650,36 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	/* Still figuring this one out. need to make "setPodNetworkAnnotation throw an error */
-	It("Fails to set pod network annotations without error", func() {
-		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+	// Still figuring this one out. need to make "setPodNetworkAnnotation throw an error
+	// It("Fails to set pod network annotations without error", func() {
+	// 	fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
-		net1 := `{
-		"name": "net1",
-		"type": "mynet",
-		"cniVersion": "0.2.0"
-	}`
+	// 	net1 := `{
+	// 	"name": "net1",
+	// 	"type": "mynet",
+	// 	"cniVersion": "0.2.0"
+	// }`
 
-		args := &skel.CmdArgs{
-			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-		}
+	// 	args := &skel.CmdArgs{
+	// 		Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+	// 	}
 
-		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+	// 	fKubeClient := testutils.NewFakeKubeClient()
+	// 	fKubeClient.AddPod(fakePod)
+	// 	fKubeClient.AddNetConfig("kube-system", "net1", net1)
 
-		kubeClient, err := GetK8sClient("", fKubeClient)
-		Expect(err).NotTo(HaveOccurred())
-		k8sArgs, err := GetK8sArgs(args)
-		Expect(err).NotTo(HaveOccurred())
+	// 	kubeClient, err := GetK8sClient("", fKubeClient)
+	// 	Expect(err).NotTo(HaveOccurred())
+	// 	k8sArgs, err := GetK8sArgs(args)
+	// 	Expect(err).NotTo(HaveOccurred())
 
-		pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-		Expect(err).NotTo(HaveOccurred())
+	// 	pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+	// 	Expect(err).NotTo(HaveOccurred())
 
-		networkstatus := "test status"
-		_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
-		Expect(err).NotTo(HaveOccurred())
-	})
+	// 	networkstatus := "test status"
+	// 	_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
+	// 	Expect(err).NotTo(HaveOccurred())
+	// })
 
 	It("Sets network status without error", func() {
 		result := &types020.Result{
@@ -762,7 +762,7 @@ var _ = Describe("k8sclient operations", func() {
 	    }
 	}`
 
-		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "")
 		Expect(err).NotTo(HaveOccurred())
 
 		delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
