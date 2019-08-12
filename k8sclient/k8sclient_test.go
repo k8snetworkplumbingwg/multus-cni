@@ -569,6 +569,108 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet1"))
 	})
 
+	It("fails with no kubeclient and invalid kubeconfig", func() {
+		fakePod := testutils.NewFakePod("testpod", "", "net1")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"type": "mynet2",
+				"name": "net2"
+			}]
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", "{\"type\": \"mynet1\"}")
+		_, err = GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, _, err = TryLoadPodDelegates(k8sArgs, netConf, nil)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("fails with no kubeclient and no kubeconfig", func() {
+		fakePod := testutils.NewFakePod("testpod", "", "net1")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"kubeconfig":"",
+			"delegates": [{
+				"type": "mynet2",
+				"name": "net2"
+			}]
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", "{\"type\": \"mynet1\"}")
+		_, err = GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, _, err = TryLoadPodDelegates(k8sArgs, netConf, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		// additionally, we expect the test to fail with no delegates, as at least one is always required.
+		netConf.Delegates = nil
+		_, _, err = TryLoadPodDelegates(k8sArgs, netConf, nil)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("uses cached delegates when an error in loading from pod annotation occurs", func() {
+		//something about cached delegates, line 438
+		fakePod := testutils.NewFakePod("testpod", "", "net1")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"kubeconfig":"/etc/kubernetes/kubelet.conf",
+			"delegates": [{
+				"type": "mynet2",
+				"name": "net2"
+			}]
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
+		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", "{\"type\": \"mynet1\"}")
+		_, err = GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		_, _, err = TryLoadPodDelegates(k8sArgs, netConf, nil)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("Errors when namespace isolation is violated", func() {
 		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 		conf := `{
@@ -614,186 +716,413 @@ var _ = Describe("k8sclient operations", func() {
 
 	})
 
-	It("Returns proper error message", func() {
-		// getPodNetwork will give us the error, then this test will use that error on the top func boi
-		err := &NoK8sNetworkError{"no kubernetes network found"}
-		Expect(err.Error()).To(Equal("no kubernetes network found"))
+	Context("Error function", func() {
+		It("Returns proper error message", func() {
+			err := &NoK8sNetworkError{"no kubernetes network found"}
+			Expect(err.Error()).To(Equal("no kubernetes network found"))
+		})
 	})
 
-	It("Sets pod network annotations without error", func() {
-		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+	Context("GetK8sArgs", func() {
+		It("fails when provided with bad format", func() {
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME:%s;K8S_POD_NAMESPACE:%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+			// using colon instead of equals sign makes an invalid CmdArgs
 
-		net1 := `{
-	"name": "net1",
-	"type": "mynet",
-	"cniVersion": "0.2.0"
-}`
-
-		args := &skel.CmdArgs{
-			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-		}
-
-		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("kube-system", "net1", net1)
-
-		kubeClient, err := GetK8sClient("", fKubeClient)
-		Expect(err).NotTo(HaveOccurred())
-		k8sArgs, err := GetK8sArgs(args)
-		Expect(err).NotTo(HaveOccurred())
-
-		pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-		Expect(err).NotTo(HaveOccurred())
-
-		networkstatus := "test status"
-		_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
-		Expect(err).NotTo(HaveOccurred())
+			_, err := GetK8sArgs(args)
+			Expect(err).To(HaveOccurred())
+		})
 	})
 
-	// Still figuring this one out. need to make "setPodNetworkAnnotation throw an error
-	// It("Fails to set pod network annotations without error", func() {
-	// 	fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
-
-	// 	net1 := `{
+	// can't get this test working yet - metadata annotation issue
+	// 	Context("getKubernetesDelegate", func() {
+	// 		It("reaches that big chunk of untested code, better test name is a work in progress", func() {
+	// 			/*
+	// 				func call [networks] -> getnetworkdelegates [net] -> getkubernetesdelegate
+	// 			*/
+	// 			fmt.Println("BLAH!!!")
+	// 			fakePod := testutils.NewFakePod("testpod", "net1,net2", "")
+	// 			net1 := `{
 	// 	"name": "net1",
 	// 	"type": "mynet",
 	// 	"cniVersion": "0.2.0"
 	// }`
+	// 			net2 := `{
+	// 	"name": "net2",
+	// 	"type": "mynet2",
+	// 	"cniVersion": "0.2.0"
+	// }`
+	// 			net3 := `{
+	// 	"name": "net3",
+	// 	"type": "mynet3",
+	// 	"cniVersion": "0.2.0"
+	// }`
+	// 			// args := &skel.CmdArgs{
+	// 			// 	Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+	// 			// }
 
-	// 	args := &skel.CmdArgs{
-	// 		Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-	// 	}
+	// 			fKubeClient := testutils.NewFakeKubeClient()
+	// 			fKubeClient.AddPod(fakePod)
+	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
+	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net2", net2)
+	// 			// net3 is not used; make sure it's not accessed
+	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net3", net3)
 
-	// 	fKubeClient := testutils.NewFakeKubeClient()
-	// 	fKubeClient.AddPod(fakePod)
-	// 	fKubeClient.AddNetConfig("kube-system", "net1", net1)
+	// 			kubeClient, err := GetK8sClient("", fKubeClient)
+	// 			Expect(err).NotTo(HaveOccurred())
+	// 			// k8sArgs, err := GetK8sArgs(args)
+	// 			Expect(err).NotTo(HaveOccurred())
+	// 			// pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+	// 			networks, err := GetPodNetwork(fakePod)
+	// 			Expect(err).NotTo(HaveOccurred())
 
-	// 	kubeClient, err := GetK8sClient("", fKubeClient)
-	// 	Expect(err).NotTo(HaveOccurred())
-	// 	k8sArgs, err := GetK8sArgs(args)
-	// 	Expect(err).NotTo(HaveOccurred())
+	// 			meme, err := kubeClient.GetRawWithPath("/apis/k8s.cni.cncf.io/v1/namespaces/test/network-attachment-definitions/net1")
+	// 			fmt.Println("MEME: ", meme)
 
-	// 	pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-	// 	Expect(err).NotTo(HaveOccurred())
+	// 			_, err = GetNetworkDelegates(kubeClient, fakePod, networks, tmpDir, false)
+	// 			Expect(err).NotTo(HaveOccurred())
+	// 			// Expect(fKubeClient.PodCount).To(Equal(1))
+	// 			// Expect(fKubeClient.NetCount).To(Equal(2))
 
-	// 	networkstatus := "test status"
-	// 	_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
-	// 	Expect(err).NotTo(HaveOccurred())
-	// })
+	// 			// Expect(len(delegates)).To(Equal(2))
+	// 			// Expect(delegates[0].Conf.Name).To(Equal("net1"))
+	// 			// Expect(delegates[0].Conf.Type).To(Equal("mynet"))
+	// 			// Expect(delegates[0].MasterPlugin).To(BeFalse())
+	// 			// Expect(delegates[1].Conf.Name).To(Equal("net2"))
+	// 			// Expect(delegates[1].Conf.Type).To(Equal("mynet2"))
+	// 			// Expect(delegates[1].MasterPlugin).To(BeFalse())
+	// 		})
+	// 	})
 
-	It("Sets network status without error", func() {
-		result := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
+	Context("parsePodNetworkObjectName", func() {
+		It("fails to get podnetwork given bad annotation values", func() {
+			fakePod := testutils.NewFakePod("testpod", "net1", "")
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
 
-		conf := `{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-	    "delegates": [{
-	        "type": "weave-net"
-	    }],
-	  "runtimeConfig": {
-	      "portMappings": [
-	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-	      ]
-	    }
-	}`
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", "{\"type\": \"mynet\"}")
 
-		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
-		Expect(err).NotTo(HaveOccurred())
+			kubeClient, err := GetK8sClient("", fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+			pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 
-		delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
-		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
-		Expect(err).NotTo(HaveOccurred())
+			// invalid case 1 - can't have more than 2 items separated by "/"
+			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP/root@thirdIP"
+			_, err = GetPodNetwork(pod)
+			Expect(err).To(HaveOccurred())
 
-		netstatus := []*types.NetworkStatus{delegateNetStatus}
+			// invalid case 2 - can't have more than 2 items separated by "@"
+			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP@garbagevalue"
+			_, err = GetPodNetwork(pod)
+			Expect(err).To(HaveOccurred())
 
-		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
-
-		netConf, err := types.LoadNetConf([]byte(conf))
-		Expect(err).NotTo(HaveOccurred())
-
-		net1 := `{
-		"name": "net1",
-		"type": "mynet",
-		"cniVersion": "0.2.0"
-	}`
-
-		args := &skel.CmdArgs{
-			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-		}
-
-		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("kube-system", "net1", net1)
-
-		kubeClient, err := GetK8sClient("", fKubeClient)
-		Expect(err).NotTo(HaveOccurred())
-		k8sArgs, err := GetK8sArgs(args)
-		Expect(err).NotTo(HaveOccurred())
-
-		err = SetNetworkStatus(kubeClient, k8sArgs, netstatus, netConf)
-		Expect(err).NotTo(HaveOccurred())
+			// invalid case 3 - not matching comma-delimited format
+			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP"
+			_, err = GetPodNetwork(pod)
+			Expect(err).To(HaveOccurred())
+		})
 	})
 
-	It("Fails to set network status without error", func() {
-		result := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
+	Context("setPodNetworkAnnotation", func() {
+		It("Sets pod network annotations without error", func() {
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
-		conf := `{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-	    "delegates": [{
-	        "type": "weave-net"
-	    }],
-	  "runtimeConfig": {
-	      "portMappings": [
-	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-	      ]
-	    }
-	}`
-
-		delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "")
-		Expect(err).NotTo(HaveOccurred())
-
-		delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
-		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
-		Expect(err).NotTo(HaveOccurred())
-
-		netstatus := []*types.NetworkStatus{delegateNetStatus}
-
-		fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
-
-		netConf, err := types.LoadNetConf([]byte(conf))
-		Expect(err).NotTo(HaveOccurred())
-
-		net1 := `{
+			net1 := `{
 		"name": "net1",
 		"type": "mynet",
 		"cniVersion": "0.2.0"
 	}`
 
-		args := &skel.CmdArgs{
-			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-		}
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
 
-		fKubeClient := testutils.NewFakeKubeClient()
-		fKubeClient.AddPod(fakePod)
-		fKubeClient.AddNetConfig("kube-system", "net1", net1)
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig("kube-system", "net1", net1)
 
-		k8sArgs, err := GetK8sArgs(args)
-		Expect(err).NotTo(HaveOccurred())
+			kubeClient, err := GetK8sClient("", fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
 
-		err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
-		Expect(err).To(HaveOccurred())
+			pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+			Expect(err).NotTo(HaveOccurred())
+
+			networkstatus := "test status"
+			_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		// Still figuring this next one out. deals with exponentialBackoff
+		// It("Fails to set pod network annotations without error", func() {
+		// 	fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+		// 	net1 := `{
+		// 	"name": "net1",
+		// 	"type": "mynet",
+		// 	"cniVersion": "0.2.0"
+		// }`
+
+		// 	args := &skel.CmdArgs{
+		// 		Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		// 	}
+
+		// 	fKubeClient := testutils.NewFakeKubeClient()
+		// 	fKubeClient.AddPod(fakePod)
+		// 	fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+		// 	kubeClient, err := GetK8sClient("", fKubeClient)
+		// 	Expect(err).NotTo(HaveOccurred())
+		// 	k8sArgs, err := GetK8sArgs(args)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	networkstatus := "test status"
+		// 	_, err = setPodNetworkAnnotation(kubeClient, "test", pod, networkstatus)
+		// 	Expect(err).NotTo(HaveOccurred())
+		// })
+	})
+
+	Context("SetNetworkStatus", func() {
+		It("Sets network status without error", func() {
+			result := &types020.Result{
+				CNIVersion: "0.2.0",
+				IP4: &types020.IPConfig{
+					IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+				},
+			}
+
+			conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"type": "weave-net"
+			}],
+		  "runtimeConfig": {
+			  "portMappings": [
+				{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			  ]
+			}
+		}`
+
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			Expect(err).NotTo(HaveOccurred())
+
+			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			Expect(err).NotTo(HaveOccurred())
+
+			netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+			netConf, err := types.LoadNetConf([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+
+			net1 := `{
+			"name": "net1",
+			"type": "mynet",
+			"cniVersion": "0.2.0"
+		}`
+
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+			kubeClient, err := GetK8sClient("", fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = SetNetworkStatus(kubeClient, k8sArgs, netstatus, netConf)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Sets network status with kubeclient built from kubeconfig and attempts to connect", func() {
+			result := &types020.Result{
+				CNIVersion: "0.2.0",
+				IP4: &types020.IPConfig{
+					IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+				},
+			}
+
+			conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/kubelet.conf",
+			"delegates": [{
+				"type": "weave-net"
+			}],
+		  "runtimeConfig": {
+			  "portMappings": [
+				{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			  ]
+			}
+		}`
+
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			Expect(err).NotTo(HaveOccurred())
+
+			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			Expect(err).NotTo(HaveOccurred())
+
+			netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+			netConf, err := types.LoadNetConf([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+
+			net1 := `{
+			"name": "net1",
+			"type": "mynet",
+			"cniVersion": "0.2.0"
+		}`
+
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("Fails to set network status without kubeclient or kubeconfig", func() {
+			result := &types020.Result{
+				CNIVersion: "0.2.0",
+				IP4: &types020.IPConfig{
+					IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+				},
+			}
+
+			conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"type": "weave-net"
+			}],
+		  "runtimeConfig": {
+			  "portMappings": [
+				{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			  ]
+			}
+		}`
+			// note that the provided kubeconfig is invalid
+
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			Expect(err).NotTo(HaveOccurred())
+
+			netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+			netConf, err := types.LoadNetConf([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+
+			net1 := `{
+			"name": "net1",
+			"type": "mynet",
+			"cniVersion": "0.2.0"
+		}`
+
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("Skips network status given no config", func() {
+			result := &types020.Result{
+				CNIVersion: "0.2.0",
+				IP4: &types020.IPConfig{
+					IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+				},
+			}
+
+			conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "",
+			"delegates": [{
+				"type": "weave-net"
+			}],
+		  "runtimeConfig": {
+			  "portMappings": [
+				{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+			  ]
+			}
+		}`
+
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			Expect(err).NotTo(HaveOccurred())
+
+			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			Expect(err).NotTo(HaveOccurred())
+
+			netstatus := []*types.NetworkStatus{delegateNetStatus}
+
+			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
+
+			netConf, err := types.LoadNetConf([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+
+			net1 := `{
+			"name": "net1",
+			"type": "mynet",
+			"cniVersion": "0.2.0"
+		}`
+
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfig("kube-system", "net1", net1)
+
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
+			Expect(err).NotTo(HaveOccurred())
+		})
 	})
 })
