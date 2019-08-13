@@ -495,7 +495,6 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("overwrite cluster network when Pod annotation is set", func() {
-
 		fakePod := testutils.NewFakePod("testpod", "", "net1")
 		conf := `{
 			"name":"node-cni-network",
@@ -639,7 +638,7 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("uses cached delegates when an error in loading from pod annotation occurs", func() {
-		//something about cached delegates, line 438
+
 		fakePod := testutils.NewFakePod("testpod", "", "net1")
 		conf := `{
 			"name":"node-cni-network",
@@ -720,6 +719,38 @@ var _ = Describe("k8sclient operations", func() {
 		It("Returns proper error message", func() {
 			err := &NoK8sNetworkError{"no kubernetes network found"}
 			Expect(err.Error()).To(Equal("no kubernetes network found"))
+		})
+	})
+
+	Context("getDefaultNetDelegateCRD", func() {
+		It("fails when netConf contains bad confDir", func() {
+			fakePod := testutils.NewFakePod("testpod", "", "net1")
+			conf := `{
+				"name":"node-cni-network",
+				"type":"multus",
+				"clusterNetwork": "net2",
+				"multusNamespace" : "kube-system",
+				"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+			}`
+			netConf, err := types.LoadNetConf([]byte(conf))
+			Expect(err).NotTo(HaveOccurred())
+
+			args := &skel.CmdArgs{
+				Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			}
+
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddNetConfig("kube-system", "net1", "")
+			fKubeClient.AddNetConfig("kube-system", "net2", "")
+			fKubeClient.AddPod(fakePod)
+			kubeClient, err := GetK8sClient("", fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			k8sArgs, err := GetK8sArgs(args)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf.ConfDir = "garbage value"
+			err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
