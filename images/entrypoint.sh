@@ -196,6 +196,12 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   log "Generating Multus configuration file ..."
   found_master=false
   tries=0
+
+  if [ -f $MULTUS_AUTOCONF_DIR/00-multus.conf ]; then
+    log "Find 00-multus.conf, skip to generate."
+    found_master=true
+  fi
+
   while [ $found_master == false ]; do
     MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     if [ "$MASTER_PLUGIN" == "" ]; then
