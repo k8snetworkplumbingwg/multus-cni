@@ -17,6 +17,7 @@ package k8sclient
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"regexp"
 	"strings"
@@ -228,13 +229,35 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		}
 	}
 
-	for _, net := range networks {
-		if net.Namespace == "" {
-			net.Namespace = defaultNamespace
+	for _, n := range networks {
+		if n.Namespace == "" {
+			n.Namespace = defaultNamespace
 		}
 		// compatibility pre v3.2, will be removed in v4.0
-		if net.ObsolatedInterfaceRequest != "" && net.InterfaceRequest == "" {
-			net.InterfaceRequest = net.ObsolatedInterfaceRequest
+		if n.DeprecatedInterfaceRequest != "" && n.InterfaceRequest == "" {
+			n.InterfaceRequest = n.DeprecatedInterfaceRequest
+		}
+		if n.MacRequest != "" {
+			// validate MAC address
+			if _, err := net.ParseMAC(n.MacRequest); err != nil {
+				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to mac: %v", err)
+			}
+		}
+		if n.IPRequest != nil {
+			for _, ip := range n.IPRequest {
+				// validate IP address
+				if strings.Contains(ip, "/") {
+					if _, _, err := net.ParseCIDR(ip); err != nil {
+						return nil, logging.Errorf("failed to parse CIDR %q: %v", ip, err)
+					}
+				} else if net.ParseIP(ip) == nil {
+					return nil, logging.Errorf("failed to parse IP address %q", ip)
+				}
+			}
+		}
+		// compatibility pre v3.2, will be removed in v4.0
+		if n.DeprecatedInterfaceRequest != "" && n.InterfaceRequest == "" {
+			n.InterfaceRequest = n.DeprecatedInterfaceRequest
 		}
 	}
 

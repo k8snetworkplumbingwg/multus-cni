@@ -144,11 +144,51 @@ func validateIfName(nsname string, ifname string) error {
 	return err
 }
 
+func confAdd(rt *libcni.RuntimeConf, rawNetconf []byte, binDir string, exec invoke.Exec) (cnitypes.Result, error) {
+	logging.Debugf("conflistAdd: %v, %s, %s", rt, string(rawNetconf), binDir)
+	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{binDir}, binDirs...)
+	cniNet := libcni.NewCNIConfig(binDirs, exec)
+
+	conf, err := libcni.ConfFromBytes(rawNetconf)
+	if err != nil {
+		return nil, logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	}
+
+	result, err := cniNet.AddNetwork(context.Background(), conf, rt)
+	if err != nil {
+		return nil, logging.Errorf("error in getting result from AddNetwork: %v", err)
+	}
+
+	return result, nil
+}
+
+func confDel(rt *libcni.RuntimeConf, rawNetconf []byte, binDir string, exec invoke.Exec) error {
+	logging.Debugf("conflistDel: %v, %s, %s", rt, string(rawNetconf), binDir)
+	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{binDir}, binDirs...)
+	cniNet := libcni.NewCNIConfig(binDirs, exec)
+
+	conf, err := libcni.ConfFromBytes(rawNetconf)
+	if err != nil {
+		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	}
+
+	err = cniNet.DelNetwork(context.Background(), conf, rt)
+	if err != nil {
+		return logging.Errorf("error in getting result from DelNetwork: %v", err)
+	}
+
+	return err
+}
+
 func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, exec invoke.Exec) (cnitypes.Result, error) {
 	logging.Debugf("conflistAdd: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
-	binDirs = append(binDirs, binDir)
+	binDirs = append([]string{binDir}, binDirs...)
 	cniNet := libcni.NewCNIConfig(binDirs, exec)
 
 	confList, err := libcni.ConfListFromBytes(rawnetconflist)
@@ -168,7 +208,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 	logging.Debugf("conflistDel: %v, %s, %s", rt, string(rawnetconflist), binDir)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
-	binDirs = append(binDirs, binDir)
+	binDirs = append([]string{binDir}, binDirs...)
 	cniNet := libcni.NewCNIConfig(binDirs, exec)
 
 	confList, err := libcni.ConfListFromBytes(rawnetconflist)
@@ -194,7 +234,8 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 		return nil, logging.Errorf("delegateAdd: cannot set %q interface name to %q: %v", delegate.Conf.Type, ifName, err)
 	}
 
-	if delegate.MacRequest != "" || delegate.IPRequest != "" {
+	// Deprecated in ver 3.5.
+	if delegate.MacRequest != "" || delegate.IPRequest != nil {
 		if cniArgs != "" {
 			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
 		} else {
@@ -209,24 +250,26 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 
 			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
 			logging.Debugf("delegateAdd: set MAC address %q to %q", delegate.MacRequest, ifName)
+			rt.Args = append(rt.Args, [2]string{ "MAC", delegate.MacRequest })
 		}
 
-		if delegate.IPRequest != "" {
+		if delegate.IPRequest != nil {
 			// validate IP address
-			if strings.Contains(delegate.IPRequest, "/") {
-				_, _, err := net.ParseCIDR(delegate.IPRequest)
-				if err != nil {
-					return nil, logging.Errorf("delegateAdd: failed to parse CIDR %q", delegate.MacRequest)
+			for _, ip := range delegate.IPRequest {
+				if strings.Contains(ip, "/") {
+					_, _, err := net.ParseCIDR(ip)
+					if err != nil {
+						return nil, logging.Errorf("delegateAdd: failed to parse IP address %q", ip)
+					}
+				} else if net.ParseIP(ip) == nil {
+					return nil, logging.Errorf("delegateAdd: failed to parse IP address %q", ip)
 				}
-			} else if net.ParseIP(delegate.IPRequest) == nil {
-				return nil, logging.Errorf("delegateAdd: failed to parse IP address %q", delegate.IPRequest)
 			}
 
-			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, delegate.IPRequest)
-			logging.Debugf("delegateAdd: set IP address %q to %q", delegate.IPRequest, ifName)
-		}
-		if os.Setenv("CNI_ARGS", cniArgs) != nil {
-			return nil, logging.Errorf("delegateAdd: cannot set %q mac to %q and ip to %q", delegate.Conf.Type, delegate.MacRequest, delegate.IPRequest)
+			ips := strings.Join(delegate.IPRequest, ",")
+			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, ips)
+			logging.Debugf("delegateAdd: set IP address %q to %q", ips, ifName)
+			rt.Args = append(rt.Args, [2]string{ "IP", ips })
 		}
 	}
 
@@ -238,10 +281,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			return nil, logging.Errorf("delegateAdd: error invoking conflistAdd - %q: %v", delegate.ConfList.Name, err)
 		}
 	} else {
-		origpath := os.Getenv("CNI_PATH")
-		os.Setenv("CNI_PATH", origpath+":"+binDir)
-		result, err = invoke.DelegateAdd(context.Background(), delegate.Conf.Type, delegate.Bytes, exec)
-		os.Setenv("CNI_PATH", origpath)
+		result, err = confAdd(rt, delegate.Bytes, binDir, exec)
 		if err != nil {
 			return nil, logging.Errorf("delegateAdd: error invoking DelegateAdd - %q: %v", delegate.Conf.Type, err)
 		}
@@ -285,13 +325,10 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 			return logging.Errorf("delegateDel: error invoking ConflistDel - %q: %v", delegateConf.ConfList.Name, err)
 		}
 	} else {
-		origpath := os.Getenv("CNI_PATH")
-		os.Setenv("CNI_PATH", origpath+":"+binDir)
-		if err = invoke.DelegateDel(context.Background(), delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
-			os.Setenv("CNI_PATH", origpath)
+		err = confDel(rt, delegateConf.Bytes, binDir, exec)
+		if err != nil {
 			return logging.Errorf("delegateDel: error invoking DelegateDel - %q: %v", delegateConf.Conf.Type, err)
 		}
-		os.Setenv("CNI_PATH", origpath)
 	}
 
 	return err
@@ -367,7 +404,9 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig)
+
+		runtimeConfig := types.MergeCNIRuntimeConfig(n.RuntimeConfig, delegate)
+		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, runtimeConfig)
 		tmpResult, err = delegateAdd(exec, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			// If the add failed, tear down all networks we already added

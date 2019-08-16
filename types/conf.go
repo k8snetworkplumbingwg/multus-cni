@@ -90,14 +90,47 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.MacRequest != "" {
 			delegateConf.MacRequest = net.MacRequest
 		}
-		if net.IPRequest != "" {
+		if net.IPRequest != nil {
 			delegateConf.IPRequest = net.IPRequest
+		}
+		if net.BandwidthRequest != nil {
+			delegateConf.BandwidthRequest = net.BandwidthRequest
+		}
+		if net.PortMappingsRequest != nil {
+			delegateConf.PortMappingsRequest = net.PortMappingsRequest
 		}
 	}
 
 	delegateConf.Bytes = bytes
 
 	return delegateConf, nil
+}
+
+// MergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
+func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
+	logging.Debugf("MergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
+	if runtimeConfig == nil {
+		runtimeConfig = &RuntimeConfig{}
+	}
+
+	// multus inject RuntimeConfig only in case of non MasterPlugin.
+	if delegate.MasterPlugin != true {
+		logging.Debugf("MergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
+		if delegate.PortMappingsRequest != nil {
+			runtimeConfig.PortMaps = delegate.PortMappingsRequest
+		}
+		if delegate.BandwidthRequest != nil {
+			runtimeConfig.Bandwidth = delegate.BandwidthRequest
+		}
+		if delegate.IPRequest != nil {
+			runtimeConfig.IPs = delegate.IPRequest
+		}
+		if delegate.MacRequest != "" {
+			runtimeConfig.Mac = delegate.MacRequest
+		}
+	}
+
+	return runtimeConfig
 }
 
 // CreateCNIRuntimeConf create CNI RuntimeConf
@@ -112,7 +145,7 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		NetNS:       args.Netns,
 		IfName:      ifName,
 		Args: [][2]string{
-			{"IgnoreUnknown", "1"},
+			{"IgnoreUnknown", string("true")},
 			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
 			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
 			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
@@ -120,9 +153,20 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 	}
 
 	if rc != nil {
-		rt.CapabilityArgs = map[string]interface{}{
-			"portMappings": rc.PortMaps,
+		capabilityArgs := map[string]interface{}{}
+		if len(rc.PortMaps) != 0 {
+			capabilityArgs["portMappings"] = rc.PortMaps
 		}
+		if rc.Bandwidth != nil {
+			capabilityArgs["bandwidth"] = rc.Bandwidth
+		}
+		if len(rc.IPs) != 0 {
+			capabilityArgs["ips"] = rc.IPs
+		}
+		if len(rc.Mac) != 0 {
+			capabilityArgs["mac"] = rc.Mac
+		}
+		rt.CapabilityArgs = capabilityArgs
 	}
 	return rt
 }
