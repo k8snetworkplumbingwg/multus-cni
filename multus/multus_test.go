@@ -29,6 +29,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
+	current "github.com/containernetworking/cni/pkg/types/current"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
@@ -62,7 +63,17 @@ type fakeExec struct {
 	plugins  []*fakePlugin
 }
 
-func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf string, result *types020.Result, err error) {
+func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf string, result *current.Result, err error) {
+	f.plugins = append(f.plugins, &fakePlugin{
+		expectedEnv:    expectedEnv,
+		expectedConf:   expectedConf,
+		expectedIfname: expectedIfname,
+		result:         result,
+		err:            err,
+	})
+}
+
+func (f *fakeExec) addPlugin020(expectedEnv []string, expectedIfname, expectedConf string, result *types020.Result, err error) {
 	f.plugins = append(f.plugins, &fakePlugin{
 		expectedEnv:    expectedEnv,
 		expectedConf:   expectedConf,
@@ -151,6 +162,7 @@ func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
 var _ = Describe("multus operations", func() {
 	var testNS ns.NetNS
 	var tmpDir string
+	resultCNIVersion := "0.4.0"
 
 	BeforeEach(func() {
 		// Create a new NetNS so we don't modify the host
@@ -212,7 +224,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -225,7 +237,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -288,7 +300,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -301,7 +313,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -365,7 +377,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -378,7 +390,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -444,7 +456,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -457,7 +469,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -521,7 +533,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -534,7 +546,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -601,7 +613,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -614,7 +626,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -678,7 +690,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -691,7 +703,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -757,7 +769,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -770,7 +782,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -834,7 +846,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -847,7 +859,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -913,7 +925,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -926,7 +938,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -988,7 +1000,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -1001,7 +1013,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1067,7 +1079,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -1080,7 +1092,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1146,11 +1158,11 @@ var _ = Describe("multus operations", func() {
 				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 		}
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		// This plugin invocation should fail
 		err := fmt.Errorf("expected plugin failure")
-		fExec.addPlugin(nil, "net1", expectedConf2, nil, err)
+		fExec.addPlugin020(nil, "net1", expectedConf2, nil, err)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1204,11 +1216,11 @@ var _ = Describe("multus operations", func() {
 				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 		}
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		// This plugin invocation should fail
 		err := fmt.Errorf("expected plugin failure")
-		fExec.addPlugin(nil, "net1", expectedConf2, nil, err)
+		fExec.addPlugin020(nil, "net1", expectedConf2, nil, err)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1225,24 +1237,31 @@ var _ = Describe("multus operations", func() {
 
 	})
 
-	It("executes delegates with interface name and MAC and IP addr", func() {
+	It("executes delegates with runtimeConfigs", func() {
 		podNet := `[{"name":"net1",
-				 "interface": "test1",
-				 "ips":"1.2.3.4/24"},
-			{"name":"net2",
-			 "mac": "c2:11:22:33:44:66",
-			 "ips": "10.0.0.1"}
+                             "mac": "c2:11:22:33:44:66",
+                             "ips": [ "10.0.0.1" ],
+                             "bandwidth": {
+				     "ingressRate": 2048,
+				     "ingressBurst": 1600,
+				     "egressRate": 4096,
+				     "egressBurst": 1600
+			     },
+			     "portMappings": [
+			     {
+				     "hostPort": 8080, "containerPort": 80, "protocol": "tcp"
+			     },
+			     {
+				     "hostPort": 8000, "containerPort": 8001, "protocol": "udp"
+			     }]
+		     }
 	]`
 		fakePod := testhelpers.NewFakePod("testpod", podNet, "")
 		net1 := `{
 		"name": "net1",
 		"type": "mynet",
-		"cniVersion": "0.2.0"
-	}`
-		net2 := `{
-		"name": "net2",
-		"type": "mynet2",
-		"cniVersion": "0.2.0"
+		"capabilities": {"mac": true, "ips": true, "bandwidth": true, "portMappings": true},
+		"cniVersion": "0.3.1"
 	}`
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
@@ -1255,42 +1274,69 @@ var _ = Describe("multus operations", func() {
 	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
 	    "delegates": [{
 	        "name": "weave1",
-	        "cniVersion": "0.2.0",
+	        "cniVersion": "0.3.1",
 	        "type": "weave-net"
 	    }]
 	}`),
 		}
 
 		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+		expectedResult1 := &current.Result{
+			CNIVersion: resultCNIVersion,
+			IPs: []*current.IPConfig{&current.IPConfig{
+				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
 			},
 		}
 		expectedConf1 := `{
 	    "name": "weave1",
-	    "cniVersion": "0.2.0",
+	    "cniVersion": "0.3.1",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;IP=1.2.3.4/24"}, "test1", net1, &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
+		expectedNet1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"capabilities": {
+			"mac": true,
+			"ips": true,
+			"bandwidth": true,
+			"portMappings": true
+		},
+		"runtimeConfig": {
+			"ips": [ "10.0.0.1" ],
+			"mac": "c2:11:22:33:44:66",
+			"bandwidth": {
+				"ingressRate": 2048,
+				"ingressBurst": 1600,
+				"egressRate": 4096,
+				"egressBurst": 1600
 			},
-		}, nil)
-		fExec.addPlugin([]string{"CNI_ARGS=IgnoreUnknown=true;MAC=c2:11:22:33:44:66;IP=10.0.0.1"}, "net2", net2, &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),
+			"portMappings": [
+			{
+				"hostPort": 8080,
+				"containerPort": 80,
+				"protocol": "tcp"
+			},
+			{
+				"hostPort": 8000,
+				"containerPort": 8001,
+				"protocol": "udp"
+			}]
+		},
+		"cniVersion": "0.3.1"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "net1", expectedNet1, &current.Result{
+			CNIVersion: "0.3.1",
+			IPs: []*current.IPConfig{&current.IPConfig{
+				Address: *testhelpers.EnsureCIDR("1.1.1.3/24"),
+			},
 			},
 		}, nil)
 
 		fKubeClient := testhelpers.NewFakeKubeClient()
 		fKubeClient.AddPod(fakePod)
 		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
-		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net2", net2)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1298,10 +1344,11 @@ var _ = Describe("multus operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(fKubeClient.PodCount).To(Equal(2))
-		Expect(fKubeClient.NetCount).To(Equal(2))
-		r := result.(*types020.Result)
+		Expect(fKubeClient.NetCount).To(Equal(1))
+		r := result.(*current.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
 	})
 
 	It("executes delegates and kubernetes networks", func() {
@@ -1350,14 +1397,14 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 		}, nil)
-		fExec.addPlugin(nil, "net2", net2, &types020.Result{
+		fExec.addPlugin020(nil, "net2", net2, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.4/24"),
@@ -1419,8 +1466,8 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
@@ -1487,8 +1534,8 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
@@ -1555,8 +1602,8 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
@@ -1625,7 +1672,7 @@ var _ = Describe("multus operations", func() {
 			]
 	    }
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 		_, err := cmdAdd(args, fExec, nil)
@@ -1661,7 +1708,7 @@ var _ = Describe("multus operations", func() {
 		}
 
 		fExec := &fakeExec{}
-		fExec.addPlugin(nil, "eth0", net1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", net1, expectedResult1, nil)
 
 		fKubeClient := testhelpers.NewFakeKubeClient()
 		fKubeClient.AddPod(fakePod)
@@ -1725,8 +1772,8 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
@@ -1803,8 +1850,8 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", net1, &types020.Result{
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "net1", net1, &types020.Result{
 			CNIVersion: "0.2.0",
 			IP4: &types020.IPConfig{
 				IP: *testhelpers.EnsureCIDR("1.1.1.3/24"),
@@ -1881,7 +1928,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "weave-net"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
 
 		expectedResult2 := &types020.Result{
 			CNIVersion: "0.2.0",
@@ -1894,7 +1941,7 @@ var _ = Describe("multus operations", func() {
 	    "cniVersion": "0.2.0",
 	    "type": "other-plugin"
 	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
+		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -1952,7 +1999,7 @@ var _ = Describe("multus operations", func() {
 			]
 	    }
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
+		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 

@@ -58,15 +58,27 @@ type NetConf struct {
 
 // RuntimeConfig specifies CNI RuntimeConfig
 type RuntimeConfig struct {
-	PortMaps []PortMapEntry `json:"portMappings,omitempty"`
+	PortMaps  []*PortMapEntry `json:"portMappings,omitempty"`
+	Bandwidth *BandwidthEntry `json:"bandwidth,omitempty"`
+	IPs       []string        `json:"ips,omitempty"`
+	Mac       string          `json:"mac,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
 type PortMapEntry struct {
 	HostPort      int    `json:"hostPort"`
 	ContainerPort int    `json:"containerPort"`
-	Protocol      string `json:"protocol"`
+	Protocol      string `json:"protocol,omitempty"`
 	HostIP        string `json:"hostIP,omitempty"`
+}
+
+// BandwidthEntry for CNI BandwidthEntry
+type BandwidthEntry struct {
+	IngressRate  int `json:"ingressRate"`
+	IngressBurst int `json:"ingressBurst"`
+
+	EgressRate  int `json:"egressRate"`
+	EgressBurst int `json:"egressBurst"`
 }
 
 // NetworkStatus is for network status annotation for pod
@@ -81,11 +93,13 @@ type NetworkStatus struct {
 
 // DelegateNetConf for net-attach-def for pod
 type DelegateNetConf struct {
-	Conf          types.NetConf
-	ConfList      types.NetConfList
-	IfnameRequest string `json:"ifnameRequest,omitempty"`
-	MacRequest    string `json:"macRequest,omitempty"`
-	IPRequest     string `json:"ipRequest,omitempty"`
+	Conf                types.NetConf
+	ConfList            types.NetConfList
+	IfnameRequest       string          `json:"ifnameRequest,omitempty"`
+	MacRequest          string          `json:"macRequest,omitempty"`
+	IPRequest           []string        `json:"ipRequest,omitempty"`
+	PortMappingsRequest []*PortMapEntry `json:"-"`
+	BandwidthRequest    *BandwidthEntry `json:"-"`
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
@@ -133,16 +147,22 @@ type NetworkSelectionElement struct {
 	Namespace string `json:"namespace,omitempty"`
 	// IPRequest contains an optional requested IP address for this network
 	// attachment
-	IPRequest string `json:"ips,omitempty"`
+	IPRequest []string `json:"ips,omitempty"`
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
 	MacRequest string `json:"mac,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interface,omitempty"`
-	// ObsoateInterfaceRequest is obsolated parameter at pre 3.2.
+	// DeprecatedInterfaceRequest is obsolated parameter at pre 3.2.
 	// This will be removed in 4.0 release.
-	ObsolatedInterfaceRequest string `json:"interfaceRequest,omitempty"`
+	DeprecatedInterfaceRequest string `json:"interfaceRequest,omitempty"`
+	// PortMappingsRequest contains an optional requested port mapping
+	// for the network
+	PortMappingsRequest []*PortMapEntry `json:"portMappings,omitempty"`
+	// BandwidthRequest contains an optional requested bandwidth for
+	// the network
+	BandwidthRequest *BandwidthEntry `json:"bandwidth,omitempty"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes
