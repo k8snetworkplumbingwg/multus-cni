@@ -532,6 +532,40 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet1"))
 	})
 
+	It("fails with bad confdir", func() {
+		fakePod := testutils.NewFakePod("testpod", "", "net1")
+		conf := `{
+			"name":"node-cni-network",
+			"type":"multus",
+			"clusterNetwork": "net2",
+			"multusNamespace" : "kube-system",
+			"kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+		}`
+		netConf, err := types.LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig("kube-system", "net1", "")
+		fKubeClient.AddNetConfig("kube-system", "net2", "")
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = GetDefaultNetworks(k8sArgs, netConf, kubeClient)
+		Expect(err).To(HaveOccurred())
+
+		netConf.ConfDir = "badfilepath"
+		_, _, err = TryLoadPodDelegates(k8sArgs, netConf, kubeClient)
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("overwrite multus config when Pod annotation is set", func() {
 
 		fakePod := testutils.NewFakePod("testpod", "", "net1")
@@ -638,7 +672,28 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("uses cached delegates when an error in loading from pod annotation occurs", func() {
+		kubeletconf, err := os.Create("/etc/kubernetes/kubelet.conf")
+		kubeletconfDef := `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFNU1EVXpNVEUxTVRRME1Gb1hEVEk1TURVeU9ERTFNVFEwTUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBS3pLCnZQSHNxQWpMSHdxbDdMaDdQeTJuSndEdzAwTU4rZjFVTWtIS1BrOTVsTVRVRmgrMTVob05pWVJjaGt2d3VTRXMKRXNLYTJBRXpVeCtxR3hqTXptb01RdklMamNLbVdUS3ViNXZvZ29WV3l0N2ZzaW1jUlk4c2hWbmFSQ1pQZnptYgpUTVVRcFNHbUc5WWNGNlJhMnhwbTJ6Qm5aVWM0QjN6M1UxeHE3b1NRREp5ZVRna3VEZDB3SGhLay9tYWREYlgyCk5DU2ROVjRoUEFJcWY0MVZWc0hGV3c4WWpOUGllMVZBdWZQZDBRQlJuVFgraW50dm9weVpuWnJoVFJzVU5CanMKRWc0UGFEVXRMZDZsSUxqUnhEN2RkL1JYUWZaQ1E5azI3b0t1eU5RZUJMaWdhb052M3JPeExPWGxMaU1HUGZpVgpPTktxencwaGFDUlF1cHdoUlFVQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFGU0MrYmJHaENZTyszOXA2QVJtOFBYbnZFTmIKTjdNd2VWSXVGazh3T3c2RWlHOTllZTJIb25KOCtxaEFLNXlCNVU0d3FEM2FkY0hNTHBGVUoxMVMrSVYra2hCYgo0SGYrcEtVZEJxM3MvYXAxMmppdUNZMUVDanpIVjZ5SDZLRGwrZEdibDR1dVJ6S016SkZteFpncEl4TUVqbEZ0CnByK2MzQmdaWWVVYlpTdDFhR2VObFlvdGxKZEFBbWlZcmkxcFAzOUxzb2xZbWJEOTNVb1NTYnhoR2lkSzBjNHcKbHV5aUxJQWJUVnJxMEo1UllCa05ZOGdMVTBRZVFJaVZTYWhkc3cvakgxL0dZY2J4alN6R1ZwOTAwb1ZMWUpsQQo5SkhVaUlTb3VHVTE1QVRpMklvN0tOa2NkdW1hMCtPbU1IcnM4RGE3UEo3VzBjSFJNYWZXVG1xSE1RST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://invalid.local:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: system:node:localhost.localdomain
+  name: system:node:localhost.localdomain@kubernetes
+current-context: system:node:localhost.localdomain@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: system:node:localhost.localdomain
+  user:
+    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURBVENDQWVtZ0F3SUJBZ0lJWjd2bEJJYUF6V3d3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB4T1RBMU16RXhOVEUwTkRCYUZ3MHlNREExTXpBeE5URTBOREZhTUVNeApGVEFUQmdOVkJBb1RESE41YzNSbGJUcHViMlJsY3pFcU1DZ0dBMVVFQXhNaGMzbHpkR1Z0T201dlpHVTZiRzlqCllXeG9iM04wTG14dlkyRnNaRzl0WVdsdU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0MKQVFFQTFMcmZlMWlzUGkzQ2J4OHh0Q1htUE5RNi9MV2FVRGtWUTVQZHRrUCt3VWJnSVBSemNtRzNEcnUya0kvagprMTBkM2lIMzlWZWQ5R1Y3M252clZuSHdKc2RBeUM1ZmJUU0FQVFVTSTlvdDFRRmxDUVBnQ2JLbjBRbmxUeUhXCjJjZ04rNkNwVitFOHRaVmoydnA2aEw5ZkdLNm1CQi9iOFRTd0ZmMUZrZ1gvYUxjdXpmQ2hmVFNDOWlRTk15cEEKY2pmWnRJM1orM2x1c0lQek1aQTU2T2VzaHc5Z0ZCR1JMN0c2R1pmSnBvTmhlcUw5Zmp3VFRkNURlbVZXcUxURwpOWTVoYVd4YnMvVW04bjNEL3ZVdUJFT2E2MUNnL3BpY1JFN1JteEphSUViYkJTU1dXZEgzWDlrem5RdHJrUXloCi9vMWZ6UldacXlhQmN4cUdRVjdCUksxbUp3SURBUUFCb3ljd0pUQU9CZ05WSFE4QkFmOEVCQU1DQmFBd0V3WUQKVlIwbEJBd3dDZ1lJS3dZQkJRVUhBd0l3RFFZSktvWklodmNOQVFFTEJRQURnZ0VCQUNEWGRPQ3FxVUx6b1FJRgpaWGpBNWxBMXArZG1KaUg2Q016N2taTWozazkzbGs3ZmZTWXZKQjB3MFY2UUZGcExQNUJON1pFRzNsTmxKdkZzCjFhR2M4Q0tvV3kzNzJvR1ZnRERlTUFZQ0dic0RLYnhTMHVETHcydGxuQkpoTTRFc1lldHBnNUE0dmpUa0g3SWkKVzljb1V4V2xWdjAvN2VPMW1sTzloYVhMQnJjS1l0eTNneEF6R2NJNW9wNnpYZjFLNk5UMWJaN2gya1dvdyt1MgpNZXNYZFFueHdVZ0YzdzNWMVREQSt1UGFFN0R2MmRvMnNTRTc4Mk9rRDhna0UzdytJSnhqOXVwSTMrcDVOVzBaCmtDMVk2b3NIN0pFT1RHQW8yeTZ0b2pFNngwdTJ6R0E3UVVpM1N4czNMcnhLcFFkSFN1aitZZnh0dkgvOWY4ak4KS1BMbFV5ST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb2dJQkFBS0NBUUVBMUxyZmUxaXNQaTNDYng4eHRDWG1QTlE2L0xXYVVEa1ZRNVBkdGtQK3dVYmdJUFJ6CmNtRzNEcnUya0kvamsxMGQzaUgzOVZlZDlHVjczbnZyVm5Id0pzZEF5QzVmYlRTQVBUVVNJOW90MVFGbENRUGcKQ2JLbjBRbmxUeUhXMmNnTis2Q3BWK0U4dFpWajJ2cDZoTDlmR0s2bUJCL2I4VFN3RmYxRmtnWC9hTGN1emZDaApmVFNDOWlRTk15cEFjamZadEkzWiszbHVzSVB6TVpBNTZPZXNodzlnRkJHUkw3RzZHWmZKcG9OaGVxTDlmandUClRkNURlbVZXcUxUR05ZNWhhV3hicy9VbThuM0QvdlV1QkVPYTYxQ2cvcGljUkU3Um14SmFJRWJiQlNTV1dkSDMKWDlrem5RdHJrUXloL28xZnpSV1pxeWFCY3hxR1FWN0JSSzFtSndJREFRQUJBb0lCQUJ0bjA4QzFSTU5oNjhtYgpFREV3TE1BcmEwb0JMMWNrYzN2WVFkam9XNXFVd2UwYzhQNk1YaVAweE9sTTBEbTg1a3NtdnlZSldwMFFzZXVRCnRWbldwZVNwQ015QlJPUHh2bytrRmFrdXczYk1qaktpSUN1L3EyVC96RjNzY3h4dGJIZTlVL094WGJ2YStobE0KNlpuT2ViYlpVU1A0NHNIcFVzSVNkZk1BK00ySmg1UFJibGZWaUFEY1hxNFR5RU1JaStzRkhOcFIrdmdWZzRFawp4RmFVaS83V0E2YUxWVzBUTzREdjMwbTJ0TVczWXN1bk1LTU0xOTNyUEZrU0dEdFpheWV2Z0JDeURXaFhOTEo2Clh1cTNxSUg4bFE2bzRBUjMvcDc1ZW9hOCtrVzVmT3o2UWF3WnpPYlBENkRCQlVOYVM1YklXaVV1dmx5L0JlM20KZnlxK3NRRUNnWUVBMW84R3l6ODk2bFhwdU1yVXVsb2orbGp5U0FaNkpLOCsyaFMvQnpyREx6NlpvY3FzKzg3awpVUkwzKy9LL1pja2pIMVVDeXROVVZ6Q3RKaG4zZmdLS2dpQWhsU0pNRzhqc05sbEkydFZSazNZZ1RCcUg2bXZxCit3citsTUxoUDZxbWFObUx3QXljY2lEanpMdXlRdjhVOFhKazJOdVFsQlFwbkt2eWJIRGdxSUVDZ1lFQS9kRnMKazNlYmRNNFAxV2psYXJoRTV5blpuRmdQbDg1L2Vudk4rQ1oxcStlMGxYendaUGswdWdJUWozYyt2UEpLWlh0OApLWk1HQjM0N2VLNlFIL3J1a2xRWXlLOStHeUV1YnRJQUZ2NWFrYXZxV1haR1p5ZC9QdDR1V09adXMrd3BnSG00CkxFY0lzZElsYkpFY2RJTzJyb3FaY0VNY3FEbGtXcTdwQWxqU2VxY0NnWUJYdUQ0RTFxUlByRFJVRXNrS0wxUksKUkJjNkR6dmN4N0VncEI2OXErNms0Q2tibHF0R2YvMmtqK2JISVNYVFRYcUlrczhEY1ljbjVvVEQ4UlhZZE4xLworZmNBNi9iRjNVMkZvdGRBY0xwYldZNDJ6eG9HWTN5OGluQXZEY1hkcTcxQlhML2dFc2ZiZVVycEowdm9URFdaCnlUVWwzQTZ1RzlndmI3VTdWS0xsQVFLQmdBTmNscmVOU2YzT0ROK2l1QWNsMGFQT0poZXdBdVRiMDB4bi8xNWUKQkFqMjFLbDJNaWprTkJLU25HMktBc2ExM3M1aFNFKzBwc3ZLbkRjSStOZXpseDFSQjlNQW9BYno5WTE2TW80YgphRSt0bXpqOEhBcVp0MUc1MTV0TjBnR0lDelNzYUFnT0dNdGlJU1RDOTBHRHpST2F1bFdHVGdiY1c3dm52U1pPCnp0clpBb0dBWmtIRWV5em16Z2cxR3dtTzN3bmljSHRMR1BQRFhiSW53NTdsdkIrY3lyd0FrVEs1MlFScTM0VkMKRDhnQWFwMTU2OWlWUER3YlgrNkpBQk1WQ2tNUmdxMjdHanUzN0pVY2Fib2g1YzJQeTBYNUlhUG8rek1hWHgvQwpqbjUvUW5YandjU1MrRU5hL1lXVWcxWEVjQjJYdEM0UExCdGUycitrUTVLbFNOREcxSTQ9Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==`
 
+		kubeletconf.Write([]byte(kubeletconfDef))
 		fakePod := testutils.NewFakePod("testpod", "", "net1")
 		conf := `{
 			"name":"node-cni-network",
@@ -767,65 +822,44 @@ var _ = Describe("k8sclient operations", func() {
 		})
 	})
 
-	// can't get this test working yet - metadata annotation issue
-	// 	Context("getKubernetesDelegate", func() {
-	// 		It("reaches that big chunk of untested code, better test name is a work in progress", func() {
-	// 			/*
-	// 				func call [networks] -> getnetworkdelegates [net] -> getkubernetesdelegate
-	// 			*/
-	// 			fmt.Println("BLAH!!!")
-	// 			fakePod := testutils.NewFakePod("testpod", "net1,net2", "")
-	// 			net1 := `{
-	// 	"name": "net1",
-	// 	"type": "mynet",
-	// 	"cniVersion": "0.2.0"
-	// }`
-	// 			net2 := `{
-	// 	"name": "net2",
-	// 	"type": "mynet2",
-	// 	"cniVersion": "0.2.0"
-	// }`
-	// 			net3 := `{
-	// 	"name": "net3",
-	// 	"type": "mynet3",
-	// 	"cniVersion": "0.2.0"
-	// }`
-	// 			// args := &skel.CmdArgs{
-	// 			// 	Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
-	// 			// }
+	Context("getKubernetesDelegate", func() {
+		It("failed to get a ResourceClient instance", func() {
+			fakePod := testutils.NewFakePod("testpod", "net1,net2", "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+			net2 := `{
+		"name": "net2",
+		"type": "mynet2",
+		"cniVersion": "0.2.0"
+	}`
+			net3 := `{
+		"name": "net3",
+		"type": "mynet3",
+		"cniVersion": "0.2.0"
+	}`
+			// args := &skel.CmdArgs{
+			// 	Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+			// }
 
-	// 			fKubeClient := testutils.NewFakeKubeClient()
-	// 			fKubeClient.AddPod(fakePod)
-	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", net1)
-	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net2", net2)
-	// 			// net3 is not used; make sure it's not accessed
-	// 			fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net3", net3)
+			fKubeClient := testutils.NewFakeKubeClient()
+			fKubeClient.AddPod(fakePod)
+			fKubeClient.AddNetConfigAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1)
+			fKubeClient.AddNetConfigAnnotation(fakePod.ObjectMeta.Namespace, "net2", net2)
+			// net3 is not used; make sure it's not accessed
+			fKubeClient.AddNetConfigAnnotation(fakePod.ObjectMeta.Namespace, "net3", net3)
 
-	// 			kubeClient, err := GetK8sClient("", fKubeClient)
-	// 			Expect(err).NotTo(HaveOccurred())
-	// 			// k8sArgs, err := GetK8sArgs(args)
-	// 			Expect(err).NotTo(HaveOccurred())
-	// 			// pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-	// 			networks, err := GetPodNetwork(fakePod)
-	// 			Expect(err).NotTo(HaveOccurred())
+			kubeClient, err := GetK8sClient("", fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
 
-	// 			meme, err := kubeClient.GetRawWithPath("/apis/k8s.cni.cncf.io/v1/namespaces/test/network-attachment-definitions/net1")
-	// 			fmt.Println("MEME: ", meme)
-
-	// 			_, err = GetNetworkDelegates(kubeClient, fakePod, networks, tmpDir, false)
-	// 			Expect(err).NotTo(HaveOccurred())
-	// 			// Expect(fKubeClient.PodCount).To(Equal(1))
-	// 			// Expect(fKubeClient.NetCount).To(Equal(2))
-
-	// 			// Expect(len(delegates)).To(Equal(2))
-	// 			// Expect(delegates[0].Conf.Name).To(Equal("net1"))
-	// 			// Expect(delegates[0].Conf.Type).To(Equal("mynet"))
-	// 			// Expect(delegates[0].MasterPlugin).To(BeFalse())
-	// 			// Expect(delegates[1].Conf.Name).To(Equal("net2"))
-	// 			// Expect(delegates[1].Conf.Type).To(Equal("mynet2"))
-	// 			// Expect(delegates[1].MasterPlugin).To(BeFalse())
-	// 		})
-	// 	})
+			_, err = GetNetworkDelegates(kubeClient, fakePod, networks, tmpDir, false)
+			Expect(err).To(HaveOccurred())
+		})
+	})
 
 	Context("parsePodNetworkObjectName", func() {
 		It("fails to get podnetwork given bad annotation values", func() {
@@ -892,7 +926,7 @@ var _ = Describe("k8sclient operations", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		// Still figuring this next one out. deals with exponentialBackoff
+		// TODO Still figuring this next one out. deals with exponentialBackoff
 		// It("Fails to set pod network annotations without error", func() {
 		// 	fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
@@ -985,6 +1019,29 @@ var _ = Describe("k8sclient operations", func() {
 		})
 
 		It("Sets network status with kubeclient built from kubeconfig and attempts to connect", func() {
+			kubeletconf, err := os.Create("/etc/kubernetes/kubelet.conf")
+			kubeletconfDef := `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFNU1EVXpNVEUxTVRRME1Gb1hEVEk1TURVeU9ERTFNVFEwTUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBS3pLCnZQSHNxQWpMSHdxbDdMaDdQeTJuSndEdzAwTU4rZjFVTWtIS1BrOTVsTVRVRmgrMTVob05pWVJjaGt2d3VTRXMKRXNLYTJBRXpVeCtxR3hqTXptb01RdklMamNLbVdUS3ViNXZvZ29WV3l0N2ZzaW1jUlk4c2hWbmFSQ1pQZnptYgpUTVVRcFNHbUc5WWNGNlJhMnhwbTJ6Qm5aVWM0QjN6M1UxeHE3b1NRREp5ZVRna3VEZDB3SGhLay9tYWREYlgyCk5DU2ROVjRoUEFJcWY0MVZWc0hGV3c4WWpOUGllMVZBdWZQZDBRQlJuVFgraW50dm9weVpuWnJoVFJzVU5CanMKRWc0UGFEVXRMZDZsSUxqUnhEN2RkL1JYUWZaQ1E5azI3b0t1eU5RZUJMaWdhb052M3JPeExPWGxMaU1HUGZpVgpPTktxencwaGFDUlF1cHdoUlFVQ0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFGU0MrYmJHaENZTyszOXA2QVJtOFBYbnZFTmIKTjdNd2VWSXVGazh3T3c2RWlHOTllZTJIb25KOCtxaEFLNXlCNVU0d3FEM2FkY0hNTHBGVUoxMVMrSVYra2hCYgo0SGYrcEtVZEJxM3MvYXAxMmppdUNZMUVDanpIVjZ5SDZLRGwrZEdibDR1dVJ6S016SkZteFpncEl4TUVqbEZ0CnByK2MzQmdaWWVVYlpTdDFhR2VObFlvdGxKZEFBbWlZcmkxcFAzOUxzb2xZbWJEOTNVb1NTYnhoR2lkSzBjNHcKbHV5aUxJQWJUVnJxMEo1UllCa05ZOGdMVTBRZVFJaVZTYWhkc3cvakgxL0dZY2J4alN6R1ZwOTAwb1ZMWUpsQQo5SkhVaUlTb3VHVTE1QVRpMklvN0tOa2NkdW1hMCtPbU1IcnM4RGE3UEo3VzBjSFJNYWZXVG1xSE1RST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    server: https://invalid.local:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: system:node:localhost.localdomain
+  name: system:node:localhost.localdomain@kubernetes
+current-context: system:node:localhost.localdomain@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: system:node:localhost.localdomain
+  user:
+    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURBVENDQWVtZ0F3SUJBZ0lJWjd2bEJJYUF6V3d3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB4T1RBMU16RXhOVEUwTkRCYUZ3MHlNREExTXpBeE5URTBOREZhTUVNeApGVEFUQmdOVkJBb1RESE41YzNSbGJUcHViMlJsY3pFcU1DZ0dBMVVFQXhNaGMzbHpkR1Z0T201dlpHVTZiRzlqCllXeG9iM04wTG14dlkyRnNaRzl0WVdsdU1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0MKQVFFQTFMcmZlMWlzUGkzQ2J4OHh0Q1htUE5RNi9MV2FVRGtWUTVQZHRrUCt3VWJnSVBSemNtRzNEcnUya0kvagprMTBkM2lIMzlWZWQ5R1Y3M252clZuSHdKc2RBeUM1ZmJUU0FQVFVTSTlvdDFRRmxDUVBnQ2JLbjBRbmxUeUhXCjJjZ04rNkNwVitFOHRaVmoydnA2aEw5ZkdLNm1CQi9iOFRTd0ZmMUZrZ1gvYUxjdXpmQ2hmVFNDOWlRTk15cEEKY2pmWnRJM1orM2x1c0lQek1aQTU2T2VzaHc5Z0ZCR1JMN0c2R1pmSnBvTmhlcUw5Zmp3VFRkNURlbVZXcUxURwpOWTVoYVd4YnMvVW04bjNEL3ZVdUJFT2E2MUNnL3BpY1JFN1JteEphSUViYkJTU1dXZEgzWDlrem5RdHJrUXloCi9vMWZ6UldacXlhQmN4cUdRVjdCUksxbUp3SURBUUFCb3ljd0pUQU9CZ05WSFE4QkFmOEVCQU1DQmFBd0V3WUQKVlIwbEJBd3dDZ1lJS3dZQkJRVUhBd0l3RFFZSktvWklodmNOQVFFTEJRQURnZ0VCQUNEWGRPQ3FxVUx6b1FJRgpaWGpBNWxBMXArZG1KaUg2Q016N2taTWozazkzbGs3ZmZTWXZKQjB3MFY2UUZGcExQNUJON1pFRzNsTmxKdkZzCjFhR2M4Q0tvV3kzNzJvR1ZnRERlTUFZQ0dic0RLYnhTMHVETHcydGxuQkpoTTRFc1lldHBnNUE0dmpUa0g3SWkKVzljb1V4V2xWdjAvN2VPMW1sTzloYVhMQnJjS1l0eTNneEF6R2NJNW9wNnpYZjFLNk5UMWJaN2gya1dvdyt1MgpNZXNYZFFueHdVZ0YzdzNWMVREQSt1UGFFN0R2MmRvMnNTRTc4Mk9rRDhna0UzdytJSnhqOXVwSTMrcDVOVzBaCmtDMVk2b3NIN0pFT1RHQW8yeTZ0b2pFNngwdTJ6R0E3UVVpM1N4czNMcnhLcFFkSFN1aitZZnh0dkgvOWY4ak4KS1BMbFV5ST0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb2dJQkFBS0NBUUVBMUxyZmUxaXNQaTNDYng4eHRDWG1QTlE2L0xXYVVEa1ZRNVBkdGtQK3dVYmdJUFJ6CmNtRzNEcnUya0kvamsxMGQzaUgzOVZlZDlHVjczbnZyVm5Id0pzZEF5QzVmYlRTQVBUVVNJOW90MVFGbENRUGcKQ2JLbjBRbmxUeUhXMmNnTis2Q3BWK0U4dFpWajJ2cDZoTDlmR0s2bUJCL2I4VFN3RmYxRmtnWC9hTGN1emZDaApmVFNDOWlRTk15cEFjamZadEkzWiszbHVzSVB6TVpBNTZPZXNodzlnRkJHUkw3RzZHWmZKcG9OaGVxTDlmandUClRkNURlbVZXcUxUR05ZNWhhV3hicy9VbThuM0QvdlV1QkVPYTYxQ2cvcGljUkU3Um14SmFJRWJiQlNTV1dkSDMKWDlrem5RdHJrUXloL28xZnpSV1pxeWFCY3hxR1FWN0JSSzFtSndJREFRQUJBb0lCQUJ0bjA4QzFSTU5oNjhtYgpFREV3TE1BcmEwb0JMMWNrYzN2WVFkam9XNXFVd2UwYzhQNk1YaVAweE9sTTBEbTg1a3NtdnlZSldwMFFzZXVRCnRWbldwZVNwQ015QlJPUHh2bytrRmFrdXczYk1qaktpSUN1L3EyVC96RjNzY3h4dGJIZTlVL094WGJ2YStobE0KNlpuT2ViYlpVU1A0NHNIcFVzSVNkZk1BK00ySmg1UFJibGZWaUFEY1hxNFR5RU1JaStzRkhOcFIrdmdWZzRFawp4RmFVaS83V0E2YUxWVzBUTzREdjMwbTJ0TVczWXN1bk1LTU0xOTNyUEZrU0dEdFpheWV2Z0JDeURXaFhOTEo2Clh1cTNxSUg4bFE2bzRBUjMvcDc1ZW9hOCtrVzVmT3o2UWF3WnpPYlBENkRCQlVOYVM1YklXaVV1dmx5L0JlM20KZnlxK3NRRUNnWUVBMW84R3l6ODk2bFhwdU1yVXVsb2orbGp5U0FaNkpLOCsyaFMvQnpyREx6NlpvY3FzKzg3awpVUkwzKy9LL1pja2pIMVVDeXROVVZ6Q3RKaG4zZmdLS2dpQWhsU0pNRzhqc05sbEkydFZSazNZZ1RCcUg2bXZxCit3citsTUxoUDZxbWFObUx3QXljY2lEanpMdXlRdjhVOFhKazJOdVFsQlFwbkt2eWJIRGdxSUVDZ1lFQS9kRnMKazNlYmRNNFAxV2psYXJoRTV5blpuRmdQbDg1L2Vudk4rQ1oxcStlMGxYendaUGswdWdJUWozYyt2UEpLWlh0OApLWk1HQjM0N2VLNlFIL3J1a2xRWXlLOStHeUV1YnRJQUZ2NWFrYXZxV1haR1p5ZC9QdDR1V09adXMrd3BnSG00CkxFY0lzZElsYkpFY2RJTzJyb3FaY0VNY3FEbGtXcTdwQWxqU2VxY0NnWUJYdUQ0RTFxUlByRFJVRXNrS0wxUksKUkJjNkR6dmN4N0VncEI2OXErNms0Q2tibHF0R2YvMmtqK2JISVNYVFRYcUlrczhEY1ljbjVvVEQ4UlhZZE4xLworZmNBNi9iRjNVMkZvdGRBY0xwYldZNDJ6eG9HWTN5OGluQXZEY1hkcTcxQlhML2dFc2ZiZVVycEowdm9URFdaCnlUVWwzQTZ1RzlndmI3VTdWS0xsQVFLQmdBTmNscmVOU2YzT0ROK2l1QWNsMGFQT0poZXdBdVRiMDB4bi8xNWUKQkFqMjFLbDJNaWprTkJLU25HMktBc2ExM3M1aFNFKzBwc3ZLbkRjSStOZXpseDFSQjlNQW9BYno5WTE2TW80YgphRSt0bXpqOEhBcVp0MUc1MTV0TjBnR0lDelNzYUFnT0dNdGlJU1RDOTBHRHpST2F1bFdHVGdiY1c3dm52U1pPCnp0clpBb0dBWmtIRWV5em16Z2cxR3dtTzN3bmljSHRMR1BQRFhiSW53NTdsdkIrY3lyd0FrVEs1MlFScTM0VkMKRDhnQWFwMTU2OWlWUER3YlgrNkpBQk1WQ2tNUmdxMjdHanUzN0pVY2Fib2g1YzJQeTBYNUlhUG8rek1hWHgvQwpqbjUvUW5YandjU1MrRU5hL1lXVWcxWEVjQjJYdEM0UExCdGUycitrUTVLbFNOREcxSTQ9Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==`
+
+			kubeletconf.Write([]byte(kubeletconfDef))
+
 			result := &types020.Result{
 				CNIVersion: "0.2.0",
 				IP4: &types020.IPConfig{
