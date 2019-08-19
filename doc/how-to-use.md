@@ -533,3 +533,7 @@ Used only with `--multus-conf-file=auto`. See the documentation for logging for 
 Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to speicfy CNI spec version.
 
     --cni-version=
+
+In some cases, the original CNI configuration that the Multus configuration was generated from (using `--multus-conf-file=auto`) may be used as a sort of semaphor for network readiness -- as this model is used by the Kubelet itself. If you need to disable Multus' availablity, you may wish to clean out the generated configuration file when the source file for autogeneration of the config file is no longer present. You can use this functionality by setting:
+
+    --cleanup-config-on-exit=true
