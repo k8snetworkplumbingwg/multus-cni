@@ -163,6 +163,8 @@ type NetworkSelectionElement struct {
 	// BandwidthRequest contains an optional requested bandwidth for
 	// the network
 	BandwidthRequest *BandwidthEntry `json:"bandwidth,omitempty"`
+	// CNIArgs contains additional CNI arguments for the network interface
+	CNIArgs	*map[string]interface{} `json:"cni-args"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes

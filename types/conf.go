@@ -74,11 +74,23 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConfList bytes: %v", err)
 			}
 		}
+		if net != nil && net.CNIArgs != nil {
+			bytes, err = addCNIArgsInConfList(bytes, net.CNIArgs)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add cni-args in NetConfList bytes: %v", err)
+			}
+		}
 	} else {
 		if deviceID != "" {
 			bytes, err = delegateAddDeviceID(bytes, deviceID)
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConf bytes: %v", err)
+			}
+		}
+		if net != nil && net.CNIArgs != nil {
+			bytes, err = addCNIArgsInConfig(bytes, net.CNIArgs)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add cni-args in NetConfList bytes: %v", err)
 			}
 		}
 	}
@@ -362,6 +374,78 @@ func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
 		return nil, logging.Errorf("addDeviceIDInConfList: failed to re-marshal: %v", err)
 	}
 	logging.Debugf("addDeviceIDInConfList: updated configBytes %s", string(configBytes))
+	return configBytes, nil
+}
+
+// injectCNIArgs injects given args to cniConfig
+func injectCNIArgs(cniConfig *map[string]interface{}, args *map[string]interface{}) error {
+	if argsval, ok := (*cniConfig)["args"]; ok {
+		argsvalmap := argsval.(map[string]interface{})
+		if cnival, ok := argsvalmap["cni"]; ok {
+			cnivalmap := cnival.(map[string]interface{})
+			// merge it if conf has args
+			for key, val := range *args {
+				cnivalmap[key] = val
+			}
+		} else {
+			argsvalmap["cni"] = *args
+		}
+	} else {
+		argsval := map[string]interface{}{}
+		argsval["cni"] = *args
+		(*cniConfig)["args"] = argsval
+	}
+	return nil
+}
+
+// addCNIArgsInConfig injects given cniArgs to CNI config in inBytes
+func addCNIArgsInConfig(inBytes []byte, cniArgs *map[string]interface{}) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addCNIArgsInConfig(): failed to unmarshal inBytes: %v", err)
+	}
+
+	injectCNIArgs(&rawConfig, cniArgs)
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addCNIArgsInConfig(): failed to re-marshal: %v", err)
+	}
+	return configBytes, nil
+}
+
+// addCNIArgsInConfList injects given cniArgs to CNI conflist in inBytes
+func addCNIArgsInConfList(inBytes []byte, cniArgs *map[string]interface{}) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addCNIArgsInConfList(): failed to unmarshal inBytes: %v", err)
+	}
+
+	pList, ok := rawConfig["plugins"]
+	if !ok {
+		return nil, logging.Errorf("addCNIArgsInConfList(): unable to get plugin list")
+	}
+
+	pMap, ok := pList.([]interface{})
+	if !ok {
+		return nil, logging.Errorf("addCNIArgsInConfList(): unable to typecast plugin list")
+	}
+
+	for idx := range pMap {
+		valMap := pMap[idx].(map[string]interface{})
+		injectCNIArgs(&valMap, cniArgs)
+	}
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addCNIArgsInConfList(): failed to re-marshal: %v", err)
+	}
 	return configBytes, nil
 }
 
