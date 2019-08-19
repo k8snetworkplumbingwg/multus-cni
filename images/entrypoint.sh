@@ -3,6 +3,20 @@
 # Always exit on errors.
 set -e
 
+# Run a clean up when we exit if configured to do so.
+trap cleanup TERM
+function cleanup {
+  if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == "true" ]; then
+    CONF=$(cat <<-EOF
+        {Multus configuration intentionally invalidated to prevent pods from being scheduled.}
+EOF
+      )
+      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      log "Multus configuration intentionally invalidated to prevent pods from being scheduled."
+  fi
+}
+
+
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
@@ -14,6 +28,7 @@ MULTUS_NAMESPACE_ISOLATION=false
 MULTUS_LOG_LEVEL=""
 MULTUS_LOG_FILE=""
 OVERRIDE_NETWORK_NAME=false
+MULTUS_CLEANUP_CONFIG_ON_EXIT=false
 
 # Give help text for parameters.
 function usage()
@@ -38,6 +53,7 @@ function usage()
     echo -e "\t--multus-log-level=$MULTUS_LOG_LEVEL (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--override-network-name=false (used only with --multus-conf-file=auto)"
+    echo -e "\t--cleanup-config-on-exit=false (used only with --multus-conf-file=auto)"
 }
 
 function log()
@@ -96,6 +112,9 @@ while [ "$1" != "" ]; do
             ;;
         --override-network-name)
             OVERRIDE_NETWORK_NAME=$VALUE
+            ;;
+        --cleanup-config-on-exit)
+            MULTUS_CLEANUP_CONFIG_ON_EXIT=$VALUE
             ;;
         *)
             warn "unknown parameter \"$PARAM\""
@@ -192,8 +211,9 @@ fi
 
 # ------------------------------- Generate "00-multus.conf"
 
+function generateMultusConf {
 if [ "$MULTUS_CONF_FILE" == "auto" ]; then
-  log "Generating Multus configuration file ..."
+  log "Generating Multus configuration file using files in $MULTUS_AUTOCONF_DIR..."
   found_master=false
   tries=0
   while [ $found_master == false ]; do
@@ -204,6 +224,13 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           log "Attemping to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
+        # See if the Multus configuration file exists, if it does then clean it up.
+        if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ] && [ -f "$CNI_CONF_DIR/00-multus.conf" ]; then
+          # But first, check if it has the invalidated configuration in it (otherwise we keep doing this over and over.)
+          if ! grep -q "invalidated" $CNI_CONF_DIR/00-multus.conf; then
+            cleanup
+          fi
+        fi
         sleep 1;
       else
         error "Multus could not be configured: no master plugin was found."
@@ -254,34 +281,49 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         MASTER_PLUGIN_NET_NAME="multus-cni-network"
       fi
 
-      MASTER_PLUGIN_JSON="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN)"
+      MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
+      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
+      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
       CONF=$(cat <<-EOF
-  			{
+        {
           $CNI_VERSION_STRING
-				"name": "$MASTER_PLUGIN_NET_NAME",
-  				"type": "multus",
+          "name": "$MASTER_PLUGIN_NET_NAME",
+          "type": "multus",
           $ISOLATION_STRING
           $LOG_LEVEL_STRING
           $LOG_FILE_STRING
-  				"kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
-  				"delegates": [
-  					$MASTER_PLUGIN_JSON
-  				]
-  			}
+          "kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
+          "delegates": [
+            $MASTER_PLUGIN_JSON
+          ]
+        }
 EOF
-  		)
+      )
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
-      mv ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN} ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old
-      log "Original master file moved to ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old"
     fi
   done
 fi
+}
+generateMultusConf
 
 # ---------------------- end Generate "00-multus.conf".
 
-log "Entering sleep... (success)"
-
-# Sleep forever.
-sleep infinity
+# Enter either sleep loop, or watch loop...
+if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
+  log "Entering watch loop..."
+  while true; do
+    # Check and see if the original master plugin configuration exists...
+    if [ ! -f "$MASTER_PLUGIN_LOCATION" ]; then
+      log "Master plugin @ $MASTER_PLUGIN_LOCATION has been deleted. Performing cleanup..."
+      cleanup
+      generateMultusConf
+      log "Continuing watch loop after configuration regeneration..."
+    fi
+    sleep 1
+  done
+else
+  log "Entering sleep (success)..."
+  sleep infinity
+fi
