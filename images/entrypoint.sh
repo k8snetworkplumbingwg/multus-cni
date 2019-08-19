@@ -29,6 +29,7 @@ MULTUS_LOG_LEVEL=""
 MULTUS_LOG_FILE=""
 OVERRIDE_NETWORK_NAME=false
 MULTUS_CLEANUP_CONFIG_ON_EXIT=false
+RESTART_CRIO=false
 
 # Give help text for parameters.
 function usage()
@@ -53,6 +54,7 @@ function usage()
     echo -e "\t--multus-log-file=$MULTUS_LOG_FILE (empty by default, used only with --multus-conf-file=auto)"
     echo -e "\t--override-network-name=false (used only with --multus-conf-file=auto)"
     echo -e "\t--cleanup-config-on-exit=false (used only with --multus-conf-file=auto)"
+    echo -e "\t--restart-crio=false (restarts CRIO after config file is generated)"
 }
 
 function log()
@@ -114,6 +116,9 @@ while [ "$1" != "" ]; do
             ;;
         --cleanup-config-on-exit)
             MULTUS_CLEANUP_CONFIG_ON_EXIT=$VALUE
+            ;;
+        --restart-crio)
+            RESTART_CRIO=$VALUE
             ;;
         *)
             warn "unknown parameter \"$PARAM\""
@@ -301,6 +306,11 @@ EOF
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
+
+      if [ "$RESTART_CRIO" == true ]; then
+        log "Restarting crio"
+        systemctl restart crio
+      fi
     fi
   done
 fi
