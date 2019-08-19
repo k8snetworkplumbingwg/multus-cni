@@ -150,7 +150,11 @@ spec:
             memory: "50Mi"
         securityContext:
           privileged: true
+          capabilities:
+            add: ["SYS_ADMIN"]
         volumeMounts:
+        - name: run
+          mountPath: /run
         - name: cni
           mountPath: /host/etc/cni/net.d
         - name: cnibin
@@ -158,6 +162,9 @@ spec:
         - name: multus-cfg
           mountPath: /tmp/multus-conf
       volumes:
+        - name: run
+          hostPath:
+            path: /run
         - name: cni
           hostPath:
             path: /etc/cni/net.d
