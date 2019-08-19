@@ -233,10 +233,6 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		if n.Namespace == "" {
 			n.Namespace = defaultNamespace
 		}
-		// compatibility pre v3.2, will be removed in v4.0
-		if n.DeprecatedInterfaceRequest != "" && n.InterfaceRequest == "" {
-			n.InterfaceRequest = n.DeprecatedInterfaceRequest
-		}
 		if n.MacRequest != "" {
 			// validate MAC address
 			if _, err := net.ParseMAC(n.MacRequest); err != nil {

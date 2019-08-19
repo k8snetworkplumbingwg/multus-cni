@@ -358,6 +358,110 @@ var _ = Describe("config operations", func() {
 		Expect(hostDeviceConfList.Plugins[0].PCIBusID).To(Equal("0000:00:00.3"))
 	})
 
+	It("add cni-args in config", func() {
+		var args map[string]interface{}
+		conf := `{
+    "name": "second-network",
+    "type": "bridge"
+}`
+		cniArgs := `{
+    "args1": "val1"
+}`
+		type bridgeNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			Args     struct {
+				CNI map[string]string `json:"cni"`
+			} `json:"args"`
+		}
+
+                err := json.Unmarshal([]byte(cniArgs), &args)
+		Expect(err).NotTo(HaveOccurred())
+                net := &NetworkSelectionElement{
+			Name: "test-elem",
+			CNIArgs: &args,
+		}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		Expect(err).NotTo(HaveOccurred())
+		bridgeConf := &bridgeNetConf{}
+		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConf)
+		Expect(bridgeConf.Args.CNI["args1"]).To(Equal("val1"))
+	})
+
+	It("add cni-args in config which has cni args already (merge case)", func() {
+		var args map[string]interface{}
+		conf := `{
+    "name": "second-network",
+    "type": "bridge",
+    "args": {
+       "cni": {
+         "args0": "val0",
+         "args1": "val1"
+       }
+    }
+}`
+		cniArgs := `{
+    "args1": "val1a"
+}`
+		type bridgeNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			Args     struct {
+				CNI map[string]string `json:"cni"`
+			} `json:"args"`
+		}
+
+                err := json.Unmarshal([]byte(cniArgs), &args)
+		Expect(err).NotTo(HaveOccurred())
+                net := &NetworkSelectionElement{
+			Name: "test-elem",
+			CNIArgs: &args,
+		}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		Expect(err).NotTo(HaveOccurred())
+		bridgeConf := &bridgeNetConf{}
+		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConf)
+		Expect(bridgeConf.Args.CNI["args0"]).To(Equal("val0"))
+		Expect(bridgeConf.Args.CNI["args1"]).To(Equal("val1a"))
+	})
+
+	It("add cni-args in conflist", func() {
+		var args map[string]interface{}
+		conf := `{
+    "name": "second-network",
+    "plugins": [
+      {
+        "type": "bridge"
+      }
+    ]
+}`
+		cniArgs := `{
+    "args1": "val1"
+}`
+		type bridgeNetConf struct {
+			Type     string `json:"type"`
+			Args     struct {
+				CNI map[string]string `json:"cni"`
+			} `json:"args"`
+		}
+		type bridgeNetConfList struct {
+			Name     string `json:"name"`
+			Plugins []*bridgeNetConf `json:"plugins"`
+		}
+
+                err := json.Unmarshal([]byte(cniArgs), &args)
+		Expect(err).NotTo(HaveOccurred())
+                net := &NetworkSelectionElement{
+			Name: "test-elem",
+			CNIArgs: &args,
+		}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		Expect(err).NotTo(HaveOccurred())
+		bridgeConflist := &bridgeNetConfList{}
+		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConflist)
+		Expect(bridgeConflist.Plugins[0].Args.CNI["args1"]).To(Equal("val1"))
+	})
+
 	It("creates a valid CNI runtime config", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
