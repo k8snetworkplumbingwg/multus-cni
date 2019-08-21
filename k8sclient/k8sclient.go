@@ -232,6 +232,10 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		if net.Namespace == "" {
 			net.Namespace = defaultNamespace
 		}
+		// compatibility pre v3.2, will be removed in v4.0
+		if net.ObsolatedInterfaceRequest != "" && net.InterfaceRequest == "" {
+			net.InterfaceRequest = net.ObsolatedInterfaceRequest
+		}
 	}
 
 	return networks, nil
