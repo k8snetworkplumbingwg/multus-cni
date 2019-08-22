@@ -140,6 +140,9 @@ type NetworkSelectionElement struct {
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interface,omitempty"`
+	// ObsoateInterfaceRequest is obsolated parameter at pre 3.2.
+	// This will be removed in 4.0 release.
+	ObsolatedInterfaceRequest string `json:"interfaceRequest,omitempty"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes
