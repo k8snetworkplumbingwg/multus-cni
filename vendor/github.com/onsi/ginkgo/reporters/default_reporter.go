@@ -29,9 +29,10 @@ func NewDefaultReporter(config config.DefaultReporterConfigType, stenographer st
 func (reporter *DefaultReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 	reporter.stenographer.AnnounceSuite(summary.SuiteDescription, config.RandomSeed, config.RandomizeAllSpecs, reporter.config.Succinct)
 	if config.ParallelTotal > 1 {
-		reporter.stenographer.AnnounceParallelRun(config.ParallelNode, config.ParallelTotal, summary.NumberOfTotalSpecs, summary.NumberOfSpecsBeforeParallelization, reporter.config.Succinct)
+		reporter.stenographer.AnnounceParallelRun(config.ParallelNode, config.ParallelTotal, reporter.config.Succinct)
+	} else {
+		reporter.stenographer.AnnounceNumberOfSpecs(summary.NumberOfSpecsThatWillBeRun, summary.NumberOfTotalSpecs, reporter.config.Succinct)
 	}
-	reporter.stenographer.AnnounceNumberOfSpecs(summary.NumberOfSpecsThatWillBeRun, summary.NumberOfTotalSpecs, reporter.config.Succinct)
 }
 
 func (reporter *DefaultReporter) BeforeSuiteDidRun(setupSummary *types.SetupSummary) {
@@ -61,11 +62,14 @@ func (reporter *DefaultReporter) SpecDidComplete(specSummary *types.SpecSummary)
 			reporter.stenographer.AnnounceSuccesfulSlowSpec(specSummary, reporter.config.Succinct)
 		} else {
 			reporter.stenographer.AnnounceSuccesfulSpec(specSummary)
+			if reporter.config.ReportPassed {
+				reporter.stenographer.AnnounceCapturedOutput(specSummary.CapturedOutput)
+			}
 		}
 	case types.SpecStatePending:
 		reporter.stenographer.AnnouncePendingSpec(specSummary, reporter.config.NoisyPendings && !reporter.config.Succinct)
 	case types.SpecStateSkipped:
-		reporter.stenographer.AnnounceSkippedSpec(specSummary, reporter.config.Succinct, reporter.config.FullTrace)
+		reporter.stenographer.AnnounceSkippedSpec(specSummary, reporter.config.Succinct || !reporter.config.NoisySkippings, reporter.config.FullTrace)
 	case types.SpecStateTimedOut:
 		reporter.stenographer.AnnounceSpecTimedOut(specSummary, reporter.config.Succinct, reporter.config.FullTrace)
 	case types.SpecStatePanicked:
