@@ -1,3 +1,5 @@
+// untested sections: 2
+
 package matchers
 
 import (
@@ -10,15 +12,18 @@ type HaveOccurredMatcher struct {
 }
 
 func (matcher *HaveOccurredMatcher) Match(actual interface{}) (success bool, err error) {
-	if isNil(actual) {
+	// is purely nil?
+	if actual == nil {
 		return false, nil
 	}
 
-	if isError(actual) {
-		return true, nil
+	// must be an 'error' type
+	if !isError(actual) {
+		return false, fmt.Errorf("Expected an error-type.  Got:\n%s", format.Object(actual, 1))
 	}
 
-	return false, fmt.Errorf("Expected an error.  Got:\n%s", format.Object(actual, 1))
+	// must be non-nil (or a pointer to a non-nil)
+	return !isNil(actual), nil
 }
 
 func (matcher *HaveOccurredMatcher) FailureMessage(actual interface{}) (message string) {
@@ -26,5 +31,5 @@ func (matcher *HaveOccurredMatcher) FailureMessage(actual interface{}) (message 
 }
 
 func (matcher *HaveOccurredMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	return fmt.Sprintf("Expected error:\n%s\n%s\n%s", format.Object(actual, 1), format.IndentString(actual.(error).Error(), 1), "not to have occurred")
+	return fmt.Sprintf("Unexpected error:\n%s\n%s\n%s", format.Object(actual, 1), format.IndentString(actual.(error).Error(), 1), "occurred")
 }
