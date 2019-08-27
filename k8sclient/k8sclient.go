@@ -490,8 +490,24 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 		if err = conf.AddDelegates(delegates); err != nil {
 			return 0, nil, err
 		}
+
+		// Check gatewayRequest is configured in delegates
+		// and mark its config if gateway filter is required
+		isGatewayConfigured := false
+		for _, delegate := range conf.Delegates {
+			if delegate.GatewayRequest != nil {
+				isGatewayConfigured = true
+				break
+			}
+		}
+
+		if isGatewayConfigured == true {
+			types.CheckGatewayConfig(conf.Delegates)
+		}
+
 		return len(delegates), clientInfo, nil
 	}
+
 	return 0, clientInfo, nil
 }
 

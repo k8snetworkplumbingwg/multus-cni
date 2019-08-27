@@ -38,6 +38,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	k8s "github.com/intel/multus-cni/k8sclient"
 	"github.com/intel/multus-cni/logging"
+	"github.com/intel/multus-cni/netutils"
 	"github.com/intel/multus-cni/types"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -417,6 +418,14 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			// Ignore errors; DEL must be idempotent anyway
 			_ = delPlugins(exec, args.IfName, n.Delegates, idx, rt, n.BinDir)
 			return nil, logging.Errorf("Multus: error adding pod to network %q: %v", netName, err)
+		}
+
+		// Remove gateway from routing table if the gateway is not used
+		if delegate.IsFilterGateway {
+			tmpResult, err = netutils.DeleteDefaultGW(args, ifName, &tmpResult)
+			if err != nil {
+				return nil, logging.Errorf("Multus: Err in deleting gateway: %v", err)
+			}
 		}
 
 		// Master plugin result is always used if present
