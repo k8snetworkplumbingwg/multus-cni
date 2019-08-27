@@ -469,6 +469,72 @@ $ kubectl exec -it pod-case-06 -- ip -d address
 | macvlan1 | macvlan interface (macvlan-conf-1) |
 | net2 | macvlan interface (macvlan-conf-2) |
 
+## Specifying a default route for a specific attachment
+
+Typically, the default route for a pod will route traffic over the `eth0` and therefore over the cluster-wide default network. You may wish to specify that a different network attachment will have the default route.
+
+You can achieve this by using the JSON formatted annotation and specifying a `default-route` key.
+
+*NOTE*: It's important that you consider that this may impact some functionality of getting traffic to route over the cluster-wide default network.
+
+For example, we have a this configuration for macvlan:
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.2.0/24",
+        "rangeStart": "192.168.2.200",
+        "rangeEnd": "192.168.2.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.2.1"
+      }
+    }'
+EOF
+```
+
+We can then create a pod which uses the `default-route` key in the JSON formatted `k8s.v1.cni.cncf.io/networks` annotation. 
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: samplepod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[{
+      "name": "macvlan-conf",
+      "default-route": ["192.168.2.1"]
+    }]'
+spec:
+  containers:
+  - name: samplepod
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    image: dougbtv/centos-network
+EOF
+```
+
+This will set `192.168.2.1` as the default route over the `net1` interface, such as:
+
+```
+$ kubectl exec -it samplepod -- ip route
+default via 192.168.2.1 dev net1 
+10.244.0.0/24 dev eth0  proto kernel  scope link  src 10.244.0.169 
+10.244.0.0/16 via 10.244.0.1 dev eth0 
+```
+
 ## Entrypoint Parameters
 
 Multus CNI, when installed using the daemonset-style installation uses an entrypoint script which copies the Multus binary into place, places CNI configurations. This entrypoint takes a variety of parameters for customization.

@@ -17,6 +17,7 @@ package types
 
 import (
 	"encoding/json"
+	"net"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -111,6 +112,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.PortMappingsRequest != nil {
 			delegateConf.PortMappingsRequest = net.PortMappingsRequest
 		}
+		if net.GatewayRequest != nil {
+			delegateConf.GatewayRequest = append(delegateConf.GatewayRequest, net.GatewayRequest...)
+		}
 	}
 
 	delegateConf.Bytes = bytes
@@ -183,6 +187,18 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 	return rt
 }
 
+// GetGatewayFromResult retrieves gateway IP addresses from CNI result
+func GetGatewayFromResult(result *current.Result) []net.IP {
+	var gateways []net.IP
+
+	for _, route := range result.Routes {
+		if mask, _ := route.Dst.Mask.Size(); mask == 0 {
+			gateways = append(gateways, route.GW)
+		}
+	}
+	return gateways
+}
+
 // LoadNetworkStatus create network status from CNI result
 func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
@@ -215,6 +231,7 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 	}
 
 	netstatus.DNS = result.DNS
+	netstatus.Gateway = GetGatewayFromResult(result)
 
 	return netstatus, nil
 
@@ -447,6 +464,17 @@ func addCNIArgsInConfList(inBytes []byte, cniArgs *map[string]interface{}) ([]by
 		return nil, logging.Errorf("addCNIArgsInConfList(): failed to re-marshal: %v", err)
 	}
 	return configBytes, nil
+}
+
+// CheckGatewayConfig check gatewayRequest and mark IsFilterGateway flag if
+// gw filtering is required
+func CheckGatewayConfig(delegates []*DelegateNetConf) {
+	// Check the Gateway
+	for i, delegate := range delegates {
+		if delegate.GatewayRequest == nil {
+			delegates[i].IsFilterGateway = true
+		}
+	}
 }
 
 // CheckSystemNamespaces checks whether given namespace is in systemNamespaces or not.
