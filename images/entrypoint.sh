@@ -30,6 +30,7 @@ MULTUS_LOG_FILE=""
 OVERRIDE_NETWORK_NAME=false
 MULTUS_CLEANUP_CONFIG_ON_EXIT=false
 RESTART_CRIO=false
+CRIO_RESTARTED_ONCE=false
 
 # Give help text for parameters.
 function usage()
@@ -307,10 +308,20 @@ EOF
       echo $CONF > $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
+      
+      # If we're not performing the cleanup on exit, we can safely rename the config file.
+      if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == false ]; then
+        mv ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN} ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old
+        log "Original master file moved to ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old"
+      fi
 
       if [ "$RESTART_CRIO" == true ]; then
-        log "Restarting crio"
-        systemctl restart crio
+        # Restart CRIO only once.
+        if [ "$CRIO_RESTARTED_ONCE" == false ]; then
+          log "Restarting crio"
+          systemctl restart crio
+          CRIO_RESTARTED_ONCE=true
+        fi
       fi
     fi
   done
