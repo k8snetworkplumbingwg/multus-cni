@@ -8,7 +8,6 @@ require (
 	github.com/containernetworking/plugins v0.8.2
 	github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680 // indirect
 	github.com/gogo/protobuf v0.0.0-20170330071051-c0656edd0d9e // indirect
-	github.com/golang/glog v0.0.0-20141105023935-44145f04b68c // indirect
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/btree v0.0.0-20160524151835-7d79101e329e // indirect
 	github.com/google/gofuzz v0.0.0-20161122191042-44d81051d367 // indirect
@@ -32,8 +31,7 @@ require (
 	golang.org/x/sys v0.0.0-20190825160603-fb81701db80f // indirect
 	golang.org/x/text v0.3.2 // indirect
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d // indirect
-	google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6 // indirect
-	google.golang.org/grpc v1.13.0
+	google.golang.org/grpc v1.23.0
 	gopkg.in/inf.v0 v0.9.0 // indirect
 	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
 	k8s.io/api v0.0.0-20180712090710-2d6f90ab1293
