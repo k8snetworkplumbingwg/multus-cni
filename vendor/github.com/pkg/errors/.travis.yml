@@ -12,4 +12,4 @@ go:
   - tip
 
 script:
-  - make check
+  - go test -v ./...
