@@ -141,6 +141,7 @@ spec:
         - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
         - "--override-network-name=true"
+        - "--rename-conf-file=true"
         resources:
           requests:
             cpu: "100m"
