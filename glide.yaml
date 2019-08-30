@@ -40,3 +40,8 @@ import:
   - pkg/kubelet/util
 - package: github.com/vishvananda/netns
 - package: github.com/pkg/errors
+- package: google.golang.org/grpc
+  version: ^1.23.0
+- package: golang.org/x/sys
+  subpackages:
+  - unix
