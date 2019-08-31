@@ -13,6 +13,9 @@ env:
     - REGISTRY_USER=${REGISTRY_USER}
     - REGISTRY_PASS=${REGISTRY_PASS}
     - secure: "${REGISTRY_SECURE}"
+  matrix:
+    - TARGET=amd64
+    - TARGET=ppc64le
 
 before_install:
   - sudo apt-get update -qq
@@ -24,23 +27,28 @@ install:
 before_script:
   # Make gopath... to run golint/go fmt/go vet
   # Suppress golint for fixing lint later.
-  #- golint ... | grep -v ALL_CAPS | xargs -r false
+  - golint ./... | grep -v vendor | grep -v ALL_CAPS | xargs -r false
   - go fmt ./...
   - go vet ./...
 #  - gocyclo -over 15 ./multus
 
 script:
-  - ./build
-  - sudo env PATH=${PATH} ./test.sh
-  - goveralls -coverprofile=coverage.out -service=travis-ci
-  - mkdir -p ${TRAVIS_BUILD_DIR}/dist
-  - tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" .
-  - docker build -t nfvpe/multus .
+  - GOARCH="${TARGET}" ./build
+  - |
+    if [ "${TARGET}" == "amd64" ]; then
+      sudo env PATH=${PATH} ./test.sh
+      goveralls -coverprofile=coverage.out -service=travis-ci
+      mkdir -p ${TRAVIS_BUILD_DIR}/dist
+      tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" .
+      docker build -t nfvpe/multus:latest-amd64 .
+      docker build -t nfvpe/multus:latest-ppc64le -f Dockerfile.ppc64le .
+      docker build -t nfvpe/multus-origin:latest -f Dockerfile.openshift .
+    fi
 
 deploy:
   # Release on versioned tag (e.g. v1.0)
   - provider: script
-    skip_cleanup: true
+    #skip_cleanup: true
     script: curl -sL https://git.io/goreleaser | bash
     on:
       tags: true
@@ -48,13 +56,23 @@ deploy:
       condition: "$TRAVIS_TAG =~ ^v[0-9].*$"
   # Push images to Dockerhub on tag
   - provider: script
+    skip_cleanup: true
     script: >
       bash -c '
-      docker tag nfvpe/multus nfvpe/multus:$TRAVIS_TAG;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:latest;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:stable;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:stable-amd64;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:$TRAVIS_TAG;
+      docker tag nfvpe/multus:latest-ppc64le nfvpe/multus:stable-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus; 
+      docker push nfvpe/multus:latest;
+      docker push nfvpe/multus:latest-amd64;
+      docker push nfvpe/multus:latest-ppc64le;
+      docker push nfvpe/multus:stable;
+      docker push nfvpe/multus:stable-amd64;
+      docker push nfvpe/multus:stable-ppc64le;
       docker push nfvpe/multus:$TRAVIS_TAG;
-      echo foo'
+      echo done'
     on:
       tags: true
       all_branches: true
@@ -65,10 +83,17 @@ deploy:
       branch: master
     script: >
       bash -c '
-      docker tag nfvpe/multus nfvpe/multus:snapshot;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:snapshot;
+      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:snapshot-amd64;
+      docker tag nfvpe/multus:latest-ppc64le nfvpe/multus:snapshot-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push nfvpe/multus:snapshot; 
-      echo foo'
+      docker push nfvpe/multus:snapshot;
+      docker push nfvpe/multus:snapshot-amd64;
+      docker push nfvpe/multus:snapshot-ppc64le;
+      docker push nfvpe/multus:latest;
+      docker push nfvpe/multus:latest-amd64;
+      docker push nfvpe/multus:latest-ppc64le;
+      echo done'
 
 after_success:
   # put build tgz to bintray
