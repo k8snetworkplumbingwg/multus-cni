@@ -42,6 +42,7 @@ script:
       tar cvfz ${TRAVIS_BUILD_DIR}/dist/multus-cni_amd64.tar.gz --warning=no-file-changed --exclude="dist" .
       docker build -t nfvpe/multus:latest-amd64 .
       docker build -t nfvpe/multus:latest-ppc64le -f Dockerfile.ppc64le .
+      docker build -t nfvpe/multus-origin:latest -f Dockerfile.openshift .
     fi
 
 deploy:

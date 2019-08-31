@@ -4,11 +4,11 @@ FROM openshift/origin-release:golang-1.10 as builder
 ADD . /usr/src/multus-cni
 
 WORKDIR /usr/src/multus-cni
+ENV GO111MODULE=off
 RUN ./build
 
 FROM openshift/origin-base
 RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
-COPY --from=builder /usr/src/multus-cni/images/70-multus.conf /usr/src/multus-cni/images
 COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
 ADD ./images/entrypoint.sh /
 
