@@ -2,7 +2,10 @@ package suite
 
 import (
 	"math/rand"
+	"net/http"
 	"time"
+
+	"github.com/onsi/ginkgo/internal/spec_iterator"
 
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/internal/containernode"
@@ -52,18 +55,18 @@ func (suite *Suite) Run(t ginkgoTestingT, description string, reporters []report
 
 	r := rand.New(rand.NewSource(config.RandomSeed))
 	suite.topLevelContainer.Shuffle(r)
-	specs := suite.generateSpecs(description, config)
-	suite.runner = specrunner.New(description, suite.beforeSuiteNode, specs, suite.afterSuiteNode, reporters, writer, config)
+	iterator, hasProgrammaticFocus := suite.generateSpecsIterator(description, config)
+	suite.runner = specrunner.New(description, suite.beforeSuiteNode, iterator, suite.afterSuiteNode, reporters, writer, config)
 
 	suite.running = true
 	success := suite.runner.Run()
 	if !success {
 		t.Fail()
 	}
-	return success, specs.HasProgrammaticFocus()
+	return success, hasProgrammaticFocus
 }
 
-func (suite *Suite) generateSpecs(description string, config config.GinkgoConfigType) *spec.Specs {
+func (suite *Suite) generateSpecsIterator(description string, config config.GinkgoConfigType) (spec_iterator.SpecIterator, bool) {
 	specsSlice := []*spec.Spec{}
 	suite.topLevelContainer.BackPropagateProgrammaticFocus()
 	for _, collatedNodes := range suite.topLevelContainer.Collate() {
@@ -71,6 +74,7 @@ func (suite *Suite) generateSpecs(description string, config config.GinkgoConfig
 	}
 
 	specs := spec.NewSpecs(specsSlice)
+	specs.RegexScansFilePath = config.RegexScansFilePath
 
 	if config.RandomizeAllSpecs {
 		specs.Shuffle(rand.New(rand.NewSource(config.RandomSeed)))
@@ -82,11 +86,19 @@ func (suite *Suite) generateSpecs(description string, config config.GinkgoConfig
 		specs.SkipMeasurements()
 	}
 
+	var iterator spec_iterator.SpecIterator
+
 	if config.ParallelTotal > 1 {
-		specs.TrimForParallelization(config.ParallelTotal, config.ParallelNode)
+		iterator = spec_iterator.NewParallelIterator(specs.Specs(), config.SyncHost)
+		resp, err := http.Get(config.SyncHost + "/has-counter")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			iterator = spec_iterator.NewShardedParallelIterator(specs.Specs(), config.ParallelTotal, config.ParallelNode)
+		}
+	} else {
+		iterator = spec_iterator.NewSerialIterator(specs.Specs())
 	}
 
-	return specs
+	return iterator, specs.HasProgrammaticFocus()
 }
 
 func (suite *Suite) CurrentRunningSpecSummary() (*types.SpecSummary, bool) {
@@ -137,35 +149,42 @@ func (suite *Suite) PushContainerNode(text string, body func(), flag types.FlagT
 
 func (suite *Suite) PushItNode(text string, body interface{}, flag types.FlagType, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call It from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call It from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSubjectNode(leafnodes.NewItNode(text, body, flag, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushMeasureNode(text string, body interface{}, flag types.FlagType, codeLocation types.CodeLocation, samples int) {
 	if suite.running {
-		suite.failer.Fail("You may only call Measure from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call Measure from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSubjectNode(leafnodes.NewMeasureNode(text, body, flag, codeLocation, samples, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushBeforeEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call BeforeEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call BeforeEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewBeforeEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
 func (suite *Suite) PushJustBeforeEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call JustBeforeEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call JustBeforeEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewJustBeforeEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }
 
+func (suite *Suite) PushJustAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
+	if suite.running {
+		suite.failer.Fail("You may only call JustAfterEach from within a Describe or Context", codeLocation)
+	}
+	suite.currentContainer.PushSetupNode(leafnodes.NewJustAfterEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
+}
+
 func (suite *Suite) PushAfterEachNode(body interface{}, codeLocation types.CodeLocation, timeout time.Duration) {
 	if suite.running {
-		suite.failer.Fail("You may only call AfterEach from within a Describe or Context", codeLocation)
+		suite.failer.Fail("You may only call AfterEach from within a Describe, Context or When", codeLocation)
 	}
 	suite.currentContainer.PushSetupNode(leafnodes.NewAfterEachNode(body, codeLocation, timeout, suite.failer, suite.containerIndex))
 }

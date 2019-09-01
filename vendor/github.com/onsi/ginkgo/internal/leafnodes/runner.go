@@ -2,11 +2,12 @@ package leafnodes
 
 import (
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/onsi/ginkgo/internal/codelocation"
 	"github.com/onsi/ginkgo/internal/failer"
 	"github.com/onsi/ginkgo/types"
-	"reflect"
-	"time"
 )
 
 type runner struct {
@@ -68,7 +69,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 	done := make(chan interface{}, 1)
 
 	go func() {
-                finished := false
+		finished := false
 
 		defer func() {
 			if e := recover(); e != nil || !finished {
@@ -83,9 +84,12 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 		}()
 
 		r.asyncFunc(done)
-                finished = true
+		finished = true
 	}()
 
+	// If this goroutine gets no CPU time before the select block,
+	// the <-done case may complete even if the test took longer than the timeoutThreshold.
+	// This can cause flaky behaviour, but we haven't seen it in the wild.
 	select {
 	case <-done:
 	case <-time.After(r.timeoutThreshold):
@@ -96,7 +100,7 @@ func (r *runner) runAsync() (outcome types.SpecState, failure types.SpecFailure)
 	return
 }
 func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) {
-        finished := false
+	finished := false
 
 	defer func() {
 		if e := recover(); e != nil || !finished {
@@ -107,7 +111,7 @@ func (r *runner) runSync() (outcome types.SpecState, failure types.SpecFailure) 
 	}()
 
 	r.syncFunc()
-        finished = true
+	finished = true
 
 	return
 }
