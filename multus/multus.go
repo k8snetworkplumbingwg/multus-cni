@@ -238,7 +238,10 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			return nil, logging.Errorf("Multus: error in invoke Conflist add - %q: %v", delegate.ConfList.Name, err)
 		}
 	} else {
+		origpath := os.Getenv("CNI_PATH")
+		os.Setenv("CNI_PATH", origpath+":"+binDir)
 		result, err = invoke.DelegateAdd(context.Background(), delegate.Conf.Type, delegate.Bytes, exec)
+		os.Setenv("CNI_PATH", origpath)
 		if err != nil {
 			return nil, logging.Errorf("Multus: error in invoke Delegate add - %q: %v", delegate.Conf.Type, err)
 		}
@@ -282,9 +285,13 @@ func delegateDel(exec invoke.Exec, ifName string, delegateConf *types.DelegateNe
 			return logging.Errorf("Multus: error in invoke Conflist Del - %q: %v", delegateConf.ConfList.Name, err)
 		}
 	} else {
+		origpath := os.Getenv("CNI_PATH")
+		os.Setenv("CNI_PATH", origpath+":"+binDir)
 		if err = invoke.DelegateDel(context.Background(), delegateConf.Conf.Type, delegateConf.Bytes, exec); err != nil {
+			os.Setenv("CNI_PATH", origpath)
 			return logging.Errorf("Multus: error in invoke Delegate del - %q: %v", delegateConf.Conf.Type, err)
 		}
+		os.Setenv("CNI_PATH", origpath)
 	}
 
 	return err
