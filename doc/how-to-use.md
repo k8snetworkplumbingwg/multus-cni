@@ -545,3 +545,7 @@ When using CRIO, you may need to restart CRIO to get the Multus configuration fi
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 
     --rename-conf-file=true
+
+When using `--multus-conf-file=auto` you may also care to specify a `binDir` in the configuration, this can be accomplished using the `--additional-bin-dir` option.
+
+    --additional-bin-dir=/opt/multus/bin
