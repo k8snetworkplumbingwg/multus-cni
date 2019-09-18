@@ -38,7 +38,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `type` (string, required): &quot;multus&quot;
 * `confDir` (string, optional): directory for CNI config file that multus reads. default `/etc/cni/multus/net.d`
 * `cniDir` (string, optional): Multus CNI data directory, default `/var/lib/cni/multus`
-* `binDir` (string, optional): directory for CNI plugins which multus calls. default `/opt/cni/bin`
+* `binDir` (string, optional): additional directory for CNI plugins which multus calls, in addition to the default (the default is typically set to `/opt/cni/bin`)
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
 * `logFile` (string, optional): file path for log file. multus puts log in given file
 * `logLevel` (string, optional): logging level ("debug", "error", "verbose", or "panic")
