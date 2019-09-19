@@ -35,6 +35,7 @@ import (
 	"github.com/intel/multus-cni/kubeletclient"
 	"github.com/intel/multus-cni/logging"
 	"github.com/intel/multus-cni/types"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 )
 
 const (
@@ -334,17 +335,17 @@ func getCNIConfigFromSpec(configData, netName string) ([]byte, error) {
 	return configBytes, nil
 }
 
-func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinition, confdir string) ([]byte, error) {
+func cniConfigFromNetworkResource(customResource *nettypes.NetworkAttachmentDefinition, confdir string) ([]byte, error) {
 	var config []byte
 	var err error
 
 	logging.Debugf("cniConfigFromNetworkResource: %v, %s", customResource, confdir)
-	emptySpec := types.NetworkAttachmentDefinitionSpec{}
+	emptySpec := nettypes.NetworkAttachmentDefinitionSpec{}
 	if customResource.Spec == emptySpec {
 		// Network Spec empty; generate delegate from CNI JSON config
 		// from the configuration directory that has the same network
 		// name as the custom resource
-		config, err = getCNIConfigFromFile(customResource.Metadata.Name, confdir)
+		config, err = getCNIConfigFromFile(customResource.GetName(), confdir)
 		if err != nil {
 			return nil, logging.Errorf("cniConfigFromNetworkResource: %v", err)
 		}
@@ -352,7 +353,7 @@ func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinit
 		// Config contains a standard JSON-encoded CNI configuration
 		// or configuration list which defines the plugin chain to
 		// execute.
-		config, err = getCNIConfigFromSpec(customResource.Spec.Config, customResource.Metadata.Name)
+		config, err = getCNIConfigFromSpec(customResource.Spec.Config, customResource.GetName())
 		if err != nil {
 			return nil, logging.Errorf("cniConfigFromNetworkResource: %v", err)
 		}
@@ -370,14 +371,14 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: cannot find get a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 	}
 
-	customResource := &types.NetworkAttachmentDefinition{}
+	customResource := &nettypes.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to parse the network-attachment-definition: %v", err)
 	}
 
 	// Get resourceName annotation from NetworkAttachmentDefinition
 	deviceID := ""
-	resourceName, ok := customResource.Metadata.Annotations[resourceNameAnnot]
+	resourceName, ok := customResource.GetAnnotations()[resourceNameAnnot]
 	if ok && pod.Name != "" && pod.Namespace != "" {
 		// ResourceName annotation is found; try to get device info from resourceMap
 		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
@@ -595,7 +596,7 @@ func getDefaultNetDelegateCRD(client KubeClient, net, confdir, namespace string)
 		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get network resource: %v", err)
 	}
 
-	customResource := &types.NetworkAttachmentDefinition{}
+	customResource := &nettypes.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
 		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get the netplugin data: %v", err)
 	}
