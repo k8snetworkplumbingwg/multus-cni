@@ -108,7 +108,7 @@ data:
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
     }
 ---
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-amd64
@@ -117,9 +117,6 @@ metadata:
     tier: node
     app: multus
 spec:
-  selector:
-    matchLabels:
-      name: multus
   updateStrategy:
     type: RollingUpdate
   template:
@@ -127,7 +124,6 @@ spec:
       labels:
         tier: node
         app: multus
-        name: multus
     spec:
       hostNetwork: true
       nodeSelector:
@@ -138,11 +134,10 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: nfvpe/multus:v3.3
+        image: nfvpe/multus:v3.2
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
         resources:
           requests:
             cpu: "100m"
@@ -173,7 +168,7 @@ spec:
             - key: cni-conf.json
               path: 70-multus.conf
 ---
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-ppc64le
@@ -182,9 +177,6 @@ metadata:
     tier: node
     app: multus
 spec:
-  selector:
-    matchLabels:
-      name: multus
   updateStrategy:
     type: RollingUpdate
   template:
@@ -192,7 +184,6 @@ spec:
       labels:
         tier: node
         app: multus
-        name: multus
     spec:
       hostNetwork: true
       nodeSelector:
@@ -208,7 +199,6 @@ spec:
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
         resources:
           requests:
             cpu: "100m"
