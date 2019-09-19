@@ -39,11 +39,18 @@ Firstly, clone this GitHub repository.
 git clone https://github.com/intel/multus-cni.git && cd multus-cni
 ```
 
-We'll apply a YAML file with `kubectl` from this repo.
+If you're using Kubernetes 1.16+, we'll apply a YAML file with `kubectl` from this repo.
 
 ```
 $ cat ./images/multus-daemonset.yml | kubectl apply -f -
 ```
+
+Or, for Kubernetes versions < 1.16, use the prior version yaml:
+
+```
+$ cat ./images/multus-daemonset-pre-1.16.yml | kubectl apply -f -
+```
+
 
 ### What the Multus daemonset does
 
