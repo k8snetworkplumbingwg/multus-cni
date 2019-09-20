@@ -1,5 +1,5 @@
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: network-attachment-definitions.k8s.cni.cncf.io
@@ -22,7 +22,7 @@ spec:
                  type: string
 ---
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: multus
 rules:
@@ -41,7 +41,7 @@ rules:
       - update
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: multus
 roleRef:
@@ -116,6 +116,7 @@ metadata:
   labels:
     tier: node
     app: multus
+    name: multus
 spec:
   selector:
     matchLabels:
@@ -131,7 +132,7 @@ spec:
     spec:
       hostNetwork: true
       nodeSelector:
-        beta.kubernetes.io/arch: amd64
+        kubernetes.io/arch: amd64
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -181,6 +182,7 @@ metadata:
   labels:
     tier: node
     app: multus
+    name: multus
 spec:
   selector:
     matchLabels:
@@ -196,7 +198,7 @@ spec:
     spec:
       hostNetwork: true
       nodeSelector:
-        beta.kubernetes.io/arch: ppc64le
+        kubernetes.io/arch: ppc64le
       tolerations:
       - operator: Exists
         effect: NoSchedule

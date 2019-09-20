@@ -1,5 +1,5 @@
 ---
-apiVersion: apiextensions.k8s.io/v1
+apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: network-attachment-definitions.k8s.cni.cncf.io
@@ -22,7 +22,7 @@ spec:
                  type: string
 ---
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: multus
 rules:
@@ -41,7 +41,7 @@ rules:
       - update
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
+apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
   name: multus
 roleRef:
@@ -108,7 +108,7 @@ data:
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
     }
 ---
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-amd64
@@ -116,11 +116,7 @@ metadata:
   labels:
     tier: node
     app: multus
-    name: multus
 spec:
-  selector:
-    matchLabels:
-      name: multus
   updateStrategy:
     type: RollingUpdate
   template:
@@ -128,11 +124,10 @@ spec:
       labels:
         tier: node
         app: multus
-        name: multus
     spec:
       hostNetwork: true
       nodeSelector:
-        kubernetes.io/arch: amd64
+        beta.kubernetes.io/arch: amd64
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -143,10 +138,10 @@ spec:
         image: nfvpe/multus:latest
         command: ["/entrypoint.sh"]
         args:
-        - "--cni-version=0.3.1"
         - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
-        - "--restart-crio=true"
+        - "--override-network-name=true"
+        - "--rename-conf-file=true"
         resources:
           requests:
             cpu: "100m"
@@ -184,7 +179,7 @@ spec:
             - key: cni-conf.json
               path: 70-multus.conf
 ---
-apiVersion: apps/v1
+apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-ppc64le
@@ -192,11 +187,7 @@ metadata:
   labels:
     tier: node
     app: multus
-    name: multus
 spec:
-  selector:
-    matchLabels:
-      name: multus
   updateStrategy:
     type: RollingUpdate
   template:
@@ -204,11 +195,10 @@ spec:
       labels:
         tier: node
         app: multus
-        name: multus
     spec:
       hostNetwork: true
       nodeSelector:
-        kubernetes.io/arch: ppc64le
+        beta.kubernetes.io/arch: ppc64le
       tolerations:
       - operator: Exists
         effect: NoSchedule
@@ -219,10 +209,9 @@ spec:
         image: nfvpe/multus:latest-ppc64le
         command: ["/entrypoint.sh"]
         args:
-        - "--cni-version=0.3.1"
         - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
-        - "--restart-crio=true"
+        - "--override-network-name=true"
         resources:
           requests:
             cpu: "100m"
