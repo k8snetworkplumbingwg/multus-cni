@@ -125,7 +125,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		delegates, err := GetNetworkDelegates(kubeClient, pod, networks, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
-		Expect(err).To(MatchError("GetPodNetwork: failed getting the delegate: getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: resource not found"))
+		Expect(err).To(MatchError("GetNetworkDelegates: failed getting the delegate: getKubernetesDelegate: cannot find get a network-attachment-definition (net1) in namespace (test): resource not found"))
 	})
 
 	It("retrieves delegates from kubernetes using JSON format annotation", func() {
@@ -296,7 +296,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		delegates, err := GetNetworkDelegates(kubeClient, pod, networks, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
-		Expect(err).To(MatchError(fmt.Sprintf("GetPodNetwork: failed getting the delegate: cniConfigFromNetworkResource: err in getCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
+		Expect(err).To(MatchError(fmt.Sprintf("GetNetworkDelegates: failed getting the delegate: cniConfigFromNetworkResource: getCNIConfigFromFile: error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
 
 	It("retrieves cluster network from CRD", func() {
@@ -672,7 +672,11 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("uses cached delegates when an error in loading from pod annotation occurs", func() {
-		kubeletconf, err := os.Create("/etc/kubernetes/kubelet.conf")
+		dir, err := ioutil.TempDir("", "multus-test")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(dir) // clean up
+
+		kubeletconf, err := os.Create(fmt.Sprintf("%s/kubelet.conf", dir))
 		kubeletconfDef := `apiVersion: v1
 clusters:
 - cluster:
@@ -695,15 +699,15 @@ users:
 
 		kubeletconf.Write([]byte(kubeletconfDef))
 		fakePod := testutils.NewFakePod("testpod", "", "net1")
-		conf := `{
+		conf := fmt.Sprintf(`{
 			"name":"node-cni-network",
 			"type":"multus",
-			"kubeconfig":"/etc/kubernetes/kubelet.conf",
+			"kubeconfig":"%s/kubelet.conf",
 			"delegates": [{
 				"type": "mynet2",
 				"name": "net2"
 			}]
-		}`
+		}`, dir)
 		netConf, err := types.LoadNetConf([]byte(conf))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
@@ -766,7 +770,7 @@ users:
 		Expect(err).NotTo(HaveOccurred())
 		_, err = GetNetworkDelegates(kubeClient, pod, networks, tmpDir, netConf.NamespaceIsolation)
 		Expect(err).To(HaveOccurred())
-		Expect(err).To(MatchError("GetPodNetwork: namespace isolation violation: podnamespace: test / target namespace: kube-system"))
+		Expect(err).To(MatchError("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace test but refers to target namespace kube-system"))
 
 	})
 
