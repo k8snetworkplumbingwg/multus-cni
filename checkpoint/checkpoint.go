@@ -64,7 +64,7 @@ func getCheckpoint(filePath string) (types.ResourceClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	logging.Debugf("getCheckpoint(): created checkpoint instance with file: %s", filePath)
+	logging.Debugf("getCheckpoint: created checkpoint instance with file: %s", filePath)
 	return cp, nil
 }
 
@@ -74,15 +74,15 @@ func (cp *checkpoint) getPodEntries() error {
 	cpd := &checkpointFileData{}
 	rawBytes, err := ioutil.ReadFile(cp.fileName)
 	if err != nil {
-		return logging.Errorf("getPodEntries(): error reading file %s\n%v\n", checkPointfile, err)
+		return logging.Errorf("getPodEntries: error reading file %s\n%v\n", checkPointfile, err)
 	}
 
 	if err = json.Unmarshal(rawBytes, cpd); err != nil {
-		return logging.Errorf("getPodEntries(): error unmarshalling raw bytes %v", err)
+		return logging.Errorf("getPodEntries: error unmarshalling raw bytes %v", err)
 	}
 
 	cp.podEntires = cpd.Data.PodDeviceEntries
-	logging.Debugf("getPodEntries(): podEntires %+v", cp.podEntires)
+	logging.Debugf("getPodEntries: podEntires %+v", cp.podEntires)
 	return nil
 }
 
@@ -92,7 +92,7 @@ func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resource
 	resourceMap := make(map[string]*types.ResourceInfo)
 
 	if podID == "" {
-		return nil, logging.Errorf("GetPodResourceMap(): invalid Pod cannot be empty")
+		return nil, logging.Errorf("GetPodResourceMap: invalid Pod cannot be empty")
 	}
 	for _, pod := range cp.podEntires {
 		if pod.PodUID == podID {

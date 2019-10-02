@@ -30,11 +30,11 @@ func GetResourceClient() (types.ResourceClient, error) {
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
 	if hasKubeletAPIEndpoint() {
-		logging.Verbosef("GetResourceClient(): using Kubelet resource API endpoint")
+		logging.Debugf("GetResourceClient: using Kubelet resource API endpoint")
 		return getKubeletClient()
 	}
 
-	logging.Verbosef("GetResourceClient(): using Kubelet device plugin checkpoint")
+	logging.Debugf("GetResourceClient: using Kubelet device plugin checkpoint")
 	return checkpoint.GetCheckpoint()
 }
 
@@ -46,12 +46,12 @@ func getKubeletClient() (types.ResourceClient, error) {
 
 	client, conn, err := podresources.GetClient(kubeletSocket, 10*time.Second, defaultPodResourcesMaxSize)
 	if err != nil {
-		return nil, logging.Errorf("GetResourceClient(): error getting grpc client: %v\n", err)
+		return nil, logging.Errorf("getKubeletClient: error getting grpc client: %v\n", err)
 	}
 	defer conn.Close()
 
 	if err := newClient.getPodResources(client); err != nil {
-		return nil, logging.Errorf("GetResourceClient(): error getting resource client: %v\n", err)
+		return nil, logging.Errorf("getKubeletClient: error ge tting pod resources from client: %v\n", err)
 	}
 
 	return newClient, nil
@@ -68,7 +68,7 @@ func (rc *kubeletClient) getPodResources(client podresourcesapi.PodResourcesList
 
 	resp, err := client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
 	if err != nil {
-		return logging.Errorf("getPodResources(): %v.Get(_) = _, %v", client, err)
+		return logging.Errorf("getPodResources: failed to list pod resources, %v.Get(_) = _, %v", client, err)
 	}
 
 	rc.resources = resp.PodResources
@@ -83,7 +83,7 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 	ns := pod.Namespace
 
 	if name == "" || ns == "" {
-		return nil, logging.Errorf("GetPodResourcesMap(): Pod name or namespace cannot be empty")
+		return nil, logging.Errorf("GetPodResourcesMap: Pod name or namespace cannot be empty")
 	}
 
 	for _, pr := range rc.resources {
@@ -106,7 +106,7 @@ func hasKubeletAPIEndpoint() bool {
 	// Check for kubelet resource API socket file
 	kubeletAPISocket := filepath.Join(defaultPodResourcesPath, defaultKubeletSocketFile)
 	if _, err := os.Stat(kubeletAPISocket); err != nil {
-		logging.Verbosef("hasKubeletAPIEndpoint(): error looking up kubelet resource api socket file: %q", err)
+		logging.Debugf("hasKubeletAPIEndpoint: error looking up kubelet resource api socket file: %q", err)
 		return false
 	}
 	return true

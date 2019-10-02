@@ -93,7 +93,7 @@ func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*ty
 	if client == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
-			return logging.Errorf("must have either Kubernetes config or delegates, refer to Multus documentation for usage instructions")
+			return logging.Errorf("SetNetworkStatus: must have either Kubernetes config or delegates")
 		}
 		logging.Debugf("SetNetworkStatus: kube client info is not defined, skip network status setup")
 		return nil
@@ -150,7 +150,7 @@ func setPodNetworkAnnotation(client KubeClient, namespace string, pod *v1.Pod, n
 		pod, err = client.UpdatePodStatus(pod)
 		return err
 	}); resultErr != nil {
-		return nil, logging.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
+		return nil, logging.Errorf("setPodNetworkAnnotation: status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
 	}
 	return pod, nil
 }
@@ -168,7 +168,7 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	} else if len(slashItems) == 1 {
 		networkName = slashItems[0]
 	} else {
-		return "", "", "", logging.Errorf("Invalid network object (failed at '/')")
+		return "", "", "", logging.Errorf("parsePodNetworkObjectName: Invalid network object (failed at '/')")
 	}
 
 	atItems := strings.Split(networkName, "@")
@@ -176,7 +176,7 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	if len(atItems) == 2 {
 		netIfName = strings.TrimSpace(atItems[1])
 	} else if len(atItems) != 1 {
-		return "", "", "", logging.Errorf("Invalid network object (failed at '@')")
+		return "", "", "", logging.Errorf("parsePodNetworkObjectName: Invalid network object (failed at '@')")
 	}
 
 	// Check and see if each item matches the specification for valid attachment name.
@@ -188,7 +188,7 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	for i := range allItems {
 		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
 		if !matched && len([]rune(allItems[i])) > 0 {
-			return "", "", "", logging.Errorf(fmt.Sprintf("Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
+			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
 		}
 	}
 
@@ -201,7 +201,7 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 
 	logging.Debugf("parsePodNetworkAnnotation: %s, %s", podNetworks, defaultNamespace)
 	if podNetworks == "" {
-		return nil, logging.Errorf("parsePodNetworkAnnotation: pod annotation not having \"network\" as key, refer Multus README.md for the usage guide")
+		return nil, logging.Errorf("parsePodNetworkAnnotation: pod annotation does not have \"network\" as key")
 	}
 
 	if strings.IndexAny(podNetworks, "[{\"") >= 0 {
@@ -253,9 +253,9 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 	files, err := libcni.ConfFiles(confdir, []string{".conf", ".json", ".conflist"})
 	switch {
 	case err != nil:
-		return nil, logging.Errorf("No networks found in %s", confdir)
+		return nil, logging.Errorf("getCNIConfigFromFile: no networks found in %s", confdir)
 	case len(files) == 0:
-		return nil, logging.Errorf("No networks found in %s", confdir)
+		return nil, logging.Errorf("getCNIConfigFromFile: no networks found in %s", confdir)
 	}
 
 	for _, confFile := range files {
@@ -263,7 +263,7 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 		if strings.HasSuffix(confFile, ".conflist") {
 			confList, err = libcni.ConfListFromFile(confFile)
 			if err != nil {
-				return nil, logging.Errorf("Error loading CNI conflist file %s: %v", confFile, err)
+				return nil, logging.Errorf("getCNIConfigFromFile: error loading CNI conflist file %s: %v", confFile, err)
 			}
 
 			if confList.Name == name || name == "" {
@@ -273,21 +273,21 @@ func getCNIConfigFromFile(name string, confdir string) ([]byte, error) {
 		} else {
 			conf, err := libcni.ConfFromFile(confFile)
 			if err != nil {
-				return nil, logging.Errorf("Error loading CNI config file %s: %v", confFile, err)
+				return nil, logging.Errorf("getCNIConfigFromFile: error loading CNI config file %s: %v", confFile, err)
 			}
 
 			if conf.Network.Name == name || name == "" {
 				// Ensure the config has a "type" so we know what plugin to run.
 				// Also catches the case where somebody put a conflist into a conf file.
 				if conf.Network.Type == "" {
-					return nil, logging.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+					return nil, logging.Errorf("getCNIConfigFromFile: error loading CNI config file %s: does not have a 'type' key; perhaps this is a .conflist?", confFile)
 				}
 				return conf.Bytes, nil
 			}
 		}
 	}
 
-	return nil, logging.Errorf("no network available in the name %s in cni dir %s", name, confdir)
+	return nil, logging.Errorf("getCNIConfigFromFile: no network available with the name %s in cni dir %s", name, confdir)
 }
 
 // getCNIConfigFromSpec reads a CNI JSON configuration from the NetworkAttachmentDefinition
@@ -327,7 +327,7 @@ func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinit
 		// name as the custom resource
 		config, err = getCNIConfigFromFile(customResource.Metadata.Name, confdir)
 		if err != nil {
-			return nil, logging.Errorf("cniConfigFromNetworkResource: err in getCNIConfigFromFile: %v", err)
+			return nil, logging.Errorf("cniConfigFromNetworkResource: %v", err)
 		}
 	} else {
 		// Config contains a standard JSON-encoded CNI configuration
@@ -335,7 +335,7 @@ func cniConfigFromNetworkResource(customResource *types.NetworkAttachmentDefinit
 		// execute.
 		config, err = getCNIConfigFromSpec(customResource.Spec.Config, customResource.Metadata.Name)
 		if err != nil {
-			return nil, logging.Errorf("cniConfigFromNetworkResource: err in getCNIConfigFromSpec: %v", err)
+			return nil, logging.Errorf("cniConfigFromNetworkResource: %v", err)
 		}
 	}
 
@@ -348,12 +348,12 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", net.Namespace, net.Name)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: cannot find get a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 	}
 
 	customResource := &types.NetworkAttachmentDefinition{}
 	if err := json.Unmarshal(netData, customResource); err != nil {
-		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get the netplugin data: %v", err)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to parse the network-attachment-definition: %v", err)
 	}
 
 	// Get resourceName annotation from NetworkAttachmentDefinition
@@ -372,7 +372,7 @@ func getKubernetesDelegate(client KubeClient, net *types.NetworkSelectionElement
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from ResourceClient: %v", err)
 			}
-			logging.Debugf("getKubernetesDelegate(): resourceMap instance: %+v", resourceMap)
+			logging.Debugf("getKubernetesDelegate: resourceMap instance: %+v", resourceMap)
 		}
 
 		entry, ok := resourceMap[resourceName]
@@ -433,7 +433,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	if kubeClient == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
-			return 0, nil, logging.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+			return 0, nil, logging.Errorf("TryLoadPodDelegates: must have either Kubernetes config or delegates")
 		}
 		return 0, nil, nil
 	}
@@ -442,16 +442,16 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 	// Get the pod info. If cannot get it, we use cached delegates
 	pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 	if err != nil {
-		logging.Debugf("tryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v, use cached delegates", err)
+		logging.Debugf("TryLoadPodDelegates: Err in loading K8s cluster default network from pod annotation: %v, use cached delegates", err)
 		return 0, nil, nil
 	}
 
 	delegate, err := tryLoadK8sPodDefaultNetwork(kubeClient, pod, conf)
 	if err != nil {
-		return 0, nil, logging.Errorf("tryLoadK8sDelegates: Err in loading K8s cluster default network from pod annotation: %v", err)
+		return 0, nil, logging.Errorf("TryLoadPodDelegates: error in loading K8s cluster default network from pod annotation: %v", err)
 	}
 	if delegate != nil {
-		logging.Debugf("tryLoadK8sDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
+		logging.Debugf("TryLoadPodDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
 
 		conf.Delegates[0] = delegate
 	}
@@ -464,7 +464,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient
 			if _, ok := err.(*NoK8sNetworkError); ok {
 				return 0, clientInfo, nil
 			}
-			return 0, nil, logging.Errorf("Multus: Err in getting k8s network from pod: %v", err)
+			return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network from pod: %v", err)
 		}
 
 		if err = conf.AddDelegates(delegates); err != nil {
@@ -492,13 +492,13 @@ func GetK8sClient(kubeconfig string, kubeClient KubeClient) (KubeClient, error) 
 		// uses the current context in kubeconfig
 		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			return nil, logging.Errorf("GetK8sClient: failed to get context for the kubeconfig %v, refer Multus README.md for the usage guide: %v", kubeconfig, err)
+			return nil, logging.Errorf("GetK8sClient: failed to get context for the kubeconfig %v: %v", kubeconfig, err)
 		}
 	} else if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
 		// Try in-cluster config where multus might be running in a kubernetes pod
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			return nil, logging.Errorf("createK8sClient: failed to get context for in-cluster kube config, refer Multus README.md for the usage guide: %v", err)
+			return nil, logging.Errorf("GetK8sClient: failed to get context for in-cluster kube config: %v", err)
 		}
 	} else {
 		// No kubernetes config; assume we shouldn't talk to Kube at all
@@ -553,13 +553,13 @@ func GetNetworkDelegates(k8sclient KubeClient, pod *v1.Pod, networks []*types.Ne
 		// In the case that this is a mismatch when namespaceisolation is enabled, this should be an error.
 		if confnamespaceIsolation {
 			if defaultNamespace != net.Namespace {
-				return nil, logging.Errorf("GetPodNetwork: namespace isolation violation: podnamespace: %v / target namespace: %v", defaultNamespace, net.Namespace)
+				return nil, logging.Errorf("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace %v but refers to target namespace %v", defaultNamespace, net.Namespace)
 			}
 		}
 
 		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, pod, resourceMap)
 		if err != nil {
-			return nil, logging.Errorf("GetPodNetwork: failed getting the delegate: %v", err)
+			return nil, logging.Errorf("GetNetworkDelegates: failed getting the delegate: %v", err)
 		}
 		delegates = append(delegates, delegate)
 		resourceMap = updatedResourceMap
@@ -573,7 +573,7 @@ func getDefaultNetDelegateCRD(client KubeClient, net, confdir, namespace string)
 	rawPath := fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, net)
 	netData, err := client.GetRawWithPath(rawPath)
 	if err != nil {
-		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get network resource, refer Multus README.md for the usage guide: %v", err)
+		return nil, logging.Errorf("getDefaultNetDelegateCRD: failed to get network resource: %v", err)
 	}
 
 	customResource := &types.NetworkAttachmentDefinition{}
@@ -650,7 +650,7 @@ func GetDefaultNetworks(k8sArgs *types.K8sArgs, conf *types.NetConf, kubeClient 
 	if kubeClient == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
-			return logging.Errorf("must have either Kubernetes config or delegates, refer Multus README.md for the usage guide")
+			return logging.Errorf("GetDefaultNetworks: must have either Kubernetes config or delegates")
 		}
 		return nil
 	}
