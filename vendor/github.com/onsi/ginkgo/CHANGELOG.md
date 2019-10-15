@@ -1,3 +1,14 @@
+## 1.10.1
+
+## Fixes
+- stack backtrace: fix skipping (#600) [2a4c0bd]
+
+## 1.10.0
+
+## Fixes
+- stack backtrace: fix alignment and skipping [66915d6]
+- fix typo in documentation [8f97b93]
+
 ## 1.9.0
 
 ## Features
