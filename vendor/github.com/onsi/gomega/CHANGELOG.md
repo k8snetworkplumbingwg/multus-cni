@@ -1,3 +1,11 @@
+## 1.7.0
+
+### Features
+- export format property variables (#347) [642e5ba]
+
+### Fixes
+- minor fix in the documentation of ExpectWithOffset (#358) [beea727]
+
 ## 1.6.0
 
 ### Features
