@@ -251,7 +251,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 
 			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
 			logging.Debugf("delegateAdd: set MAC address %q to %q", delegate.MacRequest, ifName)
-			rt.Args = append(rt.Args, [2]string{ "MAC", delegate.MacRequest })
+			rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
 		}
 
 		if delegate.IPRequest != nil {
@@ -270,7 +270,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			ips := strings.Join(delegate.IPRequest, ",")
 			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, ips)
 			logging.Debugf("delegateAdd: set IP address %q to %q", ips, ifName)
-			rt.Args = append(rt.Args, [2]string{ "IP", ips })
+			rt.Args = append(rt.Args, [2]string{"IP", ips})
 		}
 	}
 
@@ -421,10 +421,32 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		}
 
 		// Remove gateway from routing table if the gateway is not used
+		deletegateway := false
+		adddefaultgateway := false
 		if delegate.IsFilterGateway {
+			deletegateway = true
+			logging.Debugf("Marked interface %v for gateway deletion", ifName)
+		} else {
+			// Otherwise, determine if this interface now gets our default route.
+			if delegate.GatewayRequest != nil {
+				deletegateway = true
+				adddefaultgateway = true
+				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
+			}
+		}
+
+		if deletegateway {
 			tmpResult, err = netutils.DeleteDefaultGW(args, ifName, &tmpResult)
 			if err != nil {
 				return nil, logging.Errorf("Multus: Err in deleting gateway: %v", err)
+			}
+		}
+
+		// Here we'll set the default gateway
+		if adddefaultgateway {
+			tmpResult, err = netutils.SetDefaultGW(args, ifName, delegate.GatewayRequest, &tmpResult)
+			if err != nil {
+				return nil, logging.Errorf("Multus: Err in setting default gateway: %v", err)
 			}
 		}
 

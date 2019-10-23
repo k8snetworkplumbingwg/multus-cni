@@ -86,7 +86,6 @@ type NetworkStatus struct {
 	Interface string    `json:"interface,omitempty"`
 	IPs       []string  `json:"ips,omitempty"`
 	Mac       string    `json:"mac,omitempty"`
-	Default   bool      `json:"default,omitempty"`
 	DNS       types.DNS `json:"dns,omitempty"`
 	Gateway   []net.IP  `json:"default-route,omitempty"`
 }
