@@ -204,7 +204,6 @@ func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*Networ
 	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
 	netstatus := &NetworkStatus{}
 	netstatus.Name = netName
-	netstatus.Default = defaultNet
 
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)

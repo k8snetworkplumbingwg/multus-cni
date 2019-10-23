@@ -112,6 +112,20 @@ func SetNetworkStatus(client KubeClient, k8sArgs *types.K8sArgs, netStatus []*ty
 	if netStatus != nil {
 		var networkStatus []string
 		for _, status := range netStatus {
+			// Clean each empty gateway
+			// Otherwise we wind up with JSON that's a "default-route": [""]
+			cleargateway := true
+			for _, eachgateway := range status.Gateway {
+				if eachgateway != nil {
+					cleargateway = false
+				}
+			}
+
+			if cleargateway {
+				status.Gateway = nil
+			}
+
+			// Now we can sanely marshal the JSON output
 			data, err := json.MarshalIndent(status, "", "    ")
 			if err != nil {
 				return logging.Errorf("SetNetworkStatus: error with Marshal Indent: %v", err)
