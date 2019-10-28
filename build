@@ -20,7 +20,7 @@ set -e
 DATE=$(date --iso-8601=seconds)
 COMMIT=$(git rev-parse --verify HEAD)
 LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
-export CGO_ENABLED=0
+export CGO_ENABLED=1
 
 # this if... will be removed when gomodules goes default
 if [ "$GO111MODULE" == "off" ]; then
@@ -38,11 +38,11 @@ if [ "$GO111MODULE" == "off" ]; then
 	export GO15VENDOREXPERIMENT=1
 	export GOBIN=${PWD}/bin
 	export GOPATH=${PWD}/gopath
-	go install -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
+	go install -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/multus
 else
 	# build with go modules
 	export GO111MODULE=on
 
 	echo "Building plugins"
-	go build -o ${DEST_DIR}/multus -tags no_openssl -ldflags "${LDFLAGS}" "$@" ./multus
+	go build -o ${DEST_DIR}/multus -ldflags "${LDFLAGS}" "$@" ./multus
 fi
