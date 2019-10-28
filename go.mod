@@ -3,11 +3,11 @@ module github.com/intel/multus-cni
 go 1.12
 
 require (
-	github.com/K8sNetworkPlumbingWG/network-attachment-definition-client v0.0.0-20191002070930-3de720f9c99b
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/containernetworking/cni v0.7.1
 	github.com/containernetworking/plugins v0.8.2
 	github.com/golang/protobuf v1.3.2 // indirect
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v0.0.0-20191025120722-4c57cd5732f3
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
 	github.com/pkg/errors v0.8.1

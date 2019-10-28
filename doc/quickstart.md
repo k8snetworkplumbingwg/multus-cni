@@ -19,7 +19,7 @@ To install Kubernetes, you may decide to use [kubeadm](https://kubernetes.io/doc
 
 After installing Kubernetes, you must install a default network CNI plugin. If you're using kubeadm, refer to the "[Installing a pod network add-on](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/#pod-network)" section in the kubeadm documentation. If it's your first time, we generally recommend using Flannel for the sake of simplicity.
 
-Alternatively, for advanced use cases, for installing Multus and a default network plugin at the same time, you may refer to the [Kubernetes Network Plumbing Group's Reference Deployments](https://github.com/K8sNetworkPlumbingWG/reference-deployment).
+Alternatively, for advanced use cases, for installing Multus and a default network plugin at the same time, you may refer to the [Kubernetes Network Plumbing Group's Reference Deployments](https://github.com/k8snetworkplumbingwg/reference-deployment).
 
 To verify that you default network is ready, you may list your Kubernetes nodes with:
 
