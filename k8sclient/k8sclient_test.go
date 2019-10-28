@@ -203,6 +203,61 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).To(MatchError("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
 	})
 
+	It("can set the default-gateway on an additional interface", func() {
+		fakePod := testutils.NewFakePod("testpod", `[
+{"name":"net1"},
+{
+  "name":"net2",
+  "default-route": ["192.168.2.2"]
+},
+{
+  "name":"net3",
+  "namespace":"other-ns"
+}
+]`, "")
+		args := &skel.CmdArgs{
+			Args: fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", fakePod.ObjectMeta.Name, fakePod.ObjectMeta.Namespace),
+		}
+
+		fKubeClient := testutils.NewFakeKubeClient()
+		fKubeClient.AddPod(fakePod)
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net1", `{
+	"name": "net1",
+	"type": "mynet",
+	"cniVersion": "0.2.0"
+}`)
+		fKubeClient.AddNetConfig(fakePod.ObjectMeta.Namespace, "net2", `{
+	"name": "net2",
+	"type": "mynet2",
+	"cniVersion": "0.2.0"
+}`)
+		fKubeClient.AddNetConfig("other-ns", "net3", `{
+	"name": "net3",
+	"type": "mynet3",
+	"cniVersion": "0.2.0"
+}`)
+
+		kubeClient, err := GetK8sClient("", fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		k8sArgs, err := GetK8sArgs(args)
+		Expect(err).NotTo(HaveOccurred())
+		pod, err := kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		networks, err := GetPodNetwork(pod)
+		Expect(err).NotTo(HaveOccurred())
+		delegates, err := GetNetworkDelegates(kubeClient, pod, networks, tmpDir, false)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fKubeClient.PodCount).To(Equal(1))
+		Expect(fKubeClient.NetCount).To(Equal(3))
+
+		Expect(len(delegates)).To(Equal(3))
+		Expect(delegates[0].Conf.Name).To(Equal("net1"))
+		Expect(delegates[0].Conf.Type).To(Equal("mynet"))
+		Expect(delegates[1].Conf.Name).To(Equal("net2"))
+		Expect(delegates[1].Conf.Type).To(Equal("mynet2"))
+		Expect(delegates[2].Conf.Name).To(Equal("net3"))
+		Expect(delegates[2].Conf.Type).To(Equal("mynet3"))
+	})
+
 	It("retrieves delegates from kubernetes using on-disk config files", func() {
 		fakePod := testutils.NewFakePod("testpod", "net1,net2", "")
 		args := &skel.CmdArgs{
