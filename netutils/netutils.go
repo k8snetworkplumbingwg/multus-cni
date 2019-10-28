@@ -23,6 +23,7 @@ import (
 	"github.com/intel/multus-cni/logging"
 	"github.com/vishvananda/netlink"
 	"net"
+	"strings"
 )
 
 // DeleteDefaultGW removes the default gateway from marked interfaces.
@@ -98,7 +99,7 @@ func SetDefaultGW(args *skel.CmdArgs, ifName string, gateways []net.IP, res *cni
 
 			// Set a correct CIDR depending on IP type
 			_, dstipnet, _ := net.ParseCIDR("::0/0")
-			if gw.To4 != nil {
+			if strings.Count(gw.String(), ":") < 2 {
 				_, dstipnet, _ = net.ParseCIDR("0.0.0.0/0")
 			}
 			newResultDefaultRoutes = append(newResultDefaultRoutes, &cnitypes.Route{Dst: *dstipnet, GW: gw})
