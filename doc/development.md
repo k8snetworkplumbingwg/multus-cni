@@ -10,7 +10,7 @@ cd multus-cni
 
 ## How to run CI tests?
 
-Multus has go unit tests (based on ginkgo framework). Following commands drive CI tests manually in your environment:
+Multus has go unit tests (based on ginkgo framework).The following commands drive CI tests manually in your environment:
 
 ```
 sudo ./test.sh
@@ -18,11 +18,11 @@ sudo ./test.sh
 
 ## Logging Best Practices
 
-Followings are multus logging best practices:
+Following are multus logging best practices:
 
-* Add `logging.Debugf()` at the begining of function
+* Add `logging.Debugf()` at the begining of functions
 * In case of error handling, use `logging.Errorf()` with given error info
-* `logging.Panicf()` only be used at very critical error (it should NOT used usually)
+* `logging.Panicf()` only be used for critical errors (it should NOT normally be used)
 
 
 ## CI Introduction

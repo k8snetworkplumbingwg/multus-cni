@@ -1,5 +1,5 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM centos:centos7
+FROM centos:centos7 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
@@ -10,13 +10,11 @@ RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     cd /usr/src/multus-cni && \
-    ./build && \
-    yum autoremove -y $INSTALL_PKGS && \
-    yum clean all && \
-    rm -rf /tmp/*
+    ./build
 
+FROM centos:centos7
+COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
 WORKDIR /
 
 ADD ./images/entrypoint.sh /
-
 ENTRYPOINT ["/entrypoint.sh"]

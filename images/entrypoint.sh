@@ -48,6 +48,7 @@ function usage()
     echo -e "\t-h --help"
     echo -e "\t--cni-conf-dir=$CNI_CONF_DIR"
     echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
+    echo -e "\t--cni-version=<cniVersion (e.g. 0.3.1)>"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"

@@ -45,6 +45,12 @@ var _ = Describe("logging operations", func() {
 		// check file existance
 	})
 
+	It("Check file setter with bad filepath", func() {
+		SetLogFile("/invalid/filepath")
+		Expect(loggingFp).NotTo(Equal(nil))
+		// check file existance
+	})
+
 	It("Check loglevel setter", func() {
 		SetLogLevel("debug")
 		Expect(loggingLevel).To(Equal(DebugLevel))
@@ -66,5 +72,11 @@ var _ = Describe("logging operations", func() {
 		currentVal := loggingStderr
 		SetLogStderr(!currentVal)
 		Expect(loggingStderr).NotTo(Equal(currentVal))
+	})
+
+	// Tests public getter
+	It("Check getter for logging level with current level", func() {
+		currentLevel := loggingLevel
+		Expect(currentLevel).To(Equal(GetLoggingLevel()))
 	})
 })

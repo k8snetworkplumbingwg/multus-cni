@@ -4,6 +4,11 @@ bin/
 # GOPATH created by the build script
 gopath/
 
+# Editor paths
+.swp*
+.swo*
+.idea*
+
 # Test outputs
 *.out
 *.test

@@ -2,7 +2,7 @@
 
 ### Prerequisites
 
-* Kubelet configured to use CNI 
+* Kubelet configured to use CNI
 * Kubernetes version with CRD support (generally )
 
 Your Kubelet(s) must be configured to run with the CNI network plugin. Please see [Kubernetes document for CNI](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/#cni) for more details.
@@ -19,11 +19,11 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 *Via Daemonset method*
 
-As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage yoru cluster). 
+As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
     $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
 
-If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](https://github.com/s1061123/multus-cni/blob/dev/update-readme/doc/how-to-use.md#create-network-attachment-definition) section.
+If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
 ### Set up conf file in /etc/cni/net.d/ (Installed automatically by Daemonset)
 
@@ -119,7 +119,7 @@ Create kubeconfig at master node as following commands:
 
 ```
 # Execute following command at Kubernetes master
-$ mkdir -p /etc/cni/multus.d
+$ mkdir -p /etc/cni/net.d/multus.d
 $ SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
 $ SERVICEACCOUNT_TOKEN=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data.token' | base64 -d )
 $ KUBERNETES_SERVICE_PROTO=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)
@@ -286,7 +286,7 @@ EOF
 
 #### Lauch pod with text annotation for NetworkAttachmentDefinition in different namespace
 
-You can also specify NetworkAttachmentDefinition with its namespace as adding `/<namespace>`
+You can also specify NetworkAttachmentDefinition with its namespace as adding `<namespace>/`
 
 ```
 # Execute following command at Kubernetes master
@@ -320,7 +320,7 @@ kind: Pod
 metadata:
   name: pod-case-02
   annotations:
-    k8s.v1.cni.cncf.io/networks: macvlan-conf-3/testns1
+    k8s.v1.cni.cncf.io/networks: testns1/macvlan-conf-3
 spec:
   containers:
   - name: pod-case-02
@@ -402,7 +402,7 @@ EOF
 
 #### Lauch pod with json annotation with interface
 
-You can also specify interface name as adding `"interfaceRequest": "<ifname>"`.
+You can also specify interface name as adding `"interface": "<ifname>"`.
 
 ```
 # Execute following command at Kubernetes master
@@ -414,7 +414,7 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: '[
             { "name" : "macvlan-conf-1",
-              "interfaceRequest": "macvlan1" },
+              "interface": "macvlan1" },
             { "name" : "macvlan-conf-2" }
     ]'
 spec:
@@ -468,6 +468,72 @@ $ kubectl exec -it pod-case-06 -- ip -d address
 | eth0 | Default network interface (flannel) |
 | macvlan1 | macvlan interface (macvlan-conf-1) |
 | net2 | macvlan interface (macvlan-conf-2) |
+
+## Specifying a default route for a specific attachment
+
+Typically, the default route for a pod will route traffic over the `eth0` and therefore over the cluster-wide default network. You may wish to specify that a different network attachment will have the default route.
+
+You can achieve this by using the JSON formatted annotation and specifying a `default-route` key.
+
+*NOTE*: It's important that you consider that this may impact some functionality of getting traffic to route over the cluster-wide default network.
+
+For example, we have a this configuration for macvlan:
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: macvlan-conf
+spec:
+  config: '{
+      "cniVersion": "0.3.0",
+      "type": "macvlan",
+      "master": "eth0",
+      "mode": "bridge",
+      "ipam": {
+        "type": "host-local",
+        "subnet": "192.168.2.0/24",
+        "rangeStart": "192.168.2.200",
+        "rangeEnd": "192.168.2.216",
+        "routes": [
+          { "dst": "0.0.0.0/0" }
+        ],
+        "gateway": "192.168.2.1"
+      }
+    }'
+EOF
+```
+
+We can then create a pod which uses the `default-route` key in the JSON formatted `k8s.v1.cni.cncf.io/networks` annotation. 
+
+```
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: samplepod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[{
+      "name": "macvlan-conf",
+      "default-route": ["192.168.2.1"]
+    }]'
+spec:
+  containers:
+  - name: samplepod
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    image: dougbtv/centos-network
+EOF
+```
+
+This will set `192.168.2.1` as the default route over the `net1` interface, such as:
+
+```
+$ kubectl exec -it samplepod -- ip route
+default via 192.168.2.1 dev net1 
+10.244.0.0/24 dev eth0  proto kernel  scope link  src 10.244.0.169 
+10.244.0.0/16 via 10.244.0.1 dev eth0 
+```
 
 ## Entrypoint Parameters
 
