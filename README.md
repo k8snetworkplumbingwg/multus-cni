@@ -2,7 +2,7 @@
 
 ![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/doc/images/Multus.png)
 
-[![Travis CI](https://travis-ci.org/intel/multus-cni.svg?branch=master)](https://travis-ci.org/intel/multus-cni/builds)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)
+[![Travis CI](https://travis-ci.org/intel/multus-cni.svg?branch=master)](https://travis-ci.org/intel/multus-cni/builds)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/intel/multus-cni/badge.svg)](https://coveralls.io/github/intel/multus-cni)
 
 Multus CNI enables attaching multiple network interfaces to pods in Kubernetes.
 
@@ -22,14 +22,12 @@ Here's an illustration of the network interfaces attached to a pod, as provision
 
 ## Quickstart Installation Guide
 
-Multus may be deployed as a Daemonset, and is provided in this guide along with Flannel. Flannel is deployed as a pod-to-pod network that is used as our "default network" (a network interface that every pod will be created with). Each network attachment is made in addition to this default network.
+The quickstart installation method for Multus requires that you have first installed a Kubernetes CNI plugin to serve as your pod-to-pod network, which we refer to as your "default network" (a network interface that every pod will be creatd with). Each network attachment created by Multus will be in addition to this default network interface. For more detail on installing a default network CNI plugins, refer to our [quick-start guide](doc/quickstart.md).
 
-Firstly, clone this GitHub repository. We'll apply files to `kubectl` from this repo.
-
-We apply these files as such:
+Clone this GitHub repository, we'll apply a daemonset which installs Multus using to `kubectl` from this repo. From the root directory of the clone, apply the daemonset YAML file:
 
 ```
-$ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+$ cat ./images/multus-daemonset.yml | kubectl apply -f -
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](doc/quickstart.md)
@@ -50,4 +48,4 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 
 ## Contact Us
 
-For any questions about Multus CNI, feel free to ask a question in #general in the [Intel-Corp Slack](https://intel-corp.herokuapp.com/), or open up a GitHub issue. 
+For any questions about Multus CNI, feel free to ask a question in #general in the [Intel-Corp Slack](https://intel-corp.herokuapp.com/), or open up a GitHub issue.

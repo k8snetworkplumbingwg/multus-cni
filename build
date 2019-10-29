@@ -9,16 +9,18 @@ fi
 
 # Add version/commit/date into binary
 # In case of TravisCI, need to check error code of 'git describe'.
-set +e
-git describe --tags --abbrev=0 > /dev/null 2>&1
-if [ "$?" != "0" ]; then
-	VERSION="master"
-else
-	VERSION=$(git describe --tags --abbrev=0)
+if [ -z "$VERSION" ]; then
+	set +e
+	git describe --tags --abbrev=0 > /dev/null 2>&1
+	if [ "$?" != "0" ]; then
+		VERSION="master"
+	else
+		VERSION=$(git describe --tags --abbrev=0)
+	fi
+	set -e
 fi
-set -e
 DATE=$(date --iso-8601=seconds)
-COMMIT=$(git rev-parse --verify HEAD)
+COMMIT=${COMMIT:-$(git rev-parse --verify HEAD)}
 LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
 export CGO_ENABLED=1
 

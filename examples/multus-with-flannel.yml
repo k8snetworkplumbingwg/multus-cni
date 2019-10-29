@@ -91,6 +91,8 @@ metadata:
     tier: node
     app: multus
 spec:
+  updateStrategy:
+    type: RollingUpdate
   template:
     metadata:
       labels:

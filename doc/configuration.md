@@ -41,7 +41,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `binDir` (string, optional): additional directory for CNI plugins which multus calls, in addition to the default (the default is typically set to `/opt/cni/bin`)
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/intel/multus-cni/blob/master/doc/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
 * `logFile` (string, optional): file path for log file. multus puts log in given file
-* `logLevel` (string, optional): logging level ("debug", "error" or "panic")
+* `logLevel` (string, optional): logging level ("debug", "error", "verbose", or "panic")
 * `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
 * `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready
@@ -103,6 +103,7 @@ The default logging level is set as `panic` -- this will log only the most criti
 The available logging level values, in decreasing order of verbosity are:
 
 * `debug`
+* `verbose`
 * `error`
 * `panic`
 
@@ -248,4 +249,29 @@ pod/samplepod created
 [user@kube-master ~]$ kubectl get pods -n development
 NAME        READY   STATUS    RESTARTS   AGE
 samplepod   1/1     Running   0          31s
+```
+
+### Specify default cluster network in Pod annotations
+
+Users may also specify the default network for any given pod (via annotation), for cases where there are multiple cluster networks available within a Kubernetes cluster.
+
+Example use cases may include:
+
+1. During a migration from one default network to another (e.g. from Flannel to Calico), it may be practical if both network solutions are able to operate in parallel. Users can then control which network a pod should attach to during the transition period.
+2. Some users may deploy multiple cluster networks for the sake of their security considerations, and may desire to specify the default network for individual pods.
+
+Follow these steps to specify the default network on a pod-by-pod basis:
+
+1. First, you need to define all your cluster networks as network-attachment-definition objects.
+
+2. Next, you can specify the network you want in pods with the `v1.multus-cni.io/default-network` annotation. Pods which do not specify this annotation will keep using the CNI as defined in the Multus config file.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+name: pod-example
+annotations:
+ v1.multus-cni.io/default-network: calico-conf
+...
 ```
