@@ -355,16 +355,24 @@ func delPlugins(exec invoke.Exec, argIfname string, delegates []*types.DelegateN
 	return nil
 }
 
+func cmdErr(k8sArgs *types.K8sArgs, format string, args ...interface{}) error {
+	prefix := "Multus: "
+	if k8sArgs != nil {
+		prefix += fmt.Sprintf("[%s/%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
+	}
+	return logging.Errorf(prefix+format, args...)
+}
+
 func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdAdd: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
-		return nil, logging.Errorf("Multus: error loading netconf: %v", err)
+		return nil, cmdErr(nil, "error loading netconf: %v", err)
 	}
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
 	if err != nil {
-		return nil, logging.Errorf("Multus: error getting k8s args: %v", err)
+		return nil, cmdErr(nil, "error getting k8s args: %v", err)
 	}
 
 	if n.ReadinessIndicatorFile != "" {
@@ -380,7 +388,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	if n.ClusterNetwork != "" {
 		err = k8s.GetDefaultNetworks(k8sArgs, n, kubeClient)
 		if err != nil {
-			return nil, logging.Errorf("Multus: failed to get clusterNetwork/defaultNetworks: %v", err)
+			return nil, cmdErr(k8sArgs, "failed to get clusterNetwork/defaultNetworks: %v", err)
 		}
 		// First delegate is always the master plugin
 		n.Delegates[0].MasterPlugin = true
@@ -388,12 +396,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 
 	_, kc, err := k8s.TryLoadPodDelegates(k8sArgs, n, kubeClient)
 	if err != nil {
-		return nil, logging.Errorf("Multus: error loading k8s delegates k8s args: %v", err)
+		return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
 	}
 
 	// cache the multus config
 	if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
-		return nil, logging.Errorf("Multus: error saving the delegates: %v", err)
+		return nil, cmdErr(k8sArgs, "error saving the delegates: %v", err)
 	}
 
 	var result, tmpResult cnitypes.Result
@@ -413,7 +421,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			}
 			// Ignore errors; DEL must be idempotent anyway
 			_ = delPlugins(exec, args.IfName, n.Delegates, idx, rt, n.BinDir)
-			return nil, logging.Errorf("Multus: error adding pod to network %q: %v", netName, err)
+			return nil, cmdErr(k8sArgs, "error adding container to network %q: %v", netName, err)
 		}
 
 		// Remove gateway from routing table if the gateway is not used
@@ -434,7 +442,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		if deletegateway {
 			tmpResult, err = netutils.DeleteDefaultGW(args, ifName, &tmpResult)
 			if err != nil {
-				return nil, logging.Errorf("Multus: Err in deleting gateway: %v", err)
+				return nil, cmdErr(k8sArgs, "error deleting default gateway: %v", err)
 			}
 		}
 
@@ -442,7 +450,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		if adddefaultgateway {
 			tmpResult, err = netutils.SetDefaultGW(args, ifName, delegate.GatewayRequest, &tmpResult)
 			if err != nil {
-				return nil, logging.Errorf("Multus: Err in setting default gateway: %v", err)
+				return nil, cmdErr(k8sArgs, "error setting default gateway: %v", err)
 			}
 		}
 
@@ -456,7 +464,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 			if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
 				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
 				if err != nil {
-					return nil, logging.Errorf("Multus: error setting network status: %v", err)
+					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
 				}
 
 				netStatus = append(netStatus, delegateNetStatus)
@@ -469,7 +477,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
-				return nil, logging.Errorf("Multus: error setting the networks status: %v", err)
+				return nil, cmdErr(k8sArgs, "error setting the networks status: %v", err)
 			}
 		}
 	}
@@ -507,7 +515,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 			netnsfound = false
 			logging.Debugf("cmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
-			return logging.Errorf("Multus: failed to open netns %q: %v", netns, err)
+			return cmdErr(nil, "failed to open netns %q: %v", netns, err)
 		}
 	}
 
@@ -517,7 +525,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
 	if err != nil {
-		return logging.Errorf("Multus: error getting k8s args: %v", err)
+		return cmdErr(nil, "error getting k8s args: %v", err)
 	}
 
 	// Read the cache to get delegates json for the pod
@@ -528,7 +536,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 			if in.ClusterNetwork != "" {
 				err = k8s.GetDefaultNetworks(k8sArgs, in, kubeClient)
 				if err != nil {
-					return logging.Errorf("Multus: failed to get clusterNetwork/defaultNetworks: %v", err)
+					return cmdErr(k8sArgs, "failed to get clusterNetwork/defaultNetworks: %v", err)
 				}
 				// First delegate is always the master plugin
 				in.Delegates[0].MasterPlugin = true
@@ -539,18 +547,18 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 			if err != nil {
 				if len(in.Delegates) == 0 {
 					// No delegate available so send error
-					return logging.Errorf("Multus: failed to get delegates: %v", err)
+					return cmdErr(k8sArgs, "failed to get delegates: %v", err)
 				}
 				// Get clusterNetwork before, so continue to delete
 				logging.Errorf("Multus: failed to get delegates: %v, but continue to delete clusterNetwork", err)
 			}
 		} else {
-			return logging.Errorf("Multus: error reading the delegates: %v", err)
+			return cmdErr(k8sArgs, "error reading the delegates: %v", err)
 		}
 	} else {
 		defer os.Remove(path)
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
-			return logging.Errorf("Multus: failed to load netconf: %v", err)
+			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
 		}
 		// check plugins field and enable ConfListPlugin if there is
 		for _, v := range in.Delegates {
