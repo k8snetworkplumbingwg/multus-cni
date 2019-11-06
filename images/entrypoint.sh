@@ -33,6 +33,7 @@ MULTUS_CLEANUP_CONFIG_ON_EXIT=false
 RESTART_CRIO=false
 CRIO_RESTARTED_ONCE=false
 RENAME_SOURCE_CONFIG_FILE=false
+SKIP_BINARY_COPY=false
 
 # Give help text for parameters.
 function usage()
@@ -51,6 +52,7 @@ function usage()
     echo -e "\t--cni-version=<cniVersion (e.g. 0.3.1)>"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
+    echo -e "\t--skip-multus-binary-copy=$SKIP_BINARY_COPY"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
     echo -e "\t--multus-autoconfig-dir=$MULTUS_AUTOCONF_DIR (used only with --multus-conf-file=auto)"
@@ -132,6 +134,9 @@ while [ "$1" != "" ]; do
         --additional-bin-dir)
             ADDITIONAL_BIN_DIR=$VALUE
             ;;
+        --skip-multus-binary-copy)
+            SKIP_BINARY_COPY=$VALUE
+            ;;
         *)
             warn "unknown parameter \"$PARAM\""
             ;;
@@ -157,8 +162,13 @@ do
 done
 
 # Copy files into place and atomically move into final binary name
-cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
-mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus 
+if [ "$SKIP_BINARY_COPY" = false ]; then
+  cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
+  mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus
+else
+  log "Entrypoint skipped copying Multus binary."
+fi
+
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
 fi
