@@ -4,7 +4,7 @@ ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
 ENV GO111MODULE=off
-ENV VERSION=rhel8
+ENV VERSION=rhel8 COMMIT=unset
 RUN ./build && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
@@ -19,7 +19,6 @@ RUN ./build && \
 
 WORKDIR /usr/src/multus-cni
 ENV GO111MODULE=off
-RUN yum install -y git
 RUN ./build && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
