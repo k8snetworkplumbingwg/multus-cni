@@ -372,5 +372,5 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
   done
 else
   log "Entering sleep (success)..."
-  sleep infinity
+  trap : TERM INT; (while true; do sleep 1000; done) & wait
 fi
