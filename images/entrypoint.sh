@@ -191,6 +191,10 @@ if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
   # We're running as a k8d pod - expect some variables.
   if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
     error "KUBERNETES_SERVICE_HOST not set"; exit 1;
+  elif [[ ${KUBERNETES_SERVICE_HOST} == *":"* ]]; then
+    K8S_API_SERVICE_HOST="[${KUBERNETES_SERVICE_HOST}]"
+  else
+    K8S_API_SERVICE_HOST="${KUBERNETES_SERVICE_HOST}"
   fi
   if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
     error "KUBERNETES_SERVICE_PORT not set"; exit 1;
@@ -215,7 +219,7 @@ kind: Config
 clusters:
 - name: local
   cluster:
-    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
+    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://${K8S_API_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
     $TLS_CFG
 users:
 - name: multus
