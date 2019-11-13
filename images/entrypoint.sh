@@ -17,23 +17,23 @@ EOF
 }
 
 
-# Set our known directories.
-CNI_CONF_DIR="/host/etc/cni/net.d"
-CNI_BIN_DIR="/host/opt/cni/bin"
-ADDITIONAL_BIN_DIR=""
-MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
-MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
-MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
-MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
-MULTUS_NAMESPACE_ISOLATION=false
-MULTUS_LOG_LEVEL=""
-MULTUS_LOG_FILE=""
-OVERRIDE_NETWORK_NAME=false
-MULTUS_CLEANUP_CONFIG_ON_EXIT=false
-RESTART_CRIO=false
-CRIO_RESTARTED_ONCE=false
-RENAME_SOURCE_CONFIG_FILE=false
-SKIP_BINARY_COPY=false
+# Set our known directories if not already set as environment.
+[ -z "${CNI_CONF_DIR}" ] && CNI_CONF_DIR="/host/etc/cni/net.d"
+[ -z "${CNI_BIN_DIR}" ] && CNI_BIN_DIR="/host/opt/cni/bin"
+[ -z "${ADDITIONAL_BIN_DIR}" ] && ADDITIONAL_BIN_DIR=""
+[ -z "${MULTUS_CONF_FILE}" ] && MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
+[ -z "${MULTUS_AUTOCONF_DIR}" ] && MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
+[ -z "${MULTUS_BIN_FILE}" ] && MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
+[ -z "${MULTUS_KUBECONFIG_FILE_HOST}" ] && MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
+[ -z "${MULTUS_NAMESPACE_ISOLATION}" ] && MULTUS_NAMESPACE_ISOLATION=false
+[ -z "${MULTUS_LOG_FILE}" ] && MULTUS_LOG_LEVEL=""
+[ -z "${MULTUS_LOG_FILE}" ] && MULTUS_LOG_FILE=""
+[ -z "${OVERRIDE_NETWORK_NAME}" ] && OVERRIDE_NETWORK_NAME=false
+[ -z "${MULTUS_CLEANUP_CONFIG_ON_EXIT}" ] && MULTUS_CLEANUP_CONFIG_ON_EXIT=false
+[ -z "${RESTART_CRIO}" ] && RESTART_CRIO=false
+[ -z "${CRIO_RESTARTED_ONCE}" ] && CRIO_RESTARTED_ONCE=false
+[ -z "${RENAME_SOURCE_CONFIG_FILE}" ] && RENAME_SOURCE_CONFIG_FILE=false
+[ -z "${SKIP_BINARY_COPY}" ] && SKIP_BINARY_COPY=false
 
 # Give help text for parameters.
 function usage()
