@@ -1169,7 +1169,7 @@ var _ = Describe("multus operations", func() {
 		_, err = cmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("Multus: error adding pod to network \"other1\": delegateAdd: error invoking DelegateAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
+		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking DelegateAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {
