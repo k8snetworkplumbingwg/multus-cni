@@ -134,7 +134,7 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: nfvpe/multus:v3.2
+        image: nfvpe/multus:v3.4
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
