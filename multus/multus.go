@@ -367,7 +367,7 @@ func cmdErr(k8sArgs *types.K8sArgs, format string, args ...interface{}) error {
 	return logging.Errorf(prefix+format, args...)
 }
 
-func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
+func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdAdd: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
@@ -465,7 +465,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 
 		//create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
-			if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
+			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
 				if err != nil {
 					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
@@ -478,7 +478,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 
 	//set the network status annotation in apiserver, only in case Multus as kubeconfig
 	if n.Kubeconfig != "" && kc != nil {
-		if !types.CheckSystemNamespaces(kc.Podnamespace, n.SystemNamespaces) {
+		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error setting the networks status: %v", err)
@@ -489,7 +489,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	return result, nil
 }
 
-func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cnitypes.Result, error) {
+func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	logging.Debugf("cmdGet: %v, %v, %v", args, exec, kubeClient)
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
@@ -501,7 +501,7 @@ func cmdGet(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	return in.PrevResult, nil
 }
 
-func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) error {
+func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
 	in, err := types.LoadNetConf(args.StdinData)
 	if err != nil {
