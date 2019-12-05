@@ -28,19 +28,27 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/intel/multus-cni/types"
 
-	//netscheme "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/scheme"
-	//netv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	//netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
+	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+
+	"k8s.io/client-go/kubernetes/fake"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	//"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestK8sClient(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "k8sclient")
+}
+
+// NewFakeClientInfo returns fake client (just for testing)
+func NewFakeClientInfo() *ClientInfo {
+	return &ClientInfo{
+		Client:    fake.NewSimpleClientset(),
+		NetClient: netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+	}
 }
 
 var _ = Describe("k8sclient operations", func() {
@@ -362,7 +370,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
-		Expect(err).To(MatchError(fmt.Sprintf("GetNetworkDelegates: failed getting the delegate: cniConfigFromNetworkResource: getCNIConfigFromFile: error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
+		Expect(err).To(MatchError(fmt.Sprintf("GetNetworkDelegates: failed getting the delegate: GetCNIConfig: err in GetCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
 
 	It("retrieves cluster network from CRD", func() {
@@ -1026,8 +1034,21 @@ users:
 			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 			Expect(err).NotTo(HaveOccurred())
 
-			networkstatus := "test status"
-			_, err = setPodNetworkAnnotation(clientInfo, "test", pod, networkstatus)
+			fakeStatus := []nettypes.NetworkStatus{
+				{
+					Name:      "cbr0",
+					Interface: "eth0",
+					IPs:       []string{"10.244.1.2"},
+					Mac:       "92:79:27:01:7c:ce",
+				},
+				{
+					Name:      "test-net-attach-def-1",
+					Interface: "net1",
+					IPs:       []string{"1.1.1.1"},
+					Mac:       "ea:0e:fa:63:95:f9",
+				},
+			}
+			err = netutils.SetNetworkStatus(clientInfo.Client, pod, fakeStatus)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -1090,8 +1111,21 @@ users:
 			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 			Expect(err).NotTo(HaveOccurred())
 
-			networkstatus := "test status"
-			_, err = setPodNetworkAnnotation(clientInfo, "test", pod, networkstatus)
+			fakeStatus := []nettypes.NetworkStatus{
+				{
+					Name:      "cbr0",
+					Interface: "eth0",
+					IPs:       []string{"10.244.1.2"},
+					Mac:       "92:79:27:01:7c:ce",
+				},
+				{
+					Name:      "test-net-attach-def-1",
+					Interface: "net1",
+					IPs:       []string{"1.1.1.1"},
+					Mac:       "ea:0e:fa:63:95:f9",
+				},
+			}
+			err = netutils.SetNetworkStatus(clientInfo.Client, pod, fakeStatus)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -1153,11 +1187,11 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []*types.NetworkStatus{delegateNetStatus}
+			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
 
 			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
@@ -1235,11 +1269,11 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []*types.NetworkStatus{delegateNetStatus}
+			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
 
 			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
@@ -1295,11 +1329,11 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []*types.NetworkStatus{delegateNetStatus}
+			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
 
 			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 
@@ -1354,11 +1388,11 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := types.LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []*types.NetworkStatus{delegateNetStatus}
+			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
 
 			fakePod := testutils.NewFakePod("testpod", "kube-system/net1", "")
 

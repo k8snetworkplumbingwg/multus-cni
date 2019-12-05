@@ -40,6 +40,8 @@ import (
 	"github.com/intel/multus-cni/logging"
 	"github.com/intel/multus-cni/netutils"
 	"github.com/intel/multus-cni/types"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"github.com/vishvananda/netlink"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -409,7 +411,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	}
 
 	var result, tmpResult cnitypes.Result
-	var netStatus []*types.NetworkStatus
+	var netStatus []nettypes.NetworkStatus
 	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
@@ -466,12 +468,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		//create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
-				delegateNetStatus, err := types.LoadNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
+				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
 				if err != nil {
 					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
 				}
 
-				netStatus = append(netStatus, delegateNetStatus)
+				netStatus = append(netStatus, *delegateNetStatus)
 			}
 		}
 	}

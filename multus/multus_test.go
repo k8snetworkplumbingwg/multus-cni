@@ -37,6 +37,8 @@ import (
 	"github.com/intel/multus-cni/logging"
 	testhelpers "github.com/intel/multus-cni/testing"
 	"github.com/intel/multus-cni/types"
+	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
+	"k8s.io/client-go/kubernetes/fake"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -157,6 +159,14 @@ func (f *fakeExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData 
 func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
 	Expect(len(paths)).To(BeNumerically(">", 0))
 	return filepath.Join(paths[0], plugin), nil
+}
+
+// NewFakeClientInfo returns fake client (just for testing)
+func NewFakeClientInfo() *k8sclient.ClientInfo {
+	return &k8sclient.ClientInfo{
+		Client:    fake.NewSimpleClientset(),
+		NetClient: netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+	}
 }
 
 var _ = Describe("multus operations", func() {
@@ -1334,7 +1344,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		clientInfo := k8sclient.NewFakeClientInfo()
+		clientInfo := NewFakeClientInfo()
 		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1413,7 +1423,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		clientInfo := k8sclient.NewFakeClientInfo()
+		clientInfo := NewFakeClientInfo()
 		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1482,7 +1492,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		clientInfo := k8sclient.NewFakeClientInfo()
+		clientInfo := NewFakeClientInfo()
 		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1552,7 +1562,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		fKubeClient := k8sclient.NewFakeClientInfo()
+		fKubeClient := NewFakeClientInfo()
 		fKubeClient.AddPod(fakePod)
 		_, err := fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
@@ -1620,7 +1630,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		fKubeClient := k8sclient.NewFakeClientInfo()
+		fKubeClient := NewFakeClientInfo()
 		fKubeClient.AddPod(fakePod)
 		_, err := fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
@@ -1720,7 +1730,7 @@ var _ = Describe("multus operations", func() {
 		fExec := &fakeExec{}
 		fExec.addPlugin020(nil, "eth0", net1, expectedResult1, nil)
 
-		fKubeClient := k8sclient.NewFakeClientInfo()
+		fKubeClient := NewFakeClientInfo()
 		fKubeClient.AddPod(fakePod)
 		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
@@ -1789,7 +1799,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		fKubeClient := k8sclient.NewFakeClientInfo()
+		fKubeClient := NewFakeClientInfo()
 		fKubeClient.AddPod(fakePod)
 		_, err = fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
@@ -1865,7 +1875,7 @@ var _ = Describe("multus operations", func() {
 			},
 		}, nil)
 
-		fKubeClient := k8sclient.NewFakeClientInfo()
+		fKubeClient := NewFakeClientInfo()
 		fKubeClient.AddPod(fakePod)
 		_, err = fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))

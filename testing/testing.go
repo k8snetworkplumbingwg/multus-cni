@@ -24,9 +24,9 @@ import (
 	"os"
 	"strings"
 
+	netv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	netv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 
 	"github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
@@ -34,18 +34,20 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// NewFakeNetAttachDef returns net-attach-def for testing
 func NewFakeNetAttachDef(namespace, name, config string) *netv1.NetworkAttachmentDefinition {
 	return &netv1.NetworkAttachmentDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-			},
-			Spec: netv1.NetworkAttachmentDefinitionSpec{
-				Config: config,
-			},
-		}
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: netv1.NetworkAttachmentDefinitionSpec{
+			Config: config,
+		},
+	}
 }
 
+// NewFakeNetAttachDefFile returns net-attach-def for testing with conf file
 func NewFakeNetAttachDefFile(namespace, name, filePath, fileData string) *netv1.NetworkAttachmentDefinition {
 	netAttach := &netv1.NetworkAttachmentDefinition{
 		ObjectMeta: metav1.ObjectMeta{
@@ -58,19 +60,20 @@ func NewFakeNetAttachDefFile(namespace, name, filePath, fileData string) *netv1.
 	return netAttach
 }
 
+// NewFakeNetAttachDefAnnotation returns net-attach-def with resource annotation
 func NewFakeNetAttachDefAnnotation(namespace, name, config string) *netv1.NetworkAttachmentDefinition {
 	return &netv1.NetworkAttachmentDefinition{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: namespace,
-				Annotations: map[string]string {
-					"k8s.v1.cni.cncf.io/resourceName": "intel.com/sriov",
-				},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"k8s.v1.cni.cncf.io/resourceName": "intel.com/sriov",
 			},
-			Spec: netv1.NetworkAttachmentDefinitionSpec{
-				Config: config,
-			},
-		}
+		},
+		Spec: netv1.NetworkAttachmentDefinitionSpec{
+			Config: config,
+		},
+	}
 }
 
 // NewFakePod creates fake Pod object
