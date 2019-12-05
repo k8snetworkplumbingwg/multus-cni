@@ -27,6 +27,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	testhelpers "github.com/intel/multus-cni/testing"
+	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -368,17 +369,17 @@ var _ = Describe("config operations", func() {
     "args1": "val1"
 }`
 		type bridgeNetConf struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Args     struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
@@ -404,17 +405,17 @@ var _ = Describe("config operations", func() {
     "args1": "val1a"
 }`
 		type bridgeNetConf struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Args     struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
@@ -439,20 +440,20 @@ var _ = Describe("config operations", func() {
     "args1": "val1"
 }`
 		type bridgeNetConf struct {
-			Type     string `json:"type"`
-			Args     struct {
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 		type bridgeNetConfList struct {
-			Name     string `json:"name"`
+			Name    string           `json:"name"`
 			Plugins []*bridgeNetConf `json:"plugins"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
@@ -535,7 +536,7 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 		Expect(err).NotTo(HaveOccurred())
 
-		delegateNetStatus, err := LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 
 		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 
@@ -568,7 +569,7 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
 		Expect(err).NotTo(HaveOccurred())
 		fmt.Println("result.Version: ", result.Version())
-		delegateNetStatus, err := LoadNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
 
 		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 

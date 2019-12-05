@@ -21,7 +21,6 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/multus-cni/logging"
@@ -197,43 +196,6 @@ func GetGatewayFromResult(result *current.Result) []net.IP {
 		}
 	}
 	return gateways
-}
-
-// LoadNetworkStatus create network status from CNI result
-func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
-	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
-	netstatus := &NetworkStatus{}
-	netstatus.Name = netName
-
-	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
-	if err != nil {
-		logging.Errorf("LoadNetworkStatus: error converting the type.Result to current.Result: %v", err)
-		return netstatus, err
-	}
-	for _, ifs := range result.Interfaces {
-		//Only pod interfaces can have sandbox information
-		if ifs.Sandbox != "" {
-			netstatus.Interface = ifs.Name
-			netstatus.Mac = ifs.Mac
-		}
-	}
-
-	for _, ipconfig := range result.IPs {
-		if ipconfig.Version == "4" && ipconfig.Address.IP.To4() != nil {
-			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
-		}
-
-		if ipconfig.Version == "6" && ipconfig.Address.IP.To16() != nil {
-			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
-		}
-	}
-
-	netstatus.DNS = result.DNS
-	netstatus.Gateway = GetGatewayFromResult(result)
-
-	return netstatus, nil
-
 }
 
 // LoadNetConf converts inputs (i.e. stdin) to NetConf
