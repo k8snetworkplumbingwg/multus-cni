@@ -47,15 +47,16 @@ script:
 deploy:
   # Release on versioned tag (e.g. v1.0)
   - provider: script
-    #skip_cleanup: true
-    script: curl -sL https://git.io/goreleaser | bash
+    #cleanup: false
+    #script: curl -sL https://git.io/goreleaser | VERSION="v0.101.0" bash
+    script: curl -sL https://git.io/goreleaser
     on:
       tags: true
       all_branches: true
-      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && ! -z $GITHUB_TOKEN"
+      condition: "$TARGET = amd64 && $TRAVIS_TAG =~ ^v[0-9].*$ && ! -z $GITHUB_TOKEN && $TRAVIS_OS_NAME = linux"
   # Push images to Dockerhub on tag
   - provider: script
-    skip_cleanup: true
+    cleanup: false
     script: >
       bash -c '
       docker tag nfvpe/multus:latest-amd64 nfvpe/multus:latest;
@@ -75,12 +76,12 @@ deploy:
     on:
       tags: true
       all_branches: true
-      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && ! -z $REGISTRY_USER"
+      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && -n $REGISTRY_USER && -n $REGISTRY_PASS"
   # Push images to Dockerhub on merge to master
   - provider: script
     on:
       branch: master
-      condition: "! -z $REGISTRY_USER"
+      condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS"
     script: >
       bash -c '
       docker tag nfvpe/multus:latest-amd64 nfvpe/multus:snapshot;
