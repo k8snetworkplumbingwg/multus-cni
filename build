@@ -21,7 +21,7 @@ if [ -z "$VERSION" ]; then
 fi
 DATE=$(date --iso-8601=seconds)
 COMMIT=${COMMIT:-$(git rev-parse --verify HEAD)}
-LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
+LDFLAGS="-w -s -X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
 export CGO_ENABLED=0
 
 # this if... will be removed when gomodules goes default
