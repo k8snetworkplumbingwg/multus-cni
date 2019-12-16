@@ -4,8 +4,8 @@ FROM golang:1.13.4 as build
 # Add everything
 ADD . /usr/src/multus-cni
 
-#ENV GOARCH "arm64"
-#ENV GOOS "linux"
+ENV GOARCH "arm64"
+ENV GOOS "linux"
 
 RUN  cd /usr/src/multus-cni && \
      ./build
