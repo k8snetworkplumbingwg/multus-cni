@@ -331,7 +331,9 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         }
 EOF
       )
-      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      tmpfile=$(mktemp)
+      echo $CONF > $tmpfile
+      mv $tmpfile $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
       
