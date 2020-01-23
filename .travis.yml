@@ -3,22 +3,28 @@ language: go
 # see https://docs.travis-ci.com/user/reference/overview/#Virtualization-environments
 # for the detail
 # sudo: requried
-dist: trusty
+dist: bionic
+
+services:
+  - docker
 
 go:
-  - 1.12.x
+  - 1.13.x
 
 env:
   global:
     - GO111MODULE=on
-    - REGISTRY_USER=${REGISTRY_USER}
+    - REGISTRY_USER=${REGISTRY_USER:-nfvpe}
     - REGISTRY_PASS=${REGISTRY_PASS}
+    - REPOSITORY_NAME=${REPOSITORY_NAME}
+    - DOCKER_CLI_EXPERIMENTAL="enabled"
     - secure: "${REGISTRY_SECURE}"
   jobs:
     - TARGET=amd64
     - TARGET=ppc64le
 
 before_install:
+  - if [ "${REPOSITORY_NAME}" = "" ]; then export REPOSITORY_NAME=multus; fi
   - sudo apt-get update -qq
   - go get github.com/mattn/goveralls
 
@@ -39,9 +45,9 @@ script:
     if [ "${TARGET}" == "amd64" ]; then
       sudo env PATH=${PATH} ./test.sh
       goveralls -coverprofile=coverage.out -service=travis-ci
-      docker build -t nfvpe/multus:latest-amd64 .
-      docker build -t nfvpe/multus:latest-ppc64le -f Dockerfile.ppc64le .
-      docker build -t nfvpe/multus-origin:latest -f Dockerfile.openshift .
+      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 .
+      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le -f Dockerfile.ppc64le .
+      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}-origin:latest -f Dockerfile.openshift .
     fi
 
 deploy:
@@ -58,39 +64,52 @@ deploy:
     cleanup: false
     script: >
       bash -c '
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:latest;
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:stable;
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:stable-amd64;
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:$TRAVIS_TAG;
-      docker tag nfvpe/multus:latest-ppc64le nfvpe/multus:stable-ppc64le;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:$TRAVIS_TAG;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push nfvpe/multus:latest;
-      docker push nfvpe/multus:latest-amd64;
-      docker push nfvpe/multus:latest-ppc64le;
-      docker push nfvpe/multus:stable;
-      docker push nfvpe/multus:stable-amd64;
-      docker push nfvpe/multus:stable-ppc64le;
-      docker push nfvpe/multus:$TRAVIS_TAG;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable-amd64;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable-ppc64le;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:$TRAVIS_TAG;
+      export DOCKER_CLI_EXPERIMENTAL="enabled";
+      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 --arch amd64;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le --arch ppc64le;
+      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest;
+      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64 --arch amd64;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le --arch ppc64le;
+      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable;
       echo done'
     on:
       tags: true
       all_branches: true
-      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && -n $REGISTRY_USER && -n $REGISTRY_PASS"
+      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && -n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME"
   # Push images to Dockerhub on merge to master
   - provider: script
     on:
       branch: master
-      condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS"
+      condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME"
     script: >
       bash -c '
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:snapshot;
-      docker tag nfvpe/multus:latest-amd64 nfvpe/multus:snapshot-amd64;
-      docker tag nfvpe/multus:latest-ppc64le nfvpe/multus:snapshot-ppc64le;
+      docker tag ${REGISTRY_USER}/:latest-amd64 ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64;
+      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push nfvpe/multus:snapshot;
-      docker push nfvpe/multus:snapshot-amd64;
-      docker push nfvpe/multus:snapshot-ppc64le;
-      docker push nfvpe/multus:latest;
-      docker push nfvpe/multus:latest-amd64;
-      docker push nfvpe/multus:latest-ppc64le;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot-amd64;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64;
+      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64 --arch amd64;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le --arch ppc64le;
+      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot;
+      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 --arch amd64;
+      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le --arch ppc64le;
+      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest;
       echo done'
