@@ -17,6 +17,7 @@ env:
     - REGISTRY_USER=${REGISTRY_USER:-nfvpe}
     - REGISTRY_PASS=${REGISTRY_PASS}
     - REPOSITORY_NAME=${REPOSITORY_NAME}
+    - REPOSITORY_USER=${REPOSITORY_USER}
     - DOCKER_CLI_EXPERIMENTAL="enabled"
     - secure: "${REGISTRY_SECURE}"
   jobs:
@@ -45,9 +46,9 @@ script:
     if [ "${TARGET}" == "amd64" ]; then
       sudo env PATH=${PATH} ./test.sh
       goveralls -coverprofile=coverage.out -service=travis-ci
-      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 .
-      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le -f Dockerfile.ppc64le .
-      docker build -t ${REGISTRY_USER}/${REPOSITORY_NAME}-origin:latest -f Dockerfile.openshift .
+      docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 .
+      docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le -f Dockerfile.ppc64le .
+      docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}-origin:latest -f Dockerfile.openshift .
     fi
 
 deploy:
@@ -64,26 +65,26 @@ deploy:
     cleanup: false
     script: >
       bash -c '
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:$TRAVIS_TAG;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-amd64;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:$TRAVIS_TAG;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS"; 
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable-amd64;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable-ppc64le;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:$TRAVIS_TAG;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-amd64;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-ppc64le;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:$TRAVIS_TAG;
       export DOCKER_CLI_EXPERIMENTAL="enabled";
-      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 --arch amd64;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le --arch ppc64le;
-      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest;
-      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-amd64 --arch amd64;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:stable ${REGISTRY_USER}/${REPOSITRY_NAME}:stable-ppc64le --arch ppc64le;
-      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:stable;
+      docker manifest create ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 --arch amd64;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le --arch ppc64le;
+      docker manifest push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest;
+      docker manifest create ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-ppc64le;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-amd64 --arch amd64;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable-ppc64le --arch ppc64le;
+      docker manifest push ${REPOSITORY_USER}/${REPOSITORY_NAME}:stable;
       echo done'
     on:
       tags: true
@@ -96,20 +97,20 @@ deploy:
       condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME"
     script: >
       bash -c '
-      docker tag ${REGISTRY_USER}/:latest-amd64 ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64;
-      docker tag ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le;
+      docker tag ${REPOSITORY_USER}/:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-amd64;
+      docker tag ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le;
       docker login -u "$REGISTRY_USER" -p "$REGISTRY_PASS";
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot-amd64;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-amd64;
-      docker push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
-      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-amd64 --arch amd64;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot ${REGISTRY_USER}/${REPOSITRY_NAME}:snapshot-ppc64le --arch ppc64le;
-      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:snapshot;
-      docker manifest create ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-amd64 --arch amd64;
-      docker manifest annotate ${REGISTRY_USER}/${REPOSITORY_NAME}:latest ${REGISTRY_USER}/${REPOSITRY_NAME}:latest-ppc64le --arch ppc64le;
-      docker manifest push ${REGISTRY_USER}/${REPOSITORY_NAME}:latest;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-amd64;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64;
+      docker push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker manifest create ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-amd64 --arch amd64;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot-ppc64le --arch ppc64le;
+      docker manifest push ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot;
+      docker manifest create ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 --arch amd64;
+      docker manifest annotate ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le --arch ppc64le;
+      docker manifest push ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest;
       echo done'
