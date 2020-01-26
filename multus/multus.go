@@ -278,7 +278,7 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 	}
 
 	// Deprecated in ver 3.5.
-	if delegate.MacRequest != "" || delegate.IPRequest != nil {
+	if delegate.MacRequest != "" || delegate.IPRequest != nil || delegate.GUIDRequest != "" {
 		if cniArgs != "" {
 			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
 		} else {
@@ -294,6 +294,17 @@ func delegateAdd(exec invoke.Exec, ifName string, delegate *types.DelegateNetCon
 			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
 			logging.Debugf("delegateAdd: set MAC address %q to %q", delegate.MacRequest, ifName)
 			rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
+		}
+		if delegate.GUIDRequest != "" {
+			// validate Guid address
+			_, err := net.ParseMAC(delegate.GUIDRequest)
+			if err != nil {
+				return nil, logging.Errorf("delegateAdd: failed to parse guid address %q", delegate.GUIDRequest)
+			}
+
+			cniArgs = fmt.Sprintf("%s;GUID=%s", cniArgs, delegate.GUIDRequest)
+			logging.Debugf("delegateAdd: set GUID address %q to %q", delegate.GUIDRequest, ifName)
+			rt.Args = append(rt.Args, [2]string{"GUID", delegate.GUIDRequest})
 		}
 
 		if delegate.IPRequest != nil {

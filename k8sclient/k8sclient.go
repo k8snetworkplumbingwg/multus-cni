@@ -196,6 +196,12 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to mac: %v", err)
 			}
 		}
+		if n.GUIDRequest != "" {
+			// validate MAC address
+			if _, err := net.ParseMAC(n.GUIDRequest); err != nil {
+				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to guid: %v", err)
+			}
+		}
 		if n.IPRequest != nil {
 			for _, ip := range n.IPRequest {
 				// validate IP address

@@ -61,6 +61,7 @@ type RuntimeConfig struct {
 	Bandwidth *BandwidthEntry `json:"bandwidth,omitempty"`
 	IPs       []string        `json:"ips,omitempty"`
 	Mac       string          `json:"mac,omitempty"`
+	GUID      string          `json:"guid,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
@@ -86,6 +87,7 @@ type NetworkStatus struct {
 	Interface string    `json:"interface,omitempty"`
 	IPs       []string  `json:"ips,omitempty"`
 	Mac       string    `json:"mac,omitempty"`
+	GUID      string    `json:"guid,omitempty"`
 	DNS       types.DNS `json:"dns,omitempty"`
 	Gateway   []net.IP  `json:"default-route,omitempty"`
 }
@@ -96,6 +98,7 @@ type DelegateNetConf struct {
 	ConfList            types.NetConfList
 	IfnameRequest       string          `json:"ifnameRequest,omitempty"`
 	MacRequest          string          `json:"macRequest,omitempty"`
+	GUIDRequest         string          `json:"guidRequest,omitempty"`
 	IPRequest           []string        `json:"ipRequest,omitempty"`
 	PortMappingsRequest []*PortMapEntry `json:"-"`
 	BandwidthRequest    *BandwidthEntry `json:"-"`
@@ -125,6 +128,7 @@ type NetworkSelectionElement struct {
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
 	MacRequest string `json:"mac,omitempty"`
+	GUIDRequest string `json:"guid,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interface,omitempty"`

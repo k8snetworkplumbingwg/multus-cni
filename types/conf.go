@@ -102,6 +102,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.MacRequest != "" {
 			delegateConf.MacRequest = net.MacRequest
 		}
+		if net.GUIDRequest != "" {
+			delegateConf.GUIDRequest = net.GUIDRequest
+		}
 		if net.IPRequest != nil {
 			delegateConf.IPRequest = net.IPRequest
 		}
@@ -143,6 +146,9 @@ func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		if delegate.MacRequest != "" {
 			runtimeConfig.Mac = delegate.MacRequest
 		}
+		if delegate.GUIDRequest != "" {
+			runtimeConfig.GUID = delegate.GUIDRequest
+		}
 	}
 
 	return runtimeConfig
@@ -180,6 +186,9 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		}
 		if len(rc.Mac) != 0 {
 			capabilityArgs["mac"] = rc.Mac
+		}
+		if len(rc.GUID) != 0 {
+			capabilityArgs["guid"] = rc.GUID
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}
