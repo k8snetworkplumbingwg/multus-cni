@@ -46,9 +46,9 @@ github.com/hpcloud/tail/watch
 github.com/hpcloud/tail/winfile
 # github.com/imdario/mergo v0.0.0-20171009183408-7fe0c75c13ab
 github.com/imdario/mergo
-# github.com/json-iterator/go v1.1.8
+# github.com/json-iterator/go v1.1.9
 github.com/json-iterator/go
-# github.com/k8snetworkplumbingwg/network-attachment-definition-client v0.0.0-20191119172530-79f836b90111
+# github.com/k8snetworkplumbingwg/network-attachment-definition-client v0.0.0-20200127152046-0ee521d56061
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned
@@ -104,9 +104,9 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f
 github.com/vishvananda/netns
-# golang.org/x/crypto v0.0.0-20190927123631-a832865fa7ad
+# golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933
+# golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -197,7 +197,7 @@ gopkg.in/fsnotify.v1
 gopkg.in/inf.v0
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 gopkg.in/tomb.v1
-# gopkg.in/yaml.v2 v2.2.7
+# gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20181115043458-b799cb063522
 k8s.io/api/admissionregistration/v1alpha1
@@ -366,7 +366,7 @@ k8s.io/client-go/util/integer
 k8s.io/client-go/util/retry
 # k8s.io/klog v1.0.0
 k8s.io/klog
-# k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a
+# k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c
 k8s.io/kube-openapi/pkg/util/proto
 # k8s.io/kubernetes v1.13.0
 k8s.io/kubernetes/pkg/kubelet/apis/podresources
