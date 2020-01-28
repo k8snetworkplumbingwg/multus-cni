@@ -79,6 +79,7 @@ func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkst
 	coreClient := client.CoreV1()
 
 	pod.Annotations[v1.NetworkStatusAnnot] = networkstatus
+	pod.Annotations[v1.OldNetworkStatusAnnot] = networkstatus
 	pod = pod.DeepCopy()
 	var err error
 
