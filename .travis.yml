@@ -31,6 +31,31 @@ before_install:
 
 install:
   - go get -u golang.org/x/lint/golint
+  # Download kind & deps
+  - curl -Lo ./kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.7.0/kind-$(uname)-amd64"
+  - chmod +x ./kind
+  - sudo mv ./kind /usr/bin
+  - curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+  - chmod +x ./kubectl
+  - sudo mv ./kubectl /usr/bin
+  # Spin up kind
+  - kind create cluster --config e2e-tests/config-3node.yml 
+  - export KUBECONFIG=~/.kube/config
+  # Download centos tools
+  - docker pull centos/tools:latest
+  - kind load docker-image centos/tools:latest
+  # Install koko
+  - curl -LO https://github.com/redhat-nfvpe/koko/releases/download/v0.82/koko_0.82_linux_amd64
+  - chmod +x koko_0.82_linux_amd64
+  # Create veth interface between kind-woker and kind-worker2
+  - sudo ./koko_0.82_linux_amd64 -d kind-worker,eth1 -d kind-worker2,eth1
+  # Verify that kind is running
+  - kubectl get nodes
+  # Install flannel
+  - curl https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml -o flannel.yml
+  - kubectl create -f flannel.yml
+  # Install default CNI plugins
+  - kubectl create -f images/cni-install.yml
 
 before_script:
   # Make gopath... to run golint/go fmt/go vet
@@ -44,11 +69,72 @@ script:
   - GOARCH="${TARGET}" ./build
   - |
     if [ "${TARGET}" == "amd64" ]; then
+      # Run the test suite
       sudo env PATH=${PATH} ./test.sh
       goveralls -coverprofile=coverage.out -service=travis-ci
+    fi
+
+  - |
+    # Test building the docker images
+    if [ "${TARGET}" == "amd64" ]; then
       docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 .
+      docker build -t multus/multus-cni:latest .
       docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le -f Dockerfile.ppc64le .
       docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}-origin:latest -f Dockerfile.openshift .
+    fi
+
+  - |
+    # End to end test with KIND
+    if [ "${TARGET}" == "amd64" ]; then
+      kind load docker-image multus/multus-cni:latest
+      cp images/multus-daemonset.yml images/multus-test-daemonset.yml
+      sed -ie '0,/        image:.*/ s|        image:.*|        image: multus/multus-cni:latest|' images/multus-test-daemonset.yml
+      sed -ie '/image: multus/ a\\        imagePullPolicy: Never' images/multus-test-daemonset.yml
+      cat images/multus-test-daemonset.yml
+      kubectl create -f images/multus-test-daemonset.yml
+      # Wait for the multus pod to become ready.
+      kubectl describe pod $(kubectl get pods -n kube-system | grep multus | awk '{print $1}') -n kube-system
+      i="0"
+      while [ $i -le 120 ]; do
+        pods=$(kubectl get pods -n kube-system)
+        if echo "$pods" | grep -Piq "multus.+running"; then
+          echo "Detected Multus pod running..."
+          break
+        else
+          echo "Multus not running yet..."
+          sleep 1
+        fi
+        i=$[$i+1]
+      done
+      if [ $i -ge 120 ]; then
+        echo "Too long to wait for Multus pod..."
+        exit 1
+      fi
+      kubectl describe pod $(kubectl get pods -n kube-system | grep multus | awk '{print $1}') -n kube-system
+      kubectl get pods --all-namespaces
+      kubectl logs $(kubectl get pods -n kube-system | grep multus | awk '{print $1}') -n kube-system
+      kubectl create -f e2e-tests/centos-macvlan.yml
+      # Wait for the centos pods to become ready
+      i="0"
+      while [ $i -le 240 ]; do
+        pods=$(kubectl get pods)
+        if echo "$pods" | grep -Piq "centos.worker1.+running"; then
+          echo "Detected centos pod running..."
+          break
+        else
+          echo "Multus not running yet..."
+          sleep 1
+        fi
+        i=$[$i+1]
+      done
+      kubectl describe pod centos-worker1
+      if [ $i -ge 240 ]; then
+        echo "Too long to wait for Centos pod..."
+        exit 1
+      fi
+      kubectl exec -it centos-worker1 -- ip a | grep net1
+      kubectl exec -it centos-worker2 -- ip a | grep net1
+      kubectl exec -it centos-worker2 -- ping -c5 10.1.1.11
     fi
 
 deploy:

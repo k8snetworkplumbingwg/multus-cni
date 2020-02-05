@@ -1,0 +1,61 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: centos-runtimeconfig-def
+spec: 
+  config: '{
+            "cniVersion": "0.3.1",
+            "plugins": [
+                {
+                    "type": "macvlan",
+                    "capabilities": { "ips": true },
+                    "master": "eth1",
+                    "mode": "bridge",
+                    "ipam": {
+                        "type": "static"
+                    }
+                }, {
+                    "type": "tuning"
+                } ]
+        }'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: centos-worker1
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "centos-runtimeconfig-def",
+              "ips": [ "10.1.1.11/24" ] }
+    ]'
+spec:
+  containers:
+  - name: centos-worker1
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+    securityContext:
+      privileged: true
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: centos-worker2
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "centos-runtimeconfig-def",
+              "ips": [ "10.1.1.12/24" ] }
+    ]'
+spec:
+  containers:
+  - name: centos-worker2
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+    securityContext:
+      privileged: true
+  nodeSelector:
+    kubernetes.io/hostname: kind-worker2
