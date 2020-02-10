@@ -1,0 +1,53 @@
+name: Docker-build-push-latest
+on: 
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
+      GO111MODULE: on
+      TARGET: amd64
+      REPOSITORY: nfvpe/multus
+      REPOSITORY_USER: nfvperobot
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Build latest-amd64
+      run: docker build -t ${REPOSITORY}:latest-amd64 .
+
+    - name: Build latest-ppc64le
+      run: docker build -t ${REPOSITORY}:latest-ppc64le -f Dockerfile.ppc64le .
+
+    - name: Build latest-origin
+      run: docker build -t ${REPOSITORY}:latest-origin -f Dockerfile.openshift .
+
+    - name: Tag snapshot
+      run: |
+        docker tag ${REPOSITORY}:latest-amd64 ${REPOSITORY}:snapshot-amd64
+        docker tag ${REPOSITORY}:latest-ppc64le ${REPOSITORY}:snapshot-ppc64le
+
+    - name: Login to registry
+      run: docker login -u ${REPOSITORY_USER} -p ${{ secrets. REPOSITORY_PASS }}
+
+    - name: Push latest/snapshot images
+      run: |
+        docker push ${REPOSITORY}:latest-amd64
+        docker push ${REPOSITORY}:latest-ppc64le
+        docker push ${REPOSITORY}:snapshot-amd64
+        docker push ${REPOSITORY}:snapshot-ppc64le
+
+    - name: Create manifest for multi-arch images
+      run: |
+        docker manifest create ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 ${REPOSITORY}:snapshot-ppc64le
+        docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 --arch amd64
+        docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-ppc64le --arch ppc64le
+        docker manifest push ${REPOSITORY}:snapshot
+        docker manifest create ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 ${REPOSITORY}:latest-ppc64le
+        docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 --arch amd64
+        docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-ppc64le --arch ppc64le
+        docker manifest push ${REPOSITORY}:latest
