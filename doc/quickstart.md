@@ -171,7 +171,7 @@ spec:
 EOF
 ```
 
-You may now inspect the pod and see what interfaces interfaces are attached, like so:
+You may now inspect the pod and see what interfaces are attached, like so:
 
 ```
 $ kubectl exec -it samplepod -- ip a
