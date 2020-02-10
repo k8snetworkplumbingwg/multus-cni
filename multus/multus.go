@@ -371,15 +371,15 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 		return nil, logging.Errorf("Multus: error getting k8s args: %v", err)
 	}
 
-	wait.ExponentialBackoff(defaultReadinessBackoff, func() (bool, error) {
-		_, err := os.Stat(n.ReadinessIndicatorFile)
-		switch {
-		case err == nil:
-			return true, nil
-		default:
-			return false, nil
+	if n.ReadinessIndicatorFile != "" {
+		err := wait.ExponentialBackoff(defaultReadinessBackoff, func() (bool, error) {
+			_, err := os.Stat(n.ReadinessIndicatorFile)
+			return err == nil, nil
+		})
+		if err != nil {
+			return nil, cmdErr(k8sArgs, "ExponentialBackoff error waiting for ReadinessIndicatorFile: %v", err)
 		}
-	})
+	}
 
 	if n.ClusterNetwork != "" {
 		err = k8s.GetDefaultNetworks(k8sArgs, n, kubeClient)
