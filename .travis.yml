@@ -89,12 +89,12 @@ deploy:
     on:
       tags: true
       all_branches: true
-      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && -n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME"
+      condition: "$TRAVIS_TAG =~ ^v[0-9].*$ && -n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME && -n $REPOSITORY_USER"
   # Push images to Dockerhub on merge to master
   - provider: script
     on:
       branch: master
-      condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME"
+      condition: "-n $REGISTRY_USER && -n $REGISTRY_PASS && -n $REPOSITORY_NAME && -n $REPOSITORY_USER"
     script: >
       bash -c '
       docker tag ${REPOSITORY_USER}/:latest-amd64 ${REPOSITORY_USER}/${REPOSITORY_NAME}:snapshot;
