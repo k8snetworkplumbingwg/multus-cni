@@ -166,8 +166,8 @@ metadata:
 spec:
   containers:
   - name: samplepod
-    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
-    image: dougbtv/centos-network
+    command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    image: alpine
 EOF
 ```
 
@@ -225,8 +225,8 @@ metadata:
 spec:
   containers:
   - name: samplepod
-    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
-    image: dougbtv/centos-network
+    command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    image: alpine
 EOF
 ```
 
