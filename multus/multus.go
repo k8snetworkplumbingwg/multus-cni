@@ -48,12 +48,8 @@ var version = "master@git"
 var commit = "unknown commit"
 var date = "unknown date"
 
-var defaultReadinessBackoff = wait.Backoff{
-	Steps:    4,
-	Duration: 250 * time.Millisecond,
-	Factor:   4.0,
-	Jitter:   0.1,
-}
+var pollDuration = 1000 * time.Millisecond
+var pollTimeout = 45 * time.Second
 
 func printVersionString() string {
 	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
@@ -372,12 +368,12 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) (cn
 	}
 
 	if n.ReadinessIndicatorFile != "" {
-		err := wait.ExponentialBackoff(defaultReadinessBackoff, func() (bool, error) {
+		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
 			_, err := os.Stat(n.ReadinessIndicatorFile)
 			return err == nil, nil
 		})
 		if err != nil {
-			return nil, cmdErr(k8sArgs, "ExponentialBackoff error waiting for ReadinessIndicatorFile: %v", err)
+			return nil, cmdErr(k8sArgs, "PollImmediate error waiting for ReadinessIndicatorFile: %v", err)
 		}
 	}
 
