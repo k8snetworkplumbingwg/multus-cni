@@ -28,6 +28,7 @@ MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
 MULTUS_LOG_LEVEL=""
 MULTUS_LOG_FILE=""
+MULTUS_READINESS_INDICATOR_FILE=""
 OVERRIDE_NETWORK_NAME=false
 MULTUS_CLEANUP_CONFIG_ON_EXIT=false
 RESTART_CRIO=false
@@ -61,6 +62,7 @@ function usage()
     echo -e "\t--override-network-name=false (used only with --multus-conf-file=auto)"
     echo -e "\t--cleanup-config-on-exit=false (used only with --multus-conf-file=auto)"
     echo -e "\t--rename-conf-file=false (used only with --multus-conf-file=auto)"
+    echo -e "\t--readiness-indicator-file=$MULTUS_READINESS_INDICATOR_FILE (used only with --multus-conf-file=auto)"
     echo -e "\t--additional-bin-dir=$ADDITIONAL_BIN_DIR (adds binDir option to configuration, used only with --multus-conf-file=auto)"
     echo -e "\t--restart-crio=false (restarts CRIO after config file is generated)"
 }
@@ -136,6 +138,9 @@ while [ "$1" != "" ]; do
             ;;
         --skip-multus-binary-copy)
             SKIP_BINARY_COPY=$VALUE
+            ;;
+        --readiness-indicator-file)
+            MULTUS_READINESS_INDICATOR_FILE=$VALUE
             ;;
         *)
             warn "unknown parameter \"$PARAM\""
@@ -305,6 +310,12 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         ADDITIONAL_BIN_DIR_STRING="\"binDir\": \"$ADDITIONAL_BIN_DIR\","
       fi
 
+
+      READINESS_INDICATOR_FILE_STRING=""
+      if [ ! -z "${MULTUS_READINESS_INDICATOR_FILE// }" ]; then
+        READINESS_INDICATOR_FILE_STRING="\"readinessindicatorfile\": \"$MULTUS_READINESS_INDICATOR_FILE\","
+      fi
+
       if [ "$OVERRIDE_NETWORK_NAME" == "true" ]; then
         MASTER_PLUGIN_NET_NAME="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
             python -c 'import json,sys;print json.load(sys.stdin)["name"]')"
@@ -324,6 +335,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           $LOG_LEVEL_STRING
           $LOG_FILE_STRING
           $ADDITIONAL_BIN_DIR_STRING
+          $READINESS_INDICATOR_FILE_STRING
           "kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
           "delegates": [
             $MASTER_PLUGIN_JSON
@@ -363,8 +375,21 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
   while true; do
     # Check and see if the original master plugin configuration exists...
     if [ ! -f "$MASTER_PLUGIN_LOCATION" ]; then
-      log "Master plugin @ $MASTER_PLUGIN_LOCATION has been deleted. Performing cleanup..."
-      cleanup
+      log "Master plugin @ $MASTER_PLUGIN_LOCATION has been deleted. Allowing 45 seconds for its restoration..."
+      sleep 10
+      for i in {1..35}
+      do
+        if [ -f "$MASTER_PLUGIN_LOCATION" ]; then
+          log "Master plugin @ $MASTER_PLUGIN_LOCATION was restored. Regenerating given configuration."
+          break
+        fi
+        sleep 1
+      done
+
+      if [ ! -f "$MASTER_PLUGIN_LOCATION" ]; then
+        log "Master plugin @ $MASTER_PLUGIN_LOCATION has not been restored, beginning regeneration."
+        cleanup
+      fi
       generateMultusConf
       log "Continuing watch loop after configuration regeneration..."
     fi
