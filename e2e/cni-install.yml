@@ -1,0 +1,64 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: cni-install-sh
+  namespace: kube-system
+data:
+  install_cni.sh: |
+    cd /tmp
+    wget https://github.com/containernetworking/plugins/releases/download/v0.8.5/cni-plugins-linux-amd64-v0.8.5.tgz
+    cd /host/opt/cni/bin
+    tar xvfzp /tmp/cni-plugins-linux-amd64-v0.8.5.tgz
+    sleep infinite
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: install-cni-plugins
+  namespace: kube-system
+  labels:
+    name: cni-plugins
+spec:
+  selector:
+    matchLabels:
+      name: cni-plugins
+  template:
+    metadata:
+      labels:
+        name: cni-plugins
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: install-cni-plugins
+        image: alpine
+        command: ["/bin/sh", "/scripts/install_cni.sh"]
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "50Mi"
+          limits:
+            cpu: "100m"
+            memory: "50Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: cni-bin
+          mountPath: /host/opt/cni/bin
+        - name: scripts
+          mountPath: /scripts
+      volumes:
+        - name: cni-bin
+          hostPath:
+            path: /opt/cni/bin
+        - name: scripts
+          configMap:
+            name: cni-install-sh
+            items:
+            - key: install_cni.sh
+              path: install_cni.sh

@@ -12,16 +12,6 @@ jobs:
       GO111MODULE: on
       TARGET: amd64
     steps:
-      - name: Dump GitHub login
-        env:
-          GITHUB_LOGIN: ${{ github.event.pull_request.head.repo.owner.login }}
-        run: echo "$GITHUB_LOGIN"
-
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
-
       - name: Set up Go 1.13
         uses: actions/setup-go@v1
         with:
