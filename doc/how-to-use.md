@@ -619,3 +619,7 @@ When using `--multus-conf-file=auto` you may also care to specify a `binDir` in 
 Sometimes, you may wish to not have the entrypoint copy the binary file onto the host. Potentially, you have another way to copy in a specific version of Multus, for example. By default, it's always copied, but you may disable the copy with:
 
     --skip-multus-binary-copy=true
+
+If you wish to have auto configuration use the `readinessindicatorfile` in the configuration, you can use the `--readiness-indicator-file` to express which file should be used as the readiness indicator.
+
+    --readiness-indicator-file=/path/to/file
