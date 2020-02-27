@@ -560,8 +560,8 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 }
 
 func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
-	logging.Debugf("cmdCheck: %v, %v, %v", args, exec, kubeClient)
 	in, err := types.LoadNetConf(args.StdinData)
+	logging.Debugf("cmdCheck: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -586,8 +586,8 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 }
 
 func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
-	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
 	in, err := types.LoadNetConf(args.StdinData)
+	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
 		return err
 	}
