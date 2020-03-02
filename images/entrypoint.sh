@@ -3,20 +3,6 @@
 # Always exit on errors.
 set -e
 
-# Run a clean up when we exit if configured to do so.
-trap cleanup TERM
-function cleanup {
-  if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == "true" ]; then
-    CONF=$(cat <<-EOF
-        {Multus configuration intentionally invalidated to prevent pods from being scheduled.}
-EOF
-      )
-      echo $CONF > $CNI_CONF_DIR/00-multus.conf
-      log "Multus configuration intentionally invalidated to prevent pods from being scheduled."
-  fi
-}
-
-
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
@@ -255,13 +241,6 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           log "Attemping to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
-        # See if the Multus configuration file exists, if it does then clean it up.
-        if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ] && [ -f "$CNI_CONF_DIR/00-multus.conf" ]; then
-          # But first, check if it has the invalidated configuration in it (otherwise we keep doing this over and over.)
-          if ! grep -q "invalidated" $CNI_CONF_DIR/00-multus.conf; then
-            cleanup
-          fi
-        fi
         sleep 1;
       else
         error "Multus could not be configured: no master plugin was found."
@@ -388,10 +367,6 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
         sleep 1
       done
 
-      if [ ! -f "$MASTER_PLUGIN_LOCATION" ]; then
-        log "Master plugin @ $MASTER_PLUGIN_LOCATION has not been restored, beginning regeneration."
-        cleanup
-      fi
       generateMultusConf
       log "Continuing watch loop after configuration regeneration..."
     fi
