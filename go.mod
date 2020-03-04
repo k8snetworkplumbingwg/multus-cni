@@ -28,5 +28,6 @@ require (
 	k8s.io/code-generator v0.17.2 // indirect
 	k8s.io/gengo v0.0.0-20200127102705-1e9b17e831be // indirect
 	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
+	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.13.0
 )

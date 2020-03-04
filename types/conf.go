@@ -96,6 +96,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	}
 
 	if net != nil {
+		if net.Name != "" {
+			delegateConf.Name = net.Name
+		}
 		if net.InterfaceRequest != "" {
 			delegateConf.IfnameRequest = net.InterfaceRequest
 		}
