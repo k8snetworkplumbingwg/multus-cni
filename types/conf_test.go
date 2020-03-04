@@ -314,6 +314,37 @@ var _ = Describe("config operations", func() {
 		Expect(sriovConfList.Plugins[0].DeviceID).To(Equal("0000:00:00.1"))
 	})
 
+	It("assigns deviceID in delegated conf list multiple plugins", func() {
+		conf := `{
+    "name": "second-network",
+    "plugins": [
+      {
+        "type": "sriov"
+      },
+      {
+        "type": "other-cni"
+      }
+    ]
+}`
+		type sriovNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			DeviceID string `json:"deviceID"`
+		}
+		type sriovNetConfList struct {
+			Plugins []*sriovNetConf `json:"plugins"`
+		}
+		sriovConfList := &sriovNetConfList{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConfList)
+		Expect(err).NotTo(HaveOccurred())
+		for _, plugin := range sriovConfList.Plugins {
+			Expect(plugin.DeviceID).To(Equal("0000:00:00.1"))
+		}
+	})
+
 	It("assigns pciBusID in delegated conf", func() {
 		conf := `{
     "name": "second-network",
@@ -357,6 +388,37 @@ var _ = Describe("config operations", func() {
 		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(hostDeviceConfList.Plugins[0].PCIBusID).To(Equal("0000:00:00.3"))
+	})
+
+	It("assigns pciBusID in delegated conf list multiple plugins", func() {
+		conf := `{
+    "name": "second-network",
+    "plugins": [
+      {
+        "type": "host-device"
+      },
+      {
+        "type": "other-cni"
+      }
+    ]
+}`
+		type hostDeviceNetConf struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			PCIBusID string `json:"pciBusID"`
+		}
+		type hostDeviceNetConfList struct {
+			Plugins []*hostDeviceNetConf `json:"plugins"`
+		}
+		hostDeviceConfList := &hostDeviceNetConfList{}
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3")
+		Expect(err).NotTo(HaveOccurred())
+
+		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
+		Expect(err).NotTo(HaveOccurred())
+		for _, plugin := range hostDeviceConfList.Plugins {
+			Expect(plugin.PCIBusID).To(Equal("0000:00:00.3"))
+		}
 	})
 
 	It("add cni-args in config", func() {
