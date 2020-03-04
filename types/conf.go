@@ -339,13 +339,15 @@ func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
 		return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast plugin list")
 	}
 
-	firstPlugin, ok := pMap[0].(map[string]interface{})
-	if !ok {
-		return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast pMap")
+	for idx, plugin := range pMap {
+		currentPlugin, ok := plugin.(map[string]interface{})
+		if !ok {
+			return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast plugin #%d", idx)
+		}
+		// Inject deviceID
+		currentPlugin["deviceID"] = deviceID
+		currentPlugin["pciBusID"] = deviceID
 	}
-	// Inject deviceID
-	firstPlugin["deviceID"] = deviceID
-	firstPlugin["pciBusID"] = deviceID
 
 	configBytes, err := json.Marshal(rawConfig)
 	if err != nil {
