@@ -24,9 +24,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -52,8 +57,10 @@ type NoK8sNetworkError struct {
 
 // ClientInfo contains information given from k8s client
 type ClientInfo struct {
-	Client    kubernetes.Interface
-	NetClient netclient.K8sCniCncfIoV1Interface
+	Client           kubernetes.Interface
+	NetClient        netclient.K8sCniCncfIoV1Interface
+	EventBroadcaster record.EventBroadcaster
+	EventRecorder    record.EventRecorder
 }
 
 // AddPod adds pod into kubernetes
@@ -74,6 +81,13 @@ func (c *ClientInfo) DeletePod(namespace, name string) error {
 // AddNetAttachDef adds net-attach-def into kubernetes
 func (c *ClientInfo) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
 	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
+}
+
+// Eventf puts event into kubernetes events
+func (c *ClientInfo) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if c != nil && c.EventRecorder != nil {
+		c.EventRecorder.Eventf(object, eventtype, reason, messageFmt, args...)
+	}
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }
@@ -282,33 +296,33 @@ func GetK8sArgs(args *skel.CmdArgs) (*types.K8sArgs, error) {
 
 // TryLoadPodDelegates attempts to load Kubernetes-defined delegates and add them to the Multus config.
 // Returns the number of Kubernetes-defined delegates added or an error.
-func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, clientInfo *ClientInfo) (int, *ClientInfo, error) {
+func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, clientInfo *ClientInfo) (int, *v1.Pod, *ClientInfo, error) {
 	var err error
 
 	logging.Debugf("TryLoadPodDelegates: %v, %v, %v", k8sArgs, conf, clientInfo)
 	clientInfo, err = GetK8sClient(conf.Kubeconfig, clientInfo)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
 	if clientInfo == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
-			return 0, nil, logging.Errorf("TryLoadPodDelegates: must have either Kubernetes config or delegates")
+			return 0, nil, nil, logging.Errorf("TryLoadPodDelegates: must have either Kubernetes config or delegates")
 		}
-		return 0, nil, nil
+		return 0, nil, nil, nil
 	}
 
 	// Get the pod info. If cannot get it, we use cached delegates
 	pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 	if err != nil {
 		logging.Debugf("TryLoadPodDelegates: Err in loading K8s cluster default network from pod annotation: %v, use cached delegates", err)
-		return 0, nil, nil
+		return 0, nil, nil, nil
 	}
 
 	delegate, err := tryLoadK8sPodDefaultNetwork(clientInfo, pod, conf)
 	if err != nil {
-		return 0, nil, logging.Errorf("TryLoadPodDelegates: error in loading K8s cluster default network from pod annotation: %v", err)
+		return 0, nil, nil, logging.Errorf("TryLoadPodDelegates: error in loading K8s cluster default network from pod annotation: %v", err)
 	}
 	if delegate != nil {
 		logging.Debugf("TryLoadPodDelegates: Overwrite the cluster default network with %v from pod annotations", delegate)
@@ -322,13 +336,13 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, clientInfo
 
 		if err != nil {
 			if _, ok := err.(*NoK8sNetworkError); ok {
-				return 0, clientInfo, nil
+				return 0, nil, clientInfo, nil
 			}
-			return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network from pod: %v", err)
+			return 0, nil, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network from pod: %v", err)
 		}
 
 		if err = conf.AddDelegates(delegates); err != nil {
-			return 0, nil, err
+			return 0, nil, nil, err
 		}
 
 		// Check gatewayRequest is configured in delegates
@@ -345,10 +359,10 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, clientInfo
 			types.CheckGatewayConfig(conf.Delegates)
 		}
 
-		return len(delegates), clientInfo, nil
+		return len(delegates), pod, clientInfo, nil
 	}
 
-	return 0, clientInfo, nil
+	return 0, pod, clientInfo, nil
 }
 
 // GetK8sClient gets client info from kubeconfig
@@ -396,9 +410,16 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 		return nil, err
 	}
 
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartLogging(klog.Infof)
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
+
 	return &ClientInfo{
-		Client:    client,
-		NetClient: netclient,
+		Client:           client,
+		NetClient:        netclient,
+		EventBroadcaster: broadcaster,
+		EventRecorder:    recorder,
 	}, nil
 }
 

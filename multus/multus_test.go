@@ -16,6 +16,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,7 +26,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"bytes"
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -40,6 +40,7 @@ import (
 	"github.com/intel/multus-cni/types"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -149,12 +150,12 @@ func (f *fakeExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData 
 
 	dec := json.NewDecoder(reader)
 	enc := json.NewEncoder(writer)
-	err  = dec.Decode(&m)
+	err = dec.Decode(&m)
 	Expect(err).NotTo(HaveOccurred())
 	for k := range m {
-	    if k == "prevResult" {
-	       delete(m, k)
-	    }
+		if k == "prevResult" {
+			delete(m, k)
+		}
 	}
 	err = enc.Encode(&m)
 	Expect(err).NotTo(HaveOccurred())
@@ -190,9 +191,24 @@ func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
 // NewFakeClientInfo returns fake client (just for testing)
 func NewFakeClientInfo() *k8sclient.ClientInfo {
 	return &k8sclient.ClientInfo{
-		Client:    fake.NewSimpleClientset(),
-		NetClient: netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+		Client:        fake.NewSimpleClientset(),
+		NetClient:     netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+		EventRecorder: record.NewFakeRecorder(10),
 	}
+}
+
+func collectEvents(source <-chan string) []string {
+	done := false
+	events := make([]string, 0)
+	for !done {
+		select {
+		case ev := <-source:
+			events = append(events, ev)
+		default:
+			done = true
+		}
+	}
+	return events
 }
 
 var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
@@ -1210,7 +1226,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err = cmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking DelegateAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
+		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking confAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {
@@ -1391,10 +1407,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		r := result.(*current.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
-
 	})
 
-	It("executes delegates and kubernetes networks", func() {
+	It("executes delegates and kubernetes networks with events check", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "net1,net2", "")
 		net1 := `{
 		"name": "net1",
@@ -1477,6 +1492,13 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		recorder := clientInfo.EventRecorder.(*record.FakeRecorder)
+		events := collectEvents(recorder.Events)
+		Expect(len(events)).To(Equal(3))
+		Expect(events[0]).To(Equal("Normal AddedInterface Add eth0 [1.1.1.2/24]"))
+		Expect(events[1]).To(Equal("Normal AddedInterface Add net1 [1.1.1.3/24] from net1"))
+		Expect(events[2]).To(Equal("Normal AddedInterface Add net2 [1.1.1.4/24] from net2"))
 	})
 
 	It("executes kubernetes networks and delete it after pod removal", func() {
@@ -2442,7 +2464,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err = cmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking DelegateAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
+		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking confAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {
