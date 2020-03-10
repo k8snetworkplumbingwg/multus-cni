@@ -536,7 +536,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		//create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
-				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Conf.Name, delegate.MasterPlugin)
+				delegateNetStatus, err := nadutils.CreateNetworkStatusWithDeviceID(tmpResult, delegate.Conf.Name, delegate.DeviceID, delegate.MasterPlugin)
 				if err != nil {
 					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
 				}

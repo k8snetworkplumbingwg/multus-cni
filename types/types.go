@@ -100,6 +100,7 @@ type DelegateNetConf struct {
 	PortMappingsRequest []*PortMapEntry `json:"-"`
 	BandwidthRequest    *BandwidthEntry `json:"-"`
 	GatewayRequest      []net.IP        `json:"default-route,omitempty"`
+	DeviceID            string          `json:"deviceID,omitempty"`
 	IsFilterGateway     bool
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
