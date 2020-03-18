@@ -82,6 +82,7 @@ func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "test",
+			UID:       "testUID",
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
