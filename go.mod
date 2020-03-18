@@ -17,8 +17,9 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/vishvananda/netlink v0.0.0-20181108222139-023a6dafdcdf
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
-	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
-	golang.org/x/tools v0.0.0-20200128002243-345141a36859 // indirect
+	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
+	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
+	golang.org/x/tools v0.0.0-20200318054722-11a475a590ac // indirect
 	gonum.org/v1/gonum v0.6.2 // indirect
 	google.golang.org/grpc v1.23.0
 	gopkg.in/yaml.v2 v2.2.8 // indirect
@@ -27,7 +28,7 @@ require (
 	k8s.io/client-go v0.0.0-20181115111358-9bea17718df8
 	k8s.io/code-generator v0.17.2 // indirect
 	k8s.io/gengo v0.0.0-20200127102705-1e9b17e831be // indirect
-	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
 	k8s.io/klog v1.0.0
+	k8s.io/kube-openapi v0.0.0-20200121204235-bf4fb3bd569c // indirect
 	k8s.io/kubernetes v1.13.0
 )

@@ -162,6 +162,7 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		ContainerID: args.ContainerID,
 		NetNS:       args.Netns,
 		IfName:      ifName,
+		// NOTE: Verbose logging depends on this order, so please keep Args order.
 		Args: [][2]string{
 			{"IgnoreUnknown", string("true")},
 			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
