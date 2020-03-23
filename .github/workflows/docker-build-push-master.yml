@@ -52,10 +52,10 @@ jobs:
           docker manifest create ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 ${REPOSITORY}:snapshot-ppc64le ${REPOSITORY}:snapshot-arm64v8
           docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 --arch amd64
           docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-ppc64le --arch ppc64le
-          docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-arm64v8 --arch arm64v8
+          docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-arm64v8 --arch arm64
           docker manifest push ${REPOSITORY}:snapshot
           docker manifest create ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 ${REPOSITORY}:latest-ppc64le ${REPOSITORY}:latest-arm64v8
           docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 --arch amd64
           docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-ppc64le --arch ppc64le
-          docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-arm64v8 --arch arm64v8
+          docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-arm64v8 --arch arm64
           docker manifest push ${REPOSITORY}:latest
