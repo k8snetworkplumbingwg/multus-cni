@@ -23,6 +23,9 @@ jobs:
       - name: Build latest-ppc64le
         run: docker build -t ${REPOSITORY}:latest-ppc64le -f Dockerfile.ppc64le .
   
+      - name: Build latest-arm64v8
+        run: docker build -t ${REPOSITORY}:latest-arm64v8 -f Dockerfile.arm64 .
+  
       - name: Build latest-origin
         run: docker build -t ${REPOSITORY}:latest-origin -f Dockerfile.openshift .
   
@@ -30,6 +33,7 @@ jobs:
         run: |
           docker tag ${REPOSITORY}:latest-amd64 ${REPOSITORY}:snapshot-amd64
           docker tag ${REPOSITORY}:latest-ppc64le ${REPOSITORY}:snapshot-ppc64le
+          docker tag ${REPOSITORY}:latest-arm64v8 ${REPOSITORY}:snapshot-arm64v8
   
       - name: Login to registry
         run: docker login -u ${REPOSITORY_USER} -p ${{ secrets. REPOSITORY_PASS }}
@@ -38,16 +42,20 @@ jobs:
         run: |
           docker push ${REPOSITORY}:latest-amd64
           docker push ${REPOSITORY}:latest-ppc64le
+          docker push ${REPOSITORY}:latest-arm64v8
           docker push ${REPOSITORY}:snapshot-amd64
           docker push ${REPOSITORY}:snapshot-ppc64le
+          docker push ${REPOSITORY}:snapshot-arm64v8
   
       - name: Create manifest for multi-arch images
         run: |
-          docker manifest create ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 ${REPOSITORY}:snapshot-ppc64le
+          docker manifest create ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 ${REPOSITORY}:snapshot-ppc64le ${REPOSITORY}:snapshot-arm64v8
           docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 --arch amd64
           docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-ppc64le --arch ppc64le
+          docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-arm64v8 --arch arm64v8
           docker manifest push ${REPOSITORY}:snapshot
-          docker manifest create ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 ${REPOSITORY}:latest-ppc64le
+          docker manifest create ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 ${REPOSITORY}:latest-ppc64le ${REPOSITORY}:latest-arm64v8
           docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-amd64 --arch amd64
           docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-ppc64le --arch ppc64le
+          docker manifest annotate ${REPOSITORY}:latest ${REPOSITORY}:latest-arm64v8 --arch arm64v8
           docker manifest push ${REPOSITORY}:latest
