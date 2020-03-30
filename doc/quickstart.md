@@ -1,6 +1,6 @@
 # Quickstart Guide
 
-This guide is intended as a way to get you off the ground, and using Multus CNI to create Kubernetes pods with multiple interfaces. If you're already using Multus and need more detail, see the [comprehensive usage guide](how-to-use.md). This document a quickstart and a getting started guide in one, intended for your first run-through of Multus CNI.
+This guide is intended as a way to get you off the ground, using Multus CNI to create Kubernetes pods with multiple interfaces. If you're already using Multus and need more detail, see the [comprehensive usage guide](how-to-use.md). This document is a quickstart and a getting started guide in one, intended for your first run-through of Multus CNI.
 
 We'll first install Multus CNI, and then we'll setup some configurations so that you can see how multiple interfaces are created for pods.
 
@@ -55,7 +55,7 @@ $ cat ./images/multus-daemonset-pre-1.16.yml | kubectl apply -f -
 ### What the Multus daemonset does
 
 * Starts a Multus daemonset, this runs a pod on each node which places a Multus binary on each node in `/opt/cni/bin`
-* Reads the lexigraphically (alphabetically) first configuration file in `/etc/cni/net.d`, and creates a new configuration file for Multus as `/etc/cni/net.d/00-multus.conf`, this configuration is auto-generated and is based on the default network configuration (which is assumed to be the alphabetically first configuration)
+* Reads the lexicographically (alphabetically) first configuration file in `/etc/cni/net.d`, and creates a new configuration file for Multus as `/etc/cni/net.d/00-multus.conf`, this configuration is auto-generated and is based on the default network configuration (which is assumed to be the alphabetically first configuration)
 * Creates a `/etc/cni/net.d/multus.d` directory on each node with authentication information for Multus to access the Kubernetes API.
 
 
@@ -67,7 +67,7 @@ Generally, the first step in validating your installation is to ensure that the 
 $ kubectl get pods --all-namespaces | grep -i multus
 ```
 
-You may further validate that it has ran by looking at the `/etc/cni/net.d/` directory and ensure that the alphabetically first
+You may further validate that it has ran by looking at the `/etc/cni/net.d/` directory and ensure that the auto-generated `/etc/cni/net.d/00-multus.conf` exists corresponding to the alphabetically first configuration file.
 
 ## Creating additional interfaces
 
@@ -91,11 +91,11 @@ CNI configurations are JSON, and we have a structure here that has a few things 
 2. `type`: This tells CNI which binary to call on disk. Each CNI plugin is a binary that's called. Typically, these binaries are stored in `/opt/cni/bin` on each node, and CNI executes this binary. In this case we've specified the `loopback` binary (which create a loopback-type network interface). If this is your first time installing Multus, you might want to verify that the plugins that are in the "type" field are actually on disk in the `/opt/cni/bin` directory.
 3. `additional`: This field is put here as an example, each CNI plugin can specify whatever configuration parameters they'd like in JSON. These are specific to the binary you're calling in the `type` field.
 
-For an even further example -- take a look at the [bridge CNI plugin README](https://github.com/containernetworking/plugins/tree/master/plugins/main/bridge) which shows additional
+For an even further example -- take a look at the [bridge CNI plugin README](https://github.com/containernetworking/plugins/tree/master/plugins/main/bridge) which shows additional details.
 
 If you'd like more information about CNI configuration, you can read [the entire CNI specification](https://github.com/containernetworking/cni/blob/master/SPEC.md). It might also be useful to look at the [CNI reference plugins](https://github.com/containernetworking/plugins) and see how they're configured.
 
-You do not need to reload or refresh the Kubelets when CNI configurations  change. These are read on each creation & deletion of pods. So if you change a configuration, it'll apply the next time a pod is created. Existing pods may need to be restarted if they need the new configuration.
+You do not need to reload or refresh the Kubelets when CNI configurations change. These are read on each creation & deletion of pods. So if you change a configuration, it'll apply the next time a pod is created. Existing pods may need to be restarted if they need the new configuration.
 
 ### Storing a configuration as a Custom Resource
 
@@ -151,7 +151,7 @@ kubectl describe network-attachment-definitions macvlan-conf
 
 ### Creating a pod that attaches an additional interface
 
-We're going to create a pod. This will look familiar as any pod you might have created before, but, we'll have a special `annotations` field -- in this case we'll have an annotation called `k8s.v1.cni.cncf.io/networks`. This field takes a comma delimited list of the names of your `NetworkAttachmentDefinition`s as we created above. Note in the comand below that we have the annotation of `k8s.v1.cni.cncf.io/networks: macvlan-conf` where `macvlan-conf` is the name we used above when we created our configuration.
+We're going to create a pod. This will look familiar as any pod you might have created before, but, we'll have a special `annotations` field -- in this case we'll have an annotation called `k8s.v1.cni.cncf.io/networks`. This field takes a comma delimited list of the names of your `NetworkAttachmentDefinition`s as we created above. Note in the command below that we have the annotation of `k8s.v1.cni.cncf.io/networks: macvlan-conf` where `macvlan-conf` is the name we used above when we created our configuration.
 
 Let's go ahead and create a pod (that just sleeps for a really long time) with this command:
 
@@ -177,7 +177,7 @@ You may now inspect the pod and see what interfaces are attached, like so:
 $ kubectl exec -it samplepod -- ip a
 ```
 
-You should note that there's 3 interfaces:
+You should note that there are 3 interfaces:
 
 * `lo` a loopback interface
 * `eth0` our default network
