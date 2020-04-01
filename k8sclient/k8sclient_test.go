@@ -141,7 +141,7 @@ var _ = Describe("k8sclient operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false)
 		Expect(len(delegates)).To(Equal(0))
-		Expect(err).To(MatchError("GetNetworkDelegates: failed getting the delegate: getKubernetesDelegate: cannot find get a network-attachment-definition (net1) in namespace (test): network-attachment-definitions.k8s.cni.cncf.io \"net1\" not found"))
+		Expect(err).To(MatchError("GetNetworkDelegates: failed getting the delegate: getKubernetesDelegate: cannot find a network-attachment-definition (net1) in namespace (test): network-attachment-definitions.k8s.cni.cncf.io \"net1\" not found"))
 	})
 
 	It("retrieves delegates from kubernetes using JSON format annotation", func() {

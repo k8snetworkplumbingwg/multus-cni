@@ -236,10 +236,11 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
 	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(net.Name, metav1.GetOptions{})
 	if err != nil {
+		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 		if client != nil {
-			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", "cannot find get a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Name, err)
+			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
 		}
-		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: cannot find get a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: " + errMsg)
 	}
 
 	// Get resourceName annotation from NetworkAttachmentDefinition
@@ -341,7 +342,7 @@ func TryLoadPodDelegates(k8sArgs *types.K8sArgs, conf *types.NetConf, clientInfo
 			if _, ok := err.(*NoK8sNetworkError); ok {
 				return 0, nil, clientInfo, nil
 			}
-			return 0, nil, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network from pod: %v", err)
+			return 0, nil, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network for pod: %v", err)
 		}
 
 		if err = conf.AddDelegates(delegates); err != nil {
