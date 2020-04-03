@@ -21,7 +21,6 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/intel/multus-cni/logging"
@@ -97,6 +96,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	}
 
 	if net != nil {
+		if net.Name != "" {
+			delegateConf.Name = net.Name
+		}
 		if net.InterfaceRequest != "" {
 			delegateConf.IfnameRequest = net.InterfaceRequest
 		}
@@ -160,6 +162,7 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		ContainerID: args.ContainerID,
 		NetNS:       args.Netns,
 		IfName:      ifName,
+		// NOTE: Verbose logging depends on this order, so please keep Args order.
 		Args: [][2]string{
 			{"IgnoreUnknown", string("true")},
 			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
@@ -197,43 +200,6 @@ func GetGatewayFromResult(result *current.Result) []net.IP {
 		}
 	}
 	return gateways
-}
-
-// LoadNetworkStatus create network status from CNI result
-func LoadNetworkStatus(r types.Result, netName string, defaultNet bool) (*NetworkStatus, error) {
-	logging.Debugf("LoadNetworkStatus: %v, %s, %t", r, netName, defaultNet)
-	netstatus := &NetworkStatus{}
-	netstatus.Name = netName
-
-	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
-	if err != nil {
-		logging.Errorf("LoadNetworkStatus: error converting the type.Result to current.Result: %v", err)
-		return netstatus, err
-	}
-	for _, ifs := range result.Interfaces {
-		//Only pod interfaces can have sandbox information
-		if ifs.Sandbox != "" {
-			netstatus.Interface = ifs.Name
-			netstatus.Mac = ifs.Mac
-		}
-	}
-
-	for _, ipconfig := range result.IPs {
-		if ipconfig.Version == "4" && ipconfig.Address.IP.To4() != nil {
-			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
-		}
-
-		if ipconfig.Version == "6" && ipconfig.Address.IP.To16() != nil {
-			netstatus.IPs = append(netstatus.IPs, ipconfig.Address.IP.String())
-		}
-	}
-
-	netstatus.DNS = result.DNS
-	netstatus.Gateway = GetGatewayFromResult(result)
-
-	return netstatus, nil
-
 }
 
 // LoadNetConf converts inputs (i.e. stdin) to NetConf
@@ -377,13 +343,15 @@ func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
 		return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast plugin list")
 	}
 
-	firstPlugin, ok := pMap[0].(map[string]interface{})
-	if !ok {
-		return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast pMap")
+	for idx, plugin := range pMap {
+		currentPlugin, ok := plugin.(map[string]interface{})
+		if !ok {
+			return nil, logging.Errorf("addDeviceIDInConfList: unable to typecast plugin #%d", idx)
+		}
+		// Inject deviceID
+		currentPlugin["deviceID"] = deviceID
+		currentPlugin["pciBusID"] = deviceID
 	}
-	// Inject deviceID
-	firstPlugin["deviceID"] = deviceID
-	firstPlugin["pciBusID"] = deviceID
 
 	configBytes, err := json.Marshal(rawConfig)
 	if err != nil {

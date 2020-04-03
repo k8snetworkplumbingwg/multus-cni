@@ -94,6 +94,7 @@ type NetworkStatus struct {
 type DelegateNetConf struct {
 	Conf                types.NetConf
 	ConfList            types.NetConfList
+	Name                string
 	IfnameRequest       string          `json:"ifnameRequest,omitempty"`
 	MacRequest          string          `json:"macRequest,omitempty"`
 	IPRequest           []string        `json:"ipRequest,omitempty"`

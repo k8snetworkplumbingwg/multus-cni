@@ -44,6 +44,15 @@ rules:
     verbs:
       - get
       - update
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -144,7 +153,7 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: nfvpe/multus:v3.3
+        image: nfvpe/multus:v3.4.1
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
