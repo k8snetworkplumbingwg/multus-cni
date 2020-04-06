@@ -1,0 +1,48 @@
+name: Go-build-and-test-amd64
+on: [push, pull_request]
+jobs:
+
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    if: >
+      (( github.event.pull_request.head.repo.owner.login != github.event.pull_request.base.repo.owner.login ) &&
+        github.event_name == 'pull_request' ) || (github.event_name == 'push' && github.event.commits != '[]' )
+    env:
+      GO111MODULE: on
+      TARGET: amd64
+    steps:
+      - name: Set up Go 1.13
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.13
+        id: go
+  
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+  
+      - name: install goberalls
+        run: go get github.com/mattn/goveralls
+  
+      - name: install golint
+        run: go get -u golang.org/x/lint/golint
+  
+      - name: golint
+        run: golint ./... | grep -v vendor | grep -v ALL_CAPS | xargs -r false
+  
+      - name: gofmt
+        run: go fmt ./...
+  
+      - name: go vet
+        run: go vet ./...
+  
+      - name: Build
+        run: GOARCH="${TARGET}" ./build
+  
+      - name: Go test
+        run: sudo ./test.sh
+  
+      - name: goveralls
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverage.out

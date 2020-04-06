@@ -17,8 +17,8 @@ builds:
   - amd64
   - arm
   - arm64
-archive:
-  wrap_in_directory: true
+archives:
+  - wrap_in_directory: true
 checksum:
   name_template: 'checksums.txt'
 snapshot:

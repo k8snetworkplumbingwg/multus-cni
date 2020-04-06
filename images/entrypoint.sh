@@ -206,7 +206,7 @@ kind: Config
 clusters:
 - name: local
   cluster:
-    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}
+    server: ${KUBERNETES_SERVICE_PROTOCOL:-https}://[${KUBERNETES_SERVICE_HOST}]:${KUBERNETES_SERVICE_PORT}
     $TLS_CFG
 users:
 - name: multus
@@ -322,7 +322,9 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         }
 EOF
       )
-      echo $CONF > $CNI_CONF_DIR/00-multus.conf
+      tmpfile=$(mktemp)
+      echo $CONF > $tmpfile
+      mv $tmpfile $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
       

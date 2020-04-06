@@ -24,123 +24,56 @@ import (
 	"os"
 	"strings"
 
+	netv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
+
 	"github.com/onsi/gomega"
 )
 
-// FakeKubeClient is stub KubeClient for testing
-type FakeKubeClient struct {
-	pods     map[string]*v1.Pod
-	PodCount int
-	nets     map[string]string
-	NetCount int
-}
-
-// NewFakeKubeClient creates FakeKubeClient for testing
-func NewFakeKubeClient() *FakeKubeClient {
-	return &FakeKubeClient{
-		pods: make(map[string]*v1.Pod),
-		nets: make(map[string]string),
+// NewFakeNetAttachDef returns net-attach-def for testing
+func NewFakeNetAttachDef(namespace, name, config string) *netv1.NetworkAttachmentDefinition {
+	return &netv1.NetworkAttachmentDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: netv1.NetworkAttachmentDefinitionSpec{
+			Config: config,
+		},
 	}
 }
 
-// GetRawWithPath returns k8s raw data from its path
-func (f *FakeKubeClient) GetRawWithPath(path string) ([]byte, error) {
-	obj, ok := f.nets[path]
-	if !ok {
-		return nil, fmt.Errorf("resource not found")
+// NewFakeNetAttachDefFile returns net-attach-def for testing with conf file
+func NewFakeNetAttachDefFile(namespace, name, filePath, fileData string) *netv1.NetworkAttachmentDefinition {
+	netAttach := &netv1.NetworkAttachmentDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
 	}
-	f.NetCount++
-	return []byte(obj), nil
-}
-
-// AddNetConfig adds net-attach-def into its client
-func (f *FakeKubeClient) AddNetConfig(namespace, name, data string) {
-	cr := fmt.Sprintf(`{
-  "apiVersion": "k8s.cni.cncf.io/v1",
-  "kind": "Network",
-  "metadata": {
-    "namespace": "%s",
-    "name": "%s"
-  },
-  "spec": {
-    "config": "%s"
-  }
-}`, namespace, name, strings.Replace(data, "\"", "\\\"", -1))
-	cr = strings.Replace(cr, "\n", "", -1)
-	cr = strings.Replace(cr, "\t", "", -1)
-	f.nets[fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
-}
-
-// AddNetConfigAnnotation adds net-attach-def into its client with an annotation
-func (f *FakeKubeClient) AddNetConfigAnnotation(namespace, name, data string) {
-	cr := fmt.Sprintf(`{
-	"apiVersion": "k8s.cni.cncf.io/v1",
-	"kind": "Network",
-	"metadata": {
-	  "namespace": "%s",
-	  "name": "%s",
-	  "annotations": {
-		"k8s.v1.cni.cncf.io/resourceName": "intel.com/sriov"
-	  }
-	},
-	"spec": {
-	  "config": "%s"
-	}
-  }`, namespace, name, strings.Replace(data, "\"", "\\\"", -1))
-	cr = strings.Replace(cr, "\n", "", -1)
-	cr = strings.Replace(cr, "\t", "", -1)
-	f.nets[fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
-}
-
-// AddNetFile puts config file as net-attach-def
-func (f *FakeKubeClient) AddNetFile(namespace, name, filePath, fileData string) {
-	cr := fmt.Sprintf(`{
-  "apiVersion": "k8s.cni.cncf.io/v1",
-  "kind": "Network",
-  "metadata": {
-    "namespace": "%s",
-    "name": "%s"
-  }
-}`, namespace, name)
-	f.nets[fmt.Sprintf("/apis/k8s.cni.cncf.io/v1/namespaces/%s/network-attachment-definitions/%s", namespace, name)] = cr
-
 	err := ioutil.WriteFile(filePath, []byte(fileData), 0600)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	return netAttach
 }
 
-// GetPod query pod by namespace/pod and return it if exists
-func (f *FakeKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
-	key := fmt.Sprintf("%s/%s", namespace, name)
-	pod, ok := f.pods[key]
-	if !ok {
-		return nil, fmt.Errorf("pod not found")
+// NewFakeNetAttachDefAnnotation returns net-attach-def with resource annotation
+func NewFakeNetAttachDefAnnotation(namespace, name, config string) *netv1.NetworkAttachmentDefinition {
+	return &netv1.NetworkAttachmentDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Annotations: map[string]string{
+				"k8s.v1.cni.cncf.io/resourceName": "intel.com/sriov",
+			},
+		},
+		Spec: netv1.NetworkAttachmentDefinitionSpec{
+			Config: config,
+		},
 	}
-	f.PodCount++
-	return pod, nil
-}
-
-// UpdatePodStatus update pod status
-func (f *FakeKubeClient) UpdatePodStatus(pod *v1.Pod) (*v1.Pod, error) {
-	key := fmt.Sprintf("%s/%s", pod.Namespace, pod.Name)
-	f.pods[key] = pod
-	return f.pods[key], nil
-}
-
-// AddPod adds pod into fake client
-func (f *FakeKubeClient) AddPod(pod *v1.Pod) {
-	key := fmt.Sprintf("%s/%s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
-	f.pods[key] = pod
-}
-
-// DeletePod remove pod from fake client
-func (f *FakeKubeClient) DeletePod(pod *v1.Pod) {
-	key := fmt.Sprintf("%s/%s", pod.ObjectMeta.Namespace, pod.ObjectMeta.Name)
-	delete(f.pods, key)
 }
 
 // NewFakePod creates fake Pod object
@@ -149,6 +82,7 @@ func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "test",
+			UID:       "testUID",
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
