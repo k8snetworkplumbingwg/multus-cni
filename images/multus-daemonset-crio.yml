@@ -18,12 +18,17 @@ spec:
       storage: true
       schema:
         openAPIV3Schema:
+          description: 'NetworkAttachmentDefinition is a CRD schema specified by the Network Plumbing
+            Working Group to express the intent for attaching pods to one or more logical or physical
+            networks. More information available at: https://github.com/k8snetworkplumbingwg/multi-net-spec'
           type: object
           properties:
             spec:
+              description: 'NetworkAttachmentDefinition spec defines the desired state of a network attachment'
               type: object
               properties:
                 config:
+                  description: 'NetworkAttachmentDefinition config is a JSON-formatted CNI configuration'
                   type: string
 ---
 kind: ClusterRole

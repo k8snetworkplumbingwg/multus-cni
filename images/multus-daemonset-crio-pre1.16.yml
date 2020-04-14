@@ -1,11 +1,10 @@
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: network-attachment-definitions.k8s.cni.cncf.io
 spec:
   group: k8s.cni.cncf.io
-  version: v1
   scope: Namespaced
   names:
     plural: network-attachment-definitions
@@ -13,13 +12,24 @@ spec:
     kind: NetworkAttachmentDefinition
     shortNames:
     - net-attach-def
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: 'NetworkAttachmentDefinition is a CRD schema specified by the Network Plumbing
+            Working Group to express the intent for attaching pods to one or more logical or physical
+            networks. More information available at: https://github.com/k8snetworkplumbingwg/multi-net-spec'
+          type: object
           properties:
-            config:
-                 type: string
+            spec:
+              description: 'NetworkAttachmentDefinition spec defines the desired state of a network attachment'
+              type: object
+              properties:
+                config:
+                  description: 'NetworkAttachmentDefinition config is a JSON-formatted CNI configuration'
+                  type: string
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
