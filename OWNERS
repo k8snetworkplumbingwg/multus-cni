@@ -12,4 +12,5 @@ approvers:
   - zshi
   - fepan
   - s1061123
-
+component: "Networking"
+subcomponent: "multus"
