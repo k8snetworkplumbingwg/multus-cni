@@ -528,6 +528,16 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.KubeClient) err
 		return cmdErr(nil, "error getting k8s args: %v", err)
 	}
 
+	if in.ReadinessIndicatorFile != "" {
+		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
+			_, err := os.Stat(in.ReadinessIndicatorFile)
+			return err == nil, nil
+		})
+		if err != nil {
+			return cmdErr(k8sArgs, "PollImmediate error waiting for ReadinessIndicatorFile (on del): %v", err)
+		}
+	}
+
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 	if err != nil {
