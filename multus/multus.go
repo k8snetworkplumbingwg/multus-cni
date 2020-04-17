@@ -355,11 +355,13 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 		ips = append(ips, ip.Address.String())
 	}
 
-	// send kubernetes events
-	if delegate.Name != "" {
-		kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
-	} else {
-		kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+	if pod != nil {
+		// send kubernetes events
+		if delegate.Name != "" {
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+		} else {
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+		}
 	}
 
 	return result, nil
