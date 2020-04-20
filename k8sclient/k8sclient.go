@@ -237,7 +237,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(net.Name, metav1.GetOptions{})
 	if err != nil {
 		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
-		if client != nil {
+		if client != nil && pod != nil {
 			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
 		}
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: " + errMsg)
