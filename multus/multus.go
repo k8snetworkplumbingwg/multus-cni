@@ -355,11 +355,16 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 		ips = append(ips, ip.Address.String())
 	}
 
-	// send kubernetes events
-	if delegate.Name != "" {
-		kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+	if pod != nil {
+		// send kubernetes events
+		if delegate.Name != "" {
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+		} else {
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+		}
 	} else {
-		kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+		// for further debug https://github.com/intel/multus-cni/issues/481
+		logging.Errorf("delegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
 	}
 
 	return result, nil
