@@ -34,11 +34,13 @@ jobs:
           docker tag ${REPOSITORY}:latest-amd64 ${REPOSITORY}:snapshot-amd64
           docker tag ${REPOSITORY}:latest-ppc64le ${REPOSITORY}:snapshot-ppc64le
           docker tag ${REPOSITORY}:latest-arm64v8 ${REPOSITORY}:snapshot-arm64v8
-  
+
       - name: Login to registry
-        run: docker login -u ${REPOSITORY_USER} -p ${{ secrets. REPOSITORY_PASS }}
+        if: github.repository == 'intel/multus-cni'
+        run: docker login -u ${REPOSITORY_USER} -p ${{ secrets.REPOSITORY_PASS }}
   
       - name: Push latest/snapshot images
+        if: github.repository == 'intel/multus-cni'
         run: |
           docker push ${REPOSITORY}:latest-amd64
           docker push ${REPOSITORY}:latest-ppc64le
@@ -48,6 +50,7 @@ jobs:
           docker push ${REPOSITORY}:snapshot-arm64v8
   
       - name: Create manifest for multi-arch images
+        if: github.repository == 'intel/multus-cni'
         run: |
           docker manifest create ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 ${REPOSITORY}:snapshot-ppc64le ${REPOSITORY}:snapshot-arm64v8
           docker manifest annotate ${REPOSITORY}:snapshot ${REPOSITORY}:snapshot-amd64 --arch amd64
