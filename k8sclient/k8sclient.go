@@ -462,7 +462,10 @@ func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.N
 		// In the case that this is a mismatch when namespaceisolation is enabled, this should be an error.
 		if confnamespaceIsolation {
 			if defaultNamespace != net.Namespace {
-				return nil, logging.Errorf("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace %v but refers to target namespace %v", defaultNamespace, net.Namespace)
+				// There is an exception however, we always allow a reference to the default namespace.
+				if net.Namespace != "default" {
+					return nil, logging.Errorf("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace %v but refers to target namespace %v", defaultNamespace, net.Namespace)
+				}
 			}
 		}
 
