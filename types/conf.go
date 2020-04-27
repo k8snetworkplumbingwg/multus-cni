@@ -117,6 +117,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.GatewayRequest != nil {
 			delegateConf.GatewayRequest = append(delegateConf.GatewayRequest, net.GatewayRequest...)
 		}
+		if net.InfinibandGUIDRequest != "" {
+			delegateConf.InfinibandGUIDRequest = net.InfinibandGUIDRequest
+		}
 	}
 
 	delegateConf.Bytes = bytes
@@ -145,6 +148,9 @@ func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		}
 		if delegate.MacRequest != "" {
 			runtimeConfig.Mac = delegate.MacRequest
+		}
+		if delegate.InfinibandGUIDRequest != "" {
+			runtimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
 		}
 	}
 
@@ -184,6 +190,9 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		}
 		if len(rc.Mac) != 0 {
 			capabilityArgs["mac"] = rc.Mac
+		}
+		if len(rc.InfinibandGUID) != 0 {
+			capabilityArgs["infinibandGUID"] = rc.InfinibandGUID
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}
