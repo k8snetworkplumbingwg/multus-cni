@@ -211,6 +211,12 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to mac: %v", err)
 			}
 		}
+		if n.InfinibandGUIDRequest != "" {
+			// validate GUID address
+			if _, err := net.ParseMAC(n.InfinibandGUIDRequest); err != nil {
+				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to validate infiniband GUID: %v", err)
+			}
+		}
 		if n.IPRequest != nil {
 			for _, ip := range n.IPRequest {
 				// validate IP address

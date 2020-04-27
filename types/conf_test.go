@@ -659,18 +659,20 @@ var _ = Describe("config operations", func() {
 		}
 
 		networkSelection := &NetworkSelectionElement{
-			Name:                "testname",
-			InterfaceRequest:    "testIF1",
-			MacRequest:          "c2:11:22:33:44:66",
-			IPRequest:           []string{"10.0.0.1/24"},
-			BandwidthRequest:    bandwidthEntry1,
-			PortMappingsRequest: []*PortMapEntry{portMapEntry1},
+			Name:                  "testname",
+			InterfaceRequest:      "testIF1",
+			MacRequest:            "c2:11:22:33:44:66",
+			InfinibandGUIDRequest: "24:8a:07:03:00:8d:ae:2e",
+			IPRequest:             []string{"10.0.0.1/24"},
+			BandwidthRequest:      bandwidthEntry1,
+			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
 
 		delegateConf, err := LoadDelegateNetConf([]byte(cniConfig), networkSelection, "")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(delegateConf.IfnameRequest).To(Equal(networkSelection.InterfaceRequest))
 		Expect(delegateConf.MacRequest).To(Equal(networkSelection.MacRequest))
+		Expect(delegateConf.InfinibandGUIDRequest).To(Equal(networkSelection.InfinibandGUIDRequest))
 		Expect(delegateConf.IPRequest).To(Equal(networkSelection.IPRequest))
 		Expect(delegateConf.BandwidthRequest).To(Equal(networkSelection.BandwidthRequest))
 		Expect(delegateConf.PortMappingsRequest).To(Equal(networkSelection.PortMappingsRequest))
@@ -704,12 +706,13 @@ var _ = Describe("config operations", func() {
 		}
 
 		networkSelection := &NetworkSelectionElement{
-			Name:                "testname",
-			InterfaceRequest:    "testIF1",
-			MacRequest:          "c2:11:22:33:44:66",
-			IPRequest:           []string{"10.0.0.1/24"},
-			BandwidthRequest:    bandwidthEntry1,
-			PortMappingsRequest: []*PortMapEntry{portMapEntry1},
+			Name:                  "testname",
+			InterfaceRequest:      "testIF1",
+			MacRequest:            "c2:11:22:33:44:66",
+			InfinibandGUIDRequest: "24:8a:07:03:00:8d:ae:2e",
+			IPRequest:             []string{"10.0.0.1/24"},
+			BandwidthRequest:      bandwidthEntry1,
+			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
 		delegate.MasterPlugin = true
@@ -717,6 +720,7 @@ var _ = Describe("config operations", func() {
 		runtimeConf := MergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
 		Expect(runtimeConf.PortMaps).To(BeNil())
 		Expect(runtimeConf.Bandwidth).To(BeNil())
+		Expect(runtimeConf.InfinibandGUID).To(Equal(""))
 	})
 
 	It("test MergeCNIRuntimeConfig with delegate plugin", func() {
@@ -739,12 +743,13 @@ var _ = Describe("config operations", func() {
 		}
 
 		networkSelection := &NetworkSelectionElement{
-			Name:                "testname",
-			InterfaceRequest:    "testIF1",
-			MacRequest:          "c2:11:22:33:44:66",
-			IPRequest:           []string{"10.0.0.1/24"},
-			BandwidthRequest:    bandwidthEntry1,
-			PortMappingsRequest: []*PortMapEntry{portMapEntry1},
+			Name:                  "testname",
+			InterfaceRequest:      "testIF1",
+			MacRequest:            "c2:11:22:33:44:66",
+			InfinibandGUIDRequest: "24:8a:07:03:00:8d:ae:2e",
+			IPRequest:             []string{"10.0.0.1/24"},
+			BandwidthRequest:      bandwidthEntry1,
+			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
 		Expect(err).NotTo(HaveOccurred())
@@ -755,5 +760,6 @@ var _ = Describe("config operations", func() {
 		Expect(runtimeConf.Bandwidth).To(Equal(bandwidthEntry1))
 		Expect(len(runtimeConf.IPs)).To(BeEquivalentTo(1))
 		Expect(runtimeConf.Mac).To(Equal("c2:11:22:33:44:66"))
+		Expect(runtimeConf.InfinibandGUID).To(Equal("24:8a:07:03:00:8d:ae:2e"))
 	})
 })
