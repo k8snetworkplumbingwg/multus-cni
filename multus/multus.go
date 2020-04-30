@@ -159,7 +159,7 @@ func confAdd(rt *libcni.RuntimeConf, rawNetconf []byte, binDir string, exec invo
 
 	result, err := cniNet.AddNetwork(context.Background(), conf, rt)
 	if err != nil {
-		return nil, logging.Errorf("error in getting result from AddNetwork: %v", err)
+		return nil, err
 	}
 
 	return result, nil
@@ -219,7 +219,7 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 
 	result, err := cniNet.AddNetworkList(context.Background(), confList, rt)
 	if err != nil {
-		return nil, logging.Errorf("conflistAdd: error in getting result from AddNetworkList: %v", err)
+		return nil, err
 	}
 
 	return result, nil
@@ -319,12 +319,12 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 	if delegate.ConfListPlugin {
 		result, err = conflistAdd(rt, delegate.Bytes, binDir, exec)
 		if err != nil {
-			return nil, logging.Errorf("delegateAdd: error invoking conflistAdd - %q: %v", delegate.ConfList.Name, err)
+			return nil, err
 		}
 	} else {
 		result, err = confAdd(rt, delegate.Bytes, binDir, exec)
 		if err != nil {
-			return nil, logging.Errorf("delegateAdd: error invoking confAdd - %q: %v", delegate.Conf.Type, err)
+			return nil, err
 		}
 	}
 
@@ -470,6 +470,14 @@ func cmdErr(k8sArgs *types.K8sArgs, format string, args ...interface{}) error {
 	return logging.Errorf(prefix+format, args...)
 }
 
+func cmdPluginErr(k8sArgs *types.K8sArgs, confName string, format string, args ...interface{}) error {
+	msg := ""
+	if k8sArgs != nil {
+		msg += fmt.Sprintf("[%s/%s:%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, confName)
+	}
+	return logging.Errorf(msg+format, args...)
+}
+
 func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdAdd: %v, %v, %v", args, exec, kubeClient)
@@ -533,7 +541,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			}
 			// Ignore errors; DEL must be idempotent anyway
 			_ = delPlugins(exec, nil, args.IfName, n.Delegates, idx, rt, n.BinDir)
-			return nil, cmdErr(k8sArgs, "error adding container to network %q: %v", netName, err)
+			return nil, cmdPluginErr(k8sArgs, netName, "error adding container to network %q: %v", netName, err)
 		}
 
 		// Remove gateway from routing table if the gateway is not used
