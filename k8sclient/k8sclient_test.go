@@ -23,10 +23,10 @@ import (
 	"testing"
 
 	types020 "github.com/containernetworking/cni/pkg/types/020"
-	testutils "github.com/intel/multus-cni/testing"
+	testutils "gopkg.in/intel/multus-cni.v3/testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/intel/multus-cni/types"
+	"gopkg.in/intel/multus-cni.v3/types"
 
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"

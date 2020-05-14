@@ -108,7 +108,7 @@ github.com/vishvananda/netlink/nl
 github.com/vishvananda/netns
 # golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
+# golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
