@@ -1,5 +1,15 @@
 ## Development Information
 
+## How to utilize multus-cni code as library?
+
+Multus now uses [gopkg.in](http://gopkg.in/) to expose its code as library.
+You can use following command to import our code into your go code.
+
+```
+go get gopkg.in/intel/multus-cni.v3
+```
+
+
 ## How do I submit an issue?
 
 Use GitHub as normally, you'll be presented with an option to submit a issue or enhancement request.

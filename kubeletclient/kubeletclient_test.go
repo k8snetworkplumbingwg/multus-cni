@@ -15,7 +15,7 @@ import (
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
-	mtypes "github.com/intel/multus-cni/types"
+	mtypes "gopkg.in/intel/multus-cni.v3/types"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 )
 

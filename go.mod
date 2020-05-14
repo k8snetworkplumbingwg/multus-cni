@@ -1,4 +1,4 @@
-module github.com/intel/multus-cni
+module gopkg.in/intel/multus-cni.v3
 
 go 1.12
 
