@@ -368,17 +368,17 @@ var _ = Describe("config operations", func() {
     "args1": "val1"
 }`
 		type bridgeNetConf struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Args     struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
@@ -404,17 +404,17 @@ var _ = Describe("config operations", func() {
     "args1": "val1a"
 }`
 		type bridgeNetConf struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Args     struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
@@ -439,20 +439,20 @@ var _ = Describe("config operations", func() {
     "args1": "val1"
 }`
 		type bridgeNetConf struct {
-			Type     string `json:"type"`
-			Args     struct {
+			Type string `json:"type"`
+			Args struct {
 				CNI map[string]string `json:"cni"`
 			} `json:"args"`
 		}
 		type bridgeNetConfList struct {
-			Name     string `json:"name"`
+			Name    string           `json:"name"`
 			Plugins []*bridgeNetConf `json:"plugins"`
 		}
 
-                err := json.Unmarshal([]byte(cniArgs), &args)
+		err := json.Unmarshal([]byte(cniArgs), &args)
 		Expect(err).NotTo(HaveOccurred())
-                net := &NetworkSelectionElement{
-			Name: "test-elem",
+		net := &NetworkSelectionElement{
+			Name:    "test-elem",
 			CNIArgs: &args,
 		}
 		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
