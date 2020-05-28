@@ -24,7 +24,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
-	"gopkg.in/intel/multus-cni.v3/logging"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 )
 
 const (

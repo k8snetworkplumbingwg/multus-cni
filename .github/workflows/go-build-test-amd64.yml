@@ -37,10 +37,10 @@ jobs:
         run: go vet ./...
   
       - name: Build
-        run: GOARCH="${TARGET}" ./build
+        run: GOARCH="${TARGET}" ./scripts/build
   
       - name: Go test
-        run: sudo ./test.sh
+        run: sudo ./scripts/test.sh
   
       - name: goveralls
         uses: shogo82148/actions-goveralls@v1

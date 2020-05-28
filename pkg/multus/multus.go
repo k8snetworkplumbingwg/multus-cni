@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a "Multi-plugin".The delegate concept refered from CNI project
-// It reads other plugin netconf, and then invoke them, e.g.
-// flannel or sriov plugin.
-
-package main
+package multus
 
 import (
 	"context"
@@ -37,13 +33,13 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
+	k8s "gopkg.in/intel/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
+	"gopkg.in/intel/multus-cni.v3/pkg/netutils"
+	"gopkg.in/intel/multus-cni.v3/pkg/types"
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"github.com/vishvananda/netlink"
-	k8s "gopkg.in/intel/multus-cni.v3/k8sclient"
-	"gopkg.in/intel/multus-cni.v3/logging"
-	"gopkg.in/intel/multus-cni.v3/netutils"
-	"gopkg.in/intel/multus-cni.v3/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -56,7 +52,7 @@ var date = "unknown date"
 var pollDuration = 1000 * time.Millisecond
 var pollTimeout = 45 * time.Second
 
-func printVersionString() string {
+func PrintVersionString() string {
 	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
 		version, commit, date)
 }
@@ -479,9 +475,9 @@ func cmdPluginErr(k8sArgs *types.K8sArgs, confName string, format string, args .
 	return logging.Errorf(msg+format, args...)
 }
 
-func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
+func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
-	logging.Debugf("cmdAdd: %v, %v, %v", args, exec, kubeClient)
+	logging.Debugf("CmdAdd: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
 		return nil, cmdErr(nil, "error loading netconf: %v", err)
 	}
@@ -634,9 +630,9 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	return result, nil
 }
 
-func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
-	logging.Debugf("cmdCheck: %v, %v, %v", args, exec, kubeClient)
+	logging.Debugf("CmdCheck: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -660,9 +656,9 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	return nil
 }
 
-func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
-	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
+	logging.Debugf("CmdDel: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
 		return err
 	}
@@ -676,7 +672,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		_, ok := err.(ns.NSPathNotExistErr)
 		if ok {
 			netnsfound = false
-			logging.Debugf("cmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
+			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
 			return cmdErr(nil, "failed to open netns %q: %v", netns, err)
 		}
@@ -791,21 +787,21 @@ func main() {
 	flag.BoolVar(&versionOpt, "v", false, "Show application version")
 	flag.Parse()
 	if versionOpt == true {
-		fmt.Printf("%s\n", printVersionString())
+		fmt.Printf("%s\n", PrintVersionString())
 		return
 	}
 
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
-			result, err := cmdAdd(args, nil, nil)
+			result, err := CmdAdd(args, nil, nil)
 			if err != nil {
 				return err
 			}
 			return result.Print()
 		},
 		func(args *skel.CmdArgs) error {
-			return cmdCheck(args, nil, nil)
+			return CmdCheck(args, nil, nil)
 		},
-		func(args *skel.CmdArgs) error { return cmdDel(args, nil, nil) },
+		func(args *skel.CmdArgs) error { return CmdDel(args, nil, nil) },
 		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }

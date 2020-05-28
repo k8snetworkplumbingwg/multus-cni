@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"gopkg.in/intel/multus-cni.v3/checkpoint"
-	"gopkg.in/intel/multus-cni.v3/logging"
-	"gopkg.in/intel/multus-cni.v3/types"
+	"gopkg.in/intel/multus-cni.v3/pkg/checkpoint"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
+	"gopkg.in/intel/multus-cni.v3/pkg/types"
 	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"

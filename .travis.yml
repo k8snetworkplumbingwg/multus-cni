@@ -41,10 +41,10 @@ before_script:
 #  - gocyclo -over 15 ./multus
 
 script:
-  - GOARCH="${TARGET}" ./build
+  - GOARCH="${TARGET}" ./scripts/build
   - |
     if [ "${TARGET}" == "amd64" ]; then
-      sudo env PATH=${PATH} ./test.sh
+      sudo env PATH=${PATH} ./scripts/test.sh
       goveralls -coverprofile=coverage.out -service=travis-ci
       docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-amd64 .
       docker build -t ${REPOSITORY_USER}/${REPOSITORY_NAME}:latest-ppc64le -f Dockerfile.ppc64le .

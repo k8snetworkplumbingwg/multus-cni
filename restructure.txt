@@ -1,0 +1,45 @@
+Delete this document after restructure is about to be merged.
+X - restructured
+O - not needed
+U - needs to be restructured
+
+*Note that after moving code into the pkg directory, tests try to run on directories like the cmd dir which contains main. This may be undesired behavior.*
+
+/cmd X
+
+/internal O
+
+/pkg X
+
+/vendor X
+
+/api O
+
+/web O
+
+/configs O
+
+/init O
+
+/scripts X
+
+/build O
+
+/deployments X
+
+/test O
+
+/docs X
+
+/tools O
+
+/examples X
+
+/third_party O
+
+/githooks O
+
+/assets O
+
+/website O
+
