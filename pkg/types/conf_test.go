@@ -26,7 +26,7 @@ import (
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
+	testhelpers "gopkg.in/intel/multus-cni.v3/pkg/testing"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 
 	. "github.com/onsi/ginkgo"

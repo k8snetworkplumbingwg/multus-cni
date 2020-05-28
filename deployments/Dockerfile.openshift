@@ -5,7 +5,7 @@ ADD . /usr/src/multus-cni
 
 WORKDIR /usr/src/multus-cni
 ENV GO111MODULE=off
-RUN ./build
+RUN ./scripts/build
 
 FROM openshift/origin-base
 RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin

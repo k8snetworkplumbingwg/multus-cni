@@ -13,10 +13,10 @@ jobs:
         uses: actions/checkout@v2
   
       - name: Build latest-amd64
-        run: docker build -t ${REPOSITORY}:latest-amd64 .
+        run: docker build -t ${REPOSITORY}:latest-amd64 -f deployments/Dockerfile .
   
       - name: Build latest-ppc64le
-        run: docker build -t ${REPOSITORY}:latest-ppc64le -f Dockerfile.ppc64le .
+        run: docker build -t ${REPOSITORY}:latest-ppc64le -f deployments/Dockerfile.ppc64le .
   
       - name: Build latest-origin
-        run: docker build -t ${REPOSITORY}:latest-origin -f Dockerfile.openshift .
+        run: docker build -t ${REPOSITORY}:latest-origin -f deployments/Dockerfile.openshift .
