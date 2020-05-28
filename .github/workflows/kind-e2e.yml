@@ -16,7 +16,7 @@ jobs:
         run: docker run -d --restart=always -p "5000:5000" --name "kind-registry" registry:2
   
       - name: Build latest-amd64
-        run: docker build -t localhost:5000/multus:e2e .
+        run: docker build -t localhost:5000/multus:e2e -f deployments/Dockerfile .
  
       - name: Push to local registry
         run: docker push localhost:5000/multus:e2e

@@ -22,12 +22,12 @@ If an issue is closed that you don't feel is sufficiently resolved, please feel 
 
 ## How do I build multus-cni?
 
-You can use the built in `./build` script!
+You can use the built in `./hack/build-go.sh` script!
 
 ```
 git clone https://github.com/intel/multus-cni.git
 cd multus-cni
-./build
+./hack/build-go.sh
 ```
 
 ## How do I run CI tests?
@@ -35,7 +35,7 @@ cd multus-cni
 Multus has go unit tests (based on ginkgo framework).The following commands drive CI tests manually in your environment:
 
 ```
-sudo ./test.sh
+sudo ./scripts/test.sh
 ```
 
 ## What are the best practices for logging?

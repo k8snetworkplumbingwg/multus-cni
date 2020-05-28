@@ -26,7 +26,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	"gopkg.in/intel/multus-cni.v3/logging"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 )
 
 const (

@@ -8,7 +8,7 @@ ENV GOARCH "arm64"
 ENV GOOS "linux"
 
 RUN  cd /usr/src/multus-cni && \
-     ./build
+     ./hack/build-go.sh
 
 # build arm64 container
 FROM arm64v8/centos:7

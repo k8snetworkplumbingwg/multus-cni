@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-package main
+package multus
 
 import (
 	"bytes"
@@ -34,12 +34,11 @@ import (
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
+	"gopkg.in/intel/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
+	testhelpers "gopkg.in/intel/multus-cni.v3/pkg/testing"
+	"gopkg.in/intel/multus-cni.v3/pkg/types"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	"gopkg.in/intel/multus-cni.v3/k8sclient"
-	"gopkg.in/intel/multus-cni.v3/logging"
-	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
-	"gopkg.in/intel/multus-cni.v3/types"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -296,7 +295,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -305,7 +304,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -372,7 +371,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -381,7 +380,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -392,7 +391,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -449,7 +448,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -457,12 +456,12 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		// Check is not supported until v 0.4.0
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -529,7 +528,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -538,7 +537,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -549,7 +548,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -606,7 +605,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -614,12 +613,12 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		// Check is not supported until v 0.4.0
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -687,7 +686,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -696,7 +695,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -707,7 +706,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -764,7 +763,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -772,12 +771,12 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		// Check is not supported until v 0.4.0
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -844,7 +843,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -853,7 +852,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -864,7 +863,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -921,7 +920,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -929,12 +928,12 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		// Check is not supported until v 0.4.0
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -1001,7 +1000,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1010,7 +1009,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -1021,7 +1020,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -1076,7 +1075,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1084,12 +1083,12 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		// Check is not supported until v 0.4.0
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -1100,7 +1099,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("fails to load NetConf with bad json in cmdAdd/Del", func() {
+	It("fails to load NetConf with bad json in CmdAdd/Del", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -1156,10 +1155,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err := cmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -1226,7 +1225,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err = cmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
@@ -1250,7 +1249,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		    "cniVersion": "0.2.0",
 		    "type": "other-plugin"
 		}`
-		// took out the name in expectedConf2, expecting a new value to be filled in by cmdAdd
+		// took out the name in expectedConf2, expecting a new value to be filled in by CmdAdd
 
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
@@ -1284,7 +1283,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err = cmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(HaveOccurred())
@@ -1405,7 +1404,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*current.Result)
@@ -1491,7 +1490,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1561,7 +1560,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1578,7 +1577,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(nilPod).To(BeNil())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 
-		err = cmdDel(args, fExec, clientInfo)
+		err = CmdDel(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -1635,7 +1634,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1646,7 +1645,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		os.Setenv("CNI_IFNAME", "eth0")
 		// set fKubeClient to nil to emulate no pod info
 		fKubeClient.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -1703,7 +1702,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1714,7 +1713,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		os.Setenv("CNI_IFNAME", "eth0")
 		// set fKubeClient to nil to emulate no pod info
 		fKubeClient.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -1760,7 +1759,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err := cmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -1802,7 +1801,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1810,7 +1809,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -1871,7 +1870,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1886,7 +1885,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		By("Delete and check net count is not incremented")
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -1947,7 +1946,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -1965,7 +1964,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		By("Delete and check pod/net count is incremented")
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -2082,9 +2081,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err := cmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
@@ -2173,7 +2172,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
@@ -2181,12 +2180,12 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		Expect(reflect.DeepEqual(result, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "CHECK")
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -2255,7 +2254,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -2263,7 +2262,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -2274,7 +2273,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}
 	})
 
-	It("returns the previous result using cmdCheck", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -2341,7 +2340,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
@@ -2349,12 +2348,12 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		Expect(reflect.DeepEqual(result, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "CHECK")
-		err = cmdCheck(args, fExec, nil)
+		err = CmdCheck(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 
@@ -2365,7 +2364,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}
 	})
 
-	It("fails to load NetConf with bad json in cmdAdd/Del", func() {
+	It("fails to load NetConf with bad json in CmdAdd/Del", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
@@ -2423,10 +2422,10 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err := cmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 
-		err = cmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -2474,7 +2473,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err = cmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
@@ -2498,7 +2497,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		    "cniVersion": "0.4.0",
 		    "type": "other-plugin"
 		}`
-		// took out the name in expectedConf2, expecting a new value to be filled in by cmdAdd
+		// took out the name in expectedConf2, expecting a new value to be filled in by CmdAdd
 
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
@@ -2533,7 +2532,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err = cmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(HaveOccurred())
@@ -2654,7 +2653,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*current.Result)
@@ -2744,7 +2743,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -2808,7 +2807,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -2818,7 +2817,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		os.Setenv("CNI_IFNAME", "eth0")
 		// set fKubeClient to nil to emulate no pod info
 		clientInfo.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		err = cmdDel(args, fExec, clientInfo)
+		err = CmdDel(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -2877,7 +2876,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -2887,7 +2886,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		os.Setenv("CNI_IFNAME", "eth0")
 		// set fKubeClient to nil to emulate no pod info
 		fKubeClient.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -2946,7 +2945,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -2956,7 +2955,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		os.Setenv("CNI_IFNAME", "eth0")
 		// set fKubeClient to nil to emulate no pod info
 		fKubeClient.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -3002,7 +3001,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		fExec.addPlugin(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		_, err := cmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -3045,14 +3044,14 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		Expect(reflect.DeepEqual(result, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -3115,7 +3114,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -3129,7 +3128,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		By("Delete and check net count is not incremented")
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -3192,7 +3191,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := cmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		// plugin 1 is the masterplugin
@@ -3209,7 +3208,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		By("Delete and check pod/net count is incremented")
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		err = cmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
