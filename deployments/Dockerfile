@@ -10,7 +10,7 @@ RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     cd /usr/src/multus-cni && \
-    ./build
+    ./hack/build-go.sh
 
 FROM centos:centos7
 COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
