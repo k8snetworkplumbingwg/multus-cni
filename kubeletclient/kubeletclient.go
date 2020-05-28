@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"time"
 
+	"golang.org/x/net/context"
 	"gopkg.in/intel/multus-cni.v3/checkpoint"
 	"gopkg.in/intel/multus-cni.v3/logging"
 	"gopkg.in/intel/multus-cni.v3/types"
-	"golang.org/x/net/context"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
@@ -39,9 +39,13 @@ func GetResourceClient() (types.ResourceClient, error) {
 }
 
 func getKubeletClient() (types.ResourceClient, error) {
+	var err error
 	newClient := &kubeletClient{}
 	if kubeletSocket == "" {
-		kubeletSocket = util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+		kubeletSocket, err = util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+		if err != nil {
+			return nil, logging.Errorf("getKubeletClient: error getting local endpoint: %v\n", err)
+		}
 	}
 
 	client, conn, err := podresources.GetClient(kubeletSocket, 10*time.Second, defaultPodResourcesMaxSize)

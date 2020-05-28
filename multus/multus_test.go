@@ -39,6 +39,7 @@ import (
 	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
 	"gopkg.in/intel/multus-cni.v3/types"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 
@@ -1392,7 +1393,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -1470,7 +1471,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -1546,7 +1547,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -2631,7 +2632,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -2713,7 +2714,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -2783,7 +2784,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
