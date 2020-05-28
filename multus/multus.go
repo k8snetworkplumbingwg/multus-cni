@@ -37,13 +37,13 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"github.com/vishvananda/netlink"
 	k8s "gopkg.in/intel/multus-cni.v3/k8sclient"
 	"gopkg.in/intel/multus-cni.v3/logging"
 	"gopkg.in/intel/multus-cni.v3/netutils"
 	"gopkg.in/intel/multus-cni.v3/types"
-	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -510,7 +510,21 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if kubeClient != nil {
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			var waitErr error
+			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
+			if errors.IsServiceUnavailable(err) {
+				pollDuration := 500 * time.Millisecond
+				pollTimeout := 5 * time.Second
+				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
+					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+					return pod != nil, err
+				})
+				// retry failed, then return error with retry out
+				if waitErr != nil {
+					return nil, cmdErr(k8sArgs, "error getting pod by service unavailable: %v", err)
+				}
+			} else {
+				// Other case, return error
 				return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
 			}
 		}
