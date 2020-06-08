@@ -15,10 +15,10 @@
 package logging
 
 import (
-	"testing"
-
+	"fmt"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"testing"
 )
 
 func TestLogging(t *testing.T) {
@@ -79,4 +79,24 @@ var _ = Describe("logging operations", func() {
 		currentLevel := loggingLevel
 		Expect(currentLevel).To(Equal(GetLoggingLevel()))
 	})
+
+	It("Detects a known error", func() {
+		newerror := Errorf("Testing 123", fmt.Errorf("error dialing DHCP daemon: dial unix /run/cni/dhcp.sock: connect: no such file or directory"))
+		Expect(newerror.Error()).To(ContainSubstring("please check that the dhcp cni daemon is running and is properly configured."))
+	})
+
+	It("Properly errors when an error message is not set for a pattern", func() {
+		_, err := getKnownErrorMessage("intentionally unset error pattern")
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("Has a message set for each error pattern that is set", func() {
+		// If this fails, it probably means you added the error pattern, but, not the error message.
+		for _, errorpattern := range knownErrorPatterns {
+			message, err := getKnownErrorMessage(errorpattern)
+			Expect(message).NotTo(HaveLen(0))
+			Expect(err).NotTo(HaveOccurred())
+		}
+	})
+
 })

@@ -88,6 +88,7 @@ func Verbosef(format string, a ...interface{}) {
 
 // Errorf prints logging if logging level >= error
 func Errorf(format string, a ...interface{}) error {
+	format = addKnownErrorMessage(a) + format
 	printf(ErrorLevel, format, a...)
 	return fmt.Errorf(format, a...)
 }
