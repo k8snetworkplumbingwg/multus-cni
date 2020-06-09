@@ -34,11 +34,11 @@ import (
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
+	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	"gopkg.in/intel/multus-cni.v3/k8sclient"
 	"gopkg.in/intel/multus-cni.v3/logging"
 	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
 	"gopkg.in/intel/multus-cni.v3/types"
-	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 
@@ -1497,8 +1497,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		events := collectEvents(recorder.Events)
 		Expect(len(events)).To(Equal(3))
 		Expect(events[0]).To(Equal("Normal AddedInterface Add eth0 [1.1.1.2/24]"))
-		Expect(events[1]).To(Equal("Normal AddedInterface Add net1 [1.1.1.3/24] from net1"))
-		Expect(events[2]).To(Equal("Normal AddedInterface Add net2 [1.1.1.4/24] from net2"))
+		Expect(events[1]).To(Equal("Normal AddedInterface Add net1 [1.1.1.3/24] from test/net1"))
+		Expect(events[2]).To(Equal("Normal AddedInterface Add net2 [1.1.1.4/24] from test/net2"))
 	})
 
 	It("executes kubernetes networks and delete it after pod removal", func() {
