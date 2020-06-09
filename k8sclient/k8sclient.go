@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
-
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -56,39 +55,69 @@ type NoK8sNetworkError struct {
 	message string
 }
 
-// ClientInfo contains information given from k8s client
-type ClientInfo struct {
+type ClientInfo interface {
+	AddPod(pod *v1.Pod) (*v1.Pod, error)
+	GetPod(namespace, name string) (*v1.Pod, error)
+	DeletePod(namespace, name string) error
+	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
+	GetKubeClient() kubernetes.Interface
+	GetNetClient() netclient.K8sCniCncfIoV1Interface
+	GetEventBroadCaster() record.EventBroadcaster
+	GetEventRecorder() record.EventRecorder
+}
+
+// KubeClient contains information given from k8s client
+type KubeClient struct {
 	Client           kubernetes.Interface
 	NetClient        netclient.K8sCniCncfIoV1Interface
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
 }
 
+// KubeClient implements ClientInfo
+var _ ClientInfo = &KubeClient{}
+
 // AddPod adds pod into kubernetes
-func (c *ClientInfo) AddPod(pod *v1.Pod) (*v1.Pod, error) {
+func (c *KubeClient) AddPod(pod *v1.Pod) (*v1.Pod, error) {
 	return c.Client.Core().Pods(pod.ObjectMeta.Namespace).Create(pod)
 }
 
 // GetPod gets pod from kubernetes
-func (c *ClientInfo) GetPod(namespace, name string) (*v1.Pod, error) {
+func (c *KubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 	return c.Client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
 // DeletePod deletes a pod from kubernetes
-func (c *ClientInfo) DeletePod(namespace, name string) error {
+func (c *KubeClient) DeletePod(namespace, name string) error {
 	return c.Client.Core().Pods(namespace).Delete(name, &metav1.DeleteOptions{})
 }
 
-// AddNetAttachDef adds net-attach-def into kubernetes
-func (c *ClientInfo) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
-}
-
 // Eventf puts event into kubernetes events
-func (c *ClientInfo) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+func (c *KubeClient) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
 	if c != nil && c.EventRecorder != nil {
 		c.EventRecorder.Eventf(object, eventtype, reason, messageFmt, args...)
 	}
+}
+
+func (c *KubeClient) GetKubeClient() kubernetes.Interface {
+	return c.Client
+}
+
+func (c *KubeClient) GetNetClient() netclient.K8sCniCncfIoV1Interface {
+	return c.NetClient
+}
+
+func (c *KubeClient) GetEventBroadCaster() record.EventBroadcaster {
+	return c.EventBroadcaster
+}
+
+func (c *KubeClient) GetEventRecorder() record.EventRecorder {
+	return c.EventRecorder
+}
+
+// AddNetAttachDef adds net-attach-def into kubernetes
+func AddNetAttachDef(c *ClientInfo, netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
+	return (*c).GetNetClient().NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }
@@ -102,7 +131,7 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: %v", err)
 	}
-	if client == nil || client.Client == nil {
+	if client == nil || (*client).GetKubeClient() == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
 			return logging.Errorf("SetNetworkStatus: must have either Kubernetes config or delegates")
@@ -113,13 +142,13 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 
 	podName := string(k8sArgs.K8S_POD_NAME)
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
-	pod, err := client.GetPod(podNamespace, podName)
+	pod, err := (*client).GetPod(podNamespace, podName)
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", podName, err)
 	}
 
 	if netStatus != nil {
-		err = netutils.SetNetworkStatus(client.Client, pod, netStatus)
+		err = netutils.SetNetworkStatus((*client).GetKubeClient(), pod, netStatus)
 		if err != nil {
 			return logging.Errorf("SetNetworkStatus: failed to update the pod %v in out of cluster comm: %v", podName, err)
 		}
@@ -235,11 +264,11 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
-	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(net.Name, metav1.GetOptions{})
+	customResource, err := (*client).GetNetClient().NetworkAttachmentDefinitions(net.Namespace).Get(net.Name, metav1.GetOptions{})
 	if err != nil {
 		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 		if client != nil {
-			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
+			(*client).Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
 		}
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: " + errMsg)
 	}
@@ -374,7 +403,6 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 
 	var err error
 	var config *rest.Config
-
 	// Otherwise try to create a kubeClient from a given kubeConfig
 	if kubeconfig != "" {
 		// uses the current context in kubeconfig
@@ -414,13 +442,36 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
+	
+	// return &ClientInfo(&KubeClient{
+	// 	Client:           client,
+	// 	NetClient:        netclient,
+	// 	EventBroadcaster: broadcaster,
+	// 	EventRecorder:    recorder,
+	// }), nil
 
-	return &ClientInfo{
+	var result ClientInfo = ClientInfo(&KubeClient{
 		Client:           client,
 		NetClient:        netclient,
 		EventBroadcaster: broadcaster,
 		EventRecorder:    recorder,
-	}, nil
+	})
+	return &result, nil
+
+	// var resultKubeClient = KubeClient{
+	// 	Client:           client,
+	// 	NetClient:        netclient,
+	// 	EventBroadcaster: broadcaster,
+	// 	EventRecorder:    recorder,
+	// }
+	// var result ClientInfo = &resultKubeClient
+	/*return KubeClient{ 
+		defined
+		definedd
+		definedd
+
+	}, nil*/
+	// return &result, nil
 }
 
 // GetPodNetwork gets net-attach-def annotation from pod

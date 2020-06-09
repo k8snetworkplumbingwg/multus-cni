@@ -359,9 +359,9 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 	if pod != nil {
 		// send kubernetes events
 		if delegate.Name != "" {
-			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+			(*kubeClient).Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
 		} else {
-			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+			(*kubeClient).Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
 		}
 	} else {
 		// for further debug https://github.com/intel/multus-cni/issues/481
@@ -485,7 +485,6 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if err != nil {
 		return nil, cmdErr(nil, "error loading netconf: %v", err)
 	}
-
 	kubeClient, err = k8s.GetK8sClient(n.Kubeconfig, kubeClient)
 	if err != nil {
 		return nil, cmdErr(nil, "error getting k8s client: %v", err)
@@ -508,7 +507,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	pod := (*v1.Pod)(nil)
 	if kubeClient != nil {
-		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
 			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
@@ -516,7 +515,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				pollDuration := 500 * time.Millisecond
 				pollTimeout := 5 * time.Second
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
-					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+					pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 					return pod != nil, err
 				})
 				// retry failed, then return error with retry out
@@ -703,7 +702,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	pod := (*v1.Pod)(nil)
 	if kubeClient != nil {
-		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdErr(k8sArgs, "error getting pod: %v", err)
