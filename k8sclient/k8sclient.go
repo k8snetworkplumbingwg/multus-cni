@@ -37,12 +37,12 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"gopkg.in/intel/multus-cni.v3/kubeletclient"
-	"gopkg.in/intel/multus-cni.v3/logging"
-	"gopkg.in/intel/multus-cni.v3/types"
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"gopkg.in/intel/multus-cni.v3/kubeletclient"
+	"gopkg.in/intel/multus-cni.v3/logging"
+	"gopkg.in/intel/multus-cni.v3/types"
 )
 
 const (
@@ -318,7 +318,12 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		return 0, nil, nil
 	}
 
-	delegate, err := tryLoadK8sPodDefaultNetwork(clientInfo, pod, conf)
+	ns, err := clientInfo.Client.CoreV1().Namespaces().Get(pod.Namespace, metav1.GetOptions{})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	delegate, err := tryLoadK8sPodDefaultNetwork(clientInfo, pod, ns, conf)
 	if err != nil {
 		return 0, nil, logging.Errorf("TryLoadPodDelegates: error in loading K8s cluster default network from pod annotation: %v", err)
 	}
@@ -358,6 +363,38 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		}
 
 		return len(delegates), clientInfo, nil
+	} else {
+		nsNetworks, _ := GetNamespaceNetwork(ns)
+		if nsNetworks != nil {
+			delegates, err := GetNetworkDelegates(clientInfo, pod, nsNetworks, conf.ConfDir, conf.NamespaceIsolation, resourceMap)
+
+			if err != nil {
+				if _, ok := err.(*NoK8sNetworkError); ok {
+					return 0, clientInfo, nil
+				}
+				return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network for pod: %v", err)
+			}
+
+			if err = conf.AddDelegates(delegates); err != nil {
+				return 0, nil, err
+			}
+
+			// Check gatewayRequest is configured in delegates
+			// and mark its config if gateway filter is required
+			isGatewayConfigured := false
+			for _, delegate := range conf.Delegates {
+				if delegate.GatewayRequest != nil {
+					isGatewayConfigured = true
+					break
+				}
+			}
+
+			if isGatewayConfigured == true {
+				types.CheckGatewayConfig(conf.Delegates)
+			}
+
+			return len(delegates), clientInfo, nil
+		}
 	}
 
 	return 0, clientInfo, nil
@@ -435,6 +472,22 @@ func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 	}
 
 	networks, err := parsePodNetworkAnnotation(netAnnot, defaultNamespace)
+	if err != nil {
+		return nil, err
+	}
+	return networks, nil
+}
+
+func GetNamespaceNetwork(ns *v1.Namespace) ([]*types.NetworkSelectionElement, error) {
+	logging.Debugf("GetNamespaceNetwork: %v", ns)
+
+	netAnnot := ns.Annotations[networkAttachmentAnnot]
+
+	if len(netAnnot) == 0 {
+		return nil, &NoK8sNetworkError{"no kubernetes network found"}
+	}
+
+	networks, err := parsePodNetworkAnnotation(netAnnot, ns.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -564,11 +617,14 @@ func GetDefaultNetworks(pod *v1.Pod, conf *types.NetConf, kubeClient *ClientInfo
 }
 
 // tryLoadK8sPodDefaultNetwork get pod default network from annotations
-func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, conf *types.NetConf) (*types.DelegateNetConf, error) {
+func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, ns *v1.Namespace, conf *types.NetConf) (*types.DelegateNetConf, error) {
 	var netAnnot string
 	logging.Debugf("tryLoadK8sPodDefaultNetwork: %v, %v, %v", kubeClient, pod, conf)
 
 	netAnnot, ok := pod.Annotations[defaultNetAnnot]
+	if !ok {
+		netAnnot, ok = ns.Annotations[defaultNetAnnot]
+	}
 	if !ok {
 		logging.Debugf("tryLoadK8sPodDefaultNetwork: Pod default network annotation is not defined")
 		return nil, nil
