@@ -266,7 +266,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, binDir string, e
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string, cniArgs string) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, kubeClient k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, binDir string, cniArgs string) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v, %s", exec, ifName, delegate, rt, binDir)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, logging.Errorf("delegateAdd: error setting envionment variable CNI_IFNAME")
@@ -359,9 +359,9 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 	if pod != nil {
 		// send kubernetes events
 		if delegate.Name != "" {
-			(*kubeClient).Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
 		} else {
-			(*kubeClient).Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
 		}
 	} else {
 		// for further debug https://github.com/intel/multus-cni/issues/481
@@ -479,7 +479,7 @@ func cmdPluginErr(k8sArgs *types.K8sArgs, confName string, format string, args .
 	return logging.Errorf(msg+format, args...)
 }
 
-func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
+func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdAdd: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
@@ -507,7 +507,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	pod := (*v1.Pod)(nil)
 	if kubeClient != nil {
-		pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
 			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
@@ -515,7 +515,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				pollDuration := 500 * time.Millisecond
 				pollTimeout := 5 * time.Second
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
-					pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 					return pod != nil, err
 				})
 				// retry failed, then return error with retry out
@@ -659,7 +659,7 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	return nil
 }
 
-func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("cmdDel: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
@@ -702,7 +702,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	pod := (*v1.Pod)(nil)
 	if kubeClient != nil {
-		pod, err = (*kubeClient).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				return cmdErr(k8sArgs, "error getting pod: %v", err)
