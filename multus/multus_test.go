@@ -39,6 +39,9 @@ import (
 	"gopkg.in/intel/multus-cni.v3/logging"
 	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
 	"gopkg.in/intel/multus-cni.v3/types"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 
@@ -1564,8 +1567,14 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		// set fKubeClient to nil to emulate no pod info
+
+		// delete pod to emulate no pod info
 		clientInfo.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
+		nilPod, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Get(
+			fakePod.ObjectMeta.Name, metav1.GetOptions{})
+		Expect(nilPod).To(BeNil())
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+
 		err = cmdDel(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
@@ -2070,8 +2079,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-
-		err := cmdDel(args, fExec, nil)
+		_, err := cmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = cmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
