@@ -31,7 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/api/errors" 
-	k8s "gopkg.in/intel/multus-cni.v3/k8sclient"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	current "github.com/containernetworking/cni/pkg/types/current"
@@ -44,7 +43,6 @@ import (
 	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
 	"gopkg.in/intel/multus-cni.v3/types"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/kubernetes"
@@ -101,11 +99,6 @@ func (c *FakeKubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 // DeletePod deletes a pod from kubernetes
 func (c *FakeKubeClient) DeletePod(namespace, name string) error {
 	return c.Client.Core().Pods(namespace).Delete(name, &metav1.DeleteOptions{})
-}
-
-// AddNetAttachDef adds net-attach-def into kubernetes
-func (c *FakeKubeClient) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
 }
 
 // Eventf puts event into kubernetes events
@@ -1460,7 +1453,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo,
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1538,14 +1531,14 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net2", net2))
 		Expect(err).NotTo(HaveOccurred())
 		// net3 is not used; make sure it's not accessed
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net3", net3))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1614,7 +1607,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1682,7 +1675,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(
+		_, err := k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1750,7 +1743,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(
+		_, err := k8sclient.AddNetAttachDef(fKubeClient,
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -1850,7 +1843,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
+		_, err := k8sclient.AddNetAttachDef(fKubeClient, testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -1919,7 +1912,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err = (*fKubeClient).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -1995,7 +1988,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err = (*fKubeClient).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -2699,7 +2692,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -2781,14 +2774,14 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net2", net2))
 		Expect(err).NotTo(HaveOccurred())
 		// net3 is not used; make sure it's not accessed
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net3", net3))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -2851,7 +2844,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err := (*clientInfo).GetKubeClient().Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = (*clientInfo).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(clientInfo, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -2920,7 +2913,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(
+		_, err := k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -2989,7 +2982,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(
+		_, err := k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
@@ -3089,7 +3082,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err := (*fKubeClient).AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
+		_, err := k8sclient.AddNetAttachDef(fKubeClient, testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -3159,7 +3152,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err = (*fKubeClient).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -3236,7 +3229,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 
 		fKubeClient := NewFakeClientInfo()
 		(*fKubeClient).AddPod(fakePod)
-		_, err = (*fKubeClient).AddNetAttachDef(
+		_, err = k8sclient.AddNetAttachDef(fKubeClient, 
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_COMMAND", "ADD")
@@ -3396,7 +3389,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 			EventRecorder: record.NewFakeRecorder(10),
 			ErrorCode:		  errors.NewServiceUnavailable("Testing purposes"),
 		}
-		var fakeClientInfo k8s.ClientInfo = fakeKubeClient
+		var fakeClientInfo k8sclient.ClientInfo = fakeKubeClient
 
 		_, err := cmdAdd(args, fExec, &fakeClientInfo)
 		Expect(err).To(HaveOccurred())

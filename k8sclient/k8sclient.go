@@ -59,7 +59,6 @@ type ClientInfo interface {
 	AddPod(pod *v1.Pod) (*v1.Pod, error)
 	GetPod(namespace, name string) (*v1.Pod, error)
 	DeletePod(namespace, name string) error
-	AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error)
 	Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{})
 	GetKubeClient() kubernetes.Interface
 	GetNetClient() netclient.K8sCniCncfIoV1Interface
@@ -76,7 +75,7 @@ type KubeClient struct {
 }
 
 // KubeClient implements ClientInfo
-// var _ ClientInfo = &KubeClient{}
+var _ ClientInfo = &KubeClient{}
 
 // AddPod adds pod into kubernetes
 func (c *KubeClient) AddPod(pod *v1.Pod) (*v1.Pod, error) {
@@ -91,11 +90,6 @@ func (c *KubeClient) GetPod(namespace, name string) (*v1.Pod, error) {
 // DeletePod deletes a pod from kubernetes
 func (c *KubeClient) DeletePod(namespace, name string) error {
 	return c.Client.Core().Pods(namespace).Delete(name, &metav1.DeleteOptions{})
-}
-
-// AddNetAttachDef adds net-attach-def into kubernetes
-func (c *KubeClient) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
 }
 
 // Eventf puts event into kubernetes events
@@ -119,6 +113,11 @@ func (c *KubeClient) GetEventBroadCaster() record.EventBroadcaster {
 
 func (c *KubeClient) GetEventRecorder() record.EventRecorder {
 	return c.EventRecorder
+}
+
+// AddNetAttachDef adds net-attach-def into kubernetes
+func AddNetAttachDef(c *ClientInfo, netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
+	return (*c).GetNetClient().NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }
@@ -443,14 +442,36 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
-	var resultKubeClient = KubeClient{
+	
+	// return &ClientInfo(&KubeClient{
+	// 	Client:           client,
+	// 	NetClient:        netclient,
+	// 	EventBroadcaster: broadcaster,
+	// 	EventRecorder:    recorder,
+	// }), nil
+
+	var result ClientInfo = ClientInfo(&KubeClient{
 		Client:           client,
 		NetClient:        netclient,
 		EventBroadcaster: broadcaster,
 		EventRecorder:    recorder,
-	}
-	var result ClientInfo = &resultKubeClient
+	})
 	return &result, nil
+
+	// var resultKubeClient = KubeClient{
+	// 	Client:           client,
+	// 	NetClient:        netclient,
+	// 	EventBroadcaster: broadcaster,
+	// 	EventRecorder:    recorder,
+	// }
+	// var result ClientInfo = &resultKubeClient
+	/*return KubeClient{ 
+		defined
+		definedd
+		definedd
+
+	}, nil*/
+	// return &result, nil
 }
 
 // GetPodNetwork gets net-attach-def annotation from pod
