@@ -30,24 +30,24 @@ var _ = Describe("logging operations", func() {
 
 	BeforeEach(func() {
 		loggingStderr = false
-		loggingFp = nil
+		loggingW = nil
 		loggingLevel = PanicLevel
 	})
 
 	It("Check file setter with empty", func() {
 		SetLogFile("")
-		Expect(loggingFp).To(BeNil())
+		Expect(loggingW).To(BeNil())
 	})
 
 	It("Check file setter with empty", func() {
 		SetLogFile("/tmp/foobar.logging")
-		Expect(loggingFp).NotTo(Equal(nil))
+		Expect(loggingW).NotTo(Equal(nil))
 		// check file existance
 	})
 
 	It("Check file setter with bad filepath", func() {
 		SetLogFile("/invalid/filepath")
-		Expect(loggingFp).NotTo(Equal(nil))
+		Expect(loggingW).NotTo(Equal(nil))
 		// check file existance
 	})
 
