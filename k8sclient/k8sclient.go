@@ -116,8 +116,8 @@ func (c *KubeClient) GetEventRecorder() record.EventRecorder {
 }
 
 // AddNetAttachDef adds net-attach-def into kubernetes
-func AddNetAttachDef(c *ClientInfo, netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return (*c).GetNetClient().NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
+func AddNetAttachDef(c ClientInfo, netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
+	return c.GetNetClient().NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.message) }

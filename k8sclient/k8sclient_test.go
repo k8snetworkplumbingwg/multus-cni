@@ -44,13 +44,11 @@ func TestK8sClient(t *testing.T) {
 }
 
 // NewFakeClientInfo returns fake client (just for testing)
-func NewFakeClientInfo() *ClientInfo {
-	var resultKubeClient = KubeClient{
+func NewFakeClientInfo() ClientInfo {
+	return &KubeClient{
 		Client:           fake.NewSimpleClientset(),
 		NetClient:        netfake.NewSimpleClientset().K8sCniCncfIoV1(),
 	}
-	var result ClientInfo = &resultKubeClient
-	return &result
 }
 
 var _ = Describe("k8sclient operations", func() {
@@ -90,7 +88,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
@@ -102,11 +100,11 @@ var _ = Describe("k8sclient operations", func() {
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		Expect(err).NotTo(HaveOccurred())
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(len(delegates)).To(Equal(2))
@@ -130,18 +128,18 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net3", net3))
 		Expect(err).NotTo(HaveOccurred())
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		Expect(err).NotTo(HaveOccurred())
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError("GetNetworkDelegates: failed getting the delegate: getKubernetesDelegate: cannot find a network-attachment-definition (net1) in namespace (test): network-attachment-definitions.k8s.cni.cncf.io \"net1\" not found"))
 	})
@@ -164,7 +162,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", `{
 			"name": "net1",
@@ -187,10 +185,10 @@ var _ = Describe("k8sclient operations", func() {
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(len(delegates)).To(Equal(3))
@@ -209,12 +207,12 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(len(networks)).To(Equal(0))
 		Expect(err).To(MatchError("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
@@ -237,7 +235,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", `{
@@ -261,10 +259,10 @@ var _ = Describe("k8sclient operations", func() {
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(len(delegates)).To(Equal(3))
@@ -283,7 +281,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
 		_, err = AddNetAttachDef(clientInfo, 
@@ -305,10 +303,10 @@ var _ = Describe("k8sclient operations", func() {
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(len(delegates)).To(Equal(2))
@@ -325,17 +323,17 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", "{\"type\": \"mynet\"}"))
 		Expect(err).NotTo(HaveOccurred())
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect(len(delegates)).To(Equal(1))
@@ -350,7 +348,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err := (*clientInfo).AddPod(fakePod)
+		_, err := clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
 		_, err = AddNetAttachDef(clientInfo, 
@@ -367,10 +365,10 @@ var _ = Describe("k8sclient operations", func() {
 
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		delegates, err := GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, false, nil)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, tmpDir, false, nil)
 		Expect(len(delegates)).To(Equal(0))
 		Expect(err).To(MatchError(fmt.Sprintf("GetNetworkDelegates: failed getting the delegate: GetCNIConfig: err in GetCNIConfigFromFile: Error loading CNI config file %s: error parsing configuration: invalid character 'a' looking for beginning of value", net2Name)))
 	})
@@ -391,7 +389,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "myCRD1", "{\"type\": \"mynet\"}"))
@@ -400,7 +398,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
@@ -424,7 +422,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "myCRD1", "{\"type\": \"mynet\"}"))
@@ -436,7 +434,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(2))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
@@ -464,7 +462,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "myCRD1", "{\"type\": \"mynet\"}"))
@@ -476,7 +474,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myCRD1"))
@@ -500,7 +498,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
@@ -515,7 +513,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("myFile1"))
@@ -538,7 +536,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
 		_, err = AddNetAttachDef(clientInfo, 
@@ -551,7 +549,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
@@ -574,13 +572,13 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -601,7 +599,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "net1", "{\"type\": \"mynet1\"}"))
@@ -613,13 +611,13 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(netConf.Delegates)).To(Equal(1))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net2"))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("mynet2"))
 
-		numK8sDelegates, _, err := TryLoadPodDelegates(fakePod, netConf, *clientInfo, nil)
+		numK8sDelegates, _, err := TryLoadPodDelegates(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(numK8sDelegates).To(Equal(0))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
@@ -643,7 +641,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", ""))
 		Expect(err).NotTo(HaveOccurred())
@@ -653,11 +651,11 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+		_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 		Expect(err).To(HaveOccurred())
 
 		netConf.ConfDir = "badfilepath"
-		_, _, err = TryLoadPodDelegates(fakePod, netConf, *clientInfo, nil)
+		_, _, err = TryLoadPodDelegates(fakePod, netConf, clientInfo, nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -683,7 +681,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "net1", "{\"type\": \"mynet1\"}"))
@@ -692,7 +690,7 @@ var _ = Describe("k8sclient operations", func() {
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		numK8sDelegates, _, err := TryLoadPodDelegates(fakePod, netConf, *clientInfo, nil)
+		numK8sDelegates, _, err := TryLoadPodDelegates(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(numK8sDelegates).To(Equal(0))
 		Expect(netConf.Delegates[0].Conf.Name).To(Equal("net1"))
@@ -720,7 +718,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "net1", "{\"type\": \"mynet1\"}"))
@@ -754,7 +752,7 @@ var _ = Describe("k8sclient operations", func() {
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "net1", "{\"type\": \"mynet1\"}"))
@@ -818,7 +816,7 @@ users:
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, 
 			testutils.NewFakeNetAttachDef("kube-system", "net1", "{\"type\": \"mynet1\"}"))
@@ -826,7 +824,7 @@ users:
 		_, err = GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		_, _, err = TryLoadPodDelegates(fakePod, netConf, *clientInfo, nil)
+		_, _, err = TryLoadPodDelegates(fakePod, netConf, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -858,7 +856,7 @@ users:
 		}
 
 		clientInfo := NewFakeClientInfo()
-		_, err = (*clientInfo).AddPod(fakePod)
+		_, err = clientInfo.AddPod(fakePod)
 		Expect(err).NotTo(HaveOccurred())
 		_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
@@ -866,10 +864,10 @@ users:
 		k8sArgs, err := GetK8sArgs(args)
 		Expect(err).NotTo(HaveOccurred())
 
-		pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(err).NotTo(HaveOccurred())
-		_, err = GetNetworkDelegates(*clientInfo, pod, networks, tmpDir, netConf.NamespaceIsolation, nil)
+		_, err = GetNetworkDelegates(clientInfo, pod, networks, tmpDir, netConf.NamespaceIsolation, nil)
 		Expect(err).To(HaveOccurred())
 		Expect(err).To(MatchError("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace test but refers to target namespace kube-system"))
 
@@ -900,7 +898,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err = (*clientInfo).AddPod(fakePod)
+			_, err = clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", ""))
 			Expect(err).NotTo(HaveOccurred())
@@ -911,7 +909,7 @@ users:
 			Expect(err).NotTo(HaveOccurred())
 
 			netConf.ConfDir = "garbage value"
-			_, err = GetDefaultNetworks(fakePod, netConf, *clientInfo, nil)
+			_, err = GetDefaultNetworks(fakePod, netConf, clientInfo, nil)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -952,7 +950,7 @@ users:
 			// }
 
 			clientInfo := NewFakeClientInfo()
-			_, err := (*clientInfo).AddPod(fakePod)
+			_, err := clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, 
 				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
@@ -968,7 +966,7 @@ users:
 			networks, err := GetPodNetwork(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 
-			_, err = GetNetworkDelegates(*clientInfo, fakePod, networks, tmpDir, false, nil)
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, tmpDir, false, nil)
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -981,7 +979,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err := (*clientInfo).AddPod(fakePod)
+			_, err := clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = AddNetAttachDef(clientInfo, 
@@ -990,7 +988,7 @@ users:
 
 			k8sArgs, err := GetK8sArgs(args)
 			Expect(err).NotTo(HaveOccurred())
-			pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 
 			// invalid case 1 - can't have more than 2 items separated by "/"
 			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP/root@thirdIP"
@@ -1024,7 +1022,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err := (*clientInfo).AddPod(fakePod)
+			_, err := clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
@@ -1033,7 +1031,7 @@ users:
 			k8sArgs, err := GetK8sArgs(args)
 			Expect(err).NotTo(HaveOccurred())
 
-			pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 			Expect(err).NotTo(HaveOccurred())
 
 			fakeStatus := []nettypes.NetworkStatus{
@@ -1050,7 +1048,7 @@ users:
 					Mac:       "ea:0e:fa:63:95:f9",
 				},
 			}
-			err = netutils.SetNetworkStatus((*clientInfo).GetKubeClient(), pod, fakeStatus)
+			err = netutils.SetNetworkStatus(clientInfo.GetKubeClient(), pod, fakeStatus)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -1069,7 +1067,7 @@ users:
 		// 	}
 
 		//	clientInfo := NewFakeClientInfo()
-		//	_, err := (*clientInfo).AddPod(fakePod)
+		//	_, err := clientInfo.AddPod(fakePod)
 		//	Expect(err).NotTo(HaveOccurred())
 		//	_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 		//	Expect(err).NotTo(HaveOccurred())
@@ -1077,7 +1075,7 @@ users:
 		// 	k8sArgs, err := GetK8sArgs(args)
 		// 	Expect(err).NotTo(HaveOccurred())
 
-		// 	pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		// 	pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		// 	Expect(err).NotTo(HaveOccurred())
 
 		// 	networkstatus := "test status"
@@ -1101,7 +1099,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err := (*clientInfo).AddPod(fakePod)
+			_, err := clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
@@ -1110,7 +1108,7 @@ users:
 			k8sArgs, err := GetK8sArgs(args)
 			Expect(err).NotTo(HaveOccurred())
 
-			pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 			Expect(err).NotTo(HaveOccurred())
 
 			fakeStatus := []nettypes.NetworkStatus{
@@ -1127,7 +1125,7 @@ users:
 					Mac:       "ea:0e:fa:63:95:f9",
 				},
 			}
-			err = netutils.SetNetworkStatus((*clientInfo).GetKubeClient(), pod, fakeStatus)
+			err = netutils.SetNetworkStatus(clientInfo.GetKubeClient(), pod, fakeStatus)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -1146,7 +1144,7 @@ users:
 		// 	}
 
 		//	clientInfo := NewFakeClientInfo()
-		//	_, err := (*clientInfo).AddPod(fakePod)
+		//	_, err := clientInfo.AddPod(fakePod)
 		//	Expect(err).NotTo(HaveOccurred())
 		//	_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 		//	Expect(err).NotTo(HaveOccurred())
@@ -1154,7 +1152,7 @@ users:
 		// 	k8sArgs, err := GetK8sArgs(args)
 		// 	Expect(err).NotTo(HaveOccurred())
 
-		// 	pod, err := (*clientInfo).GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+		// 	pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		// 	Expect(err).NotTo(HaveOccurred())
 
 		// 	networkstatus := "test status"
@@ -1211,7 +1209,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err = (*clientInfo).AddPod(fakePod)
+			_, err = clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 			Expect(err).NotTo(HaveOccurred())
@@ -1219,7 +1217,7 @@ users:
 			k8sArgs, err := GetK8sArgs(args)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = SetNetworkStatus(*clientInfo, k8sArgs, netstatus, netConf)
+			err = SetNetworkStatus(clientInfo, k8sArgs, netstatus, netConf)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -1293,7 +1291,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err = (*clientInfo).AddPod(fakePod)
+			_, err = clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 			Expect(err).NotTo(HaveOccurred())
@@ -1353,7 +1351,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err = (*clientInfo).AddPod(fakePod)
+			_, err = clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 			Expect(err).NotTo(HaveOccurred())
@@ -1412,7 +1410,7 @@ users:
 			}
 
 			clientInfo := NewFakeClientInfo()
-			_, err = (*clientInfo).AddPod(fakePod)
+			_, err = clientInfo.AddPod(fakePod)
 			Expect(err).NotTo(HaveOccurred())
 			_, err = AddNetAttachDef(clientInfo, testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
 			Expect(err).NotTo(HaveOccurred())
