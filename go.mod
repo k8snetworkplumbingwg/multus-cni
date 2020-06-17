@@ -18,6 +18,7 @@ require (
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
 	google.golang.org/grpc v1.23.0
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.0.0-20181115043458-b799cb063522
 	k8s.io/apimachinery v0.0.0-20181110190943-2a7c93004028
 	k8s.io/client-go v0.0.0-20181115111358-9bea17718df8

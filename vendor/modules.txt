@@ -201,6 +201,8 @@ gopkg.in/inf.v0
 gopkg.in/tomb.v1
 # gopkg.in/yaml.v2 v2.2.8
 gopkg.in/yaml.v2
+# gopkg.in/natefinch v2.0.0
+gopkg.in/natefinch
 # k8s.io/api v0.0.0-20181115043458-b799cb063522
 k8s.io/api/admissionregistration/v1alpha1
 k8s.io/api/admissionregistration/v1beta1
