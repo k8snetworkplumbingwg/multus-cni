@@ -44,7 +44,11 @@ if [ "$GO111MODULE" == "off" ]; then
 else
 	# build with go modules
 	export GO111MODULE=on
+	BUILD_ARGS=(-o ${DEST_DIR}/multus -tags no_openssl)
+	if [ -n "$MODMODE" ]; then
+		BUILD_ARGS+=(-mod "$MODMODE")
+	fi
 
 	echo "Building plugins"
-	go build -o ${DEST_DIR}/multus -tags no_openssl -ldflags "${LDFLAGS}" "$@" ./multus
+	go build ${BUILD_ARGS[*]} -ldflags "${LDFLAGS}" "$@" ./multus
 fi
