@@ -19,7 +19,7 @@ if [ -z "$VERSION" ]; then
 	fi
 	set -e
 fi
-DATE=$(date --iso-8601=seconds)
+DATE=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" --iso-8601=seconds)
 COMMIT=${COMMIT:-$(git rev-parse --verify HEAD)}
 LDFLAGS="-X main.version=${VERSION:-master} -X main.commit=${COMMIT} -X main.date=${DATE}"
 export CGO_ENABLED=0
