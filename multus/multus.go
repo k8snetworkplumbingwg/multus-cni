@@ -701,11 +701,33 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
+	kubeClient, err = k8s.GetK8sClient(in.Kubeconfig, kubeClient)
+	if err != nil {
+		return cmdErr(nil, "error getting k8s client: %v", err)
+	}
+
 	pod := (*v1.Pod)(nil)
 	if kubeClient != nil {
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
-			if !errors.IsNotFound(err) {
+			var waitErr error
+			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
+			if errors.IsServiceUnavailable(err) {
+				pollDuration := 500 * time.Millisecond
+				pollTimeout := 5 * time.Second
+				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
+					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
+					return pod != nil, err
+				})
+				// retry failed, then return error with retry out
+				if waitErr != nil {
+					return cmdErr(k8sArgs, "error getting pod by service unavailable: %v", err)
+				}
+			} else if errors.IsNotFound(err) {
+				// If not found, proceed to remove interface with cache
+				pod = nil
+			} else {
+				// Other case, return error
 				return cmdErr(k8sArgs, "error getting pod: %v", err)
 			}
 		}
@@ -714,8 +736,8 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 	if err != nil {
-		// Fetch delegates again if cache is not exist
-		if os.IsNotExist(err) {
+		// Fetch delegates again if cache is not exist and pod info can be read
+		if os.IsNotExist(err) && pod != nil {
 			if in.ClusterNetwork != "" {
 				_, err = k8s.GetDefaultNetworks(pod, in, kubeClient, nil)
 				if err != nil {
