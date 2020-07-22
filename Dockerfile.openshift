@@ -29,7 +29,7 @@ RUN mkdir -p /usr/src/multus-cni/images && \
        mkdir -p /usr/src/multus-cni/rhel7/bin && \
        mkdir -p /usr/src/multus-cni/rhel8/bin
 COPY --from=rhel7 /usr/src/multus-cni/bin/multus /usr/src/multus-cni/rhel7/bin
-COPY --from=rhel7 /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
+COPY --from=rhel8 /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
 COPY --from=rhel8 /usr/src/multus-cni/bin/multus /usr/src/multus-cni/rhel8/bin
 ADD ./images/entrypoint.sh /
 
