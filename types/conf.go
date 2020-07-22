@@ -17,13 +17,14 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
-	"github.com/intel/multus-cni/logging"
+	"gopkg.in/intel/multus-cni.v3/logging"
 )
 
 const (
@@ -97,7 +98,8 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 
 	if net != nil {
 		if net.Name != "" {
-			delegateConf.Name = net.Name
+			// Overwrite CNI config name with net-attach-def name
+			delegateConf.Name = fmt.Sprintf("%s/%s", net.Namespace, net.Name)
 		}
 		if net.InterfaceRequest != "" {
 			delegateConf.IfnameRequest = net.InterfaceRequest
@@ -116,6 +118,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		}
 		if net.GatewayRequest != nil {
 			delegateConf.GatewayRequest = append(delegateConf.GatewayRequest, net.GatewayRequest...)
+		}
+		if net.InfinibandGUIDRequest != "" {
+			delegateConf.InfinibandGUIDRequest = net.InfinibandGUIDRequest
 		}
 	}
 
@@ -145,6 +150,9 @@ func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		}
 		if delegate.MacRequest != "" {
 			runtimeConfig.Mac = delegate.MacRequest
+		}
+		if delegate.InfinibandGUIDRequest != "" {
+			runtimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
 		}
 	}
 
@@ -184,6 +192,9 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		}
 		if len(rc.Mac) != 0 {
 			capabilityArgs["mac"] = rc.Mac
+		}
+		if len(rc.InfinibandGUID) != 0 {
+			capabilityArgs["infinibandGUID"] = rc.InfinibandGUID
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}

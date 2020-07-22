@@ -57,10 +57,11 @@ type NetConf struct {
 
 // RuntimeConfig specifies CNI RuntimeConfig
 type RuntimeConfig struct {
-	PortMaps  []*PortMapEntry `json:"portMappings,omitempty"`
-	Bandwidth *BandwidthEntry `json:"bandwidth,omitempty"`
-	IPs       []string        `json:"ips,omitempty"`
-	Mac       string          `json:"mac,omitempty"`
+	PortMaps       []*PortMapEntry `json:"portMappings,omitempty"`
+	Bandwidth      *BandwidthEntry `json:"bandwidth,omitempty"`
+	IPs            []string        `json:"ips,omitempty"`
+	Mac            string          `json:"mac,omitempty"`
+	InfinibandGUID string          `json:"infinibandGUID,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
@@ -92,16 +93,17 @@ type NetworkStatus struct {
 
 // DelegateNetConf for net-attach-def for pod
 type DelegateNetConf struct {
-	Conf                types.NetConf
-	ConfList            types.NetConfList
-	Name                string
-	IfnameRequest       string          `json:"ifnameRequest,omitempty"`
-	MacRequest          string          `json:"macRequest,omitempty"`
-	IPRequest           []string        `json:"ipRequest,omitempty"`
-	PortMappingsRequest []*PortMapEntry `json:"-"`
-	BandwidthRequest    *BandwidthEntry `json:"-"`
-	GatewayRequest      []net.IP        `json:"default-route,omitempty"`
-	IsFilterGateway     bool
+	Conf                  types.NetConf
+	ConfList              types.NetConfList
+	Name                  string
+	IfnameRequest         string          `json:"ifnameRequest,omitempty"`
+	MacRequest            string          `json:"macRequest,omitempty"`
+	InfinibandGUIDRequest string          `json:"infinibandGUIDRequest,omitempty"`
+	IPRequest             []string        `json:"ipRequest,omitempty"`
+	PortMappingsRequest   []*PortMapEntry `json:"-"`
+	BandwidthRequest      *BandwidthEntry `json:"-"`
+	GatewayRequest        []net.IP        `json:"default-route,omitempty"`
+	IsFilterGateway       bool
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
@@ -126,6 +128,9 @@ type NetworkSelectionElement struct {
 	// MacRequest contains an optional requested MAC address for this
 	// network attachment
 	MacRequest string `json:"mac,omitempty"`
+	// InfinibandGUID request contains an optional requested Infiniband GUID address
+	// for this network attachment
+	InfinibandGUIDRequest string `json:"infiniband-guid,omitempty"`
 	// InterfaceRequest contains an optional requested name for the
 	// network interface this attachment will create in the container
 	InterfaceRequest string `json:"interface,omitempty"`

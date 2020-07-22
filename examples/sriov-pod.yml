@@ -1,0 +1,47 @@
+# This net-attach-def defines SR-IOV CNI config
+# Please see https://github.com/intel/sriov-cni and https://github.com/intel/sriov-network-device-plugin
+# for its detail.
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net-a
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov
+spec:
+  config: '{
+  "type": "sriov",
+  "vlan": 1000,
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "rangeStart": "10.56.217.171",
+    "rangeEnd": "10.56.217.181",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
+}'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod1
+  labels:
+    env: test
+  annotations:
+    k8s.v1.cni.cncf.io/networks: sriov-net-a
+spec:
+  containers:
+  - name: appcntr1
+    image: centos/tools
+    imagePullPolicy: IfNotPresent
+    command: [ "/bin/bash", "-c", "--" ]
+    args: [ "while true; do sleep 300000; done;" ]
+    resources:
+      requests:
+        intel.com/sriov: '1'
+      limits:
+        intel.com/sriov: '1'
+  restartPolicy: "Never"

@@ -19,8 +19,10 @@ import (
 	"os"
 	"strings"
 	"time"
+	"io"
 
 	"github.com/pkg/errors"
+	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 )
 
 // Level type
@@ -37,7 +39,7 @@ const (
 )
 
 var loggingStderr bool
-var loggingFp *os.File
+var loggingW io.Writer
 var loggingLevel Level
 
 const defaultTimestampFormat = time.RFC3339
@@ -69,10 +71,10 @@ func printf(level Level, format string, a ...interface{}) {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 
-	if loggingFp != nil {
-		fmt.Fprintf(loggingFp, header, t.Format(defaultTimestampFormat), level)
-		fmt.Fprintf(loggingFp, format, a...)
-		fmt.Fprintf(loggingFp, "\n")
+	if loggingW != nil {
+		fmt.Fprintf(loggingW, header, t.Format(defaultTimestampFormat), level)
+		fmt.Fprintf(loggingW, format, a...)
+		fmt.Fprintf(loggingW, "\n")
 	}
 }
 
@@ -139,16 +141,18 @@ func SetLogFile(filename string) {
 		return
 	}
 
-	fp, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		loggingFp = nil
-		fmt.Fprintf(os.Stderr, "multus logging: cannot open %s", filename)
-	}
-	loggingFp = fp
+	loggingW = &lumberjack.Logger{
+                        Filename:   filename,
+                        MaxSize:    100, // megabytes
+                        MaxBackups: 5,
+                        MaxAge:     5, // days
+                        Compress:   true,
+                    }
+
 }
 
 func init() {
 	loggingStderr = true
-	loggingFp = nil
+	loggingW = nil
 	loggingLevel = PanicLevel
 }
