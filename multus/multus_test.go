@@ -34,11 +34,14 @@ import (
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	"github.com/intel/multus-cni/k8sclient"
-	"github.com/intel/multus-cni/logging"
-	testhelpers "github.com/intel/multus-cni/testing"
-	"github.com/intel/multus-cni/types"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
+	"gopkg.in/intel/multus-cni.v3/k8sclient"
+	"gopkg.in/intel/multus-cni.v3/logging"
+	testhelpers "gopkg.in/intel/multus-cni.v3/testing"
+	"gopkg.in/intel/multus-cni.v3/types"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 
@@ -1226,7 +1229,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err = cmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking confAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
+		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {
@@ -1497,8 +1500,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		events := collectEvents(recorder.Events)
 		Expect(len(events)).To(Equal(3))
 		Expect(events[0]).To(Equal("Normal AddedInterface Add eth0 [1.1.1.2/24]"))
-		Expect(events[1]).To(Equal("Normal AddedInterface Add net1 [1.1.1.3/24] from net1"))
-		Expect(events[2]).To(Equal("Normal AddedInterface Add net2 [1.1.1.4/24] from net2"))
+		Expect(events[1]).To(Equal("Normal AddedInterface Add net1 [1.1.1.3/24] from test/net1"))
+		Expect(events[2]).To(Equal("Normal AddedInterface Add net2 [1.1.1.4/24] from test/net2"))
 	})
 
 	It("executes kubernetes networks and delete it after pod removal", func() {
@@ -1564,8 +1567,14 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
-		// set fKubeClient to nil to emulate no pod info
+
+		// delete pod to emulate no pod info
 		clientInfo.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
+		nilPod, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Get(
+			fakePod.ObjectMeta.Name, metav1.GetOptions{})
+		Expect(nilPod).To(BeNil())
+		Expect(errors.IsNotFound(err)).To(BeTrue())
+
 		err = cmdDel(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
@@ -2070,8 +2079,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		fExec.addPlugin020(nil, "eth0", expectedConf1, nil, nil)
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
-
-		err := cmdDel(args, fExec, nil)
+		_, err := cmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		err = cmdDel(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
@@ -2464,7 +2474,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err = cmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("Multus: [/]: error adding container to network \"other1\": delegateAdd: error invoking confAdd - \"other-plugin\": error in getting result from AddNetwork: expected plugin failure"))
+		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {

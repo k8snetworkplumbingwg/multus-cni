@@ -37,7 +37,7 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 - Install via daemonset using the quick-start guide, above.
 - Download binaries from [release page](https://github.com/intel/multus-cni/releases)
 - By Docker image from [Docker Hub](https://hub.docker.com/r/nfvpe/multus/tags/)
-- Or, roll-you-own and build from source
+- Or, roll-your-own and build from source
   - See [Development](doc/development.md)
 
 ## Comprehensive Documentation

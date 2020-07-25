@@ -1,4 +1,4 @@
-module github.com/intel/multus-cni
+module gopkg.in/intel/multus-cni.v3
 
 go 1.12
 
@@ -16,7 +16,9 @@ require (
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550 // indirect
 	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
+	golang.org/x/text v0.3.3 // indirect
 	google.golang.org/grpc v1.23.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	k8s.io/api v0.0.0-20181115043458-b799cb063522
 	k8s.io/apimachinery v0.0.0-20181110190943-2a7c93004028

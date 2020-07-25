@@ -29,8 +29,8 @@ if [ "$GO111MODULE" == "off" ]; then
 	echo "Building plugin without go module"
 	echo "Warning: this will be deprecated in near future so please use go modules!"
 
-	ORG_PATH="github.com/intel"
-	REPO_PATH="${ORG_PATH}/multus-cni"
+	ORG_PATH="gopkg.in/intel"
+	REPO_PATH="${ORG_PATH}/multus-cni.v3"
 
 	if [ ! -h gopath/src/${REPO_PATH} ]; then
 		mkdir -p gopath/src/${ORG_PATH}

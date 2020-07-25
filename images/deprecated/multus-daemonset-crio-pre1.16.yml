@@ -5,7 +5,6 @@ metadata:
   name: network-attachment-definitions.k8s.cni.cncf.io
 spec:
   group: k8s.cni.cncf.io
-  version: v1
   scope: Namespaced
   names:
     plural: network-attachment-definitions
@@ -13,13 +12,24 @@ spec:
     kind: NetworkAttachmentDefinition
     shortNames:
     - net-attach-def
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: 'NetworkAttachmentDefinition is a CRD schema specified by the Network Plumbing
+            Working Group to express the intent for attaching pods to one or more logical or physical
+            networks. More information available at: https://github.com/k8snetworkplumbingwg/multi-net-spec'
+          type: object
           properties:
-            config:
-                 type: string
+            spec:
+              description: 'NetworkAttachmentDefinition spec defines the desired state of a network attachment'
+              type: object
+              properties:
+                config:
+                  description: 'NetworkAttachmentDefinition config is a JSON-formatted CNI configuration'
+                  type: string
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -143,10 +153,14 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: nfvpe/multus:v3.4.1
+        # crio support requires multus:latest for now. support 3.3 or later.
+        image: nfvpe/multus:latest
         command: ["/entrypoint.sh"]
         args:
+        - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
+        - "--override-network-name=true"
+        - "--restart-crio=true"
         resources:
           requests:
             cpu: "100m"
@@ -156,20 +170,27 @@ spec:
             memory: "50Mi"
         securityContext:
           privileged: true
+          capabilities:
+            add: ["SYS_ADMIN"]
         volumeMounts:
+        - name: run
+          mountPath: /run
         - name: cni
           mountPath: /host/etc/cni/net.d
         - name: cnibin
-          mountPath: /host/opt/cni/bin
+          mountPath: /host/usr/libexec/cni
         - name: multus-cfg
           mountPath: /tmp/multus-conf
       volumes:
+        - name: run
+          hostPath:
+            path: /run
         - name: cni
           hostPath:
             path: /etc/cni/net.d
         - name: cnibin
           hostPath:
-            path: /opt/cni/bin
+            path: /usr/libexec/cni
         - name: multus-cfg
           configMap:
             name: multus-cni-config
@@ -203,11 +224,14 @@ spec:
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        # ppc64le support requires multus:latest for now. support 3.3 or later.
+        # crio support requires multus:latest for now. support 3.3 or later.
         image: nfvpe/multus:latest-ppc64le
         command: ["/entrypoint.sh"]
         args:
+        - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
+        - "--override-network-name=true"
+        - "--restart-crio=true"
         resources:
           requests:
             cpu: "100m"
@@ -221,7 +245,7 @@ spec:
         - name: cni
           mountPath: /host/etc/cni/net.d
         - name: cnibin
-          mountPath: /host/opt/cni/bin
+          mountPath: /host/usr/libexec/cni
         - name: multus-cfg
           mountPath: /tmp/multus-conf
       volumes:
@@ -230,7 +254,7 @@ spec:
             path: /etc/cni/net.d
         - name: cnibin
           hostPath:
-            path: /opt/cni/bin
+            path: /usr/libexec/cni
         - name: multus-cfg
           configMap:
             name: multus-cni-config
