@@ -302,6 +302,24 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         MASTER_PLUGIN_NET_NAME="multus-cni-network"
       fi
 
+      capabilities_python_filter_tmpfile=$(mktemp)
+      cat << EOF > $capabilities_python_filter_tmpfile
+import json,sys
+conf = json.load(sys.stdin)
+capabilities = {}
+for capa in [p['capabilities'] for p in conf['plugins'] if 'capabilities' in p]:
+    capabilities.update({capability:enabled for (capability,enabled) in capa.items() if enabled})
+if len(capabilities) > 0:
+    print("""\"capabilities\": """ + json.dumps(capabilities) + ",")
+else:
+    print("")
+EOF
+
+      NESTED_CAPABILITIES_STRING="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
+            python $capabilities_python_filter_tmpfile)"
+      rm $capabilities_python_filter_tmpfile
+      log "Nested capabilities string: $NESTED_CAPABILITIES_STRING" 
+
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
       MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
       log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
@@ -310,6 +328,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           $CNI_VERSION_STRING
           "name": "$MASTER_PLUGIN_NET_NAME",
           "type": "multus",
+          $NESTED_CAPABILITIES_STRING
           $ISOLATION_STRING
           $LOG_LEVEL_STRING
           $LOG_FILE_STRING
