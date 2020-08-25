@@ -1,5 +1,5 @@
 # This dockerfile is specific to building Multus for OpenShift
-FROM openshift/origin-release:rhel-8-golang-1.12 as rhel8
+FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6 as rhel8
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
@@ -9,7 +9,7 @@ RUN ./build && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
 
-FROM openshift/origin-release:rhel-7-golang-1.12 as rhel7
+FROM registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6 as rhel7
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
@@ -23,7 +23,7 @@ RUN ./build && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
 
-FROM openshift/origin-base
+FROM registry.svc.ci.openshift.org/ocp/4.6:base
 RUN mkdir -p /usr/src/multus-cni/images && \
        mkdir -p /usr/src/multus-cni/bin && \
        mkdir -p /usr/src/multus-cni/rhel7/bin && \
