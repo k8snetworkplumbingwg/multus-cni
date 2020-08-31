@@ -144,7 +144,7 @@ spec:
       serviceAccountName: multus
       containers:
         - name: kube-multus
-          image: nfvpe/multus:v3.6
+          image: docker.io/nfvpe/multus:stable
           command: ["/entrypoint.sh"]
           args:
             - "--multus-conf-file=auto"
@@ -212,7 +212,7 @@ spec:
       containers:
         - name: kube-multus
           # ppc64le support requires multus:latest for now. support 3.3 or later.
-          image: nfvpe/multus:latest-ppc64le
+          image: docker.io/nfvpe/multus:stable-ppc64le
           command: ["/entrypoint.sh"]
           args:
             - "--multus-conf-file=auto"
