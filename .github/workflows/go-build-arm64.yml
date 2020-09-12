@@ -1,4 +1,4 @@
-name: Go-build-ppc64le
+name: Go-build-arm64v8
 on: [push, pull_request]
 jobs:
 
