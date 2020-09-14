@@ -1,0 +1,57 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: default-route-config
+spec: 
+  config: '{
+            "cniVersion": "0.3.1",
+            "plugins": [
+                {
+                    "type": "macvlan",
+                    "master": "eth1",
+                    "mode": "bridge",
+                    "ipam": {
+                        "type": "static"
+                    }
+                } ]
+        }'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-route-worker1
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "default-route-config",
+              "ips": [ "10.1.1.21/24" ] ,
+              "default-route": [ "10.1.1.254" ] }
+    ]'
+  labels:
+    app: default-route1
+spec:
+  containers:
+  - name: default-route-worker1
+    image: centos:8
+    command: ["/bin/sleep", "10000"]
+    securityContext:
+      privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: default-route-worker2
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "default-route-config", 
+              "ips": [ "10.1.1.22/24" ] }
+    ]'
+  labels:
+    app: default-route1
+spec:
+  containers:
+  - name: default-route-worker2
+    image: centos:8
+    command: ["/bin/sleep", "10000"]
+    securityContext:
+      privileged: true
