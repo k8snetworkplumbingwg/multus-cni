@@ -9,7 +9,7 @@ RUN ./build && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
 
-FROM registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-openshift-4.6 as rhel7
+FROM registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.6 AS rhel7
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
