@@ -15,6 +15,7 @@
 package k8sclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -66,22 +67,22 @@ type ClientInfo struct {
 
 // AddPod adds pod into kubernetes
 func (c *ClientInfo) AddPod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.Client.Core().Pods(pod.ObjectMeta.Namespace).Create(pod)
+	return c.Client.CoreV1().Pods(pod.ObjectMeta.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
 // GetPod gets pod from kubernetes
 func (c *ClientInfo) GetPod(namespace, name string) (*v1.Pod, error) {
-	return c.Client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 // DeletePod deletes a pod from kubernetes
 func (c *ClientInfo) DeletePod(namespace, name string) error {
-	return c.Client.Core().Pods(namespace).Delete(name, &metav1.DeleteOptions{})
+	return c.Client.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 
 // AddNetAttachDef adds net-attach-def into kubernetes
 func (c *ClientInfo) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(netattach)
+	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(context.TODO(), netattach, metav1.CreateOptions{})
 }
 
 // Eventf puts event into kubernetes events
@@ -241,7 +242,7 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
-	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(net.Name, metav1.GetOptions{})
+	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
 	if err != nil {
 		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 		if client != nil {
