@@ -15,6 +15,7 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -86,13 +87,13 @@ func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkst
 	if resultErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		if err != nil {
 			// Re-get the pod unless it's the first attempt to update
-			pod, err = coreClient.Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+			pod, err = coreClient.Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 		}
 
-		pod, err = coreClient.Pods(pod.Namespace).UpdateStatus(pod)
+		pod, err = coreClient.Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 		return err
 	}); resultErr != nil {
 		return nil, fmt.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
