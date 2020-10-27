@@ -443,16 +443,19 @@ func delegateDel(exec invoke.Exec, pod *v1.Pod, ifName string, delegateConf *typ
 	return err
 }
 
-func delPlugins(exec invoke.Exec, pod *v1.Pod, argIfname string, delegates []*types.DelegateNetConf, lastIdx int, rt *libcni.RuntimeConf, binDir string) error {
-	logging.Debugf("delPlugins: %v, %v, %s, %v, %d, %v, %s", exec, pod, argIfname, delegates, lastIdx, rt, binDir)
+// delPlugins deletes plugins in reverse order from lastdIdx
+// Uses netRt as base RuntimeConf (coming from NetConf) but merges it
+// with each of the delegates' configuration
+func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *types.K8sArgs, delegates []*types.DelegateNetConf, lastIdx int, netRt *types.RuntimeConfig, binDir string) error {
+	logging.Debugf("delPlugins: %v, %v, %v, %v, %v, %d, %v, %s", exec, pod, args, k8sArgs, delegates, lastIdx, netRt, binDir)
 	if os.Setenv("CNI_COMMAND", "DEL") != nil {
-		return logging.Errorf("delPlugins: error setting envionment variable CNI_COMMAND to a value of DEL")
+		return logging.Errorf("delPlugins: error setting environment variable CNI_COMMAND to a value of DEL")
 	}
 
 	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
-		ifName := getIfname(delegates[idx], argIfname, idx)
-		rt.IfName = ifName
+		ifName := getIfname(delegates[idx], args.IfName, idx)
+		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
 		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, pod, ifName, delegates[idx], rt, binDir); err != nil {
 			errorstrings = append(errorstrings, err.Error())
@@ -563,8 +566,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 
-		runtimeConfig := types.MergeCNIRuntimeConfig(n.RuntimeConfig, delegate)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, runtimeConfig)
+		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
 		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
@@ -573,7 +575,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				netName = delegate.ConfList.Name
 			}
 			// Ignore errors; DEL must be idempotent anyway
-			_ = delPlugins(exec, nil, args.IfName, n.Delegates, idx, rt, n.BinDir)
+			_ = delPlugins(exec, nil, args, k8sArgs, n.Delegates, idx, n.RuntimeConfig, n.BinDir)
 			return nil, cmdPluginErr(k8sArgs, netName, "error adding container to network %q: %v", netName, err)
 		}
 
@@ -656,8 +658,7 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	for idx, delegate := range in.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 
-		runtimeConfig := types.MergeCNIRuntimeConfig(in.RuntimeConfig, delegate)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, runtimeConfig)
+		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
 		err = delegateCheck(exec, ifName, delegate, rt, in.BinDir)
 		if err != nil {
 			return err
@@ -805,8 +806,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
-	rt := types.CreateCNIRuntimeConf(args, k8sArgs, "", in.RuntimeConfig)
-	return delPlugins(exec, pod, args.IfName, in.Delegates, len(in.Delegates)-1, rt, in.BinDir)
+	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in.BinDir)
 }
 
 func main() {

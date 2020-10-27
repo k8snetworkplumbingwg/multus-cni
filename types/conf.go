@@ -129,16 +129,16 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
-// MergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
-func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
-	logging.Debugf("MergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
+// mergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
+func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
+	logging.Debugf("mergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
 	if runtimeConfig == nil {
 		runtimeConfig = &RuntimeConfig{}
 	}
 
 	// multus inject RuntimeConfig only in case of non MasterPlugin.
 	if delegate.MasterPlugin != true {
-		logging.Debugf("MergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
 		if delegate.PortMappingsRequest != nil {
 			runtimeConfig.PortMaps = delegate.PortMappingsRequest
 		}
@@ -159,9 +159,15 @@ func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 	return runtimeConfig
 }
 
-// CreateCNIRuntimeConf create CNI RuntimeConf
-func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) *libcni.RuntimeConf {
-	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
+// CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
+// exists, merge data with the runtime config.
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) *libcni.RuntimeConf {
+	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
+
+	delegateRc := rc
+	if delegate != nil {
+		delegateRc = mergeCNIRuntimeConfig(delegateRc, delegate)
+	}
 
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	// Todo
@@ -179,22 +185,22 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		},
 	}
 
-	if rc != nil {
+	if delegateRc != nil {
 		capabilityArgs := map[string]interface{}{}
-		if len(rc.PortMaps) != 0 {
-			capabilityArgs["portMappings"] = rc.PortMaps
+		if len(delegateRc.PortMaps) != 0 {
+			capabilityArgs["portMappings"] = delegateRc.PortMaps
 		}
-		if rc.Bandwidth != nil {
-			capabilityArgs["bandwidth"] = rc.Bandwidth
+		if delegateRc.Bandwidth != nil {
+			capabilityArgs["bandwidth"] = delegateRc.Bandwidth
 		}
-		if len(rc.IPs) != 0 {
-			capabilityArgs["ips"] = rc.IPs
+		if len(delegateRc.IPs) != 0 {
+			capabilityArgs["ips"] = delegateRc.IPs
 		}
-		if len(rc.Mac) != 0 {
-			capabilityArgs["mac"] = rc.Mac
+		if len(delegateRc.Mac) != 0 {
+			capabilityArgs["mac"] = delegateRc.Mac
 		}
-		if len(rc.InfinibandGUID) != 0 {
-			capabilityArgs["infinibandGUID"] = rc.InfinibandGUID
+		if len(delegateRc.InfinibandGUID) != 0 {
+			capabilityArgs["infinibandGUID"] = delegateRc.InfinibandGUID
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}

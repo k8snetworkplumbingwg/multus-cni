@@ -565,7 +565,7 @@ var _ = Describe("config operations", func() {
 			HostIP:        "anotherSampleHostIP",
 		}
 
-		rt := CreateCNIRuntimeConf(args, k8sArgs, "", rc)
+		rt := CreateCNIRuntimeConf(args, k8sArgs, "", rc, nil)
 		fmt.Println("rt.ContainerID: ", rt.ContainerID)
 		Expect(rt.ContainerID).To(Equal("123456789"))
 		Expect(rt.NetNS).To(Equal(args.Netns))
@@ -678,7 +678,7 @@ var _ = Describe("config operations", func() {
 		Expect(delegateConf.PortMappingsRequest).To(Equal(networkSelection.PortMappingsRequest))
 	})
 
-	It("test MergeCNIRuntimeConfig with masterPlugin", func() {
+	It("test mergeCNIRuntimeConfig with masterPlugin", func() {
 		conf := `{
 			"name": "node-cni-network",
 			"type": "multus",
@@ -717,13 +717,13 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
 		delegate.MasterPlugin = true
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := MergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
 		Expect(runtimeConf.PortMaps).To(BeNil())
 		Expect(runtimeConf.Bandwidth).To(BeNil())
 		Expect(runtimeConf.InfinibandGUID).To(Equal(""))
 	})
 
-	It("test MergeCNIRuntimeConfig with delegate plugin", func() {
+	It("test mergeCNIRuntimeConfig with delegate plugin", func() {
 		conf := `{
 			"name": "weave1",
 			"cniVersion": "0.2.0",
@@ -753,7 +753,7 @@ var _ = Describe("config operations", func() {
 		}
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := MergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
 		Expect(runtimeConf.PortMaps).NotTo(BeNil())
 		Expect(len(runtimeConf.PortMaps)).To(BeEquivalentTo(1))
 		Expect(runtimeConf.PortMaps[0]).To(Equal(portMapEntry1))
