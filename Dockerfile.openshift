@@ -1,5 +1,5 @@
 # This dockerfile is specific to building Multus for OpenShift
-FROM openshift/origin-release:golang-1.10 as builder
+FROM openshift/origin-release:golang-1.15 as builder
 
 ADD . /usr/src/multus-cni
 
