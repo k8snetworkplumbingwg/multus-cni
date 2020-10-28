@@ -62,6 +62,7 @@ type RuntimeConfig struct {
 	IPs            []string        `json:"ips,omitempty"`
 	Mac            string          `json:"mac,omitempty"`
 	InfinibandGUID string          `json:"infinibandGUID,omitempty"`
+	DeviceID       string          `json:"deviceID,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
@@ -108,6 +109,8 @@ type DelegateNetConf struct {
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
 	ConfListPlugin bool `json:"-"`
+	// DeviceID is only used internal housekeeping
+	DeviceID string `json:"deviceID,omitempty"`
 
 	// Raw JSON
 	Bytes []byte
@@ -143,6 +146,8 @@ type NetworkSelectionElement struct {
 	// BandwidthRequest contains an optional requested bandwidth for
 	// the network
 	BandwidthRequest *BandwidthEntry `json:"bandwidth,omitempty"`
+	// DeviceID contains an optional requested deviceID the network
+	DeviceID string `json:"deviceID,omitempty"`
 	// CNIArgs contains additional CNI arguments for the network interface
 	CNIArgs *map[string]interface{} `json:"cni-args"`
 	// GatewayRequest contains default route IP address for the pod

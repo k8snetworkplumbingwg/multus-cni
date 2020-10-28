@@ -122,6 +122,13 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.InfinibandGUIDRequest != "" {
 			delegateConf.InfinibandGUIDRequest = net.InfinibandGUIDRequest
 		}
+		if net.DeviceID != "" {
+			if deviceID != "" {
+				logging.Debugf("Warning: Both RuntimeConfig and ResourceMap provide deviceID. Ignoring RuntimeConfig")
+			} else {
+				delegateConf.DeviceID = net.DeviceID
+			}
+		}
 	}
 
 	delegateConf.Bytes = bytes
@@ -153,6 +160,9 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		}
 		if delegate.InfinibandGUIDRequest != "" {
 			runtimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
+		}
+		if delegate.DeviceID != "" {
+			runtimeConfig.DeviceID = delegate.DeviceID
 		}
 	}
 
@@ -201,6 +211,9 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		}
 		if len(delegateRc.InfinibandGUID) != 0 {
 			capabilityArgs["infinibandGUID"] = delegateRc.InfinibandGUID
+		}
+		if delegateRc.DeviceID != "" {
+			capabilityArgs["deviceID"] = delegateRc.DeviceID
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}
