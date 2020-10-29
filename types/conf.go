@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -33,6 +34,7 @@ const (
 	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
+	defaultNonIsolatedNamespace   = "default"
 )
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
@@ -279,6 +281,19 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 	if netconf.MultusNamespace == "" {
 		netconf.MultusNamespace = defaultMultusNamespace
+	}
+
+	// setup namespace isolation
+	if netconf.RawNonIsolatedNamespaces == "" {
+		netconf.NonIsolatedNamespaces = []string{defaultNonIsolatedNamespace}
+	} else {
+		// Parse the comma separated list
+		nonisolated := strings.Split(netconf.RawNonIsolatedNamespaces, ",")
+		// Cleanup the whitespace
+		for i, nonv := range nonisolated {
+			nonisolated[i] = strings.TrimSpace(nonv)
+		}
+		netconf.NonIsolatedNamespaces = nonisolated
 	}
 
 	// get RawDelegates and put delegates field

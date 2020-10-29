@@ -337,7 +337,7 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 
 	networks, err := GetPodNetwork(pod)
 	if networks != nil {
-		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, conf.ConfDir, conf.NamespaceIsolation, resourceMap)
+		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, conf, resourceMap)
 
 		if err != nil {
 			if _, ok := err.(*NoK8sNetworkError); ok {
@@ -449,8 +449,9 @@ func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 }
 
 // GetNetworkDelegates returns delegatenetconf from net-attach-def annotation in pod
-func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.NetworkSelectionElement, confdir string, confnamespaceIsolation bool, resourceMap map[string]*types.ResourceInfo) ([]*types.DelegateNetConf, error) {
-	logging.Debugf("GetNetworkDelegates: %v, %v, %v, %v, %v, %v", k8sclient, pod, networks, confdir, confnamespaceIsolation, resourceMap)
+func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.NetworkSelectionElement, conf *types.NetConf, resourceMap map[string]*types.ResourceInfo) ([]*types.DelegateNetConf, error) {
+	logging.Debugf("GetNetworkDelegates: %v, %v, %v, %v, %v", k8sclient, pod, networks, conf, resourceMap)
+
 	// Read all network objects referenced by 'networks'
 	var delegates []*types.DelegateNetConf
 	defaultNamespace := pod.ObjectMeta.Namespace
@@ -459,16 +460,16 @@ func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.N
 
 		// The pods namespace (stored as defaultNamespace, does not equal the annotation's target namespace in net.Namespace)
 		// In the case that this is a mismatch when namespaceisolation is enabled, this should be an error.
-		if confnamespaceIsolation {
+		if conf.NamespaceIsolation {
 			if defaultNamespace != net.Namespace {
-				// There is an exception however, we always allow a reference to the default namespace.
-				if net.Namespace != "default" {
+				// We allow exceptions based on the specified list of non-isolated namespaces (and/or "default" namespace, by default)
+				if !isValidNamespaceReference(net.Namespace, conf.NonIsolatedNamespaces) {
 					return nil, logging.Errorf("GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace %v but refers to target namespace %v", defaultNamespace, net.Namespace)
 				}
 			}
 		}
 
-		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, confdir, pod, resourceMap)
+		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, conf.ConfDir, pod, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetNetworkDelegates: failed getting the delegate: %v", err)
 		}
@@ -477,6 +478,15 @@ func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.N
 	}
 
 	return delegates, nil
+}
+
+func isValidNamespaceReference(targetns string, allowednamespaces []string) bool {
+	for _, eachns := range allowednamespaces {
+		if eachns == targetns {
+			return true
+		}
+	}
+	return false
 }
 
 func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace string, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {

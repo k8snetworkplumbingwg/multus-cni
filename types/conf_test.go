@@ -135,6 +135,47 @@ var _ = Describe("config operations", func() {
 		Expect(netConf.LogFile).To(Equal("/var/log/multus.log"))
 	})
 
+	It("properly sets namespace isolation using the default namespace", func() {
+		conf := `{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "logLevel": "debug",
+	    "logFile": "/var/log/multus.log",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "namespaceIsolation": true,
+	    "delegates": [{
+	        "type": "weave-net"
+	    }]
+	}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.NamespaceIsolation).To(Equal(true))
+		Expect(len(netConf.NonIsolatedNamespaces)).To(Equal(1))
+		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("default"))
+	})
+
+	It("properly sets namespace isolation using custom namespaces", func() {
+		conf := `{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "logLevel": "debug",
+	    "logFile": "/var/log/multus.log",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "namespaceIsolation": true,
+	    "globalNamespaces": " foo,bar ,default",
+	    "delegates": [{
+	        "type": "weave-net"
+	    }]
+	}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netConf.NamespaceIsolation).To(Equal(true))
+		Expect(len(netConf.NonIsolatedNamespaces)).To(Equal(3))
+		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("foo"))
+		Expect(netConf.NonIsolatedNamespaces[1]).To(Equal("bar"))
+		Expect(netConf.NonIsolatedNamespaces[2]).To(Equal("default"))
+	})
+
 	It("prevResult with no errors", func() {
 		conf := `{
 	    "name": "node-cni-network",
