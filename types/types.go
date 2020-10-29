@@ -47,7 +47,10 @@ type NetConf struct {
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.
-	NamespaceIsolation bool `json:"namespaceIsolation"`
+	NamespaceIsolation       bool     `json:"namespaceIsolation"`
+	RawNonIsolatedNamespaces string   `json:"globalNamespaces"`
+	NonIsolatedNamespaces    []string `json:"-"`
+
 	// Option to set system namespaces (to avoid to add defaultNetworks)
 	SystemNamespaces []string `json:"systemNamespaces"`
 	// Option to set the namespace that multus-cni uses (clusterNetwork/defaultNetworks)

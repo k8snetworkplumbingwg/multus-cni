@@ -119,6 +119,8 @@ The functionality provided by the `namespaceIsolation` configuration option enab
 
 **NOTE**: The default namespace is special in this scenario. Even with namespace isolation enabled, any pod, in any namespace is allowed to refer to `NetworkAttachmentDefinitions` in the default namespace. This allows you to create commonly used unprivileged `NetworkAttachmentDefinitions` without having to put them in all namespaces. For example, if you had a `NetworkAttachmentDefinition` named `foo` the default namespace, you may reference it in an annotation with: `default/foo`.
 
+**NOTE**: You can also add additional namespaces which can be referred to globally using the `global-namespaces` option (see next section).
+
 For example, if a pod is created in the namespace called `development`, Multus will not allow networks to be attached when defined by custom resources created in a different namespace, say in the `default` network.
 
 Consider the situation where you have a system that has users of different privilege levels -- as an example, a platform which has two administrators: a Senior Administrator and a Junior Administrator. The Senior Administrator may have access to all namespaces, and some network configurations as used by Multus are considered to be privileged in that they allow access to some protected resources available on the network. However, the Junior Administrator has access to only a subset of namespaces, and therefore it should be assumed that the Junior Administrator cannot create pods in their limited subset of namespaces. The `namespaceIsolation` feature provides for this isolation, allowing pods created in given namespaces to only access custom resources in the same namespace as the pod.
@@ -215,7 +217,7 @@ pod/samplepod created
 You'll note that pod fails to spawn successfully. If you check the Multus logs, you'll see an entry such as:
 
 ```
-2018-12-18T21:41:32Z [error] GetPodNetwork: namespace isolation violation: podnamespace: development / target namespace: privileged
+2018-12-18T21:41:32Z [error] GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace development but refers to target namespace privileged
 ```
 
 This error expresses that the pod resides in the namespace named `development` but refers to a `NetworkAttachmentDefinition` outside of that namespace, in this case, the namespace named `privileged`.
@@ -252,6 +254,16 @@ pod/samplepod created
 NAME        READY   STATUS    RESTARTS   AGE
 samplepod   1/1     Running   0          31s
 ```
+
+### Allow specific namespaces to be used across namespaces when using namespace isolation
+
+The `globalNamespaces` configuration option is only used when `namespaceIsolation` is set to true. `globalNamespaces` specifies a comma-delimited list of namespaces which can be referred to from outside of any given namespace in which a pod resides.
+
+```
+  "globalNamespaces": "default,namespace-a,namespace-b",
+```
+
+Note that when using `globalNamespaces` the `default` namespace must be specified in the list if you wish to use that namespace, when `globalNamespaces` is not set, the `default` namespace is implied to be used across namespaces.
 
 ### Specify default cluster network in Pod annotations
 

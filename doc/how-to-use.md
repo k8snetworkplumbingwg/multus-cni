@@ -567,7 +567,11 @@ This the directory in which the Multus binary will be installed.
 
     --namespace-isolation=false
 
-Setting this option to true enables the Namespace isolation feature, which insists that custom resources must be created in the same namespace as the pods, otherwise it will refuse to attach those definitions as additional interfaces.
+Setting this option to true enables the Namespace isolation feature, which insists that custom resources must be created in the same namespace as the pods, otherwise it will refuse to attach those definitions as additional interfaces. See (the configuration guide for more information)[configuration.md].
+
+    --global-namespaces=default,foo,bar
+
+The `--global-namespaces` works only when `--namespace-isolation=true`. This takes a comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled. See (the configuration guide for more information)[configuration.md].
 
     --multus-bin-file=/usr/src/multus-cni/bin/multus
 
