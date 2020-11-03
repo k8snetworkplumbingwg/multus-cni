@@ -455,10 +455,18 @@ func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *type
 	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
 		ifName := getIfname(delegates[idx], args.IfName, idx)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
 		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, pod, ifName, delegates[idx], rt, binDir); err != nil {
 			errorstrings = append(errorstrings, err.Error())
+		}
+		if cniDeviceInfoPath != "" {
+			err := nadutils.CleanDeviceInfoForCNI(cniDeviceInfoPath)
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			if err != nil {
+				logging.Debugf("delPlugins: CleanDeviceInfoForCNI returned an error - err=%v", err)
+			}
 		}
 	}
 
@@ -565,8 +573,16 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
+		if cniDeviceInfoPath != "" {
+			err = nadutils.CopyDeviceInfoForCNIFromDP(cniDeviceInfoPath, delegate.ResourceName, delegate.DeviceID)
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			if err != nil {
+				logging.Debugf("cmdAdd: CopyDeviceInfoForCNIFromDP returned an error - err=%v", err)
+			}
+		}
 
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
 		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
@@ -658,7 +674,7 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	for idx, delegate := range in.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
 		err = delegateCheck(exec, ifName, delegate, rt, in.BinDir)
 		if err != nil {
 			return err

@@ -24,6 +24,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"gopkg.in/intel/multus-cni.v3/logging"
 )
 
@@ -55,7 +56,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // LoadDelegateNetConf converts raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string, resourceName string) (*DelegateNetConf, error) {
 	var err error
 	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
 
@@ -87,6 +88,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConf bytes: %v", err)
 			}
+			// Save them for housekeeping
+			delegateConf.ResourceName = resourceName
+			delegateConf.DeviceID = deviceID
 		}
 		if net != nil && net.CNIArgs != nil {
 			bytes, err = addCNIArgsInConfig(bytes, net.CNIArgs)
@@ -164,6 +168,7 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		if delegate.DeviceID != "" {
 			runtimeConfig.DeviceID = delegate.DeviceID
 		}
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
 	}
 
 	return runtimeConfig
@@ -171,12 +176,19 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 
 // CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
 // exists, merge data with the runtime config.
-func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) *libcni.RuntimeConf {
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
 	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
+	var cniDeviceInfoFile string
 
 	delegateRc := rc
 	if delegate != nil {
 		delegateRc = mergeCNIRuntimeConfig(delegateRc, delegate)
+		if delegateRc.CNIDeviceInfoFile == "" && delegate.Name != "" {
+			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
+			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+			cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
+			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+		}
 	}
 
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
@@ -215,9 +227,12 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		if delegateRc.DeviceID != "" {
 			capabilityArgs["deviceID"] = delegateRc.DeviceID
 		}
+		if delegateRc.CNIDeviceInfoFile != "" {
+			capabilityArgs["CNIDeviceInfoFile"] = delegateRc.CNIDeviceInfoFile
+		}
 		rt.CapabilityArgs = capabilityArgs
 	}
-	return rt
+	return rt, cniDeviceInfoFile
 }
 
 // GetGatewayFromResult retrieves gateway IP addresses from CNI result
@@ -311,7 +326,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 			if err != nil {
 				return nil, logging.Errorf("LoadNetConf: error marshalling delegate %d config: %v", idx, err)
 			}
-			delegateConf, err := LoadDelegateNetConf(bytes, nil, "")
+			delegateConf, err := LoadDelegateNetConf(bytes, nil, "", "")
 			if err != nil {
 				return nil, logging.Errorf("LoadNetConf: failed to load delegate %d config: %v", idx, err)
 			}

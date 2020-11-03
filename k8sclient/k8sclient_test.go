@@ -1184,7 +1184,7 @@ users:
 			}
 		}`
 
-			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
 			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
@@ -1266,7 +1266,7 @@ users:
 			}
 		}`
 
-			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
 			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
@@ -1326,7 +1326,7 @@ users:
 		}`
 			// note that the provided kubeconfig is invalid
 
-			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "")
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "", "")
 			Expect(err).NotTo(HaveOccurred())
 
 			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
@@ -1385,7 +1385,7 @@ users:
 			}
 		}`
 
-			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
 			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)

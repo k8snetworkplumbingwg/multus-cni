@@ -285,7 +285,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		return nil, resourceMap, err
 	}
 
-	delegate, err := types.LoadDelegateNetConf(configBytes, net, deviceID)
+	delegate, err := types.LoadDelegateNetConf(configBytes, net, deviceID, resourceName)
 	if err != nil {
 		return nil, resourceMap, err
 	}
@@ -495,7 +495,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 	var configBytes []byte
 	configBytes, err = netutils.GetCNIConfigFromFile(netname, confdir)
 	if err == nil {
-		delegate, err := types.LoadDelegateNetConf(configBytes, nil, "")
+		delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
 		if err != nil {
 			return nil, resourceMap, err
 		}
@@ -514,7 +514,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 				var configBytes []byte
 				configBytes, err = netutils.GetCNIConfigFromFile("", netname)
 				if err == nil {
-					delegate, err := types.LoadDelegateNetConf(configBytes, nil, "")
+					delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
 					if err != nil {
 						return nil, resourceMap, err
 					}
