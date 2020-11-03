@@ -104,6 +104,20 @@ func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
 	return fmt.Sprintf("net%d", idx)
 }
 
+func getDelegateDeviceInfo(delegate *types.DelegateNetConf, runtimeConf *libcni.RuntimeConf) (*nettypes.DeviceInfo, error) {
+	// If the DPDeviceInfoFile was created, it was copied to the CNIDeviceInfoFile.
+	// If the DPDeviceInfoFile was not created, CNI might have created it. So
+	// either way, load CNIDeviceInfoFile.
+	if info, ok := runtimeConf.CapabilityArgs["CNIDeviceInfoFile"]; ok {
+		if infostr, ok := info.(string); ok {
+			return nadutils.LoadDeviceInfoFromCNI(infostr)
+		}
+	} else {
+		logging.Debugf("getDelegateDeviceInfo(): No CapArgs - info=%v ok=%v", info, ok)
+	}
+	return nil, nil
+}
+
 func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetConf) error {
 	logging.Debugf("saveDelegates: %s, %s, %v", containerID, dataDir, delegates)
 	delegatesBytes, err := json.Marshal(delegates)
@@ -630,16 +644,28 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			result = tmpResult
 		}
 
+		// Read devInfo from CNIDeviceInfoFile if it exists so
+		// it can be copied to the NetworkStatus.
+		devinfo, err := getDelegateDeviceInfo(delegate, rt)
+		if err != nil {
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			logging.Debugf("cmdAdd: getDelegateDeviceInfo returned an error - err=%v", err)
+		}
+
 		// create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
-				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin, nil)
+				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
 				if err != nil {
 					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
 				}
 
 				netStatus = append(netStatus, *delegateNetStatus)
 			}
+		} else if devinfo != nil {
+			// Warn that devinfo exists but could not add it to downwards API
+			logging.Errorf("devinfo available, but no kubeConfig so NetworkStatus not modified.")
 		}
 	}
 
