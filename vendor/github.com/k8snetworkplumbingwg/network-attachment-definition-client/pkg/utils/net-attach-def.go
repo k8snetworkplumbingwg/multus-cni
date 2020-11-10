@@ -122,7 +122,7 @@ func GetNetworkStatus(pod *corev1.Pod) ([]v1.NetworkStatus, error) {
 }
 
 // CreateNetworkStatus create NetworkStatus from CNI result
-func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork bool) (*v1.NetworkStatus, error) {
+func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork bool, dev *v1.DeviceInfo) (*v1.NetworkStatus, error) {
 	netStatus := &v1.NetworkStatus{}
 	netStatus.Name = networkName
 	netStatus.Default = defaultNetwork
@@ -153,6 +153,10 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 
 	v1dns := convertDNS(result.DNS)
 	netStatus.DNS = *v1dns
+
+	if dev != nil {
+		netStatus.DeviceInfo = dev
+	}
 
 	return netStatus, nil
 }
