@@ -49,12 +49,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-var version = "master@git"
-var commit = "unknown commit"
-var date = "unknown date"
+var (
+	version = "master@git"
+	commit  = "unknown commit"
+	date    = "unknown date"
+)
 
-var pollDuration = 1000 * time.Millisecond
-var pollTimeout = 45 * time.Second
+var (
+	pollDuration = 1000 * time.Millisecond
+	pollTimeout  = 45 * time.Second
+)
 
 func printVersionString() string {
 	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
@@ -608,7 +612,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			result = tmpResult
 		}
 
-		//create the network status, only in case Multus as kubeconfig
+		// create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin)
@@ -621,11 +625,14 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	//set the network status annotation in apiserver, only in case Multus as kubeconfig
+	// set the network status annotation in apiserver, only in case Multus as kubeconfig
 	if n.Kubeconfig != "" && kc != nil {
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
+				if strings.Contains(err.Error(), "failed to query the pod") {
+					return nil, cmdErr(k8sArgs, "error setting the networks status, pod was already deleted: %v", err)
+				}
 				return nil, cmdErr(k8sArgs, "error setting the networks status: %v", err)
 			}
 		}
@@ -803,7 +810,6 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 }
 
 func main() {
-
 	// Init command line flags to clear vendored packages' one, especially in init()
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
