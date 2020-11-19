@@ -38,7 +38,6 @@ type NetConf struct {
 	// RawDelegates is private to the NetConf class; use Delegates instead
 	RawDelegates    []map[string]interface{} `json:"delegates"`
 	Delegates       []*DelegateNetConf       `json:"-"`
-	NetStatus       []*NetworkStatus         `json:"-"`
 	Kubeconfig      string                   `json:"kubeconfig"`
 	ClusterNetwork  string                   `json:"clusterNetwork"`
 	DefaultNetworks []string                 `json:"defaultNetworks"`
@@ -81,16 +80,6 @@ type BandwidthEntry struct {
 
 	EgressRate  int `json:"egressRate"`
 	EgressBurst int `json:"egressBurst"`
-}
-
-// NetworkStatus is for network status annotation for pod
-type NetworkStatus struct {
-	Name      string    `json:"name"`
-	Interface string    `json:"interface,omitempty"`
-	IPs       []string  `json:"ips,omitempty"`
-	Mac       string    `json:"mac,omitempty"`
-	DNS       types.DNS `json:"dns,omitempty"`
-	Gateway   []net.IP  `json:"default-route,omitempty"`
 }
 
 // DelegateNetConf for net-attach-def for pod
