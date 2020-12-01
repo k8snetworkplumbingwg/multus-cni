@@ -29,7 +29,14 @@ To verify that you default network is ready, you may list your Kubernetes nodes 
 kubectl get nodes
 ```
 
-In the case that your default network is ready
+In the case that your default network is ready you will see the `STATUS` column also switch to `Ready` for each node.
+
+```
+NAME                  STATUS   ROLES           AGE    VERSION
+master-0              Ready    master          1h     v1.17.1
+master-1              Ready    master          1h     v1.17.1
+master-2              Ready    master          1h     v1.17.1
+```
 
 ## Installation
 

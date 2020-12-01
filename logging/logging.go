@@ -16,10 +16,10 @@ package logging
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
-	"io"
 
 	"github.com/pkg/errors"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -142,12 +142,12 @@ func SetLogFile(filename string) {
 	}
 
 	loggingW = &lumberjack.Logger{
-                        Filename:   filename,
-                        MaxSize:    100, // megabytes
-                        MaxBackups: 5,
-                        MaxAge:     5, // days
-                        Compress:   true,
-                    }
+		Filename:   filename,
+		MaxSize:    100, // megabytes
+		MaxBackups: 5,
+		MaxAge:     5, // days
+		Compress:   true,
+	}
 
 }
 

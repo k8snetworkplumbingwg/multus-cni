@@ -24,6 +24,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"gopkg.in/intel/multus-cni.v3/logging"
 )
 
@@ -55,7 +56,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // LoadDelegateNetConf converts raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string, resourceName string) (*DelegateNetConf, error) {
 	var err error
 	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
 
@@ -87,6 +88,9 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConf bytes: %v", err)
 			}
+			// Save them for housekeeping
+			delegateConf.ResourceName = resourceName
+			delegateConf.DeviceID = deviceID
 		}
 		if net != nil && net.CNIArgs != nil {
 			bytes, err = addCNIArgsInConfig(bytes, net.CNIArgs)
@@ -122,6 +126,13 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 		if net.InfinibandGUIDRequest != "" {
 			delegateConf.InfinibandGUIDRequest = net.InfinibandGUIDRequest
 		}
+		if net.DeviceID != "" {
+			if deviceID != "" {
+				logging.Debugf("Warning: Both RuntimeConfig and ResourceMap provide deviceID. Ignoring RuntimeConfig")
+			} else {
+				delegateConf.DeviceID = net.DeviceID
+			}
+		}
 	}
 
 	delegateConf.Bytes = bytes
@@ -129,16 +140,16 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	return delegateConf, nil
 }
 
-// MergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
-func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
-	logging.Debugf("MergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
+// mergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
+func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
+	logging.Debugf("mergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
 	if runtimeConfig == nil {
 		runtimeConfig = &RuntimeConfig{}
 	}
 
 	// multus inject RuntimeConfig only in case of non MasterPlugin.
 	if delegate.MasterPlugin != true {
-		logging.Debugf("MergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
 		if delegate.PortMappingsRequest != nil {
 			runtimeConfig.PortMaps = delegate.PortMappingsRequest
 		}
@@ -154,14 +165,31 @@ func MergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 		if delegate.InfinibandGUIDRequest != "" {
 			runtimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
 		}
+		if delegate.DeviceID != "" {
+			runtimeConfig.DeviceID = delegate.DeviceID
+		}
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
 	}
 
 	return runtimeConfig
 }
 
-// CreateCNIRuntimeConf create CNI RuntimeConf
-func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig) *libcni.RuntimeConf {
-	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v", args, k8sArgs, ifName, rc)
+// CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
+// exists, merge data with the runtime config.
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
+	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
+	var cniDeviceInfoFile string
+
+	delegateRc := rc
+	if delegate != nil {
+		delegateRc = mergeCNIRuntimeConfig(delegateRc, delegate)
+		if delegateRc.CNIDeviceInfoFile == "" && delegate.Name != "" {
+			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
+			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+			cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
+			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+		}
+	}
 
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	// Todo
@@ -179,26 +207,32 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		},
 	}
 
-	if rc != nil {
+	if delegateRc != nil {
 		capabilityArgs := map[string]interface{}{}
-		if len(rc.PortMaps) != 0 {
-			capabilityArgs["portMappings"] = rc.PortMaps
+		if len(delegateRc.PortMaps) != 0 {
+			capabilityArgs["portMappings"] = delegateRc.PortMaps
 		}
-		if rc.Bandwidth != nil {
-			capabilityArgs["bandwidth"] = rc.Bandwidth
+		if delegateRc.Bandwidth != nil {
+			capabilityArgs["bandwidth"] = delegateRc.Bandwidth
 		}
-		if len(rc.IPs) != 0 {
-			capabilityArgs["ips"] = rc.IPs
+		if len(delegateRc.IPs) != 0 {
+			capabilityArgs["ips"] = delegateRc.IPs
 		}
-		if len(rc.Mac) != 0 {
-			capabilityArgs["mac"] = rc.Mac
+		if len(delegateRc.Mac) != 0 {
+			capabilityArgs["mac"] = delegateRc.Mac
 		}
-		if len(rc.InfinibandGUID) != 0 {
-			capabilityArgs["infinibandGUID"] = rc.InfinibandGUID
+		if len(delegateRc.InfinibandGUID) != 0 {
+			capabilityArgs["infinibandGUID"] = delegateRc.InfinibandGUID
+		}
+		if delegateRc.DeviceID != "" {
+			capabilityArgs["deviceID"] = delegateRc.DeviceID
+		}
+		if delegateRc.CNIDeviceInfoFile != "" {
+			capabilityArgs["CNIDeviceInfoFile"] = delegateRc.CNIDeviceInfoFile
 		}
 		rt.CapabilityArgs = capabilityArgs
 	}
-	return rt
+	return rt, cniDeviceInfoFile
 }
 
 // GetGatewayFromResult retrieves gateway IP addresses from CNI result
@@ -292,7 +326,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 			if err != nil {
 				return nil, logging.Errorf("LoadNetConf: error marshalling delegate %d config: %v", idx, err)
 			}
-			delegateConf, err := LoadDelegateNetConf(bytes, nil, "")
+			delegateConf, err := LoadDelegateNetConf(bytes, nil, "", "")
 			if err != nil {
 				return nil, logging.Errorf("LoadNetConf: failed to load delegate %d config: %v", idx, err)
 			}

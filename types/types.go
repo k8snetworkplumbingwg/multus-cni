@@ -38,7 +38,6 @@ type NetConf struct {
 	// RawDelegates is private to the NetConf class; use Delegates instead
 	RawDelegates    []map[string]interface{} `json:"delegates"`
 	Delegates       []*DelegateNetConf       `json:"-"`
-	NetStatus       []*NetworkStatus         `json:"-"`
 	Kubeconfig      string                   `json:"kubeconfig"`
 	ClusterNetwork  string                   `json:"clusterNetwork"`
 	DefaultNetworks []string                 `json:"defaultNetworks"`
@@ -57,11 +56,13 @@ type NetConf struct {
 
 // RuntimeConfig specifies CNI RuntimeConfig
 type RuntimeConfig struct {
-	PortMaps       []*PortMapEntry `json:"portMappings,omitempty"`
-	Bandwidth      *BandwidthEntry `json:"bandwidth,omitempty"`
-	IPs            []string        `json:"ips,omitempty"`
-	Mac            string          `json:"mac,omitempty"`
-	InfinibandGUID string          `json:"infinibandGUID,omitempty"`
+	PortMaps          []*PortMapEntry `json:"portMappings,omitempty"`
+	Bandwidth         *BandwidthEntry `json:"bandwidth,omitempty"`
+	IPs               []string        `json:"ips,omitempty"`
+	Mac               string          `json:"mac,omitempty"`
+	InfinibandGUID    string          `json:"infinibandGUID,omitempty"`
+	DeviceID          string          `json:"deviceID,omitempty"`
+	CNIDeviceInfoFile string          `json:"CNIDeviceInfoFile,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
@@ -81,16 +82,6 @@ type BandwidthEntry struct {
 	EgressBurst int `json:"egressBurst"`
 }
 
-// NetworkStatus is for network status annotation for pod
-type NetworkStatus struct {
-	Name      string    `json:"name"`
-	Interface string    `json:"interface,omitempty"`
-	IPs       []string  `json:"ips,omitempty"`
-	Mac       string    `json:"mac,omitempty"`
-	DNS       types.DNS `json:"dns,omitempty"`
-	Gateway   []net.IP  `json:"default-route,omitempty"`
-}
-
 // DelegateNetConf for net-attach-def for pod
 type DelegateNetConf struct {
 	Conf                  types.NetConf
@@ -108,6 +99,10 @@ type DelegateNetConf struct {
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
 	ConfListPlugin bool `json:"-"`
+	// DeviceID is only used internal housekeeping
+	DeviceID string `json:"deviceID,omitempty"`
+	// ResourceName is only used internal housekeeping
+	ResourceName string `json:"resourceName,omitempty"`
 
 	// Raw JSON
 	Bytes []byte
@@ -143,6 +138,8 @@ type NetworkSelectionElement struct {
 	// BandwidthRequest contains an optional requested bandwidth for
 	// the network
 	BandwidthRequest *BandwidthEntry `json:"bandwidth,omitempty"`
+	// DeviceID contains an optional requested deviceID the network
+	DeviceID string `json:"deviceID,omitempty"`
 	// CNIArgs contains additional CNI arguments for the network interface
 	CNIArgs *map[string]interface{} `json:"cni-args"`
 	// GatewayRequest contains default route IP address for the pod

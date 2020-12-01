@@ -1,5 +1,6 @@
 # Binary output dir
 bin/
+e2e/bin/
 
 # GOPATH created by the build script
 gopath/

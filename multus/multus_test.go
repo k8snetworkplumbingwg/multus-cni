@@ -1395,7 +1395,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -1473,7 +1474,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -1549,7 +1551,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -1570,8 +1573,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 
 		// delete pod to emulate no pod info
 		clientInfo.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
-		nilPod, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Get(
-			fakePod.ObjectMeta.Name, metav1.GetOptions{})
+		nilPod, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Get(
+			context.TODO(), fakePod.ObjectMeta.Name, metav1.GetOptions{})
 		Expect(nilPod).To(BeNil())
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 
@@ -2028,7 +2031,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		rawnetconflist := []byte(`{"cniVersion":"0.2.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
-		rt := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
 
 		err = conflistDel(rt, rawnetconflist, binDir, fExec)
 		Expect(err).To(HaveOccurred())
@@ -2641,7 +2644,8 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -2723,7 +2727,8 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -2793,7 +2798,8 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		}, nil)
 
 		clientInfo := NewFakeClientInfo()
-		_, err := clientInfo.Client.Core().Pods(fakePod.ObjectMeta.Namespace).Create(fakePod)
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		_, err = clientInfo.AddNetAttachDef(
@@ -3271,7 +3277,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		rawnetconflist := []byte(`{"cniVersion":"0.4.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
-		rt := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
 
 		err = conflistDel(rt, rawnetconflist, binDir, fExec)
 		Expect(err).To(HaveOccurred())
