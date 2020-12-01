@@ -18,9 +18,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/containernetworking/cni/libcni"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 
 	v1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+)
+
+const (
+	baseDevInfoPath  = "/var/run/k8s.cni.cncf.io/devinfo"
+	dpDevInfoSubDir  = "dp"
+	cniDevInfoSubDir = "cni"
 )
 
 // GetCNIConfig (from annotation string to CNI JSON bytes)
@@ -116,4 +125,113 @@ func GetCNIConfigFromSpec(configData, netName string) ([]byte, error) {
 	}
 
 	return configBytes, nil
+}
+
+// loadDeviceInfo loads a Device Information file
+func loadDeviceInfo(path string) (*v1.DeviceInfo, error) {
+	var devInfo v1.DeviceInfo
+
+	bytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(bytes, &devInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &devInfo, nil
+}
+
+// cleanDeviceInfo removes a Device Information file
+func cleanDeviceInfo(path string) error {
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return os.Remove(path)
+	}
+	return nil
+}
+
+// saveDeviceInfo writes a Device Information file
+func saveDeviceInfo(devInfo *v1.DeviceInfo, path string) error {
+	if devInfo == nil {
+		return fmt.Errorf("Device Information is null")
+	}
+
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, os.ModeDir); err != nil {
+			return err
+		}
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		return fmt.Errorf("Device Information file already exists: %s", path)
+	}
+
+	devInfoJSON, err := json.Marshal(devInfo)
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(path, devInfoJSON, 0444); err != nil {
+		return err
+	}
+	return nil
+}
+
+// getDPDeviceInfoPath returns the standard Device Plugin DevInfo filename
+// This filename is fixed because Device Plugin and NPWG Implementation need
+// to both access file and name is not passed between them. So name is generated
+// from Resource Name and DeviceID.
+func getDPDeviceInfoPath(resourceName string, deviceID string) string {
+	return filepath.Join(baseDevInfoPath, dpDevInfoSubDir, fmt.Sprintf("%s-%s-device.json",
+		strings.ReplaceAll(resourceName, "/", "-"), strings.ReplaceAll(deviceID, "/", "-")))
+}
+
+// GetCNIDeviceInfoPath returns the standard Device Plugin DevInfo filename
+// The path is fixed but the filename is flexible and determined by the caller.
+func GetCNIDeviceInfoPath(filename string) string {
+	return filepath.Join(baseDevInfoPath, cniDevInfoSubDir, strings.ReplaceAll(filename, "/", "-"))
+}
+
+// LoadDeviceInfoFromDP loads a DeviceInfo structure from file created by a Device Plugin
+// Returns an error if the device information is malformed and (nil, nil) if it does not exist
+func LoadDeviceInfoFromDP(resourceName string, deviceID string) (*v1.DeviceInfo, error) {
+	return loadDeviceInfo(getDPDeviceInfoPath(resourceName, deviceID))
+}
+
+// SaveDeviceInfoForDP saves a DeviceInfo structure created by a Device Plugin
+func SaveDeviceInfoForDP(resourceName string, deviceID string, devInfo *v1.DeviceInfo) error {
+	return saveDeviceInfo(devInfo, getDPDeviceInfoPath(resourceName, deviceID))
+}
+
+// CleanDeviceInfoForDP removes a DeviceInfo DP File.
+func CleanDeviceInfoForDP(resourceName string, deviceID string) error {
+	return cleanDeviceInfo(getDPDeviceInfoPath(resourceName, deviceID))
+}
+
+// LoadDeviceInfoFromCNI loads a DeviceInfo structure from created by a CNI.
+// Returns an error if the device information is malformed and (nil, nil) if it does not exist
+func LoadDeviceInfoFromCNI(cniPath string) (*v1.DeviceInfo, error) {
+	return loadDeviceInfo(cniPath)
+}
+
+// SaveDeviceInfoForCNI saves a DeviceInfo structure created by a CNI
+func SaveDeviceInfoForCNI(cniPath string, devInfo *v1.DeviceInfo) error {
+	return saveDeviceInfo(devInfo, cniPath)
+}
+
+// CopyDeviceInfoForCNIFromDP saves a DeviceInfo structure created by a DP to a CNI File.
+func CopyDeviceInfoForCNIFromDP(cniPath string, resourceName string, deviceID string) error {
+	devInfo, err := loadDeviceInfo(getDPDeviceInfoPath(resourceName, deviceID))
+	if err != nil {
+		return err
+	}
+	return saveDeviceInfo(devInfo, cniPath)
+}
+
+// CleanDeviceInfoForCNI removes a DeviceInfo CNI File.
+func CleanDeviceInfoForCNI(cniPath string) error {
+	return cleanDeviceInfo(cniPath)
 }

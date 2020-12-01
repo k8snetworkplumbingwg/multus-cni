@@ -104,6 +104,20 @@ func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
 	return fmt.Sprintf("net%d", idx)
 }
 
+func getDelegateDeviceInfo(delegate *types.DelegateNetConf, runtimeConf *libcni.RuntimeConf) (*nettypes.DeviceInfo, error) {
+	// If the DPDeviceInfoFile was created, it was copied to the CNIDeviceInfoFile.
+	// If the DPDeviceInfoFile was not created, CNI might have created it. So
+	// either way, load CNIDeviceInfoFile.
+	if info, ok := runtimeConf.CapabilityArgs["CNIDeviceInfoFile"]; ok {
+		if infostr, ok := info.(string); ok {
+			return nadutils.LoadDeviceInfoFromCNI(infostr)
+		}
+	} else {
+		logging.Debugf("getDelegateDeviceInfo(): No CapArgs - info=%v ok=%v", info, ok)
+	}
+	return nil, nil
+}
+
 func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetConf) error {
 	logging.Debugf("saveDelegates: %s, %s, %v", containerID, dataDir, delegates)
 	delegatesBytes, err := json.Marshal(delegates)
@@ -443,19 +457,30 @@ func delegateDel(exec invoke.Exec, pod *v1.Pod, ifName string, delegateConf *typ
 	return err
 }
 
-func delPlugins(exec invoke.Exec, pod *v1.Pod, argIfname string, delegates []*types.DelegateNetConf, lastIdx int, rt *libcni.RuntimeConf, binDir string) error {
-	logging.Debugf("delPlugins: %v, %v, %s, %v, %d, %v, %s", exec, pod, argIfname, delegates, lastIdx, rt, binDir)
+// delPlugins deletes plugins in reverse order from lastdIdx
+// Uses netRt as base RuntimeConf (coming from NetConf) but merges it
+// with each of the delegates' configuration
+func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *types.K8sArgs, delegates []*types.DelegateNetConf, lastIdx int, netRt *types.RuntimeConfig, binDir string) error {
+	logging.Debugf("delPlugins: %v, %v, %v, %v, %v, %d, %v, %s", exec, pod, args, k8sArgs, delegates, lastIdx, netRt, binDir)
 	if os.Setenv("CNI_COMMAND", "DEL") != nil {
-		return logging.Errorf("delPlugins: error setting envionment variable CNI_COMMAND to a value of DEL")
+		return logging.Errorf("delPlugins: error setting environment variable CNI_COMMAND to a value of DEL")
 	}
 
 	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
-		ifName := getIfname(delegates[idx], argIfname, idx)
-		rt.IfName = ifName
+		ifName := getIfname(delegates[idx], args.IfName, idx)
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
 		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, pod, ifName, delegates[idx], rt, binDir); err != nil {
 			errorstrings = append(errorstrings, err.Error())
+		}
+		if cniDeviceInfoPath != "" {
+			err := nadutils.CleanDeviceInfoForCNI(cniDeviceInfoPath)
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			if err != nil {
+				logging.Debugf("delPlugins: CleanDeviceInfoForCNI returned an error - err=%v", err)
+			}
 		}
 	}
 
@@ -562,9 +587,16 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
+		if cniDeviceInfoPath != "" {
+			err = nadutils.CopyDeviceInfoForCNIFromDP(cniDeviceInfoPath, delegate.ResourceName, delegate.DeviceID)
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			if err != nil {
+				logging.Debugf("cmdAdd: CopyDeviceInfoForCNIFromDP returned an error - err=%v", err)
+			}
+		}
 
-		runtimeConfig := types.MergeCNIRuntimeConfig(n.RuntimeConfig, delegate)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, runtimeConfig)
 		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n.BinDir, cniArgs)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
@@ -573,7 +605,7 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				netName = delegate.ConfList.Name
 			}
 			// Ignore errors; DEL must be idempotent anyway
-			_ = delPlugins(exec, nil, args.IfName, n.Delegates, idx, rt, n.BinDir)
+			_ = delPlugins(exec, nil, args, k8sArgs, n.Delegates, idx, n.RuntimeConfig, n.BinDir)
 			return nil, cmdPluginErr(k8sArgs, netName, "error adding container to network %q: %v", netName, err)
 		}
 
@@ -612,16 +644,28 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			result = tmpResult
 		}
 
+		// Read devInfo from CNIDeviceInfoFile if it exists so
+		// it can be copied to the NetworkStatus.
+		devinfo, err := getDelegateDeviceInfo(delegate, rt)
+		if err != nil {
+			// Even if the filename is set, file may not be present. Ignore error,
+			// but log and in the future may need to filter on specific errors.
+			logging.Debugf("cmdAdd: getDelegateDeviceInfo returned an error - err=%v", err)
+		}
+
 		// create the network status, only in case Multus as kubeconfig
 		if n.Kubeconfig != "" && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
-				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin)
+				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
 				if err != nil {
 					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
 				}
 
 				netStatus = append(netStatus, *delegateNetStatus)
 			}
+		} else if devinfo != nil {
+			// Warn that devinfo exists but could not add it to downwards API
+			logging.Errorf("devinfo available, but no kubeConfig so NetworkStatus not modified.")
 		}
 	}
 
@@ -656,8 +700,7 @@ func cmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	for idx, delegate := range in.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 
-		runtimeConfig := types.MergeCNIRuntimeConfig(in.RuntimeConfig, delegate)
-		rt := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, runtimeConfig)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
 		err = delegateCheck(exec, ifName, delegate, rt, in.BinDir)
 		if err != nil {
 			return err
@@ -808,8 +851,7 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
-	rt := types.CreateCNIRuntimeConf(args, k8sArgs, "", in.RuntimeConfig)
-	return delPlugins(exec, pod, args.IfName, in.Delegates, len(in.Delegates)-1, rt, in.BinDir)
+	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in.BinDir)
 }
 
 func main() {
