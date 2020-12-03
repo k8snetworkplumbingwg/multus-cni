@@ -102,7 +102,7 @@ var _ = Describe("config operations", func() {
 
 		_, err := LoadNetConf([]byte(conf))
 		Expect(err).To(HaveOccurred())
-		_, err = LoadDelegateNetConf([]byte(conf), nil, "")
+		_, err = LoadDelegateNetConf([]byte(conf), nil, "", "")
 		Expect(err).To(HaveOccurred())
 		err = LoadDelegateNetConfList([]byte(conf), &DelegateNetConf{})
 		Expect(err).To(HaveOccurred())
@@ -280,7 +280,7 @@ var _ = Describe("config operations", func() {
 			DeviceID string `json:"deviceID"`
 		}
 		sriovConf := &sriovNetConf{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConf)
@@ -306,7 +306,7 @@ var _ = Describe("config operations", func() {
 			Plugins []*sriovNetConf `json:"plugins"`
 		}
 		sriovConfList := &sriovNetConfList{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConfList)
@@ -335,7 +335,7 @@ var _ = Describe("config operations", func() {
 			Plugins []*sriovNetConf `json:"plugins"`
 		}
 		sriovConfList := &sriovNetConfList{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.1", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &sriovConfList)
@@ -356,7 +356,7 @@ var _ = Describe("config operations", func() {
 			PCIBusID string `json:"pciBusID"`
 		}
 		hostDeviceConf := &hostDeviceNetConf{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.2")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.2", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConf)
@@ -382,7 +382,7 @@ var _ = Describe("config operations", func() {
 			Plugins []*hostDeviceNetConf `json:"plugins"`
 		}
 		hostDeviceConfList := &hostDeviceNetConfList{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
@@ -411,7 +411,7 @@ var _ = Describe("config operations", func() {
 			Plugins []*hostDeviceNetConf `json:"plugins"`
 		}
 		hostDeviceConfList := &hostDeviceNetConfList{}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.3", "")
 		Expect(err).NotTo(HaveOccurred())
 
 		err = json.Unmarshal(delegateNetConf.Bytes, &hostDeviceConfList)
@@ -444,7 +444,7 @@ var _ = Describe("config operations", func() {
 			Name:    "test-elem",
 			CNIArgs: &args,
 		}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "", "")
 		Expect(err).NotTo(HaveOccurred())
 		bridgeConf := &bridgeNetConf{}
 		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConf)
@@ -480,7 +480,7 @@ var _ = Describe("config operations", func() {
 			Name:    "test-elem",
 			CNIArgs: &args,
 		}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "", "")
 		Expect(err).NotTo(HaveOccurred())
 		bridgeConf := &bridgeNetConf{}
 		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConf)
@@ -518,7 +518,7 @@ var _ = Describe("config operations", func() {
 			Name:    "test-elem",
 			CNIArgs: &args,
 		}
-		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "")
+		delegateNetConf, err := LoadDelegateNetConf([]byte(conf), net, "", "")
 		Expect(err).NotTo(HaveOccurred())
 		bridgeConflist := &bridgeNetConfList{}
 		err = json.Unmarshal(delegateNetConf.Bytes, bridgeConflist)
@@ -565,7 +565,7 @@ var _ = Describe("config operations", func() {
 			HostIP:        "anotherSampleHostIP",
 		}
 
-		rt := CreateCNIRuntimeConf(args, k8sArgs, "", rc)
+		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", rc, nil)
 		fmt.Println("rt.ContainerID: ", rt.ContainerID)
 		Expect(rt.ContainerID).To(Equal("123456789"))
 		Expect(rt.NetNS).To(Equal(args.Netns))
@@ -595,10 +595,10 @@ var _ = Describe("config operations", func() {
     }
 }`
 
-		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 		Expect(err).NotTo(HaveOccurred())
 
-		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
 
 		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 
@@ -628,10 +628,10 @@ var _ = Describe("config operations", func() {
     }
 }`
 
-		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0")
+		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 		Expect(err).NotTo(HaveOccurred())
 		fmt.Println("result.Version: ", result.Version())
-		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin)
+		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
 
 		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
 
@@ -668,7 +668,7 @@ var _ = Describe("config operations", func() {
 			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
 
-		delegateConf, err := LoadDelegateNetConf([]byte(cniConfig), networkSelection, "")
+		delegateConf, err := LoadDelegateNetConf([]byte(cniConfig), networkSelection, "", "")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(delegateConf.IfnameRequest).To(Equal(networkSelection.InterfaceRequest))
 		Expect(delegateConf.MacRequest).To(Equal(networkSelection.MacRequest))
@@ -678,7 +678,7 @@ var _ = Describe("config operations", func() {
 		Expect(delegateConf.PortMappingsRequest).To(Equal(networkSelection.PortMappingsRequest))
 	})
 
-	It("test MergeCNIRuntimeConfig with masterPlugin", func() {
+	It("test mergeCNIRuntimeConfig with masterPlugin", func() {
 		conf := `{
 			"name": "node-cni-network",
 			"type": "multus",
@@ -714,16 +714,16 @@ var _ = Describe("config operations", func() {
 			BandwidthRequest:      bandwidthEntry1,
 			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
-		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
+		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "", "")
 		delegate.MasterPlugin = true
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := MergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
 		Expect(runtimeConf.PortMaps).To(BeNil())
 		Expect(runtimeConf.Bandwidth).To(BeNil())
 		Expect(runtimeConf.InfinibandGUID).To(Equal(""))
 	})
 
-	It("test MergeCNIRuntimeConfig with delegate plugin", func() {
+	It("test mergeCNIRuntimeConfig with delegate plugin", func() {
 		conf := `{
 			"name": "weave1",
 			"cniVersion": "0.2.0",
@@ -751,9 +751,9 @@ var _ = Describe("config operations", func() {
 			BandwidthRequest:      bandwidthEntry1,
 			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
-		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "")
+		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "", "")
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := MergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
 		Expect(runtimeConf.PortMaps).NotTo(BeNil())
 		Expect(len(runtimeConf.PortMaps)).To(BeEquivalentTo(1))
 		Expect(runtimeConf.PortMaps[0]).To(Equal(portMapEntry1))
