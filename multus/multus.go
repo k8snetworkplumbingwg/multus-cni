@@ -617,7 +617,11 @@ func cmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			logging.Debugf("Marked interface %v for gateway deletion", ifName)
 		} else {
 			// Otherwise, determine if this interface now gets our default route.
-			if delegate.GatewayRequest != nil {
+			// According to 
+			// https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ (4.1.2.1.9)
+			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
+			// else we'll update the defaultgateway to the one specified.
+			if delegate.GatewayRequest != nil && delegate.GatewayRequest[0] != nil {
 				deletegateway = true
 				adddefaultgateway = true
 				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
