@@ -758,7 +758,10 @@ func cmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				logging.Errorf("Multus: failed to get delegates: %v, but continue to delete clusterNetwork", err)
 			}
 		} else {
-			return cmdErr(k8sArgs, "error reading the delegates: %v", err)
+			// The options to continue with a delete have been exhausted (cachefile + API query didn't work)
+			// We cannot exit with an error as this may cause a sandbox to never get deleted.
+			logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
+			return nil
 		}
 	} else {
 		defer os.Remove(path)
