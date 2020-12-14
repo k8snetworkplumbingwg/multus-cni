@@ -380,6 +380,11 @@ generateMultusConf
 
 # ---------------------- end Generate "00-multus.conf".
 
+# remove "00-multus.conf" on close.
+if [ "$MULTUS_CONF_FILE" == "auto" ]; then
+  trap "rm -f $CNI_CONF_DIR/00-multus.conf" EXIT
+fi
+
 # Enter either sleep loop, or watch loop...
 if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
   log "Entering watch loop..."
