@@ -317,8 +317,11 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 import json,sys
 conf = json.load(sys.stdin)
 capabilities = {}
-for capa in [p['capabilities'] for p in conf['plugins'] if 'capabilities' in p]:
-    capabilities.update({capability:enabled for (capability,enabled) in capa.items() if enabled})
+if 'plugins' in conf:
+    for capa in [p['capabilities'] for p in conf['plugins'] if 'capabilities' in p]:
+        capabilities.update({capability:enabled for (capability,enabled) in capa.items() if enabled})
+elif 'capabilities' in conf:
+    capabilities.update({capability:enabled for (capability,enabled) in conf['capabilities'] if enabled})
 if len(capabilities) > 0:
     print("""\"capabilities\": """ + json.dumps(capabilities) + ",")
 else:
