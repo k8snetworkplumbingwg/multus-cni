@@ -192,6 +192,7 @@ spec:
           mountPath: /host/opt/cni/bin
         - name: multus-cfg
           mountPath: /tmp/multus-conf
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
           hostPath:
@@ -259,6 +260,7 @@ spec:
           mountPath: /host/opt/cni/bin
         - name: multus-cfg
           mountPath: /tmp/multus-conf
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
           hostPath:
@@ -325,6 +327,7 @@ spec:
           mountPath: /host/opt/cni/bin
         - name: multus-cfg
           mountPath: /tmp/multus-conf
+      terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
           hostPath:
