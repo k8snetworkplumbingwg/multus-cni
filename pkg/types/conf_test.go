@@ -26,8 +26,8 @@ import (
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	testhelpers "gopkg.in/intel/multus-cni.v3/pkg/testing"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	testhelpers "gopkg.in/intel/multus-cni.v3/pkg/testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -757,11 +757,14 @@ var _ = Describe("config operations", func() {
 		}
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "", "")
 		delegate.MasterPlugin = true
+		origRuntimeConfig := RuntimeConfig{}
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&origRuntimeConfig, delegate)
 		Expect(runtimeConf.PortMaps).To(BeNil())
 		Expect(runtimeConf.Bandwidth).To(BeNil())
 		Expect(runtimeConf.InfinibandGUID).To(Equal(""))
+		// The original RuntimeConfig must have not been overwritten
+		Expect(origRuntimeConfig).To(Equal(RuntimeConfig{}))
 	})
 
 	It("test mergeCNIRuntimeConfig with delegate plugin", func() {
@@ -792,9 +795,10 @@ var _ = Describe("config operations", func() {
 			BandwidthRequest:      bandwidthEntry1,
 			PortMappingsRequest:   []*PortMapEntry{portMapEntry1},
 		}
+		origRuntimeConfig := RuntimeConfig{}
 		delegate, err := LoadDelegateNetConf([]byte(conf), networkSelection, "", "")
 		Expect(err).NotTo(HaveOccurred())
-		runtimeConf := mergeCNIRuntimeConfig(&RuntimeConfig{}, delegate)
+		runtimeConf := mergeCNIRuntimeConfig(&origRuntimeConfig, delegate)
 		Expect(runtimeConf.PortMaps).NotTo(BeNil())
 		Expect(len(runtimeConf.PortMaps)).To(BeEquivalentTo(1))
 		Expect(runtimeConf.PortMaps[0]).To(Equal(portMapEntry1))
@@ -802,5 +806,7 @@ var _ = Describe("config operations", func() {
 		Expect(len(runtimeConf.IPs)).To(BeEquivalentTo(1))
 		Expect(runtimeConf.Mac).To(Equal("c2:11:22:33:44:66"))
 		Expect(runtimeConf.InfinibandGUID).To(Equal("24:8a:07:03:00:8d:ae:2e"))
+		// The original RuntimeConfig must have not been overwritten
+		Expect(origRuntimeConfig).To(Equal(RuntimeConfig{}))
 	})
 })
