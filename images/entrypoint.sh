@@ -3,6 +3,13 @@
 # Always exit on errors.
 set -e
 
+# Trap sigterm
+function exitonsigterm() {
+  echo "Trapped sigterm, exiting."
+  exit 0
+}
+trap exitonsigterm SIGTERM
+
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
@@ -246,7 +253,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           log "Attemping to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
-        sleep 1;
+        sleep 1 & wait;
       else
         error "Multus could not be configured: no master plugin was found."
         exit 1;
@@ -390,22 +397,22 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
     # Check and see if the original master plugin configuration exists...
     if [ ! -f "$MASTER_PLUGIN_LOCATION" ]; then
       log "Master plugin @ $MASTER_PLUGIN_LOCATION has been deleted. Allowing 45 seconds for its restoration..."
-      sleep 10
+      sleep 10 & wait
       for i in {1..35}
       do
         if [ -f "$MASTER_PLUGIN_LOCATION" ]; then
           log "Master plugin @ $MASTER_PLUGIN_LOCATION was restored. Regenerating given configuration."
           break
         fi
-        sleep 1
+        sleep 1 & wait
       done
 
       generateMultusConf
       log "Continuing watch loop after configuration regeneration..."
     fi
-    sleep 1
+    sleep 1 & wait
   done
 else
   log "Entering sleep (success)..."
-  sleep infinity
+  sleep infinity & wait
 fi
