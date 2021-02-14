@@ -33,13 +33,13 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"github.com/vishvananda/netlink"
 	k8s "gopkg.in/intel/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 	"gopkg.in/intel/multus-cni.v3/pkg/netutils"
 	"gopkg.in/intel/multus-cni.v3/pkg/types"
-	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -549,8 +549,13 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 					return nil, cmdErr(k8sArgs, "error getting pod by service unavailable: %v", err)
 				}
 			} else {
-				// Other case, return error
-				return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
+				if n.ValidateK8sApi {
+					return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
+				} else {
+					logging.Debugf("%v", cmdErr(k8sArgs, "error getting pod: %v", err))
+					kubeClient = nil
+					err = nil
+				}
 			}
 		}
 	}
@@ -670,7 +675,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	}
 
 	// set the network status annotation in apiserver, only in case Multus as kubeconfig
-	if n.Kubeconfig != "" && kc != nil {
+	if n.Kubeconfig != "" && kc != nil && kubeClient != nil {
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
@@ -777,8 +782,13 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				// If not found, proceed to remove interface with cache
 				pod = nil
 			} else {
-				// Other case, return error
-				return cmdErr(k8sArgs, "error getting pod: %v", err)
+				if in.ValidateK8sApi {
+					return cmdErr(k8sArgs, "error getting pod: %v", err)
+				} else {
+					logging.Debugf("%v", cmdErr(k8sArgs, "error getting pod: %v", err))
+					kubeClient = nil
+					err = nil
+				}
 			}
 		}
 	}
@@ -837,7 +847,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
-	if in.Kubeconfig != "" {
+	if in.Kubeconfig != "" && kubeClient != nil {
 		if netnsfound {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
 				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)

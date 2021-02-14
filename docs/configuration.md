@@ -18,6 +18,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
     },    
     "readinessindicatorfile": "",
     "namespaceIsolation": false,
+    "validateK8sApi": true,
 "Note1":"NOTE: you can set clusterNetwork+defaultNetworks OR delegates!!",
     "clusterNetwork": "defaultCRD",
     "defaultNetworks": ["sidecarCRD", "flannel"],
@@ -45,6 +46,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings capability for now). See the [example](https://github.com/intel/multus-cni/blob/master/examples/multus-ptp-portmap.conf).
 * `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready
+* `validateK8sApi`: (boolean, optional): Validates multus can reach kubernetes apiserver
 
 User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
 

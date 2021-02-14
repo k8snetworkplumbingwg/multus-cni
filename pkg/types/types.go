@@ -50,6 +50,7 @@ type NetConf struct {
 	NamespaceIsolation       bool     `json:"namespaceIsolation"`
 	RawNonIsolatedNamespaces string   `json:"globalNamespaces"`
 	NonIsolatedNamespaces    []string `json:"-"`
+	ValidateK8sApi           bool     `json:"validateK8sApi"`
 
 	// Option to set system namespaces (to avoid to add defaultNetworks)
 	SystemNamespaces []string `json:"systemNamespaces"`

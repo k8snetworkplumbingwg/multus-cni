@@ -22,6 +22,7 @@ RESTART_CRIO=false
 CRIO_RESTARTED_ONCE=false
 RENAME_SOURCE_CONFIG_FILE=false
 SKIP_BINARY_COPY=false
+VALIDATE_K8S_API=false
 
 # Give help text for parameters.
 function usage()
@@ -53,6 +54,7 @@ function usage()
     echo -e "\t--readiness-indicator-file=$MULTUS_READINESS_INDICATOR_FILE (used only with --multus-conf-file=auto)"
     echo -e "\t--additional-bin-dir=$ADDITIONAL_BIN_DIR (adds binDir option to configuration, used only with --multus-conf-file=auto)"
     echo -e "\t--restart-crio=false (restarts CRIO after config file is generated)"
+    echo -e "\t--validate-k8s-api=$VALIDATE_K8S_API (validates multus can reach kubernetes apiserver)"
 }
 
 function log()
@@ -132,6 +134,9 @@ while [ "$1" != "" ]; do
             ;;
         --readiness-indicator-file)
             MULTUS_READINESS_INDICATOR_FILE=$VALUE
+            ;;
+        --validate-k8s-api)
+            VALIDATE_K8S_API=$VALUE
             ;;
         *)
             warn "unknown parameter \"$PARAM\""
@@ -335,6 +340,7 @@ EOF
 
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
       MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
+      VALIDATE_K8S_API_STRING="\"validateK8sApi\": $VALIDATE_K8S_API,"
       log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
       CONF=$(cat <<-EOF
         {
@@ -347,6 +353,7 @@ EOF
           $LOG_LEVEL_STRING
           $LOG_FILE_STRING
           $ADDITIONAL_BIN_DIR_STRING
+          $VALIDATE_K8S_API_STRING
           $READINESS_INDICATOR_FILE_STRING
           "kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
           "delegates": [
