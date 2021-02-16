@@ -145,35 +145,38 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 // mergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
 func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
 	logging.Debugf("mergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
+	var mergedRuntimeConfig RuntimeConfig
+
 	if runtimeConfig == nil {
-		runtimeConfig = &RuntimeConfig{}
+		mergedRuntimeConfig = RuntimeConfig{}
+	} else {
+		mergedRuntimeConfig = *runtimeConfig
 	}
 
 	// multus inject RuntimeConfig only in case of non MasterPlugin.
 	if delegate.MasterPlugin != true {
-		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", mergedRuntimeConfig)
 		if delegate.PortMappingsRequest != nil {
-			runtimeConfig.PortMaps = delegate.PortMappingsRequest
+			mergedRuntimeConfig.PortMaps = delegate.PortMappingsRequest
 		}
 		if delegate.BandwidthRequest != nil {
-			runtimeConfig.Bandwidth = delegate.BandwidthRequest
+			mergedRuntimeConfig.Bandwidth = delegate.BandwidthRequest
 		}
 		if delegate.IPRequest != nil {
-			runtimeConfig.IPs = delegate.IPRequest
+			mergedRuntimeConfig.IPs = delegate.IPRequest
 		}
 		if delegate.MacRequest != "" {
-			runtimeConfig.Mac = delegate.MacRequest
+			mergedRuntimeConfig.Mac = delegate.MacRequest
 		}
 		if delegate.InfinibandGUIDRequest != "" {
-			runtimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
+			mergedRuntimeConfig.InfinibandGUID = delegate.InfinibandGUIDRequest
 		}
 		if delegate.DeviceID != "" {
-			runtimeConfig.DeviceID = delegate.DeviceID
+			mergedRuntimeConfig.DeviceID = delegate.DeviceID
 		}
-		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", runtimeConfig)
+		logging.Debugf("mergeCNIRuntimeConfig: add runtimeConfig for net-attach-def: %v", mergedRuntimeConfig)
 	}
-
-	return runtimeConfig
+	return &mergedRuntimeConfig
 }
 
 // CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
@@ -181,16 +184,19 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
 	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
 	var cniDeviceInfoFile string
+	var delegateRc *RuntimeConfig
 
-	delegateRc := rc
 	if delegate != nil {
-		delegateRc = mergeCNIRuntimeConfig(delegateRc, delegate)
-		if delegateRc.CNIDeviceInfoFile == "" && delegate.Name != "" {
-			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
-			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
-			cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
-			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+		delegateRc = mergeCNIRuntimeConfig(rc, delegate)
+		if delegateRc.CNIDeviceInfoFile != "" {
+			logging.Debugf("Warning: Existing value of CNIDeviceInfoFile will be overwritten %s", delegateRc.CNIDeviceInfoFile)
 		}
+		autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
+		delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+		cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
+		logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+	} else {
+		delegateRc = rc
 	}
 
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
