@@ -9,7 +9,7 @@ before_install:
   - go get -t -v github.com/modern-go/reflect2-tests/...
 
 script:
-  - ./scripts/test.sh
+  - ./test.sh
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
