@@ -17,6 +17,9 @@ jobs:
   
       - name: Build latest-ppc64le
         run: docker build -t ${REPOSITORY}:latest-ppc64le -f deployments/Dockerfile.ppc64le .
+
+      - name: Build latest-s390x
+        run: docker build -t ${REPOSITORY}:latest-s390x -f deployments/Dockerfile.s390x .
   
       - name: Build latest-origin
         run: docker build -t ${REPOSITORY}:latest-origin -f deployments/Dockerfile.openshift .

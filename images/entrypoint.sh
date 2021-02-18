@@ -77,6 +77,10 @@ function warn()
     log "WARN: {$1}"
 }
 
+if ! type python3 &> /dev/null; then
+	alias python=python3
+fi
+
 # Parse parameters given as arguments to this script.
 while [ "$1" != "" ]; do
     PARAM=`echo $1 | awk -F= '{print $1}'`
@@ -314,7 +318,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 
       if [ "$OVERRIDE_NETWORK_NAME" == "true" ]; then
         MASTER_PLUGIN_NET_NAME="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
-            python -c 'import json,sys;print json.load(sys.stdin)["name"]')"
+            python -c 'import json,sys;print(json.load(sys.stdin)["name"])')"
       else
         MASTER_PLUGIN_NET_NAME="multus-cni-network"
       fi
