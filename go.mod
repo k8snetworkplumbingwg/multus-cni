@@ -13,8 +13,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/vishvananda/netlink v0.0.0-20181108222139-023a6dafdcdf
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
-	golang.org/x/net v0.0.0-20200226121028-0de0cce0169b
-	golang.org/x/text v0.3.3 // indirect
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	google.golang.org/grpc v1.23.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.18.3
@@ -23,3 +22,5 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.13.0
 )
+
+replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
