@@ -1,9 +1,7 @@
 name: e2e-kind
 on: [push, pull_request]
 jobs:
-
   build:
-    name: Build and test
     runs-on: ubuntu-latest
     if: >
       (( github.event.pull_request.head.repo.owner.login != github.event.pull_request.base.repo.owner.login ) &&

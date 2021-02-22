@@ -1,0 +1,187 @@
+name: Image push for master
+on: 
+  push:
+    branches:
+      - master
+env:
+  REPOSITORY: docker.io/nfvpe/multus
+  REPOSITORY_USER: nfvperobot
+jobs:
+  push-amd64:
+    name: Image push/amd64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Push container image
+        if: github.repository_owner == 'intel'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REPOSITORY }}:latest-amd64
+            ${{ env.REPOSITORY }}:snapshot-amd64
+          file: deployments/Dockerfile
+
+  push-arm64:
+    name: Image push/arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Push container image
+        if: github.repository_owner == 'intel'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REPOSITORY }}:latest-arm64
+            ${{ env.REPOSITORY }}:snapshot-arm64
+          file: deployments/Dockerfile.arm64
+
+  push-ppc64le:
+    name: Image push/ppc64le
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Push container image
+        if: github.repository_owner == 'intel'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REPOSITORY }}:latest-ppc64le
+            ${{ env.REPOSITORY }}:snapshot-ppc64le
+          file: deployments/Dockerfile.ppc64le
+
+  push-s390x:
+    name: Image push/s390x
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Push container image
+        if: github.repository_owner == 'intel'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REPOSITORY }}:latest-s390x
+            ${{ env.REPOSITORY }}:snapshot-s390x
+          file: deployments/Dockerfile.s390x
+
+  push-origin:
+    name: Image push/origin
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Push container image
+        if: github.repository_owner == 'intel'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REPOSITORY }}:latest-origin
+            ${{ env.REPOSITORY }}:snapshot-origin
+          file: deployments/Dockerfile.openshift
+
+  push-manifest:
+    needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to Container Registry
+        if: github.repository_owner == 'intel'
+        uses: docker/login-action@v1
+        with:
+          username: ${{ env.REPOSITORY_USER }}
+          password: ${{ secrets.REPOSITORY_PASS }}
+
+      - name: Create manifest for multi-arch images
+        if: github.repository_owner == 'intel'
+        run: |
+          # get artifacts from previous steps
+          docker pull ${{ env.REPOSITORY }}:snapshot-amd64
+          docker pull ${{ env.REPOSITORY }}:snapshot-arm64
+          docker pull ${{ env.REPOSITORY }}:snapshot-ppc64le
+          docker pull ${{ env.REPOSITORY }}:snapshot-s390x
+          docker pull ${{ env.REPOSITORY }}:latest-amd64
+          docker pull ${{ env.REPOSITORY }}:latest-arm64
+          docker pull ${{ env.REPOSITORY }}:latest-ppc64le
+          docker pull ${{ env.REPOSITORY }}:latest-s390x
+          docker manifest create ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 ${{ env.REPOSITORY }}:snapshot-arm64 ${{ env.REPOSITORY }}:snapshot-ppc64le ${{ env.REPOSITORY }}:snapshot-s390x
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 --arch amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm64 --arch arm64
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-ppc64le --arch ppc64le
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-s390x --arch s390x
+          docker manifest push ${{ env.REPOSITORY }}:snapshot
+          docker manifest create ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 ${{ env.REPOSITORY }}:latest-arm64 ${{ env.REPOSITORY }}:latest-ppc64le ${{ env.REPOSITORY }}:latest-s390x
+          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 --arch amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm64 --arch arm64
+          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-ppc64le --arch ppc64le
+          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-s390x --arch s390x
+          docker manifest push ${{ env.REPOSITORY }}:latest

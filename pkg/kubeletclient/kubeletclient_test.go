@@ -91,10 +91,8 @@ func tearDown(path string) error {
 	if fakeServer != nil {
 		fakeServer.server.Stop()
 	}
-	if err := os.RemoveAll(path); err != nil {
-		return err
-	}
-	return nil
+	err := os.RemoveAll(path)
+	return err
 }
 
 var _ = BeforeSuite(func() {
