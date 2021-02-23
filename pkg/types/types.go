@@ -43,6 +43,7 @@ type NetConf struct {
 	DefaultNetworks []string                 `json:"defaultNetworks"`
 	LogFile         string                   `json:"logFile"`
 	LogLevel        string                   `json:"logLevel"`
+	LogToStderr     bool                     `json:"logToStderr,omitempty"`
 	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`

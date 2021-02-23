@@ -257,7 +257,8 @@ func GetGatewayFromResult(result *current.Result) []net.IP {
 
 // LoadNetConf converts inputs (i.e. stdin) to NetConf
 func LoadNetConf(bytes []byte) (*NetConf, error) {
-	netconf := &NetConf{}
+	// LogToStderr's default value set to true
+	netconf := &NetConf{LogToStderr: true}
 
 	logging.Debugf("LoadNetConf: %s", string(bytes))
 	if err := json.Unmarshal(bytes, netconf); err != nil {
@@ -265,6 +266,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	// Logging
+	logging.SetLogStderr(netconf.LogToStderr)
 	if netconf.LogFile != "" {
 		logging.SetLogFile(netconf.LogFile)
 	}
