@@ -9,7 +9,7 @@ builds:
 -  
   env:
   - CGO_ENABLED=0
-  main: ./multus/
+  main: ./cmd/
   goos:
   - linux
   goarch:
@@ -17,6 +17,7 @@ builds:
   - amd64
   - arm
   - arm64
+  - s390x
 archives:
   - wrap_in_directory: true
 checksum:

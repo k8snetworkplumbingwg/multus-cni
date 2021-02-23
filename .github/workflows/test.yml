@@ -1,0 +1,49 @@
+on: [push, pull_request]
+name: Test
+jobs:
+  test:
+    strategy:
+      matrix:
+        go-version: [1.15.x, 1.16.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run Revive
+      run: |
+        GO111MODULE=off go get github.com/mgechev/revive
+        $(go env GOPATH)/bin/revive -exclude ./vendor/... ./... # this is ouput for user
+        $(go env GOPATH)/bin/revive -exclude ./vendor/... ./...| xargs -0 -r false # this is for github actions
+
+    - name: Run go fmt
+      run: go fmt ./...
+      #run: diff -u <(echo -n) <(gofmt -d -s .)
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Test
+      run: sudo ./hack/test-go.sh
+
+    - name: Send coverage
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        path-to-profile: coverage.out
+        flag-name: Go-${{ matrix.go }}
+        parallel: true
+
+  # notifies that all test jobs are finished.
+  finish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
