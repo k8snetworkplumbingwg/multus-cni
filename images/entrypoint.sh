@@ -418,5 +418,9 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
   done
 else
   log "Entering sleep (success)..."
-  read
+  if tty -s; then
+	  read
+  else
+	  sleep infinity
+  fi
 fi
