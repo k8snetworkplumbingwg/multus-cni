@@ -20,8 +20,8 @@ import (
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 	"github.com/vishvananda/netlink"
+	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 	"net"
 	"strings"
 )

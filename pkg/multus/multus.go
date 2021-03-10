@@ -33,13 +33,13 @@ import (
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"github.com/vishvananda/netlink"
 	k8s "gopkg.in/intel/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/intel/multus-cni.v3/pkg/logging"
 	"gopkg.in/intel/multus-cni.v3/pkg/netutils"
 	"gopkg.in/intel/multus-cni.v3/pkg/types"
-	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	"github.com/vishvananda/netlink"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -615,7 +615,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			logging.Debugf("Marked interface %v for gateway deletion", ifName)
 		} else {
 			// Otherwise, determine if this interface now gets our default route.
-			// According to 
+			// According to
 			// https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ (4.1.2.1.9)
 			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
 			// else we'll update the defaultgateway to the one specified.
