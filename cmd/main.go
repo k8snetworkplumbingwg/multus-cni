@@ -23,11 +23,10 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/intel/multus-cni.v3/pkg/multus"
 	"github.com/containernetworking/cni/pkg/skel"
 	cniversion "github.com/containernetworking/cni/pkg/version"
+	"gopkg.in/intel/multus-cni.v3/pkg/multus"
 )
-
 
 func main() {
 

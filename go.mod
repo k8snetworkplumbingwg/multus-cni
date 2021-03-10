@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/Microsoft/go-winio v0.4.14 // indirect
-	github.com/containernetworking/cni v0.7.1
+	github.com/containernetworking/cni v0.8.1
 	github.com/containernetworking/plugins v0.8.2
 	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20201119153432-9d213757d22d
