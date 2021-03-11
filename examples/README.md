@@ -89,6 +89,6 @@ spec:
   }
 }'
 ```
-The [net-resource-sample-pod.yaml](./net-resource-sample-pod.yaml) is an exmaple Pod manifest file that requesting a SRIOV device from a host which is then configured using the above network attachement definition.
+The [sriov-pod.yml](./sriov-pod.yml) is an exmaple Pod manifest file that requesting a SRIOV device from a host which is then configured using the above network attachement definition.
 
 >For further information on how to configure SRIOV Device Plugin and SRIOV-CNI please refer to the links given above.
