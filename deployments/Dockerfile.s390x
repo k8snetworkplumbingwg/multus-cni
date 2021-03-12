@@ -12,6 +12,7 @@ RUN  cd /usr/src/multus-cni && \
 
 # build s390x container
 FROM s390x/python:3-slim
+LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
 WORKDIR /
 ADD ./images/entrypoint.sh /

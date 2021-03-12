@@ -8,6 +8,7 @@ ENV GO111MODULE=off
 RUN ./hack/build-go.sh
 
 FROM openshift/origin-base
+LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
 COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
 ADD ./images/entrypoint.sh /

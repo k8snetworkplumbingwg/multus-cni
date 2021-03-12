@@ -3,9 +3,6 @@ on:
   push:
     tags:
       - v*
-env:
-  REPOSITORY: docker.io/nfvpe/multus
-  REPOSITORY_USER: nfvperobot
 jobs:
   push-amd64:
     name: Image push/amd64
@@ -17,28 +14,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
       - name: Push container image
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REPOSITORY }}:stable-amd64
+            ghcr.io/${{ github.repository }}:stable-amd64
             ${{ steps.docker_meta.outputs.tags }}-amd64
           file: deployments/Dockerfile
 
@@ -52,28 +50,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
       - name: Push container image
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REPOSITORY }}:stable-arm64
+            ghcr.io/${{ github.repository }}:stable-arm64
             ${{ steps.docker_meta.outputs.tags }}-arm64
           file: deployments/Dockerfile.arm64
 
@@ -87,28 +86,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
       - name: Push container image
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REPOSITORY }}:stable-ppc64le
+            ghcr.io/${{ github.repository }}:stable-ppc64le
             ${{ steps.docker_meta.outputs.tags }}-ppc64le
           file: deployments/Dockerfile.ppc64le
 
@@ -122,28 +122,29 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
       - name: Push container image
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REPOSITORY }}:stable-s390x
+            ghcr.io/${{ github.repository }}:stable-s390x
             ${{ steps.docker_meta.outputs.tags }}-s390x
           file: deployments/Dockerfile.s390x
 
@@ -157,34 +158,37 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker meta
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
       - name: Push container image
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
           tags: |
-            ${{ env.REPOSITORY }}:stable-origin
+            ghcr.io/${{ github.repository }}:stable-origin
             ${{ steps.docker_meta.outputs.tags }}-origin
           file: deployments/Dockerfile.openshift
 
   push-manifest:
     needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
     runs-on: ubuntu-latest
+    env:
+      REPOSITORY: ghcr.io/${{ github.repository }}
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
@@ -193,18 +197,19 @@ jobs:
         id: docker_meta
         uses: crazy-max/ghaction-docker-meta@v1
         with:
-          images: ${{ env.REPOSITORY }}
+          images: ghcr.io/${{ github.repository }}
           tag-latest: false
 
-      - name: Login to Container Registry
-        if: github.repository_owner == 'intel'
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         uses: docker/login-action@v1
         with:
-          username: ${{ env.REPOSITORY_USER }}
-          password: ${{ secrets.REPOSITORY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create manifest for multi-arch images
-        if: github.repository_owner == 'intel'
+        if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
           # get artifacts from previous steps
           docker pull ${{ steps.docker_meta.outputs.tags }}-amd64
