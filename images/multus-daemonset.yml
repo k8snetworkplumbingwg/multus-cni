@@ -143,7 +143,7 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kube-multus-ds-amd64
+  name: kube-multus-ds
   namespace: kube-system
   labels:
     tier: node
@@ -163,15 +163,13 @@ spec:
         name: multus
     spec:
       hostNetwork: true
-      nodeSelector:
-        kubernetes.io/arch: amd64
       tolerations:
       - operator: Exists
         effect: NoSchedule
       serviceAccountName: multus
       containers:
       - name: kube-multus
-        image: docker.io/nfvpe/multus:stable
+        image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable
         command: ["/entrypoint.sh"]
         args:
         - "--multus-conf-file=auto"
@@ -183,208 +181,6 @@ spec:
           limits:
             cpu: "100m"
             memory: "50Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - name: cni
-          mountPath: /host/etc/cni/net.d
-        - name: cnibin
-          mountPath: /host/opt/cni/bin
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
-      terminationGracePeriodSeconds: 10
-      volumes:
-        - name: cni
-          hostPath:
-            path: /etc/cni/net.d
-        - name: cnibin
-          hostPath:
-            path: /opt/cni/bin
-        - name: multus-cfg
-          configMap:
-            name: multus-cni-config
-            items:
-            - key: cni-conf.json
-              path: 70-multus.conf
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: kube-multus-ds-ppc64le
-  namespace: kube-system
-  labels:
-    tier: node
-    app: multus
-    name: multus
-spec:
-  selector:
-    matchLabels:
-      name: multus
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: multus
-        name: multus
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        kubernetes.io/arch: ppc64le
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: multus
-      containers:
-      - name: kube-multus
-        # ppc64le support requires multus:latest for now. support 3.3 or later.
-        image: docker.io/nfvpe/multus:stable-ppc64le
-        command: ["/entrypoint.sh"]
-        args:
-        - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "90Mi"
-          limits:
-            cpu: "100m"
-            memory: "90Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - name: cni
-          mountPath: /host/etc/cni/net.d
-        - name: cnibin
-          mountPath: /host/opt/cni/bin
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
-      terminationGracePeriodSeconds: 10
-      volumes:
-        - name: cni
-          hostPath:
-            path: /etc/cni/net.d
-        - name: cnibin
-          hostPath:
-            path: /opt/cni/bin
-        - name: multus-cfg
-          configMap:
-            name: multus-cni-config
-            items:
-            - key: cni-conf.json
-              path: 70-multus.conf
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: kube-multus-ds-arm64v8
-  namespace: kube-system
-  labels:
-    tier: node
-    app: multus
-    name: multus
-spec:
-  selector:
-    matchLabels:
-      name: multus
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: multus
-        name: multus
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        kubernetes.io/arch: arm64
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: multus
-      containers:
-      - name: kube-multus
-        image: docker.io/nfvpe/multus:stable-arm64v8
-        command: ["/entrypoint.sh"]
-        args:
-        - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "90Mi"
-          limits:
-            cpu: "100m"
-            memory: "90Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - name: cni
-          mountPath: /host/etc/cni/net.d
-        - name: cnibin
-          mountPath: /host/opt/cni/bin
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
-      terminationGracePeriodSeconds: 10
-      volumes:
-        - name: cni
-          hostPath:
-            path: /etc/cni/net.d
-        - name: cnibin
-          hostPath:
-            path: /opt/cni/bin
-        - name: multus-cfg
-          configMap:
-            name: multus-cni-config
-            items:
-            - key: cni-conf.json
-              path: 70-multus.conf
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: kube-multus-ds-s390x
-  namespace: kube-system
-  labels:
-    tier: node
-    app: multus
-    name: multus
-spec:
-  selector:
-    matchLabels:
-      name: multus
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: multus
-        name: multus
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        kubernetes.io/arch: s390x
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: multus
-      containers:
-      - name: kube-multus
-        image: docker.io/nfvpe/multus:stable-s390x
-        command: ["/entrypoint.sh"]
-        args:
-        - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "90Mi"
-          limits:
-            cpu: "100m"
-            memory: "90Mi"
         securityContext:
           privileged: true
         volumeMounts:
