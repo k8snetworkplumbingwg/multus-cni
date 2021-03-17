@@ -27,7 +27,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	testhelpers "gopkg.in/intel/multus-cni.v3/pkg/testing"
+	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -36,10 +36,10 @@ import (
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"github.com/vishvananda/netlink"
-	k8s "gopkg.in/intel/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/intel/multus-cni.v3/pkg/logging"
-	"gopkg.in/intel/multus-cni.v3/pkg/netutils"
-	"gopkg.in/intel/multus-cni.v3/pkg/types"
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -379,7 +379,7 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
 		}
 	} else {
-		// for further debug https://github.com/intel/multus-cni/issues/481
+		// for further debug https://github.com/k8snetworkplumbingwg/multus-cni/issues/481
 		logging.Errorf("delegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
 	}
 

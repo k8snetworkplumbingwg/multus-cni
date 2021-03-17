@@ -4,7 +4,7 @@
 
 
 ```
-$ git clone https://github.com/intel/multus-cni.git
+$ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git
 $ cd multus-cni/e2e
 $ ./get_tools.sh
 $ ./setup_cluster.sh

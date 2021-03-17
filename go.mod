@@ -1,4 +1,4 @@
-module gopkg.in/intel/multus-cni.v3
+module gopkg.in/k8snetworkplumbingwg/multus-cni.v3
 
 go 1.12
 

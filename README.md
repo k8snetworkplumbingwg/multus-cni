@@ -1,8 +1,8 @@
 # Multus-CNI
 
-![multus-cni Logo](https://github.com/intel/multus-cni/blob/master/docs/images/Multus.png)
+![multus-cni Logo](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/images/Multus.png)
 
-[![Build](https://github.com/intel/multus-cni/actions/workflows/build.yml/badge.svg)](https://github.com/intel/multus-cni/actions/workflows/build.yml)[![Test](https://github.com/intel/multus-cni/actions/workflows/test.yml/badge.svg)](https://github.com/intel/multus-cni/actions/workflows/test.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/intel/multus-cni)](https://goreportcard.com/report/github.com/intel/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/intel/multus-cni/badge.svg)](https://coveralls.io/github/intel/multus-cni)
+[![Build](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml)[![Test](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/multus-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/k8snetworkplumbingwg/multus-cni/badge.svg)](https://coveralls.io/github/k8snetworkplumbingwg/multus-cni)
 
 Multus CNI enables attaching multiple network interfaces to pods in Kubernetes.
 
@@ -35,7 +35,7 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 ## Additional installation Options
 
 - Install via daemonset using the quick-start guide, above.
-- Download binaries from [release page](https://github.com/intel/multus-cni/releases)
+- Download binaries from [release page](https://github.com/k8snetworkplumbingwg/multus-cni/releases)
 - By Docker image from [Docker Hub](https://hub.docker.com/r/nfvpe/multus/tags/)
 - Or, roll-your-own and build from source
   - See [Development](docs/development.md)

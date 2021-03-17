@@ -45,7 +45,7 @@ Our recommended quickstart method to deploy Multus is to deploy using a Daemonse
 Firstly, clone this GitHub repository. 
 
 ```
-git clone https://github.com/intel/multus-cni.git && cd multus-cni
+git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cni
 ```
 
 We'll apply a YAML file with `kubectl` from this repo.
