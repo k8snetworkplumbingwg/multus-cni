@@ -47,6 +47,6 @@ The following are the best practices for multus logging:
 * `logging.Panicf()` only be used for critical errors (it should NOT normally be used)
 
 
-## CI Introduction
+## Multus release schedule
 
-TBD
+On the first maintainer's meeting, twice yearly, after January 1st and July 1st, if a new version has not been tagged, a new version will tagged.
