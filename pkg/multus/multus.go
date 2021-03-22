@@ -529,7 +529,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			return err == nil, nil
 		})
 		if err != nil {
-			return nil, cmdErr(k8sArgs, "PollImmediate error waiting for ReadinessIndicatorFile: %v", err)
+			return nil, cmdErr(k8sArgs, "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", n.ReadinessIndicatorFile, err)
 		}
 	}
 
