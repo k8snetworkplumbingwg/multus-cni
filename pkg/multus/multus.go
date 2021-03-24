@@ -17,7 +17,6 @@ package multus
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -31,7 +30,6 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
-	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
@@ -856,33 +854,4 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in.BinDir)
-}
-
-func main() {
-	// Init command line flags to clear vendored packages' one, especially in init()
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-
-	// add version flag
-	versionOpt := false
-	flag.BoolVar(&versionOpt, "version", false, "Show application version")
-	flag.BoolVar(&versionOpt, "v", false, "Show application version")
-	flag.Parse()
-	if versionOpt == true {
-		fmt.Printf("%s\n", PrintVersionString())
-		return
-	}
-
-	skel.PluginMain(
-		func(args *skel.CmdArgs) error {
-			result, err := CmdAdd(args, nil, nil)
-			if err != nil {
-				return err
-			}
-			return result.Print()
-		},
-		func(args *skel.CmdArgs) error {
-			return CmdCheck(args, nil, nil)
-		},
-		func(args *skel.CmdArgs) error { return CmdDel(args, nil, nil) },
-		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }
