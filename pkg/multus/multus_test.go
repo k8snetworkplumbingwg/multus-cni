@@ -2033,14 +2033,16 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 
-		binDir := "/opt/cni/bin"
+		fakeMultusNetConf := types.NetConf{
+			BinDir: "/opt/cni/bin",
+		}
 		// use fExec for the exec param
 		rawnetconflist := []byte(`{"cniVersion":"0.2.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
 		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
 
-		err = conflistDel(rt, rawnetconflist, binDir, fExec)
+		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -3279,14 +3281,16 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		os.Setenv("CNI_COMMAND", "ADD")
 		os.Setenv("CNI_IFNAME", "eth0")
 
-		binDir := "/opt/cni/bin"
+		fakeMultusNetConf := types.NetConf{
+			BinDir: "/opt/cni/bin",
+		}
 		// use fExec for the exec param
 		rawnetconflist := []byte(`{"cniVersion":"0.4.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
 		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
 
-		err = conflistDel(rt, rawnetconflist, binDir, fExec)
+		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())
 	})
 })
