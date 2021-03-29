@@ -367,7 +367,7 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		return len(delegates), clientInfo, nil
 	}
 
-	return 0, clientInfo, nil
+	return 0, clientInfo, err
 }
 
 // GetK8sClient gets client info from kubeconfig
