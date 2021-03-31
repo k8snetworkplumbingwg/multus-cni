@@ -584,7 +584,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
-		if cniDeviceInfoPath != "" {
+		if cniDeviceInfoPath != "" && delegate.ResourceName != "" && delegate.DeviceID != "" {
 			err = nadutils.CopyDeviceInfoForCNIFromDP(cniDeviceInfoPath, delegate.ResourceName, delegate.DeviceID)
 			// Even if the filename is set, file may not be present. Ignore error,
 			// but log and in the future may need to filter on specific errors.
