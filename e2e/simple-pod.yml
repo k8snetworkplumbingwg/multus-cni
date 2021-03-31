@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-centos1
+  annotations:
+  labels:
+    app: simple
+spec:
+  containers:
+  - name: simple-centos1
+    image: centos:8
+    command: ["/bin/sleep", "10000"]
+    securityContext:
+      privileged: true

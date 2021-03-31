@@ -27,6 +27,10 @@ jobs:
         working-directory: ./e2e
         run: ./setup_cluster.sh
 
+      - name: Test simple pod
+        working-directory: ./e2e
+        run: ./test-simple-pod.sh
+
       - name: Test macvlan1
         working-directory: ./e2e
         run: ./test-simple-macvlan1.sh
