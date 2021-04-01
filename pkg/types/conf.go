@@ -188,13 +188,15 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 
 	if delegate != nil {
 		delegateRc = mergeCNIRuntimeConfig(rc, delegate)
-		if delegateRc.CNIDeviceInfoFile != "" {
-			logging.Debugf("Warning: Existing value of CNIDeviceInfoFile will be overwritten %s", delegateRc.CNIDeviceInfoFile)
+		if delegateRc.DeviceID != "" {
+			if delegateRc.CNIDeviceInfoFile != "" {
+				logging.Debugf("Warning: Existing value of CNIDeviceInfoFile will be overwritten %s", delegateRc.CNIDeviceInfoFile)
+			}
+			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
+			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+			cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
+			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
 		}
-		autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
-		delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
-		cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
-		logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
 	} else {
 		delegateRc = rc
 	}
