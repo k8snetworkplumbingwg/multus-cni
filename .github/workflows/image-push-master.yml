@@ -62,6 +62,35 @@ jobs:
             ghcr.io/${{ github.repository }}:snapshot-arm64
           file: deployments/Dockerfile.arm64
 
+  push-arm32:
+    name: Image push/arm32
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to GitHub Container Registry
+        if: github.repository_owner == 'k8snetworkplumbingwg'
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push container image
+        if: github.repository_owner == 'k8snetworkplumbingwg'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest-arm32
+            ghcr.io/${{ github.repository }}:snapshot-arm32
+          file: deployments/Dockerfile.arm32
+
   push-ppc64le:
     name: Image push/ppc64le
     runs-on: ubuntu-latest
@@ -172,21 +201,25 @@ jobs:
           # get artifacts from previous steps
           docker pull ${{ env.REPOSITORY }}:snapshot-amd64
           docker pull ${{ env.REPOSITORY }}:snapshot-arm64
+          docker pull ${{ env.REPOSITORY }}:snapshot-arm32
           docker pull ${{ env.REPOSITORY }}:snapshot-ppc64le
           docker pull ${{ env.REPOSITORY }}:snapshot-s390x
           docker pull ${{ env.REPOSITORY }}:latest-amd64
           docker pull ${{ env.REPOSITORY }}:latest-arm64
+          docker pull ${{ env.REPOSITORY }}:latest-arm32
           docker pull ${{ env.REPOSITORY }}:latest-ppc64le
           docker pull ${{ env.REPOSITORY }}:latest-s390x
-          docker manifest create ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 ${{ env.REPOSITORY }}:snapshot-arm64 ${{ env.REPOSITORY }}:snapshot-ppc64le ${{ env.REPOSITORY }}:snapshot-s390x
+          docker manifest create ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 ${{ env.REPOSITORY }}:snapshot-arm64 ${{ env.REPOSITORY }}:snapshot-arm32 ${{ env.REPOSITORY }}:snapshot-ppc64le ${{ env.REPOSITORY }}:snapshot-s390x
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 --arch amd64
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm64 --arch arm64
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm32 --arch arm
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-ppc64le --arch ppc64le
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-s390x --arch s390x
           docker manifest push ${{ env.REPOSITORY }}:snapshot
-          docker manifest create ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 ${{ env.REPOSITORY }}:latest-arm64 ${{ env.REPOSITORY }}:latest-ppc64le ${{ env.REPOSITORY }}:latest-s390x
+          docker manifest create ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 ${{ env.REPOSITORY }}:latest-arm64 ${{ env.REPOSITORY }}:latest-arm32 ${{ env.REPOSITORY }}:latest-ppc64le ${{ env.REPOSITORY }}:latest-s390x
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 --arch amd64
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm64 --arch arm64
+          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm32 --arch arm
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-ppc64le --arch ppc64le
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-s390x --arch s390x
           docker manifest push ${{ env.REPOSITORY }}:latest
