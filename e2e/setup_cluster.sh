@@ -10,7 +10,7 @@ running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || t
 if [ "${running}" != 'true' ]; then
   # run registry and push the multus image
   docker run -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" registry:2
-  docker build -t localhost:5000/multus:e2e ..
+  docker build -t localhost:5000/multus:e2e -f ../deployments/Dockerfile ..
   docker push localhost:5000/multus:e2e
 fi
 reg_host="${reg_name}"
