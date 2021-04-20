@@ -54,6 +54,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 		return logging.Errorf("LoadDelegateNetConfList: a plugin delegate must have the 'type' field")
 	}
 	delegateConf.ConfListPlugin = true
+	delegateConf.Name = delegateConf.ConfList.Name
 	return nil
 }
 
@@ -66,6 +67,7 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
 		return nil, logging.Errorf("LoadDelegateNetConf: error unmarshalling delegate config: %v", err)
 	}
+	delegateConf.Name = delegateConf.Conf.Name
 
 	// Do some minimal validation
 	if delegateConf.Conf.Type == "" {

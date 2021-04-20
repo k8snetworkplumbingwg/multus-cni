@@ -725,6 +725,7 @@ var _ = Describe("config operations", func() {
 			"type": "multus",
 			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
 			"delegates": [{
+				"name": "weave",
 				"type": "weave-net"
 			}],
 		  "runtimeConfig": {
@@ -809,4 +810,39 @@ var _ = Describe("config operations", func() {
 		// The original RuntimeConfig must have not been overwritten
 		Expect(origRuntimeConfig).To(Equal(RuntimeConfig{}))
 	})
+
+	It("test DelegateConf Name is delivered", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave",
+				"type": "weave-net"
+			}]
+		}`
+
+		n, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(n.Delegates)).To(BeEquivalentTo(1))
+		Expect(n.Delegates[0].Name).To(Equal("weave"))
+	})
+
+	It("test DelegateConfList Name is delivered", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave-list",
+				"plugins": [ {"type" :"weave"} ]
+			}]
+		}`
+
+		n, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(len(n.Delegates)).To(BeEquivalentTo(1))
+		Expect(n.Delegates[0].Name).To(Equal("weave-list"))
+	})
+
 })
