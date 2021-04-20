@@ -264,7 +264,7 @@ $ cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
 
 ### Run pod with network annotation
 
-#### Lauch pod with text annotation
+#### Launch pod with text annotation
 
 ```
 # Execute following command at Kubernetes master
@@ -284,7 +284,7 @@ spec:
 EOF
 ```
 
-#### Lauch pod with text annotation for NetworkAttachmentDefinition in different namespace
+#### Launch pod with text annotation for NetworkAttachmentDefinition in different namespace
 
 You can also specify NetworkAttachmentDefinition with its namespace as adding `<namespace>/`
 
@@ -330,7 +330,7 @@ spec:
 EOF
 ```
 
-#### Lauch pod with text annotation with interface name
+#### Launch pod with text annotation with interface name
 
 You can also specify interface name as adding `@<ifname>`.
 
@@ -352,7 +352,7 @@ spec:
 EOF
 ```
 
-#### Lauch pod with json annotation
+#### Launch pod with json annotation
 
 ```
 # Execute following command at Kubernetes master
@@ -375,7 +375,7 @@ spec:
 EOF
 ```
 
-#### Lauch pod with json annotation for NetworkAttachmentDefinition in different namespace
+#### Launch pod with json annotation for NetworkAttachmentDefinition in different namespace
 
 You can also specify NetworkAttachmentDefinition with its namespace as adding `"namespace": "<namespace>"`.
 
@@ -400,7 +400,7 @@ spec:
 EOF
 ```
 
-#### Lauch pod with json annotation with interface
+#### Launch pod with json annotation with interface
 
 You can also specify interface name as adding `"interface": "<ifname>"`.
 
