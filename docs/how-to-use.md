@@ -35,7 +35,7 @@ Execute following commands at all Kubernetes nodes (i.e. master and minions)
 
 ```
 $ mkdir -p /etc/cni/net.d
-$ cat >/etc/cni/net.d/30-multus.conf <<EOF
+$ cat >/etc/cni/net.d/00-multus.conf <<EOF
 {
   "name": "multus-cni-network",
   "type": "multus",
