@@ -18,6 +18,7 @@ MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
+MULTUS_TEMP_KUBECONFIG="/tmp/multus.kubeconfig"
 MULTUS_NAMESPACE_ISOLATION=false
 MULTUS_GLOBAL_NAMESPACES=""
 MULTUS_LOG_TO_STDERR=true
@@ -218,9 +219,10 @@ if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
   # to skip TLS verification for now.  We should eventually support
   # writing more complete kubeconfig files. This is only used
   # if the provided CNI network config references it.
-  touch $MULTUS_KUBECONFIG
-  chmod ${KUBECONFIG_MODE:-600} $MULTUS_KUBECONFIG
-  cat > $MULTUS_KUBECONFIG <<EOF
+  touch $MULTUS_TEMP_KUBECONFIG
+  chmod ${KUBECONFIG_MODE:-600} $MULTUS_TEMP_KUBECONFIG
+  # Write the kubeconfig to a temp file first.
+  cat > $MULTUS_TEMP_KUBECONFIG <<EOF
 # Kubeconfig file for Multus CNI plugin.
 apiVersion: v1
 kind: Config
@@ -240,6 +242,9 @@ contexts:
     user: multus
 current-context: multus-context
 EOF
+
+  # Atomically move the temp kubeconfig to its permanent home.
+  mv -f $MULTUS_TEMP_KUBECONFIG $MULTUS_KUBECONFIG
 
 else
   warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
