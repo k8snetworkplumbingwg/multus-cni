@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Kubernetes Network Plumbing Working Group
+// Copyright (c) 2021 Kubernetes Network Plumbing Working Group
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,40 +65,41 @@ func SetNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, statuses []v
 		}
 	}
 
-	_, err := setPodNetworkStatus(client, pod, fmt.Sprintf("[%s]", strings.Join(networkStatus, ",")))
+	err := setPodNetworkStatus(client, pod, fmt.Sprintf("[%s]", strings.Join(networkStatus, ",")))
 	if err != nil {
 		return fmt.Errorf("SetNetworkStatus: failed to update the pod %s in out of cluster comm: %v", pod.Name, err)
 	}
 	return nil
 }
 
-func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkstatus string) (*corev1.Pod, error) {
+func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkstatus string) (error) {
 	if len(pod.Annotations) == 0 {
 		pod.Annotations = make(map[string]string)
 	}
 
 	coreClient := client.CoreV1()
-
-	pod.Annotations[v1.NetworkStatusAnnot] = networkstatus
-	pod.Annotations[v1.OldNetworkStatusAnnot] = networkstatus
-	pod = pod.DeepCopy()
 	var err error
+	name := pod.Name
+	namespace := pod.Namespace
 
-	if resultErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	resultErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod, err = coreClient.Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			// Re-get the pod unless it's the first attempt to update
-			pod, err = coreClient.Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
+			return err
 		}
 
-		pod, err = coreClient.Pods(pod.Namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
+		if len(pod.Annotations) == 0 {
+			pod.Annotations = make(map[string]string)
+		}
+		pod.Annotations[v1.NetworkStatusAnnot] = networkstatus
+		pod.Annotations[v1.OldNetworkStatusAnnot] = networkstatus
+		_, err = coreClient.Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 		return err
-	}); resultErr != nil {
-		return nil, fmt.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
+	})
+	if resultErr != nil {
+		return fmt.Errorf("status update failed for pod %s/%s: %v", pod.Namespace, pod.Name, resultErr)
 	}
-	return pod, nil
+	return nil
 }
 
 // GetNetworkStatus returns pod's network status
