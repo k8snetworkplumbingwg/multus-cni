@@ -46,7 +46,7 @@ github.com/hpcloud/tail/winfile
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.9
 github.com/json-iterator/go
-# github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20201119153432-9d213757d22d
+# github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20210510153419-66a699ae3b05
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned
