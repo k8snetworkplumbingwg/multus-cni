@@ -1,8 +1,8 @@
 package kubeletclient
 
 import (
+	"net/url"
 	"os"
-	"path/filepath"
 	"time"
 
 	"golang.org/x/net/context"
@@ -18,27 +18,26 @@ import (
 const (
 	defaultKubeletSocketFile   = "kubelet.sock"
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
-)
-
-var (
-	kubeletSocket           string
-	defaultPodResourcesPath = "/var/lib/kubelet/pod-resources"
+	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 )
 
 // GetResourceClient returns an instance of ResourceClient interface initialized with Pod resource information
-func GetResourceClient() (types.ResourceClient, error) {
+func GetResourceClient(kubeletSocket string) (types.ResourceClient, error) {
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
-	if hasKubeletAPIEndpoint() {
+	if kubeletSocket == "" {
+		kubeletSocket = util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	}
+	if hasKubeletAPIEndpoint(kubeletSocket) {
 		logging.Debugf("GetResourceClient: using Kubelet resource API endpoint")
-		return getKubeletClient()
+		return getKubeletClient(kubeletSocket)
 	}
 
 	logging.Debugf("GetResourceClient: using Kubelet device plugin checkpoint")
 	return checkpoint.GetCheckpoint()
 }
 
-func getKubeletClient() (types.ResourceClient, error) {
+func getKubeletClient(kubeletSocket string) (types.ResourceClient, error) {
 	newClient := &kubeletClient{}
 	if kubeletSocket == "" {
 		kubeletSocket = util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
@@ -102,10 +101,13 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 	return resourceMap, nil
 }
 
-func hasKubeletAPIEndpoint() bool {
+func hasKubeletAPIEndpoint(endpoint string) bool {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return false
+	}
 	// Check for kubelet resource API socket file
-	kubeletAPISocket := filepath.Join(defaultPodResourcesPath, defaultKubeletSocketFile)
-	if _, err := os.Stat(kubeletAPISocket); err != nil {
+	if _, err := os.Stat(u.Path); err != nil {
 		logging.Debugf("hasKubeletAPIEndpoint: error looking up kubelet resource api socket file: %q", err)
 		return false
 	}

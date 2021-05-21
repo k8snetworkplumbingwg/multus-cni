@@ -259,7 +259,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
 
 		if resourceMap == nil {
-			ck, err := kubeletclient.GetResourceClient()
+			ck, err := kubeletclient.GetResourceClient("")
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get a ResourceClient instance: %v", err)
 			}
