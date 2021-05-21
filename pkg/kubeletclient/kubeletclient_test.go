@@ -16,7 +16,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 
 	mtypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 
 var (
@@ -27,6 +27,11 @@ var (
 
 type fakeResourceServer struct {
 	server *grpc.Server
+}
+
+//TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
+func (m *fakeResourceServer) GetAllocatableResources(ctx context.Context, req *podresourcesapi.AllocatableResourcesRequest) (*podresourcesapi.AllocatableResourcesResponse, error) {
+	return &podresourcesapi.AllocatableResourcesResponse{}, nil
 }
 
 func (m *fakeResourceServer) List(ctx context.Context, req *podresourcesapi.ListPodResourcesRequest) (*podresourcesapi.ListPodResourcesResponse, error) {
@@ -142,7 +147,7 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			outputRMap := map[string]*mtypes.ResourceInfo{
-				"resource": &mtypes.ResourceInfo{DeviceIDs: []string{"dev0", "dev1"}},
+				"resource": {DeviceIDs: []string{"dev0", "dev1"}},
 			}
 			resourceMap, err := client.GetPodResourceMap(fakePod)
 			Expect(err).NotTo(HaveOccurred())
