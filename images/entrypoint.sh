@@ -264,7 +264,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
         if ! (($tries % 5)); then
-          log "Attemping to find master plugin configuration, attempt $tries"
+          log "Attempting to find master plugin configuration, attempt $tries"
         fi
         let "tries+=1"
         sleep 1;
