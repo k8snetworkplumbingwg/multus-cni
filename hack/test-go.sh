@@ -5,7 +5,7 @@ set -e
 if [ "$GO111MODULE" == "off" ]; then
 	echo "Warning: this will be deprecated in near future so please use go modules!"
 
-	ORG_PATH="github.com/intel"
+	ORG_PATH="gopkg.in/k8snetworkplumbingwg"
 	REPO_PATH="${ORG_PATH}/multus-cni"
 
 	if [ ! -h gopath/src/${REPO_PATH} ]; then
