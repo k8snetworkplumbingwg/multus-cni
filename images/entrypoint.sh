@@ -19,6 +19,7 @@ MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_TEMP_KUBECONFIG="/tmp/multus.kubeconfig"
+MULTUS_MASTER_CNI_FILE_NAME=""
 MULTUS_NAMESPACE_ISOLATION=false
 MULTUS_GLOBAL_NAMESPACES=""
 MULTUS_LOG_TO_STDERR=true
@@ -40,7 +41,9 @@ function usage()
     echo -e "will be copied to the corresponding configuration directory. When "
     echo -e "'--multus-conf-file=auto' is used, 00-multus.conf will be automatically "
     echo -e "generated from the CNI configuration file of the master plugin (the first file "
-    echo -e "in lexicographical order in cni-conf-dir)."
+    echo -e "in lexicographical order in cni-conf-dir). When '--multus-master-cni-file-name'"
+    echo -e "is used, 00-multus.conf will only be automatically generated from the specific"
+    echo -e "file rather than the first file."
     echo -e ""
     echo -e "./entrypoint.sh"
     echo -e "\t-h --help"
@@ -51,6 +54,7 @@ function usage()
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--skip-multus-binary-copy=$SKIP_BINARY_COPY"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
+    echo -e "\t--multus-master-cni-file-name=$MULTUS_MASTER_CNI_FILE_NAME (empty by default, example: 10-calico.conflist)"
     echo -e "\t--namespace-isolation=$MULTUS_NAMESPACE_ISOLATION"
     echo -e "\t--global-namespaces=$MULTUS_GLOBAL_NAMESPACES (used only with --namespace-isolation=true)"
     echo -e "\t--multus-autoconfig-dir=$MULTUS_AUTOCONF_DIR (used only with --multus-conf-file=auto)"
@@ -110,6 +114,9 @@ while [ "$1" != "" ]; do
             ;;
         --multus-kubeconfig-file-host)
             MULTUS_KUBECONFIG_FILE_HOST=$VALUE
+            ;;
+        --multus-master-cni-file-name)
+            MULTUS_MASTER_CNI_FILE_NAME=$VALUE
             ;;
         --namespace-isolation)
             MULTUS_NAMESPACE_ISOLATION=$VALUE
@@ -260,7 +267,11 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   found_master=false
   tries=0
   while [ $found_master == false ]; do
-    MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    if [ "$MULTUS_MASTER_CNI_FILE_NAME" != "" ]; then
+        MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR/$MULTUS_MASTER_CNI_FILE_NAME)" || true
+    else
+        MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
+    fi
     if [ "$MASTER_PLUGIN" == "" ]; then
       if [ $tries -lt 600 ]; then
         if ! (($tries % 5)); then
