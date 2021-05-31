@@ -35,6 +35,7 @@ const (
 	defaultBinDir                 = "/opt/cni/bin"
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
+	defaultSystemNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
 )
 
@@ -322,7 +323,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	if len(netconf.SystemNamespaces) == 0 {
-		netconf.SystemNamespaces = []string{"kube-system"}
+		netconf.SystemNamespaces = []string{defaultSystemNamespace}
 	}
 
 	if netconf.MultusNamespace == "" {
