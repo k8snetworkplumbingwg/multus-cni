@@ -595,6 +595,10 @@ This can be used if you have your CNI configuration stored in an alternate locat
 
 Used only with `--multus-conf-file=auto`. Allows you to specify an alternate path to the Kubeconfig.
 
+    --multus-master-cni-file-name=
+
+The `--multus-master-cni-file-name` can be used to select the cni file as the master cni, rather than the first file in cni-conf-dir. For example, `--multus-master-cni-file-name=10-calico.conflist`.
+
     --multus-log-level=
     --multus-log-file=
 
