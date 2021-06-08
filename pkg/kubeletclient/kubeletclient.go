@@ -23,6 +23,9 @@ const (
 
 // GetResourceClient returns an instance of ResourceClient interface initialized with Pod resource information
 func GetResourceClient(kubeletSocket string) (types.ResourceClient, error) {
+	if kubeletSocket == "" {
+		kubeletSocket, _ = util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	}
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
 	if hasKubeletAPIEndpoint(kubeletSocket) {
