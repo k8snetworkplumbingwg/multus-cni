@@ -194,43 +194,52 @@ if [ "$MULTUS_CONF_FILE" != "auto" ]; then
 fi
 
 # Make a multus.d directory (for our kubeconfig)
-
 mkdir -p $CNI_CONF_DIR/multus.d
 MULTUS_KUBECONFIG=$CNI_CONF_DIR/multus.d/multus.kubeconfig
 
 # ------------------------------- Generate a "kube-config"
 # Inspired by: https://tinyurl.com/y7r2knme
 SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
+SERVICE_ACCOUNT_TOKEN_PATH=$SERVICE_ACCOUNT_PATH/token
 KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
-SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_PATH/token)
-SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
 
+LAST_SERVICEACCOUNT_MD5SUM=""
+LAST_KUBE_CA_FILE_MD5SUM=""
 
-# Check if we're running as a k8s pod.
-if [ -f "$SERVICE_ACCOUNT_PATH/token" ]; then
-  # We're running as a k8d pod - expect some variables.
-  if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
-    error "KUBERNETES_SERVICE_HOST not set"; exit 1;
-  fi
-  if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
-    error "KUBERNETES_SERVICE_PORT not set"; exit 1;
-  fi
+function generateKubeConfig {
 
-  if [ "$SKIP_TLS_VERIFY" == "true" ]; then
-    TLS_CFG="insecure-skip-tls-verify: true"
-  elif [ -f "$KUBE_CA_FILE" ]; then
-    TLS_CFG="certificate-authority-data: $(cat $KUBE_CA_FILE | base64 | tr -d '\n')"
-  fi
+  # Check if we're running as a k8s pod.
+  if [ -f "$SERVICE_ACCOUNT_TOKEN_PATH" ]; then
+    # We're running as a k8d pod - expect some variables.
+    if [ -z ${KUBERNETES_SERVICE_HOST} ]; then
+      error "KUBERNETES_SERVICE_HOST not set"; exit 1;
+    fi
+    if [ -z ${KUBERNETES_SERVICE_PORT} ]; then
+      error "KUBERNETES_SERVICE_PORT not set"; exit 1;
+    fi
 
-  # Write a kubeconfig file for the CNI plugin.  Do this
-  # to skip TLS verification for now.  We should eventually support
-  # writing more complete kubeconfig files. This is only used
-  # if the provided CNI network config references it.
-  touch $MULTUS_TEMP_KUBECONFIG
-  chmod ${KUBECONFIG_MODE:-600} $MULTUS_TEMP_KUBECONFIG
-  # Write the kubeconfig to a temp file first.
-  cat > $MULTUS_TEMP_KUBECONFIG <<EOF
+    if [ "$SKIP_TLS_VERIFY" == "true" ]; then
+      TLS_CFG="insecure-skip-tls-verify: true"
+    elif [ -f "$KUBE_CA_FILE" ]; then
+      TLS_CFG="certificate-authority-data: $(cat $KUBE_CA_FILE | base64 | tr -d '\n')"
+    fi
+
+    # Get the contents of service account token.
+    SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_TOKEN_PATH)
+
+    SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
+
+    # Write a kubeconfig file for the CNI plugin.  Do this
+    # to skip TLS verification for now.  We should eventually support
+    # writing more complete kubeconfig files. This is only used
+    # if the provided CNI network config references it.
+    touch $MULTUS_TEMP_KUBECONFIG
+    chmod ${KUBECONFIG_MODE:-600} $MULTUS_TEMP_KUBECONFIG
+    # Write the kubeconfig to a temp file first.
+    timenow=$(date)
+    cat > $MULTUS_TEMP_KUBECONFIG <<EOF
 # Kubeconfig file for Multus CNI plugin.
+# Generated at ${timenow}
 apiVersion: v1
 kind: Config
 clusters:
@@ -250,14 +259,22 @@ contexts:
 current-context: multus-context
 EOF
 
-  # Atomically move the temp kubeconfig to its permanent home.
-  mv -f $MULTUS_TEMP_KUBECONFIG $MULTUS_KUBECONFIG
+    # Atomically move the temp kubeconfig to its permanent home.
+    mv -f $MULTUS_TEMP_KUBECONFIG $MULTUS_KUBECONFIG
 
-else
-  warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
-fi
+    # Keep track of the md5sum
+    LAST_SERVICEACCOUNT_MD5SUM=$(md5sum $SERVICE_ACCOUNT_TOKEN_PATH | awk '{print $1}')
+    LAST_KUBE_CA_FILE_MD5SUM=$(md5sum $KUBE_CA_FILE | awk '{print $1}')
+
+  else
+    warn "Doesn't look like we're running in a kubernetes environment (no serviceaccount token)"
+  fi
 
 # ---------------------- end Generate a "kube-config".
+
+}
+
+generateKubeConfig
 
 # ------------------------------- Generate "00-multus.conf"
 
@@ -442,6 +459,15 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
       generateMultusConf
       log "Continuing watch loop after configuration regeneration..."
     fi
+
+    # Check the md5sum of the service account token and ca.
+    svcaccountsum=$(md5sum $SERVICE_ACCOUNT_TOKEN_PATH | awk '{print $1}')
+    casum=$(md5sum $KUBE_CA_FILE | awk '{print $1}')
+    if [ "$svcaccountsum" != "$LAST_SERVICEACCOUNT_MD5SUM" ] || [ "$casum" != "$LAST_KUBE_CA_FILE_MD5SUM" ]; then
+      # log "Detected service account or CA file change, regenerating kubeconfig..."
+      generateKubeConfig
+    fi
+
     sleep 1
   done
 else
