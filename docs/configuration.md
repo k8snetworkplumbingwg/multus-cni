@@ -5,6 +5,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 
 ```
 {
+    "cniVersion": "0.3.1",
     "name": "node-cni-network",
     "type": "multus",
     "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
