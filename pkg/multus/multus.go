@@ -40,6 +40,7 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -503,6 +504,18 @@ func cmdPluginErr(k8sArgs *types.K8sArgs, confName string, format string, args .
 	return logging.Errorf(msg+format, args...)
 }
 
+func isCriticalRequestRetriable(err error) bool {
+	logging.Debugf("isCriticalRequestRetriable: %v", err)
+	errorTypesAllowingRetry := []func(error) bool{
+		errors.IsServiceUnavailable, errors.IsInternalError, k8snet.IsConnectionReset, k8snet.IsConnectionRefused}
+	for _, f := range errorTypesAllowingRetry {
+		if f(err) {
+			return true
+		}
+	}
+	return false
+}
+
 //CmdAdd ...
 func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
@@ -536,8 +549,8 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
-			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
-			if errors.IsServiceUnavailable(err) {
+			// in case of a retriable error, retry 10 times with 0.5 sec interval
+			if isCriticalRequestRetriable(err) {
 				pollDuration := 500 * time.Millisecond
 				pollTimeout := 5 * time.Second
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
@@ -546,7 +559,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				})
 				// retry failed, then return error with retry out
 				if waitErr != nil {
-					return nil, cmdErr(k8sArgs, "error getting pod by service unavailable: %v", err)
+					return nil, cmdErr(k8sArgs, "error getting pod with error: %v", err)
 				}
 			} else {
 				// Other case, return error
@@ -763,8 +776,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
-			// in case of ServiceUnavailable, retry 10 times with 0.5 sec interval
-			if errors.IsServiceUnavailable(err) {
+			// in case of a retriable error, retry 10 times with 0.5 sec interval
+			if isCriticalRequestRetriable(err) {
 				pollDuration := 500 * time.Millisecond
 				pollTimeout := 5 * time.Second
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
@@ -773,7 +786,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				})
 				// retry failed, then return error with retry out
 				if waitErr != nil {
-					return cmdErr(k8sArgs, "error getting pod by service unavailable: %v", err)
+					return cmdErr(k8sArgs, "error getting pod with error: %v", err)
 				}
 			} else if errors.IsNotFound(err) {
 				// If not found, proceed to remove interface with cache
