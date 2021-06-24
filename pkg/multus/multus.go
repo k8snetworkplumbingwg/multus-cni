@@ -549,10 +549,10 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
-			// in case of a retriable error, retry 10 times with 0.5 sec interval
+			// in case of a retriable error, retry 10 times with 0.25 sec interval
 			if isCriticalRequestRetriable(err) {
-				pollDuration := 500 * time.Millisecond
-				pollTimeout := 5 * time.Second
+				pollDuration := 250 * time.Millisecond
+				pollTimeout := 2500 * time.Millisecond
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
 					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 					return pod != nil, err
@@ -776,10 +776,10 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		if err != nil {
 			var waitErr error
-			// in case of a retriable error, retry 10 times with 0.5 sec interval
+			// in case of a retriable error, retry 10 times with 0.25 sec interval
 			if isCriticalRequestRetriable(err) {
-				pollDuration := 500 * time.Millisecond
-				pollTimeout := 5 * time.Second
+				pollDuration := 250 * time.Millisecond
+				pollTimeout := 2500 * time.Millisecond
 				waitErr = wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
 					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 					return pod != nil, err
