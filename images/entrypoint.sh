@@ -268,7 +268,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   tries=0
   while [ $found_master == false ]; do
     if [ "$MULTUS_MASTER_CNI_FILE_NAME" != "" ]; then
-        MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR/$MULTUS_MASTER_CNI_FILE_NAME)" || true
+        MASTER_PLUGIN="$MULTUS_MASTER_CNI_FILE_NAME"
     else
         MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     fi
@@ -284,6 +284,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         exit 1;
       fi
     else
+      log "Using MASTER_PLUGIN: $MASTER_PLUGIN"
 
       found_master=true
 
