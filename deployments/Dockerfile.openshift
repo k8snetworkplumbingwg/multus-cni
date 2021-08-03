@@ -1,5 +1,5 @@
 # This dockerfile is specific to building Multus for OpenShift
-FROM openshift/origin-release:golang-1.15 as builder
+FROM openshift/origin-release:golang-1.16 as builder
 
 ADD . /usr/src/multus-cni
 
@@ -7,7 +7,7 @@ WORKDIR /usr/src/multus-cni
 ENV GO111MODULE=off
 RUN ./hack/build-go.sh
 
-FROM openshift/origin-base
+FROM openshift/origin-base:v3.11
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
 COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
