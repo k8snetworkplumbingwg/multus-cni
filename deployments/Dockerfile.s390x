@@ -1,5 +1,5 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM golang:1.13 as build
+FROM golang:1.16 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
@@ -14,6 +14,7 @@ RUN  cd /usr/src/multus-cni && \
 FROM s390x/python:3-slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
+RUN apt-get update && apt-get upgrade -y
 WORKDIR /
 ADD ./images/entrypoint.sh /
 
