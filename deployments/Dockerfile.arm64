@@ -14,7 +14,7 @@ RUN  cd /usr/src/multus-cni && \
 FROM arm64v8/centos:7
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
-RUN yum update
+RUN yum update -y
 
 WORKDIR /
 ADD ./images/entrypoint.sh /

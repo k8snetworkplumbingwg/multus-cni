@@ -15,7 +15,7 @@ RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
 FROM centos:centos7
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni /usr/src/multus-cni
-RUN yum update
+RUN yum update -y
 WORKDIR /
 
 ADD ./images/entrypoint.sh /
