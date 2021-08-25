@@ -191,7 +191,7 @@ For additional confirmation, use `kubectl describe pod samplepod` and there will
 
 ```
 Annotations:        k8s.v1.cni.cncf.io/networks: macvlan-conf
-                    k8s.v1.cni.cncf.io/networks-status:
+                    k8s.v1.cni.cncf.io/network-status:
                       [{
                           "name": "cbr0",
                           "ips": [
