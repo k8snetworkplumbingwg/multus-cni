@@ -165,6 +165,23 @@ spec:
           mountPath: /host/opt/cni/bin
         - name: multus-cfg
           mountPath: /tmp/multus-conf
+      initContainers:
+      - name: install-multus-binary
+        image: localhost:5000/multus:e2e
+        command:
+          - "cp"
+          - "/usr/src/multus-cni/bin/multus"
+          - "/host/opt/cni/bin/multus"
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "15Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: cnibin
+            mountPath: /host/opt/cni/bin
+            mountPropagation: Bidirectional
       volumes:
         - name: cni
           hostPath:
