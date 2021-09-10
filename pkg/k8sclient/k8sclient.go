@@ -515,7 +515,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 		return delegate, resourceMap, nil
 	}
 
-	// option3) search directry
+	// option3) search directory
 	fInfo, err := os.Stat(netname)
 	if err == nil {
 		if fInfo.IsDir() {
