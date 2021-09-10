@@ -50,7 +50,7 @@ func getKubeletClient(kubeletSocket string) (types.ResourceClient, error) {
 	defer conn.Close()
 
 	if err := newClient.getPodResources(client); err != nil {
-		return nil, logging.Errorf("getKubeletClient: error ge tting pod resources from client: %v\n", err)
+		return nil, logging.Errorf("getKubeletClient: error getting pod resources from client: %v\n", err)
 	}
 
 	return newClient, nil

@@ -46,12 +46,12 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 * `logLevel` (string, optional): logging level ("debug", "error", "verbose", or "panic")
 * `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
-* `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready
+* `readinessindicatorfile`: The path to a file whose existence denotes that the default network is ready
 
 User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
 
-* `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
-* `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extention, .conf/.conflist) or directory for CNI config file
+* `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist) or directory for CNI config file
+* `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist) or directory for CNI config file
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
 * `delegates` ([]map,required): number of delegate details in the Multus
@@ -61,7 +61,7 @@ User should chose following parameters combination (`clusterNetwork`+`defaultNet
 Multus will find network for clusterNetwork/defaultNetworks as following sequences:
 
 1. CRD object for given network name, in 'kube-system' namespace
-1. CNI json config file in `confDir`. Given name should be without extention, like .conf/.conflist. (e.g. "test" for "test.conf"). The given name for `clusterNetwork` should match the value for `name` key in the config file (e.g. `"name": "test"` in "test.conf" when `"clusterNetwork": "test"`)
+1. CNI json config file in `confDir`. Given name should be without extension, like .conf/.conflist. (e.g. "test" for "test.conf"). The given name for `clusterNetwork` should match the value for `name` key in the config file (e.g. `"name": "test"` in "test.conf" when `"clusterNetwork": "test"`)
 1. Directory for CNI json config file. Multus will find alphabetically first file for the network
 1. Multus failed to find network. Multus raise error message
 
@@ -77,7 +77,7 @@ In this manner, you may prevent pods from crash looping, and instead wait for th
 
 Only one option is necessary to configure this functionality:
 
-* `readinessindicatorfile`: The path to a file whose existance denotes that the default network is ready.
+* `readinessindicatorfile`: The path to a file whose existence denotes that the default network is ready.
 
 *NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
 

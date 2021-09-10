@@ -42,7 +42,7 @@ sudo ./scripts/test.sh
 
 The following are the best practices for multus logging:
 
-* Add `logging.Debugf()` at the begining of functions
+* Add `logging.Debugf()` at the beginning of functions
 * In case of error handling, use `logging.Errorf()` with given error info
 * `logging.Panicf()` only be used for critical errors (it should NOT normally be used)
 

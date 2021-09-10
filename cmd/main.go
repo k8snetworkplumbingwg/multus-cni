@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is a "Multi-plugin".The delegate concept refered from CNI project
+// This is a "Multi-plugin".The delegate concept referred from CNI project
 // It reads other plugin netconf, and then invoke them, e.g.
 // flannel or sriov plugin.
 

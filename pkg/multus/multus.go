@@ -46,7 +46,7 @@ import (
 
 const (
 	shortPollDuration = 250 * time.Millisecond
-	shortPollTimeout = 2500 * time.Millisecond
+	shortPollTimeout  = 2500 * time.Millisecond
 )
 
 var (
@@ -288,7 +288,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf, cniArgs string) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v", exec, ifName, delegate, rt)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
-		return nil, logging.Errorf("delegateAdd: error setting envionment variable CNI_IFNAME")
+		return nil, logging.Errorf("delegateAdd: error setting environment variable CNI_IFNAME")
 	}
 
 	if err := validateIfName(os.Getenv("CNI_NETNS"), ifName); err != nil {
@@ -393,7 +393,7 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 func delegateCheck(exec invoke.Exec, ifName string, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
 	logging.Debugf("delegateCheck: %v, %s, %v, %v", exec, ifName, delegateConf, rt)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
-		return logging.Errorf("delegateCheck: error setting envionment variable CNI_IFNAME")
+		return logging.Errorf("delegateCheck: error setting environment variable CNI_IFNAME")
 	}
 
 	if logging.GetLoggingLevel() >= logging.VerboseLevel {
@@ -425,7 +425,7 @@ func delegateCheck(exec invoke.Exec, ifName string, delegateConf *types.Delegate
 func delegateDel(exec invoke.Exec, pod *v1.Pod, ifName string, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
 	logging.Debugf("delegateDel: %v, %v, %s, %v, %v", exec, pod, ifName, delegateConf, rt)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
-		return logging.Errorf("delegateDel: error setting envionment variable CNI_IFNAME")
+		return logging.Errorf("delegateDel: error setting environment variable CNI_IFNAME")
 	}
 
 	if logging.GetLoggingLevel() >= logging.VerboseLevel {

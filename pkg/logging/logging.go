@@ -94,7 +94,7 @@ func Errorf(format string, a ...interface{}) error {
 	return fmt.Errorf(format, a...)
 }
 
-// Panicf prints logging plus stack trace. This should be used only for unrecoverble error
+// Panicf prints logging plus stack trace. This should be used only for unrecoverable error
 func Panicf(format string, a ...interface{}) {
 	printf(PanicLevel, format, a...)
 	printf(PanicLevel, "========= Stack trace output ========")
