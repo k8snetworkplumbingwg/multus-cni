@@ -1,16 +1,11 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM centos:centos7 as build
+FROM golang:1.17.1 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
 
-ENV INSTALL_PKGS "git golang-1.15.13-0.el7.x86_64"
-RUN rpm --import https://mirror.go-repo.io/centos/RPM-GPG-KEY-GO-REPO && \
-    curl -s https://mirror.go-repo.io/centos/go-repo.repo | tee /etc/yum.repos.d/go-repo.repo && \
-    yum install -y $INSTALL_PKGS && \
-    rpm -V $INSTALL_PKGS && \
-    cd /usr/src/multus-cni && \
-    ./hack/build-go.sh
+RUN  cd /usr/src/multus-cni && \
+     ./hack/build-go.sh
 
 FROM centos:centos7
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
