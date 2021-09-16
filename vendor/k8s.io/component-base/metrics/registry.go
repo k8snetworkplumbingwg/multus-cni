@@ -30,12 +30,10 @@ import (
 )
 
 var (
-	showHiddenOnce      sync.Once
-	disabledMetricsLock sync.RWMutex
-	showHidden          atomic.Value
-	registries          []*kubeRegistry // stores all registries created by NewKubeRegistry()
-	registriesLock      sync.RWMutex
-	disabledMetrics     = map[string]struct{}{}
+	showHiddenOnce sync.Once
+	showHidden     atomic.Value
+	registries     []*kubeRegistry // stores all registries created by NewKubeRegistry()
+	registriesLock sync.RWMutex
 )
 
 // shouldHide be used to check if a specific metric with deprecated version should be hidden
@@ -61,12 +59,6 @@ func ValidateShowHiddenMetricsVersion(v string) []error {
 	}
 
 	return nil
-}
-
-func SetDisabledMetric(name string) {
-	disabledMetricsLock.Lock()
-	defer disabledMetricsLock.Unlock()
-	disabledMetrics[name] = struct{}{}
 }
 
 // SetShowHidden will enable showing hidden metrics. This will no-opt

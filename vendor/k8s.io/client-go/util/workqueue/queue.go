@@ -55,13 +55,7 @@ func newQueue(c clock.Clock, metrics queueMetrics, updatePeriod time.Duration) *
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
 	}
-
-	// Don't start the goroutine for a type of noMetrics so we don't consume
-	// resources unnecessarily
-	if _, ok := metrics.(noMetrics); !ok {
-		go t.updateUnfinishedWorkLoop()
-	}
-
+	go t.updateUnfinishedWorkLoop()
 	return t
 }
 

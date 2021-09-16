@@ -18,6 +18,7 @@ package exec
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -33,8 +34,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"golang.org/x/term"
-
+	"golang.org/x/crypto/ssh/terminal"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,6 +52,7 @@ import (
 )
 
 const execInfoEnv = "KUBERNETES_EXEC_INFO"
+const onRotateListWarningLength = 1000
 const installHintVerboseHelp = `
 
 It looks like you are trying to use a client-go credential plugin that is not installed.
@@ -176,12 +177,6 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 		return nil, fmt.Errorf("exec plugin: invalid apiVersion %q", config.APIVersion)
 	}
 
-	connTracker := connrotation.NewConnectionTracker()
-	defaultDialer := connrotation.NewDialerWithTracker(
-		(&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		connTracker,
-	)
-
 	a := &Authenticator{
 		cmd:                config.Command,
 		args:               config.Args,
@@ -198,12 +193,9 @@ func newAuthenticator(c *cache, config *api.ExecConfig, cluster *clientauthentic
 
 		stdin:       os.Stdin,
 		stderr:      os.Stderr,
-		interactive: term.IsTerminal(int(os.Stdin.Fd())),
+		interactive: terminal.IsTerminal(int(os.Stdout.Fd())),
 		now:         time.Now,
 		environ:     os.Environ,
-
-		defaultDialer: defaultDialer,
-		connTracker:   connTracker,
 	}
 
 	for _, env := range config.Env {
@@ -237,11 +229,6 @@ type Authenticator struct {
 	now         func() time.Time
 	environ     func() []string
 
-	// defaultDialer is used for clients which don't specify a custom dialer
-	defaultDialer *connrotation.Dialer
-	// connTracker tracks all connections opened that we need to close when rotating a client certificate
-	connTracker *connrotation.ConnectionTracker
-
 	// Cached results.
 	//
 	// The mutex also guards calling the plugin. Since the plugin could be
@@ -249,6 +236,8 @@ type Authenticator struct {
 	mu          sync.Mutex
 	cachedCreds *credentials
 	exp         time.Time
+
+	onRotateList []func()
 }
 
 type credentials struct {
@@ -277,12 +266,20 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	}
 	c.TLS.GetCert = a.cert
 
-	var d *connrotation.Dialer
+	var dial func(ctx context.Context, network, addr string) (net.Conn, error)
 	if c.Dial != nil {
-		// if c has a custom dialer, we have to wrap it
-		d = connrotation.NewDialerWithTracker(c.Dial, a.connTracker)
+		dial = c.Dial
 	} else {
-		d = a.defaultDialer
+		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	}
+	d := connrotation.NewDialer(dial)
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.onRotateList = append(a.onRotateList, d.CloseAll)
+	onRotateListLength := len(a.onRotateList)
+	if onRotateListLength > onRotateListWarningLength {
+		klog.Warningf("constructing many client instances from the same exec auth config can cause performance problems during cert rotation and can exhaust available network connections; %d clients constructed calling %q", onRotateListLength, a.cmd)
 	}
 
 	c.Dial = d.DialContext
@@ -401,9 +398,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		cmd.Stdin = a.stdin
 	}
 
-	err = cmd.Run()
-	incrementCallsMetric(err)
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		return a.wrapCmdRunErrorLocked(err)
 	}
 
@@ -463,7 +458,9 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		if oldCreds.cert != nil && oldCreds.cert.Leaf != nil {
 			metrics.ClientCertRotationAge.Observe(time.Now().Sub(oldCreds.cert.Leaf.NotBefore))
 		}
-		a.connTracker.CloseAll()
+		for _, onRotate := range a.onRotateList {
+			onRotate()
+		}
 	}
 
 	expiry := time.Time{}
