@@ -53,8 +53,6 @@ const (
 	VolumeStatsInodesKey         = "volume_stats_inodes"
 	VolumeStatsInodesFreeKey     = "volume_stats_inodes_free"
 	VolumeStatsInodesUsedKey     = "volume_stats_inodes_used"
-	RunningPodsKey               = "running_pods"
-	RunningContainersKey         = "running_containers"
 	// Metrics keys of remote runtime operations
 	RuntimeOperationsKey         = "runtime_operations_total"
 	RuntimeOperationsDurationKey = "runtime_operations_duration_seconds"
@@ -63,11 +61,7 @@ const (
 	DevicePluginRegistrationCountKey  = "device_plugin_registration_total"
 	DevicePluginAllocationDurationKey = "device_plugin_alloc_duration_seconds"
 	// Metrics keys of pod resources operations
-	PodResourcesEndpointRequestsTotalKey          = "pod_resources_endpoint_requests_total"
-	PodResourcesEndpointRequestsListKey           = "pod_resources_endpoint_requests_list"
-	PodResourcesEndpointRequestsGetAllocatableKey = "pod_resources_endpoint_requests_get_allocatable"
-	PodResourcesEndpointErrorsListKey             = "pod_resources_endpoint_errors_list"
-	PodResourcesEndpointErrorsGetAllocatableKey   = "pod_resources_endpoint_errors_get_allocatable"
+	PodResourcesEndpointRequestsTotalKey = "pod_resources_endpoint_requests_total"
 
 	// Metric keys for node config
 	AssignedConfigKey             = "node_config_assigned"
@@ -96,13 +90,13 @@ var (
 		},
 		[]string{NodeLabelKey},
 	)
-	// ContainersPerPodCount is a Histogram that tracks the number of containers per pod.
+	// ContainersPerPodCount is a Counter that tracks the number of containers per pod.
 	ContainersPerPodCount = metrics.NewHistogram(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           "containers_per_pod_count",
 			Help:           "The number of containers per pod.",
-			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -297,54 +291,6 @@ var (
 		[]string{"server_api_version"},
 	)
 
-	// PodResourcesEndpointRequestsListCount is a Counter that tracks the number of requests to the PodResource List() endpoint.
-	// Broken down by server API version.
-	PodResourcesEndpointRequestsListCount = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsListKey,
-			Help:           "Number of requests to the PodResource List endpoint. Broken down by server api version.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"server_api_version"},
-	)
-
-	// PodResourcesEndpointRequestsGetAllocatableCount is a Counter that tracks the number of requests to the PodResource GetAllocatableResources() endpoint.
-	// Broken down by server API version.
-	PodResourcesEndpointRequestsGetAllocatableCount = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointRequestsGetAllocatableKey,
-			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint. Broken down by server api version.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"server_api_version"},
-	)
-
-	// PodResourcesEndpointErrorsListCount is a Counter that tracks the number of errors returned by he PodResource List() endpoint.
-	// Broken down by server API version.
-	PodResourcesEndpointErrorsListCount = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsListKey,
-			Help:           "Number of requests to the PodResource List endpoint which returned error. Broken down by server api version.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"server_api_version"},
-	)
-
-	// PodResourcesEndpointErrorsGetAllocatableCount is a Counter that tracks the number of errors returned by the PodResource GetAllocatableResources() endpoint.
-	// Broken down by server API version.
-	PodResourcesEndpointErrorsGetAllocatableCount = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      KubeletSubsystem,
-			Name:           PodResourcesEndpointErrorsGetAllocatableKey,
-			Help:           "Number of requests to the PodResource GetAllocatableResources endpoint which returned error. Broken down by server api version.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"server_api_version"},
-	)
-
 	// Metrics for node config
 
 	// AssignedConfig is a Gauge that is set 1 if the Kubelet has a NodeConfig assigned.
@@ -416,7 +362,7 @@ var (
 	RunningPodCount = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           RunningPodsKey,
+			Name:           "running_pods",
 			Help:           "Number of pods currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -425,7 +371,7 @@ var (
 	RunningContainerCount = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
-			Name:           RunningContainersKey,
+			Name:           "running_containers",
 			Help:           "Number of containers currently running",
 			StabilityLevel: metrics.ALPHA,
 		},
@@ -519,7 +465,7 @@ func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !AssignedConfig.Delete(assignedConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", "labels", assignedConfigLabels)
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", assignedConfigLabels)
 	}
 	// record the new timeseries
 	assignedConfigLabels = labels
@@ -541,7 +487,7 @@ func SetActiveConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !ActiveConfig.Delete(activeConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", "labels", activeConfigLabels)
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", activeConfigLabels)
 	}
 	// record the new timeseries
 	activeConfigLabels = labels
@@ -563,7 +509,7 @@ func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
 	if !LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels) {
-		klog.InfoS("Failed to delete metric for labels. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", "labels", lastKnownGoodConfigLabels)
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", lastKnownGoodConfigLabels)
 	}
 	// record the new timeseries
 	lastKnownGoodConfigLabels = labels

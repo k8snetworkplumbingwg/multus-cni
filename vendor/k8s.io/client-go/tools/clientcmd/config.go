@@ -374,7 +374,7 @@ func (p *persister) Persist(config map[string]string) error {
 	authInfo, ok := newConfig.AuthInfos[p.user]
 	if ok && authInfo.AuthProvider != nil {
 		authInfo.AuthProvider.Config = config
-		return ModifyConfig(p.configAccess, *newConfig, false)
+		ModifyConfig(p.configAccess, *newConfig, false)
 	}
 	return nil
 }

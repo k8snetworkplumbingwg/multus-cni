@@ -17,10 +17,8 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
@@ -31,9 +29,6 @@ type Counter struct {
 	lazyMetric
 	selfCollector
 }
-
-// The implementation of the Metric interface is expected by testutil.GetCounterMetricValue.
-var _ Metric = &Counter{}
 
 // NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
@@ -48,14 +43,6 @@ func NewCounter(opts *CounterOpts) *Counter {
 	kc.setPrometheusCounter(noop)
 	kc.lazyInit(kc, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return kc
-}
-
-func (c *Counter) Desc() *prometheus.Desc {
-	return c.metric.Desc()
-}
-
-func (c *Counter) Write(to *dto.Metric) error {
-	return c.metric.Write(to)
 }
 
 // Reset resets the underlying prometheus Counter to start counting from 0 again
@@ -92,11 +79,6 @@ func (c *Counter) initializeDeprecatedMetric() {
 	c.initializeMetric()
 }
 
-// WithContext allows the normal Counter metric to pass in context. The context is no-op now.
-func (c *Counter) WithContext(ctx context.Context) CounterMetric {
-	return c.CounterMetric
-}
-
 // CounterVec is the internal representation of our wrapping struct around prometheus
 // counterVecs. CounterVec implements both kubeCollector and CounterVecMetric.
 type CounterVec struct {
@@ -112,20 +94,13 @@ type CounterVec struct {
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 	opts.StabilityLevel.setDefaults()
 
-	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
-
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv, fqName)
+	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return cv
 }
 
@@ -165,9 +140,6 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	}
 	return v.CounterVec.WithLabelValues(lvs...)
 }
 
@@ -178,9 +150,6 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
-	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.CounterVec.With(labels)
 }
@@ -206,28 +175,4 @@ func (v *CounterVec) Reset() {
 	}
 
 	v.CounterVec.Reset()
-}
-
-// WithContext returns wrapped CounterVec with context
-func (v *CounterVec) WithContext(ctx context.Context) *CounterVecWithContext {
-	return &CounterVecWithContext{
-		ctx:        ctx,
-		CounterVec: *v,
-	}
-}
-
-// CounterVecWithContext is the wrapper of CounterVec with context.
-type CounterVecWithContext struct {
-	CounterVec
-	ctx context.Context
-}
-
-// WithLabelValues is the wrapper of CounterVec.WithLabelValues.
-func (vc *CounterVecWithContext) WithLabelValues(lvs ...string) CounterMetric {
-	return vc.CounterVec.WithLabelValues(lvs...)
-}
-
-// With is the wrapper of CounterVec.With.
-func (vc *CounterVecWithContext) With(labels map[string]string) CounterMetric {
-	return vc.CounterVec.With(labels)
 }

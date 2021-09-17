@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -74,11 +73,6 @@ func (g *Gauge) initializeDeprecatedMetric() {
 	g.initializeMetric()
 }
 
-// WithContext allows the normal Gauge metric to pass in context. The context is no-op now.
-func (g *Gauge) WithContext(ctx context.Context) GaugeMetric {
-	return g.GaugeMetric
-}
-
 // GaugeVec is the internal representation of our wrapping struct around prometheus
 // gaugeVecs. kubeGaugeVec implements both kubeCollector and KubeGaugeVec.
 type GaugeVec struct {
@@ -94,20 +88,13 @@ type GaugeVec struct {
 func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
 	opts.StabilityLevel.setDefaults()
 
-	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
-
 	cv := &GaugeVec{
 		GaugeVec:       noopGaugeVec,
 		GaugeOpts:      opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	cv.lazyInit(cv, fqName)
+	cv.lazyInit(cv, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return cv
 }
 
@@ -146,9 +133,6 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
 	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	}
 	return v.GaugeVec.WithLabelValues(lvs...)
 }
 
@@ -159,9 +143,6 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 func (v *GaugeVec) With(labels map[string]string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
-	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.GaugeVec.With(labels)
 }
@@ -209,28 +190,4 @@ func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
 	v := parseVersion(version.Get())
 
 	return newGaugeFunc(opts, function, v)
-}
-
-// WithContext returns wrapped GaugeVec with context
-func (v *GaugeVec) WithContext(ctx context.Context) *GaugeVecWithContext {
-	return &GaugeVecWithContext{
-		ctx:      ctx,
-		GaugeVec: *v,
-	}
-}
-
-// GaugeVecWithContext is the wrapper of GaugeVec with context.
-type GaugeVecWithContext struct {
-	GaugeVec
-	ctx context.Context
-}
-
-// WithLabelValues is the wrapper of GaugeVec.WithLabelValues.
-func (vc *GaugeVecWithContext) WithLabelValues(lvs ...string) GaugeMetric {
-	return vc.GaugeVec.WithLabelValues(lvs...)
-}
-
-// With is the wrapper of GaugeVec.With.
-func (vc *GaugeVecWithContext) With(labels map[string]string) GaugeMetric {
-	return vc.GaugeVec.With(labels)
 }

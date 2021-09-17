@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -75,11 +74,6 @@ func (s *Summary) initializeDeprecatedMetric() {
 	s.initializeMetric()
 }
 
-// WithContext allows the normal Summary metric to pass in context. The context is no-op now.
-func (s *Summary) WithContext(ctx context.Context) ObserverMetric {
-	return s.ObserverMetric
-}
-
 // SummaryVec is the internal representation of our wrapping struct around prometheus
 // summaryVecs.
 //
@@ -99,19 +93,12 @@ type SummaryVec struct {
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
 	opts.StabilityLevel.setDefaults()
 
-	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
-	allowListLock.RLock()
-	if allowList, ok := labelValueAllowLists[fqName]; ok {
-		opts.LabelValueAllowLists = allowList
-	}
-	allowListLock.RUnlock()
-
 	v := &SummaryVec{
 		SummaryOpts:    opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v, fqName)
+	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
 	return v
 }
 
@@ -146,9 +133,6 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
-	}
 	return v.SummaryVec.WithLabelValues(lvs...)
 }
 
@@ -159,9 +143,6 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 func (v *SummaryVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
-	}
-	if v.LabelValueAllowLists != nil {
-		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.SummaryVec.With(labels)
 }
@@ -187,28 +168,4 @@ func (v *SummaryVec) Reset() {
 	}
 
 	v.SummaryVec.Reset()
-}
-
-// WithContext returns wrapped SummaryVec with context
-func (v *SummaryVec) WithContext(ctx context.Context) *SummaryVecWithContext {
-	return &SummaryVecWithContext{
-		ctx:        ctx,
-		SummaryVec: *v,
-	}
-}
-
-// SummaryVecWithContext is the wrapper of SummaryVec with context.
-type SummaryVecWithContext struct {
-	SummaryVec
-	ctx context.Context
-}
-
-// WithLabelValues is the wrapper of SummaryVec.WithLabelValues.
-func (vc *SummaryVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
-	return vc.SummaryVec.WithLabelValues(lvs...)
-}
-
-// With is the wrapper of SummaryVec.With.
-func (vc *SummaryVecWithContext) With(labels map[string]string) ObserverMetric {
-	return vc.SummaryVec.With(labels)
 }
