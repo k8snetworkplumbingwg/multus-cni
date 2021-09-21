@@ -285,7 +285,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf, cniArgs string) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v", exec, ifName, delegate, rt)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, logging.Errorf("delegateAdd: error setting environment variable CNI_IFNAME")
@@ -297,11 +297,6 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 
 	// Deprecated in ver 3.5.
 	if delegate.MacRequest != "" || delegate.IPRequest != nil {
-		if cniArgs != "" {
-			cniArgs = fmt.Sprintf("%s;IgnoreUnknown=true", cniArgs)
-		} else {
-			cniArgs = "IgnoreUnknown=true"
-		}
 		if delegate.MacRequest != "" {
 			// validate Mac address
 			_, err := net.ParseMAC(delegate.MacRequest)
@@ -309,7 +304,6 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 				return nil, logging.Errorf("delegateAdd: failed to parse mac address %q", delegate.MacRequest)
 			}
 
-			cniArgs = fmt.Sprintf("%s;MAC=%s", cniArgs, delegate.MacRequest)
 			logging.Debugf("delegateAdd: set MAC address %q to %q", delegate.MacRequest, ifName)
 			rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
 		}
@@ -328,7 +322,6 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 			}
 
 			ips := strings.Join(delegate.IPRequest, ",")
-			cniArgs = fmt.Sprintf("%s;IP=%s", cniArgs, ips)
 			logging.Debugf("delegateAdd: set IP address %q to %q", ips, ifName)
 			rt.Args = append(rt.Args, [2]string{"IP", ips})
 		}
@@ -623,7 +616,6 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	var result, tmpResult cnitypes.Result
 	var netStatus []nettypes.NetworkStatus
-	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
@@ -637,7 +629,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		netName := ""
-		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n, cniArgs)
+		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
 			netName = delegate.Conf.Name
