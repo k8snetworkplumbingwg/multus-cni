@@ -71,6 +71,7 @@ func TestKubeletclient(t *testing.T) {
 }
 
 var testKubeletSocket string
+
 func setUp() error {
 	tempSocketDir, err := ioutil.TempDir("", "kubelet-resource-client")
 	if err != nil {
