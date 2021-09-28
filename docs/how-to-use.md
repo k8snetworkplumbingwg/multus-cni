@@ -21,7 +21,7 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
-    $ cat ./images/{multus-daemonset.yml,flannel-daemonset.yml} | kubectl apply -f -
+    $ cat ./deployments/multus-daemonset.yml | kubectl apply -f -
 
 If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 

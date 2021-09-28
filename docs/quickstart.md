@@ -15,7 +15,7 @@ Two things we'll refer to a number of times through this document are:
 
 Our installation method requires that you first have installed Kubernetes and have configured a default network -- that is, a CNI plugin that's used for your pod-to-pod connectivity. 
 
-We recommend Kubernetes 1.16 or later.
+We support Kubernetes versions that Kubernetes community supports. Please see [Supported versions](https://kubernetes.io/releases/version-skew-policy/#supported-versions) in Kubernetes document.
 
 To install Kubernetes, you may decide to use [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/), or potentially [kubespray](https://github.com/kubernetes-sigs/kubespray).
 
@@ -51,7 +51,7 @@ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cn
 We'll apply a YAML file with `kubectl` from this repo.
 
 ```
-$ cat ./images/multus-daemonset.yml | kubectl apply -f -
+$ cat ./deployments/multus-daemonset.yml | kubectl apply -f -
 ```
 
 ### What the Multus daemonset does

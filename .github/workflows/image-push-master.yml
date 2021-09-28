@@ -31,7 +31,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-amd64
             ghcr.io/${{ github.repository }}:snapshot-amd64
-          file: deployments/Dockerfile
+          file: images/Dockerfile
 
   push-arm64:
     name: Image push/arm64
@@ -60,7 +60,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-arm64
             ghcr.io/${{ github.repository }}:snapshot-arm64
-          file: deployments/Dockerfile.arm64
+          file: images/Dockerfile.arm64
 
   push-arm32:
     name: Image push/arm32
@@ -89,7 +89,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-arm32
             ghcr.io/${{ github.repository }}:snapshot-arm32
-          file: deployments/Dockerfile.arm32
+          file: images/Dockerfile.arm32
 
   push-ppc64le:
     name: Image push/ppc64le
@@ -118,7 +118,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-ppc64le
             ghcr.io/${{ github.repository }}:snapshot-ppc64le
-          file: deployments/Dockerfile.ppc64le
+          file: images/Dockerfile.ppc64le
 
   push-s390x:
     name: Image push/s390x
@@ -147,7 +147,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-s390x
             ghcr.io/${{ github.repository }}:snapshot-s390x
-          file: deployments/Dockerfile.s390x
+          file: images/Dockerfile.s390x
 
   push-origin:
     name: Image push/origin
@@ -176,7 +176,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest-origin
             ghcr.io/${{ github.repository }}:snapshot-origin
-          file: deployments/Dockerfile.openshift
+          file: images/Dockerfile.openshift
 
   push-manifest:
     needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
