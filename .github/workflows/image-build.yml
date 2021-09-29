@@ -17,7 +17,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-amd64
-          file: deployments/Dockerfile
+          file: images/Dockerfile
 
   build-arm64:
     name: Image build/arm64
@@ -35,7 +35,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-arm64
-          file: deployments/Dockerfile.arm64
+          file: images/Dockerfile.arm64
 
   build-arm32:
     name: Image build/arm32
@@ -53,7 +53,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-arm32
-          file: deployments/Dockerfile.arm32
+          file: images/Dockerfile.arm32
 
   build-ppc64le:
     name: Image build/ppc64le
@@ -71,7 +71,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-ppc64le
-          file: deployments/Dockerfile.ppc64le
+          file: images/Dockerfile.ppc64le
 
   build-s390:
     name: Image build/s390x
@@ -89,7 +89,7 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-s390x
-          file: deployments/Dockerfile.s390x
+          file: images/Dockerfile.s390x
 
   build-origin:
     name: Image build/origin
@@ -107,4 +107,4 @@ jobs:
           context: .
           push: false
           tags: ghcr.io/${{ github.repository }}:latest-origin
-          file: deployments/Dockerfile.openshift
+          file: images/Dockerfile.openshift

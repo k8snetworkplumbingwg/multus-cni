@@ -38,7 +38,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-amd64
             ${{ steps.docker_meta.outputs.tags }}-amd64
-          file: deployments/Dockerfile
+          file: images/Dockerfile
 
   push-arm64:
     name: Image push/arm64
@@ -74,7 +74,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-arm64
             ${{ steps.docker_meta.outputs.tags }}-arm64
-          file: deployments/Dockerfile.arm64
+          file: images/Dockerfile.arm64
 
   push-arm32:
     name: Image push/arm32
@@ -110,7 +110,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-arm32
             ${{ steps.docker_meta.outputs.tags }}-arm32
-          file: deployments/Dockerfile.arm32
+          file: images/Dockerfile.arm32
 
   push-ppc64le:
     name: Image push/ppc64le
@@ -146,7 +146,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-ppc64le
             ${{ steps.docker_meta.outputs.tags }}-ppc64le
-          file: deployments/Dockerfile.ppc64le
+          file: images/Dockerfile.ppc64le
 
   push-s390x:
     name: Image push/s390x
@@ -182,7 +182,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-s390x
             ${{ steps.docker_meta.outputs.tags }}-s390x
-          file: deployments/Dockerfile.s390x
+          file: images/Dockerfile.s390x
 
   push-origin:
     name: Image push/origin
@@ -218,7 +218,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:stable-origin
             ${{ steps.docker_meta.outputs.tags }}-origin
-          file: deployments/Dockerfile.openshift
+          file: images/Dockerfile.openshift
 
   push-manifest:
     needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
