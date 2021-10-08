@@ -103,15 +103,16 @@ func (m *Manager) OverrideNetworkName() error {
 	if networkName == "" {
 		return fmt.Errorf("the primary CNI Configuration does not feature the network name: %v", m.cniConfigData)
 	}
-	m.multusConfig.WithOverriddenName(networkName)
+	m.multusConfig.Mutate(WithOverriddenName(networkName))
 	return nil
 }
 
 func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface{}) {
 	cniConfig := dproxy.New(primaryCNIConfigData)
 	m.cniConfigData = cniConfig
-	m.multusConfig.withDelegates(primaryCNIConfigData)
-	m.multusConfig.withCapabilities(cniConfig)
+	m.multusConfig.Mutate(
+		withDelegates(primaryCNIConfigData),
+		withCapabilities(cniConfig))
 }
 
 // GenerateConfig generates a multus configuration from its current state

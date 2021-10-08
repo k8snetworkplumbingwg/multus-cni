@@ -32,6 +32,9 @@ const (
 	singleConfigCapabilityKey = "capabilities"
 )
 
+// Option mutates the `conf` object
+type Option func(conf *MultusConf)
+
 // MultusConf holds the multus configuration, and persists it to disk
 type MultusConf struct {
 	BinDir                   string          `json:"binDir,omitempty"`
@@ -51,8 +54,8 @@ type MultusConf struct {
 
 // NewMultusConfig creates a basic configuration generator. It can be mutated
 // via the `With...` methods.
-func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string) *MultusConf {
-	return &MultusConf{
+func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, configurationOptions ...Option) *MultusConf {
+	multusConfig := &MultusConf{
 		Name:         MultusDefaultNetworkName,
 		CNIVersion:   cniVersion,
 		Type:         pluginName,
@@ -60,6 +63,10 @@ func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string) *M
 		Kubeconfig:   kubeconfig,
 		Delegates:    []interface{}{},
 	}
+	for _, configOption := range configurationOptions {
+		configOption(multusConfig)
+	}
+	return multusConfig
 }
 
 // Generate generates the multus configuration from whatever state is currently
@@ -69,55 +76,79 @@ func (mc *MultusConf) Generate() (string, error) {
 	return string(data), err
 }
 
+// Mutate updates the MultusConf attributes according to the provided
+// configuration `Option`s
+func (mc *MultusConf) Mutate(configurationOptions ...Option) {
+	for _, configOption := range configurationOptions {
+		configOption(mc)
+	}
+}
+
 // WithNamespaceIsolation mutates the inner state to enable the
 // NamespaceIsolation attribute
-func (mc *MultusConf) WithNamespaceIsolation() {
-	mc.NamespaceIsolation = true
+func WithNamespaceIsolation() Option {
+	return func(conf *MultusConf) {
+		conf.NamespaceIsolation = true
+	}
 }
 
 // WithGlobalNamespaces mutates the inner state to set the
 // RawNonIsolatedNamespaces attribute
-func (mc *MultusConf) WithGlobalNamespaces(globalNamespaces string) {
-	mc.RawNonIsolatedNamespaces = globalNamespaces
+func WithGlobalNamespaces(globalNamespaces string) Option {
+	return func(conf *MultusConf) {
+		conf.RawNonIsolatedNamespaces = globalNamespaces
+	}
 }
 
 // WithLogToStdErr mutates the inner state to enable the
 // WithLogToStdErr attribute
-func (mc *MultusConf) WithLogToStdErr() {
-	mc.LogToStderr = true
+func WithLogToStdErr() Option {
+	return func(conf *MultusConf) {
+		conf.LogToStderr = true
+	}
 }
 
 // WithLogLevel mutates the inner state to set the
 // LogLevel attribute
-func (mc *MultusConf) WithLogLevel(logLevel string) {
-	mc.LogLevel = logLevel
+func WithLogLevel(logLevel string) Option {
+	return func(conf *MultusConf) {
+		conf.LogLevel = logLevel
+	}
 }
 
 // WithLogFile mutates the inner state to set the
 // logFile attribute
-func (mc *MultusConf) WithLogFile(logFile string) {
-	mc.LogFile = logFile
+func WithLogFile(logFile string) Option {
+	return func(conf *MultusConf) {
+		conf.LogFile = logFile
+	}
 }
 
 // WithReadinessFileIndicator mutates the inner state to set the
 // ReadinessIndicatorFile attribute
-func (mc *MultusConf) WithReadinessFileIndicator(path string) {
-	mc.ReadinessIndicatorFile = path
+func WithReadinessFileIndicator(path string) Option {
+	return func(conf *MultusConf) {
+		conf.ReadinessIndicatorFile = path
+	}
 }
 
 // WithAdditionalBinaryFileDir mutates the inner state to set the
 // BinDir attribute
-func (mc *MultusConf) WithAdditionalBinaryFileDir(directoryPath string) {
-	mc.BinDir = directoryPath
+func WithAdditionalBinaryFileDir(directoryPath string) Option {
+	return func(conf *MultusConf) {
+		conf.BinDir = directoryPath
+	}
 }
 
 // WithOverriddenName mutates the inner state to set the
 // Name attribute
-func (mc *MultusConf) WithOverriddenName(networkName string) {
-	mc.Name = networkName
+func WithOverriddenName(networkName string) Option {
+	return func(conf *MultusConf) {
+		conf.Name = networkName
+	}
 }
 
-func (mc *MultusConf) withCapabilities(cniData dproxy.Proxy) {
+func withCapabilities(cniData dproxy.Proxy) Option {
 	var enabledCapabilities []string
 	pluginsList, err := cniData.M(configListCapabilityKey).Array()
 	if err != nil {
@@ -133,13 +164,17 @@ func (mc *MultusConf) withCapabilities(cniData dproxy.Proxy) {
 		enabledCapabilities = extractCapabilities(cniData)
 	}
 
-	for _, capability := range enabledCapabilities {
-		mc.Capabilities[capability] = true
+	return func(conf *MultusConf) {
+		for _, capability := range enabledCapabilities {
+			conf.Capabilities[capability] = true
+		}
 	}
 }
 
-func (mc *MultusConf) withDelegates(primaryCNIConfigData interface{}) {
-	mc.Delegates = []interface{}{primaryCNIConfigData}
+func withDelegates(primaryCNIConfigData interface{}) Option {
+	return func(conf *MultusConf) {
+		conf.Delegates = []interface{}{primaryCNIConfigData}
+	}
 }
 
 func extractCapabilities(capabilitiesProxy dproxy.Proxy) []string {

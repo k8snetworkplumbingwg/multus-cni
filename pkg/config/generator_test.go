@@ -45,8 +45,8 @@ var primaryCNIConfig = map[string]interface{}{
 	"logfile-maxage":     5,
 }
 
-func newMultusConfigWithDelegates(pluginName string, cniVersion string, kubeconfig string, primaryCNIPluginConfig interface{}) *MultusConf {
-	multusConfig := NewMultusConfig(pluginName, cniVersion, kubeconfig)
+func newMultusConfigWithDelegates(pluginName string, cniVersion string, kubeconfig string, primaryCNIPluginConfig interface{}, configOptions ...Option) *MultusConf {
+	multusConfig := NewMultusConfig(pluginName, cniVersion, kubeconfig, configOptions...)
 	multusConfig.Delegates = []interface{}{primaryCNIPluginConfig}
 	return multusConfig
 }
@@ -66,8 +66,8 @@ func TestMultusConfigWithNamespaceIsolation(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithNamespaceIsolation()
+		primaryCNIConfig,
+		WithNamespaceIsolation())
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"namespaceIsolation\":true,\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -77,8 +77,8 @@ func TestMultusConfigWithReadinessIndicator(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithReadinessFileIndicator("/a/b/u/it-lives")
+		primaryCNIConfig,
+		WithReadinessFileIndicator("/a/b/u/it-lives"))
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"readinessindicatorfile\":\"/a/b/u/it-lives\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -88,10 +88,10 @@ func TestMultusConfigWithLoggingConfiguration(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithLogLevel("notice")
-	multusConfig.WithLogToStdErr()
-	multusConfig.WithLogFile("/u/y/w/log.1")
+		primaryCNIConfig,
+		WithLogLevel("notice"),
+		WithLogToStdErr(),
+		WithLogFile("/u/y/w/log.1"))
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logFile\":\"/u/y/w/log.1\",\"logLevel\":\"notice\",\"logToStderr\":true,\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -102,8 +102,8 @@ func TestMultusConfigWithGlobalNamespace(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithGlobalNamespaces(globalNamespace)
+		primaryCNIConfig,
+		WithGlobalNamespaces(globalNamespace))
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"globalNamespaces\":\"come-along-ns\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -114,8 +114,8 @@ func TestMultusConfigWithAdditionalBinDir(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithAdditionalBinaryFileDir(anotherCNIBinDir)
+		primaryCNIConfig,
+		WithAdditionalBinaryFileDir(anotherCNIBinDir))
 	expectedResult := "{\"binDir\":\"a-dir-somewhere\",\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -125,9 +125,9 @@ func TestMultusConfigWithCapabilities(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`{"capabilities": {"portMappings": true}}`))
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`{"capabilities": {"portMappings": true}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -137,9 +137,9 @@ func TestMultusConfigWithMultipleCapabilities(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`))
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -149,9 +149,9 @@ func TestMultusConfigWithMultipleCapabilitiesFilterOnlyEnabled(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`))
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -161,9 +161,9 @@ func TestMultusConfigWithMultipleCapabilitiesDefinedOnAPlugin(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`))
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -173,9 +173,9 @@ func TestMultusConfigWithCapabilitiesDefinedOnMultiplePlugins(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`{"plugins": [ {"capabilities": { "portMappings": true }}, {"capabilities": { "tuning": true }} ]}`))
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`{"plugins": [ {"capabilities": { "portMappings": true }}, {"capabilities": { "tuning": true }} ]}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -185,9 +185,9 @@ func TestMultusConfigWithCapabilitiesDefinedOnMultiplePluginsFilterOnlyEnabled(t
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.withCapabilities(
-		documentProxyHelper(`
+		primaryCNIConfig,
+		withCapabilities(
+			documentProxyHelper(`
 {
     "plugins": [
         {
@@ -201,7 +201,7 @@ func TestMultusConfigWithCapabilitiesDefinedOnMultiplePluginsFilterOnlyEnabled(t
             }
         }
     ]
-}`))
+}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -212,8 +212,8 @@ func TestMultusConfigWithOverriddenName(t *testing.T) {
 		primaryCNIName,
 		cniVersion,
 		kubeconfig,
-		primaryCNIConfig)
-	multusConfig.WithOverriddenName(newNetworkName)
+		primaryCNIConfig,
+		WithOverriddenName(newNetworkName))
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"mega-net-2000\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }

@@ -104,34 +104,42 @@ func main() {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
-		multusConfig := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig)
+		var configurationOptions []config.Option
 		if *namespaceIsolation {
-			multusConfig.WithNamespaceIsolation()
+			configurationOptions = append(
+				configurationOptions, config.WithNamespaceIsolation())
 		}
 
 		if *globalNamespaces != defaultMultusGlobalNamespaces {
-			multusConfig.WithGlobalNamespaces(*globalNamespaces)
+			configurationOptions = append(
+				configurationOptions, config.WithGlobalNamespaces(*globalNamespaces))
 		}
 
 		if *logToStdErr != defaultMultusLogToStdErr {
-			multusConfig.WithLogToStdErr()
+			configurationOptions = append(
+				configurationOptions, config.WithLogToStdErr())
 		}
 
 		if *logLevel != defaultMultusLogLevel {
-			multusConfig.WithLogLevel(*logLevel)
+			configurationOptions = append(
+				configurationOptions, config.WithLogLevel(*logLevel))
 		}
 
 		if *logFile != defaultMultusLogFile {
-			multusConfig.WithLogFile(*logFile)
+			configurationOptions = append(
+				configurationOptions, config.WithLogFile(*logFile))
 		}
 
 		if *additionalBinDir != defaultMultusAdditionalBinDir {
-			multusConfig.WithAdditionalBinaryFileDir(*additionalBinDir)
+			configurationOptions = append(
+				configurationOptions, config.WithAdditionalBinaryFileDir(*additionalBinDir))
 		}
 
 		if *readinessIndicator != defaultMultusReadinessIndicatorFile {
-			multusConfig.WithReadinessFileIndicator(*readinessIndicator)
+			configurationOptions = append(
+				configurationOptions, config.WithReadinessFileIndicator(*readinessIndicator))
 		}
+		multusConfig := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig, configurationOptions...)
 
 		var configManager *config.Manager
 		var err error
