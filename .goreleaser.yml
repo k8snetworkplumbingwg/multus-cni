@@ -18,6 +18,8 @@ builds:
   - arm
   - arm64
   - s390x
+  ldflags:
+  - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.date={{ .Date }}
 archives:
   - wrap_in_directory: true
 checksum:
