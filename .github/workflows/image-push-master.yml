@@ -33,6 +33,16 @@ jobs:
             ghcr.io/${{ github.repository }}:snapshot-amd64
           file: images/Dockerfile
 
+      - name: Push container image for daemon based deployment
+        if: github.repository_owner == 'k8snetworkplumbingwg'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:thick-amd64
+          file: images/Dockerfile.thick
+
   push-arm64:
     name: Image push/arm64
     runs-on: ubuntu-latest
@@ -223,3 +233,8 @@ jobs:
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-ppc64le --arch ppc64le
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-s390x --arch s390x
           docker manifest push ${{ env.REPOSITORY }}:latest
+
+          docker pull ${{ env.REPOSITORY }}:thick-amd64
+          docker manifest create ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64 --arch amd64
+          docker manifest push ${{ env.REPOSITORY }}:thick

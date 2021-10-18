@@ -120,7 +120,7 @@ spec:
       serviceAccountName: multus
       containers:
         - name: kube-multus
-          image: docker.io/maiqueb/multus
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
           command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
           args:
             - "-cni-version=0.3.1"
