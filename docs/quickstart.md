@@ -51,7 +51,7 @@ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cn
 We'll apply a YAML file with `kubectl` from this repo.
 
 ```
-$ cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+$ cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
 ```
 
 ### What the Multus daemonset does
