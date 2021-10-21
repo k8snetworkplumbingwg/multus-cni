@@ -849,6 +849,10 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		if v.ConfListPlugin == true && v.ConfList.CNIVersion == "" && in.CNIVersion != "" {
 			v.ConfList.CNIVersion = in.CNIVersion
 			v.Bytes, err = json.Marshal(v.ConfList)
+			if err != nil {
+				// error happen but continue to delete
+				logging.Errorf("Multus: failed to marshal delegate %q config: %v", v.Name, err)
+			}
 		}
 	}
 
