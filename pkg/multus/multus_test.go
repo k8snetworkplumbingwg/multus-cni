@@ -1236,7 +1236,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
+		Expect(err).To(MatchError("[//:other1]: error adding container to network \"other1\": expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {
@@ -1390,6 +1390,116 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 				"protocol": "udp"
 			}]
 		},
+		"cniVersion": "0.3.1"
+	}`
+		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin(nil, "net1", expectedNet1, &current.Result{
+			CNIVersion: "0.3.1",
+			IPs: []*current.IPConfig{{
+				Address: *testhelpers.EnsureCIDR("1.1.1.3/24"),
+			},
+			},
+		}, nil)
+
+		clientInfo := NewFakeClientInfo()
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = clientInfo.AddNetAttachDef(
+			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
+		Expect(err).NotTo(HaveOccurred())
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		result, err := CmdAdd(args, fExec, clientInfo)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		r := result.(*current.Result)
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+	})
+
+	It("fails when pod UID is provided and does not match Kube API pod UID", func() {
+		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"capabilities": {"mac": true, "ips": true, "bandwidth": true, "portMappings": true},
+		"cniVersion": "0.3.1"
+	}`
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s;K8S_POD_UID=foobar", fakePod.Name, fakePod.Namespace),
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.3.1",
+	        "type": "weave-net"
+	    }]
+	}`),
+		}
+
+		clientInfo := NewFakeClientInfo()
+		_, err := clientInfo.Client.CoreV1().Pods(fakePod.Namespace).Create(
+			context.TODO(), fakePod, metav1.CreateOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		_, err = clientInfo.AddNetAttachDef(
+			testhelpers.NewFakeNetAttachDef(fakePod.Namespace, "net1", net1))
+		Expect(err).NotTo(HaveOccurred())
+
+		os.Setenv("CNI_COMMAND", "ADD")
+		os.Setenv("CNI_IFNAME", "eth0")
+		_, err = CmdAdd(args, &fakeExec{}, clientInfo)
+		Expect(err.Error()).To(ContainSubstring("expected pod UID \"foobar\" but got %q from Kube API", fakePod.UID))
+	})
+
+	It("executes delegates when runtime provides a matching pod UID", func() {
+		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
+		net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.3.1"
+	}`
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s;K8S_POD_UID=%s", fakePod.Name, fakePod.Namespace, fakePod.UID),
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.3.1",
+	        "type": "weave-net"
+	    }]
+	}`),
+		}
+
+		fExec := &fakeExec{}
+		expectedResult1 := &current.Result{
+			CNIVersion: resultCNIVersion,
+			IPs: []*current.IPConfig{{
+				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.3.1",
+	    "type": "weave-net"
+	}`
+		expectedNet1 := `{
+		"name": "net1",
+		"type": "mynet",
 		"cniVersion": "0.3.1"
 	}`
 		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
@@ -2486,7 +2596,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		_, err = CmdAdd(args, fExec, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
-		Expect(err).To(MatchError("[/:other1]: error adding container to network \"other1\": expected plugin failure"))
+		Expect(err).To(MatchError("[//:other1]: error adding container to network \"other1\": expected plugin failure"))
 
 		// Cleanup default network file.
 		if _, errStat := os.Stat(configPath); errStat == nil {

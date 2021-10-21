@@ -114,9 +114,14 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 
 	podName := string(k8sArgs.K8S_POD_NAME)
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podUID := string(k8sArgs.K8S_POD_UID)
 	pod, err := client.GetPod(podNamespace, podName)
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", podName, err)
+	}
+
+	if podUID != "" && string(pod.UID) != podUID {
+		return logging.Errorf("SetNetworkStatus: expected pod %s/%s UID %q but got %q from Kube API", podNamespace, podName, podUID, pod.UID)
 	}
 
 	if netStatus != nil {
