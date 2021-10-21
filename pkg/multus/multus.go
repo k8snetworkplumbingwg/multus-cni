@@ -496,7 +496,7 @@ func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *type
 func cmdErr(k8sArgs *types.K8sArgs, format string, args ...interface{}) error {
 	prefix := "Multus: "
 	if k8sArgs != nil {
-		prefix += fmt.Sprintf("[%s/%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
+		prefix += fmt.Sprintf("[%s/%s/%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, k8sArgs.K8S_POD_UID)
 	}
 	return logging.Errorf(prefix+format, args...)
 }
@@ -504,7 +504,7 @@ func cmdErr(k8sArgs *types.K8sArgs, format string, args ...interface{}) error {
 func cmdPluginErr(k8sArgs *types.K8sArgs, confName string, format string, args ...interface{}) error {
 	msg := ""
 	if k8sArgs != nil {
-		msg += fmt.Sprintf("[%s/%s:%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, confName)
+		msg += fmt.Sprintf("[%s/%s/%s:%s]: ", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, k8sArgs.K8S_POD_UID, confName)
 	}
 	return logging.Errorf(msg+format, args...)
 }
@@ -519,6 +519,43 @@ func isCriticalRequestRetriable(err error) bool {
 		}
 	}
 	return false
+}
+
+func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, ignoreNotFound bool) (*v1.Pod, error) {
+	if kubeClient == nil {
+		return nil, nil
+	}
+
+	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podName := string(k8sArgs.K8S_POD_NAME)
+	podUID := string(k8sArgs.K8S_POD_UID)
+
+	pod, err := kubeClient.GetPod(podNamespace, podName)
+	if err != nil {
+		// in case of a retriable error, retry 10 times with 0.25 sec interval
+		if isCriticalRequestRetriable(err) {
+			waitErr := wait.PollImmediate(shortPollDuration, shortPollTimeout, func() (bool, error) {
+				pod, err = kubeClient.GetPod(podNamespace, podName)
+				return pod != nil, err
+			})
+			// retry failed, then return error with retry out
+			if waitErr != nil {
+				return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
+			}
+		} else if ignoreNotFound && errors.IsNotFound(err) {
+			// If not found, proceed to remove interface with cache
+			return nil, nil
+		} else {
+			// Other case, return error
+			return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
+		}
+	}
+
+	if podUID != "" && string(pod.UID) != podUID {
+		return nil, cmdErr(k8sArgs, "expected pod UID %q but got %q from Kube API", podUID, pod.UID)
+	}
+
+	return pod, nil
 }
 
 //CmdAdd ...
@@ -549,26 +586,9 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	pod := (*v1.Pod)(nil)
-	if kubeClient != nil {
-		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-		if err != nil {
-			var waitErr error
-			// in case of a retriable error, retry 10 times with 0.25 sec interval
-			if isCriticalRequestRetriable(err) {
-				waitErr = wait.PollImmediate(shortPollDuration, shortPollTimeout, func() (bool, error) {
-					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-					return pod != nil, err
-				})
-				// retry failed, then return error with retry out
-				if waitErr != nil {
-					return nil, cmdErr(k8sArgs, "error getting pod with error: %v", err)
-				}
-			} else {
-				// Other case, return error
-				return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
-			}
-		}
+	pod, err := getPod(kubeClient, k8sArgs, false)
+	if err != nil {
+		return nil, err
 	}
 
 	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
@@ -774,29 +794,9 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return cmdErr(nil, "error getting k8s client: %v", err)
 	}
 
-	pod := (*v1.Pod)(nil)
-	if kubeClient != nil {
-		pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-		if err != nil {
-			var waitErr error
-			// in case of a retriable error, retry 10 times with 0.25 sec interval
-			if isCriticalRequestRetriable(err) {
-				waitErr = wait.PollImmediate(shortPollDuration, shortPollTimeout, func() (bool, error) {
-					pod, err = kubeClient.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-					return pod != nil, err
-				})
-				// retry failed, then return error with retry out
-				if waitErr != nil {
-					return cmdErr(k8sArgs, "error getting pod with error: %v", err)
-				}
-			} else if errors.IsNotFound(err) {
-				// If not found, proceed to remove interface with cache
-				pod = nil
-			} else {
-				// Other case, return error
-				return cmdErr(k8sArgs, "error getting pod: %v", err)
-			}
-		}
+	pod, err := getPod(kubeClient, k8sArgs, true)
+	if err != nil {
+		return err
 	}
 
 	// Read the cache to get delegates json for the pod
