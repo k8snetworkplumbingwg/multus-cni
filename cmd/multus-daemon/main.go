@@ -20,21 +20,30 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"os/user"
 	"path/filepath"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/controller"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const (
-	multusPluginName     = "multus"
-	multusConfigFileName = "00-multus.conf"
+	multusPluginName = "multus"
 )
 
 const (
@@ -70,6 +79,9 @@ const (
 	multusCNIDirVarName           = "cniDir"
 	multusBinDirVarName           = "binDir"
 )
+
+// defines default resync period between k8s API server and controller
+const syncPeriod = time.Second * 5
 
 func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -195,13 +207,31 @@ func main() {
 				_ = logging.Errorf("error watching file: %v", err)
 			}
 		}(make(chan struct{}), configWatcherDoneChannel)
-
-		<-configWatcherDoneChannel
+		go func() {
+			<-configWatcherDoneChannel
+		}()
 	} else {
 		if err := copyUserProvidedConfig(*multusConfigFile, *cniConfigDir); err != nil {
 			logging.Errorf("failed to copy the user provided configuration %s: %v", *multusConfigFile, err)
 		}
 	}
+
+	stopChan := make(chan struct{})
+	defer close(stopChan)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		stopChan <- struct{}{}
+		os.Exit(1)
+	}()
+
+	networkController, err := newPodNetworksController(stopChan)
+	if err != nil {
+		_ = logging.Errorf("could not create the pod networks controller: %v", err)
+	}
+
+	networkController.Start(stopChan)
 }
 
 func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
@@ -256,4 +286,34 @@ func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error 
 		return fmt.Errorf("error copying file - copied only %d bytes out of %d", nBytes, srcFileInfo.Size())
 	}
 	return nil
+}
+
+func newPodNetworksController(stopChannel chan struct{}) (*controller.PodNetworksController, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to implicitly generate the kubeconfig: %w", err)
+	}
+
+	k8sClientSet, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the Kubernetes client: %w", err)
+	}
+
+	k8sPodFilteredInformer := v1coreinformers.NewFilteredPodInformer(
+		k8sClientSet,
+		metav1.NamespaceAll,
+		syncPeriod,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		filterByHostSelector)
+	networkController, err := controller.NewPodNetworksController(k8sClientSet, k8sPodFilteredInformer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the pod networks controller: %w", err)
+	}
+
+	k8sPodFilteredInformer.Run(stopChannel)
+	return networkController, nil
+}
+
+func filterByHostSelector(opts *metav1.ListOptions) {
+	opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", os.Getenv("HOSTNAME")).String()
 }
