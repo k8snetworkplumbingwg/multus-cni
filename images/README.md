@@ -41,9 +41,7 @@ in lexicographical order in cni-conf-dir).
 ./entrypoint.sh
     -h --help
     --cni-conf-dir=/host/etc/cni/net.d
-    --cni-bin-dir=/host/opt/cni/bin
     --multus-conf-file=/usr/src/multus-cni/images/70-multus.conf
-    --multus-bin-file=/usr/src/multus-cni/bin/multus
     --multus-kubeconfig-file-host=/etc/cni/net.d/multus.d/multus.kubeconfig
 ```
 
