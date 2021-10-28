@@ -16,9 +16,9 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
-
-	"github.com/koron/go-dproxy"
 )
 
 const (
@@ -127,7 +127,7 @@ func TestMultusConfigWithCapabilities(t *testing.T) {
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`{"capabilities": {"portMappings": true}}`)))
+			documentHelper(`{"capabilities": {"portMappings": true}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -139,7 +139,7 @@ func TestMultusConfigWithMultipleCapabilities(t *testing.T) {
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)))
+			documentHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -151,7 +151,7 @@ func TestMultusConfigWithMultipleCapabilitiesFilterOnlyEnabled(t *testing.T) {
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)))
+			documentHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -163,7 +163,7 @@ func TestMultusConfigWithMultipleCapabilitiesDefinedOnAPlugin(t *testing.T) {
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)))
+			documentHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -175,7 +175,7 @@ func TestMultusConfigWithCapabilitiesDefinedOnMultiplePlugins(t *testing.T) {
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`{"plugins": [ {"capabilities": { "portMappings": true }}, {"capabilities": { "tuning": true }} ]}`)))
+			documentHelper(`{"plugins": [ {"capabilities": { "portMappings": true }}, {"capabilities": { "tuning": true }} ]}`)))
 	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
@@ -187,7 +187,7 @@ func TestMultusConfigWithCapabilitiesDefinedOnMultiplePluginsFilterOnlyEnabled(t
 		kubeconfig,
 		primaryCNIConfig,
 		withCapabilities(
-			documentProxyHelper(`
+			documentHelper(`
 {
     "plugins": [
         {
@@ -235,7 +235,15 @@ func (tc testCase) assertResult(expectedResult string) {
 	}
 }
 
-func documentProxyHelper(pluginInfo string) dproxy.Proxy {
-	dp, _ := documentProxy([]byte(pluginInfo))
+func documentHelper(pluginInfo string) interface{} {
+	dp, _ := documentCNIData([]byte(pluginInfo))
 	return dp
+}
+
+func documentCNIData(masterCNIConfigData []byte) (interface{}, error) {
+	var cniData interface{}
+	if err := json.Unmarshal(masterCNIConfigData, &cniData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall the delegate CNI configuration: %w", err)
+	}
+	return cniData, nil
 }
