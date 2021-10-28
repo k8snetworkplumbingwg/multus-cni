@@ -209,6 +209,11 @@ jobs:
         if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
           # get artifacts from previous steps
+          docker pull ${{ env.REPOSITORY }}:thick-amd64
+          docker manifest create ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64 --arch amd64
+          docker manifest push ${{ env.REPOSITORY }}:thick
+
           docker pull ${{ env.REPOSITORY }}:snapshot-amd64
           docker pull ${{ env.REPOSITORY }}:snapshot-arm64
           docker pull ${{ env.REPOSITORY }}:snapshot-arm32
@@ -233,8 +238,3 @@ jobs:
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-ppc64le --arch ppc64le
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-s390x --arch s390x
           docker manifest push ${{ env.REPOSITORY }}:latest
-
-          docker pull ${{ env.REPOSITORY }}:thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:thick
