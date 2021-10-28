@@ -3,19 +3,23 @@ set -o errexit
 
 export PATH=${PATH}:./bin
 
+# define the OCI binary to be used. Acceptable values are `docker`, `podman`.
+# Defaults to `docker`.
+OCI_BIN="${OCI_BIN:-docker}"
+
 kind_network='kind'
 reg_name='kind-registry'
 reg_port='5000'
-running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
+running="$($OCI_BIN inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
 if [ "${running}" != 'true' ]; then
   # run registry and push the multus image
-  docker run -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" registry:2
-  docker build -t localhost:5000/multus:e2e -f ../deployments/Dockerfile ..
-  docker push localhost:5000/multus:e2e
+  $OCI_BIN run -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" registry:2
+  $OCI_BIN build -t localhost:5000/multus:e2e -f ../images/Dockerfile ..
+  $OCI_BIN push localhost:5000/multus:e2e
 fi
 reg_host="${reg_name}"
 if [ "${kind_network}" = "bridge" ]; then
-    reg_host="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' "${reg_name}")"
+    reg_host="$($OCI_BIN inspect -f '{{.NetworkSettings.IPAddress}}' "${reg_name}")"
 fi
 echo "Registry Host: ${reg_host}"
 
@@ -45,7 +49,7 @@ data:
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
 
-containers=$(docker network inspect ${kind_network} -f "{{range .Containers}}{{.Name}} {{end}}")
+containers=$($OCI_BIN network inspect ${kind_network} -f "{{range .Containers}}{{.Name}} {{end}}")
 needs_connect="true"
 for c in $containers; do
   if [ "$c" = "${reg_name}" ]; then
@@ -53,11 +57,14 @@ for c in $containers; do
   fi
 done
 if [ "${needs_connect}" = "true" ]; then
-  docker network connect "${kind_network}" "${reg_name}" || true
+  $OCI_BIN network connect "${kind_network}" "${reg_name}" || true
 fi
 
+worker1_pid=$($OCI_BIN inspect --format "{{ .State.Pid }}" kind-worker)
+worker2_pid=$($OCI_BIN inspect --format "{{ .State.Pid }}" kind-worker2)
+
 kind export kubeconfig
-sudo env PATH=${PATH} koko -d kind-worker,eth1 -d kind-worker2,eth1
+sudo env PATH=${PATH} koko -p "$worker1_pid,eth1" -p "$worker2_pid,eth1"
 sleep 1
 kubectl -n kube-system wait --for=condition=available deploy/coredns --timeout=300s
 kubectl create -f multus-daemonset.yml

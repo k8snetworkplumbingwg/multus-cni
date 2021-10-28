@@ -145,15 +145,10 @@ spec:
       containers:
       - name: kube-multus
         image: localhost:5000/multus:e2e
-        command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
+        command: ["/entrypoint.sh"]
         args:
-        - "-multus-conf-file=auto"
-        - "-cni-version=0.3.1"
-        - "-cni-config-dir=/host/etc/cni/net.d"
-        - "-multus-autoconfig-dir=/host/etc/cni/net.d"
-        - "-multus-log-to-stderr=true"
-        - "-multus-log-level=debug"
-        - "-multus-log-file=/tmp/multus.log"
+        - "--multus-conf-file=auto"
+        - "--cni-version=0.3.1"
         resources:
           requests:
             cpu: "100m"
@@ -204,6 +199,24 @@ spec:
           - name: cni
             mountPath: /host/etc/cni/net.d
             mountPropagation: Bidirectional
+      - name: generate-multus-config
+        image: localhost:5000/multus:e2e
+        command:
+          - "/usr/src/multus-cni/bin/generate-multus-cni-config"
+        args:
+          - "-cni-version=0.3.1"
+          - "-cni-config-dir=/host/etc/cni/net.d"
+          - "-multus-autoconfig-dir=/host/etc/cni/net.d"
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "15Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: cni
+          mountPath: /host/etc/cni/net.d
+          mountPropagation: Bidirectional
       volumes:
         - name: cni
           hostPath:

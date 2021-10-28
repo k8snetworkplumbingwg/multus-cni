@@ -40,6 +40,17 @@ jobs:
             ${{ steps.docker_meta.outputs.tags }}-amd64
           file: images/Dockerfile
 
+      - name: Push container image for daemon based deployment
+        if: github.repository_owner == 'k8snetworkplumbingwg'
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:thick-amd64
+            ${{ steps.docker_meta.outputs.tags }}-thick-amd64
+          file: images/Dockerfile.thick
+
   push-arm64:
     name: Image push/arm64
     runs-on: ubuntu-latest

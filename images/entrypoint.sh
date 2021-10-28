@@ -12,11 +12,9 @@ trap exitonsigterm SIGTERM
 
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
-CNI_BIN_DIR="/host/opt/cni/bin"
 ADDITIONAL_BIN_DIR=""
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
-MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_TEMP_KUBECONFIG="/tmp/multus.kubeconfig"
 MULTUS_MASTER_CNI_FILE_NAME=""
@@ -36,22 +34,19 @@ SKIP_BINARY_COPY=false
 # Give help text for parameters.
 function usage()
 {
-    echo -e "This is an entrypoint script for Multus CNI to overlay its binary and "
-    echo -e "configuration into locations in a filesystem. The configuration & binary file "
-    echo -e "will be copied to the corresponding configuration directory. When "
-    echo -e "'--multus-conf-file=auto' is used, 00-multus.conf will be automatically "
-    echo -e "generated from the CNI configuration file of the master plugin (the first file "
-    echo -e "in lexicographical order in cni-conf-dir). When '--multus-master-cni-file-name'"
-    echo -e "is used, 00-multus.conf will only be automatically generated from the specific"
-    echo -e "file rather than the first file."
+    echo -e "This is an entrypoint script for Multus CNI to overlay its configuration into"
+    echo -e "locations in a filesystem. The configuration file will be copied to the"
+    echo -e "corresponding configuration directory. When '--multus-conf-file=auto' is used,"
+    echo -e "00-multus.conf will be automatically generated from the CNI configuration file"
+    echo -e "of the master plugin (the first file in lexicographical order in cni-conf-dir)."
+    echo -e "When '--multus-master-cni-file-name' is used, 00-multus.conf will be"
+    echo -e "automatically generated from the specific file rather than the first file."
     echo -e ""
     echo -e "./entrypoint.sh"
     echo -e "\t-h --help"
     echo -e "\t--cni-conf-dir=$CNI_CONF_DIR"
-    echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
     echo -e "\t--cni-version=<cniVersion (e.g. 0.3.1)>"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
-    echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--skip-multus-binary-copy=$SKIP_BINARY_COPY"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--multus-master-cni-file-name=$MULTUS_MASTER_CNI_FILE_NAME (empty by default, example: 10-calico.conflist)"
@@ -103,14 +98,8 @@ while [ "$1" != "" ]; do
         --cni-conf-dir)
             CNI_CONF_DIR=$VALUE
             ;;
-        --cni-bin-dir)
-            CNI_BIN_DIR=$VALUE
-            ;;
         --multus-conf-file)
             MULTUS_CONF_FILE=$VALUE
-            ;;
-        --multus-bin-file)
-            MULTUS_BIN_FILE=$VALUE
             ;;
         --multus-kubeconfig-file-host)
             MULTUS_KUBECONFIG_FILE_HOST=$VALUE
@@ -166,7 +155,7 @@ done
 
 
 # Create array of known locations
-declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
+declare -a arr=($CNI_CONF_DIR)
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   arr+=($MULTUS_CONF_FILE)
 fi
@@ -180,14 +169,6 @@ do
     exit 1;
   fi
 done
-
-# Copy files into place and atomically move into final binary name
-if [ "$SKIP_BINARY_COPY" = false ]; then
-  cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
-  mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus
-else
-  log "Entrypoint skipped copying Multus binary."
-fi
 
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR

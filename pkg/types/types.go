@@ -157,6 +157,7 @@ type K8sArgs struct {
 	K8S_POD_NAME               types.UnmarshallableString //revive:disable-line
 	K8S_POD_NAMESPACE          types.UnmarshallableString //revive:disable-line
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString //revive:disable-line
+	K8S_POD_UID                types.UnmarshallableString //revive:disable-line
 }
 
 // ResourceInfo is struct to hold Pod device allocation information
