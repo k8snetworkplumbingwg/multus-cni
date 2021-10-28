@@ -142,8 +142,6 @@ spec:
               mountPath: /host/etc/cni/net.d
             - name: cnibin
               mountPath: /host/opt/cni/bin
-            - name: multus-cfg
-              mountPath: /tmp/multus-conf
       initContainers:
         - name: install-multus-binary
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable

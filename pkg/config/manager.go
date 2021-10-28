@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/koron/go-dproxy"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 )
@@ -36,7 +35,7 @@ const (
 // Manager monitors the configuration of the primary CNI plugin, and
 // regenerates multus configuration whenever it gets updated.
 type Manager struct {
-	cniConfigData        dproxy.Proxy
+	cniConfigData	     map[string]interface{}
 	configWatcher        *fsnotify.Watcher
 	multusConfig         *MultusConf
 	multusConfigDir      string
@@ -96,10 +95,12 @@ func (m *Manager) loadPrimaryCNIConfigFromFile() error {
 // OverrideNetworkName overrides the name of the multus configuration with the
 // name of the delegated primary CNI.
 func (m *Manager) OverrideNetworkName() error {
-	networkName, err := m.cniConfigData.M("name").String()
-	if err != nil {
+	name, ok := m.cniConfigData["name"]
+	if !ok {
 		return fmt.Errorf("failed to access delegate CNI plugin name")
 	}
+	networkName := name.(string)
+
 	if networkName == "" {
 		return fmt.Errorf("the primary CNI Configuration does not feature the network name: %v", m.cniConfigData)
 	}
@@ -108,11 +109,12 @@ func (m *Manager) OverrideNetworkName() error {
 }
 
 func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface{}) {
-	cniConfig := dproxy.New(primaryCNIConfigData)
-	m.cniConfigData = cniConfig
+	cniConfigData := primaryCNIConfigData.(map[string]interface{})
+
+	m.cniConfigData = cniConfigData
 	m.multusConfig.Mutate(
-		withDelegates(primaryCNIConfigData),
-		withCapabilities(cniConfig))
+		withDelegates(cniConfigData),
+		withCapabilities(cniConfigData))
 }
 
 // GenerateConfig generates a multus configuration from its current state
@@ -222,12 +224,4 @@ func primaryCNIData(masterCNIPluginPath string) (interface{}, error) {
 		return nil, fmt.Errorf("failed to unmarshall primary CNI config: %w", err)
 	}
 	return cniData, nil
-}
-
-func documentProxy(masterCNIConfigData []byte) (dproxy.Proxy, error) {
-	var cniData interface{}
-	if err := json.Unmarshal(masterCNIConfigData, &cniData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshall the delegate CNI configuration: %w", err)
-	}
-	return dproxy.New(cniData), nil
 }

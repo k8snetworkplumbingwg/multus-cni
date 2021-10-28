@@ -95,9 +95,7 @@ var _ = Describe(suiteName, func() {
 				Op:   fsnotify.Write,
 			}))
 
-		updatedConfig, err := configManager.cniConfigData.Map()
-		Expect(err).NotTo(HaveOccurred())
-		bytes, err := json.Marshal(updatedConfig)
+		bytes, err := json.Marshal(configManager.cniConfigData)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(bytes)).To(Equal(newCNIConfig))
 

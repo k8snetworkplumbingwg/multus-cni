@@ -23,8 +23,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/koron/go-dproxy"
 )
 
 const (
@@ -148,17 +146,21 @@ func WithOverriddenName(networkName string) Option {
 	}
 }
 
-func withCapabilities(cniData dproxy.Proxy) Option {
+func withCapabilities(cniData interface{}) Option {
 	var enabledCapabilities []string
-	pluginsList, err := cniData.M(configListCapabilityKey).Array()
-	if err != nil {
-		pluginsList = nil
+	var pluginsList []interface{}
+	cniDataMap, ok := cniData.(map[string]interface{})
+	if ok {
+		if pluginsListEntry, ok := cniDataMap[configListCapabilityKey]; ok {
+			pluginsList = pluginsListEntry.([]interface{})
+		}
 	}
+
 	if len(pluginsList) > 0 {
 		for _, pluginData := range pluginsList {
 			enabledCapabilities = append(
 				enabledCapabilities,
-				extractCapabilities(dproxy.New(pluginData))...)
+				extractCapabilities(pluginData)...)
 		}
 	} else {
 		enabledCapabilities = extractCapabilities(cniData)
@@ -171,15 +173,23 @@ func withCapabilities(cniData dproxy.Proxy) Option {
 	}
 }
 
-func withDelegates(primaryCNIConfigData interface{}) Option {
+func withDelegates(primaryCNIConfigData map[string]interface{}) Option {
 	return func(conf *MultusConf) {
 		conf.Delegates = []interface{}{primaryCNIConfigData}
 	}
 }
 
-func extractCapabilities(capabilitiesProxy dproxy.Proxy) []string {
-	capabilities, err := capabilitiesProxy.M(singleConfigCapabilityKey).Map()
-	if err != nil {
+func extractCapabilities(capabilitiesInterface interface{}) []string {
+	capabilitiesMap, ok := capabilitiesInterface.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	capabilitiesMapEntry, ok := capabilitiesMap[singleConfigCapabilityKey]
+	if !ok {
+		return nil
+	}
+	capabilities, ok := capabilitiesMapEntry.(map[string]interface{})
+	if !ok {
 		return nil
 	}
 
