@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -14,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
@@ -34,10 +36,11 @@ type CNIParams struct {
 // PodNetworksController handles the cncf networks annotations update, and
 // triggers adding / removing networks from a running pod.
 type PodNetworksController struct {
-	k8sClientSet kubernetes.Interface
-	podsSynced   cache.InformerSynced
-	workqueue    workqueue.RateLimitingInterface
-	recorder     record.EventRecorder
+	k8sClientSet     kubernetes.Interface
+	podsSynced       cache.InformerSynced
+	workqueue        workqueue.RateLimitingInterface
+	recorder         record.EventRecorder
+	containerRuntime containerruntimes.ContainerRuntime
 }
 
 // NewPodNetworksController returns new PodNetworksController instance
@@ -49,13 +52,19 @@ func NewPodNetworksController(
 	eventBroadcaster.StartLogging(logging.Verbosef)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: k8sClientSet.CoreV1().Events(allNamespaces)})
 
+	containerRuntime, err := containerruntimes.NewRuntime("/run/containerd/containerd.sock", containerruntimes.Containerd)
+	if err != nil {
+		return nil, err
+	}
+
 	podNetworksController := &PodNetworksController{
 		k8sClientSet: k8sClientSet,
 		podsSynced:   podInformer.HasSynced,
 		workqueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"pod-networks-updates"),
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName}),
+		recorder:         eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName}),
+		containerRuntime: *containerRuntime,
 	}
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -99,13 +108,12 @@ func (pnc *PodNetworksController) handlePodUpdate(oldObj interface{}, newObj int
 	oldPod := oldObj.(*corev1.Pod)
 	newPod := newObj.(*corev1.Pod)
 
-	podNamespace := oldPod.GetNamespace()
-	podName := oldPod.GetName()
-	logging.Debugf("pod [%s] update", fmt.Sprintf("%s/%s", podNamespace, podName))
-
 	if reflect.DeepEqual(oldPod.Annotations, newPod.Annotations) {
 		return
 	}
+	podNamespace := oldPod.GetNamespace()
+	podName := oldPod.GetName()
+	logging.Debugf("pod [%s] update", fmt.Sprintf("%s/%s", podNamespace, podName))
 
 	oldNetworkSelectionElements, err := networkSelectionElements(oldPod.Annotations, podNamespace)
 	if err != nil {
@@ -124,6 +132,21 @@ func (pnc *PodNetworksController) handlePodUpdate(oldObj interface{}, newObj int
 	// to add
 	toAdd := exclusiveNetworks(newNetworkSelectionElements, oldNetworkSelectionElements)
 	logging.Verbosef("pods to add: %+v", toAdd)
+
+	if len(toAdd) > 0 {
+		cniParams, err := pnc.getCNIParams(newPod, toAdd[0])
+		if err != nil {
+			_ = logging.Errorf("failed to extract CNI params to hotplug new interface for pod %s: %v", podName, err)
+		}
+		logging.Verbosef("CNI params for pod %s: %+v", podName, cniParams)
+	}
+	if len(toRemove) > 0 {
+		cniParams, err := pnc.getCNIParams(newPod, toRemove[0])
+		if err != nil {
+			_ = logging.Errorf("failed to extract CNI params to remove existing interface from pod %s: %v", podName, err)
+		}
+		logging.Verbosef("CNI params for pod %s: %+v", podName, cniParams)
+	}
 }
 
 func networkSelectionElements(podAnnotations map[string]string, podNamespace string) ([]*types.NetworkSelectionElement, error) {
@@ -158,4 +181,35 @@ func listToSet(list []*types.NetworkSelectionElement) map[string]types.NetworkSe
 		set[list[k].Name] = *list[k]
 	}
 	return set
+}
+
+func (pnc *PodNetworksController) getCNIParams(podObj *corev1.Pod, netSelectionElement types.NetworkSelectionElement) (*CNIParams, error) {
+	podName := podObj.ObjectMeta.Name
+	namespace := podObj.ObjectMeta.Namespace
+	if containerID := getContainerID(podObj); containerID != "" {
+		netns, err := pnc.containerRuntime.NetNS(containerID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get netns for container [%s] netns: %w", containerID, err)
+		}
+
+		return &CNIParams{
+			Namespace:   namespace,
+			PodName:     podName,
+			SandboxID:   containerID,
+			NetnsPath:   netns,
+			NetworkName: netSelectionElement.Name,
+			IfMAC:       netSelectionElement.MacRequest,
+		}, nil
+	}
+	return nil, fmt.Errorf("failed to get pod %s container ID", podName)
+}
+
+func getContainerID(pod *corev1.Pod) string {
+	cidURI := pod.Status.ContainerStatuses[0].ContainerID
+	// format is docker://<cid>
+	parts := strings.Split(cidURI, "//")
+	if len(parts) > 1 {
+		return parts[1]
+	}
+	return cidURI
 }

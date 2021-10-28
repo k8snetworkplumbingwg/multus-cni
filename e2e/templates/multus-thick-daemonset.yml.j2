@@ -206,6 +206,10 @@ spec:
           mountPropagation: HostToContainer
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
+        - name: multus-cfg
+          mountPath: /tmp/multus-conf
+        - name: cri
+          mountPath: /run/containerd/containerd.sock
           readOnly: true
       initContainers:
       - name: install-multus-shim
@@ -248,7 +252,14 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
+<<<<<<< HEAD:e2e/templates/multus-thick-daemonset.yml.j2
         - name: multus-daemon-config
+=======
+        - name: cri
+          hostPath:
+            path: /run/containerd/containerd.sock
+        - name: multus-cfg
+>>>>>>> af05f6a9 (controller, containerd: add CRI runtime):e2e/multus-daemonset.yml
           configMap:
             name: multus-daemon-config
             items:
