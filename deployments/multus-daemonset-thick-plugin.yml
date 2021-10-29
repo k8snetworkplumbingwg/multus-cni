@@ -144,7 +144,7 @@ spec:
               mountPath: /host/opt/cni/bin
       initContainers:
         - name: install-multus-binary
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
           command:
             - "cp"
             - "/usr/src/multus-cni/bin/multus"
@@ -160,7 +160,7 @@ spec:
               mountPath: /host/opt/cni/bin
               mountPropagation: Bidirectional
         - name: generate-kubeconfig
-          image: docker.io/maiqueb/multus
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
           command:
             - "/usr/src/multus-cni/bin/generate-kubeconfig"
           args:
