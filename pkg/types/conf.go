@@ -38,6 +38,8 @@ const (
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
+	// MultusConfigFileName the defaukt file name of the multus config. file
+	MultusConfigFileName = "00-multus.conf"
 )
 
 // const block for multus-daemon configs
@@ -648,4 +650,9 @@ func CheckSystemNamespaces(namespace string, systemNamespaces []string) bool {
 		}
 	}
 	return false
+}
+
+// CniPluginConfigFilePath returns the path to the multus configuration file
+func CniPluginConfigFilePath(cniConfigDir string, cniConfigFileName string) string {
+	return cniConfigDir + fmt.Sprintf("/%s", cniConfigFileName)
 }

@@ -2,20 +2,28 @@ package controller
 
 import (
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/containernetworking/cni/pkg/skel"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
+	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
@@ -23,15 +31,6 @@ import (
 const allNamespaces = ""
 const controllerName = "multus-cni-pod-networks-controller"
 const podNetworksAnnot = "k8s.v1.cni.cncf.io/networks"
-
-type CNIParams struct {
-	Namespace   string
-	PodName     string
-	SandboxID   string
-	NetnsPath   string
-	NetworkName string
-	IfMAC       string
-}
 
 // PodNetworksController handles the cncf networks annotations update, and
 // triggers adding / removing networks from a running pod.
@@ -41,12 +40,18 @@ type PodNetworksController struct {
 	workqueue        workqueue.RateLimitingInterface
 	recorder         record.EventRecorder
 	containerRuntime containerruntimes.ContainerRuntime
+	cniPlugin        *cniclient.CniPlugin
+	confDir          string
+	k8sClientConfig  *rest.Config
 }
 
 // NewPodNetworksController returns new PodNetworksController instance
 func NewPodNetworksController(
 	k8sClientSet kubernetes.Interface,
-	podInformer cache.SharedIndexInformer) (*PodNetworksController, error) {
+	podInformer cache.SharedIndexInformer,
+	cniPlugin *cniclient.CniPlugin,
+	confDir string,
+	k8sClientConfig *rest.Config) (*PodNetworksController, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(logging.Verbosef)
@@ -65,6 +70,9 @@ func NewPodNetworksController(
 			"pod-networks-updates"),
 		recorder:         eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName}),
 		containerRuntime: *containerRuntime,
+		cniPlugin:        cniPlugin,
+		confDir:          confDir,
+		k8sClientConfig:  k8sClientConfig,
 	}
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -126,27 +134,123 @@ func (pnc *PodNetworksController) handlePodUpdate(oldObj interface{}, newObj int
 		_ = logging.Errorf("failed to compute the network selection elements from the *new* pod")
 		return
 	}
-	// to remove
-	toRemove := exclusiveNetworks(oldNetworkSelectionElements, newNetworkSelectionElements)
-	logging.Verbosef("pods to remove: %+v", toRemove)
-	// to add
-	toAdd := exclusiveNetworks(newNetworkSelectionElements, oldNetworkSelectionElements)
-	logging.Verbosef("pods to add: %+v", toAdd)
 
-	if len(toAdd) > 0 {
-		cniParams, err := pnc.getCNIParams(newPod, toAdd[0])
-		if err != nil {
-			_ = logging.Errorf("failed to extract CNI params to hotplug new interface for pod %s: %v", podName, err)
-		}
-		logging.Verbosef("CNI params for pod %s: %+v", podName, cniParams)
+	toAdd := exclusiveNetworks(newNetworkSelectionElements, oldNetworkSelectionElements)
+	if err := pnc.addNetworks(toAdd, newPod); err != nil {
+		_ = logging.Errorf("failed to *add* networks: %v", err)
 	}
-	if len(toRemove) > 0 {
-		cniParams, err := pnc.getCNIParams(newPod, toRemove[0])
-		if err != nil {
-			_ = logging.Errorf("failed to extract CNI params to remove existing interface from pod %s: %v", podName, err)
-		}
-		logging.Verbosef("CNI params for pod %s: %+v", podName, cniParams)
+
+	toRemove := exclusiveNetworks(oldNetworkSelectionElements, newNetworkSelectionElements)
+	if err := pnc.removeNetworks(toRemove, newPod); err != nil {
+		_ = logging.Errorf("failed to *remove* networks: %v", err)
 	}
+}
+
+func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelectionElement, pod *corev1.Pod) error {
+	for _, netToAdd := range netsToAdd {
+		cniParams, err := pnc.getCNIParams(pod, netToAdd)
+		if err != nil {
+			return logging.Errorf("failed to extract CNI params to hotplug new interface for pod %s: %v", pod.GetName(), err)
+		}
+		logging.Verbosef("CNI params for pod %s: %+v", pod.GetName(), cniParams)
+
+		k8sClient, err := pnc.k8sClient()
+		if err != nil {
+			return err
+		}
+
+		delegateConf, _, err := k8sclient.GetKubernetesDelegate(k8sClient, &netToAdd, pnc.confDir, pod, nil)
+		if err != nil {
+			return fmt.Errorf("error retrieving the delegate info: %w", err)
+		}
+
+		k8sArgs, _ := k8sclient.GetK8sArgs(&cniParams.CniCmdArgs)
+		multusNetconf, err := pnc.multusConf()
+		if err != nil {
+			return logging.Errorf("failed to retrieve the multus network: %v", err)
+		}
+
+		logging.Verbosef("the multus config: %+v", *multusNetconf)
+		if strings.HasPrefix(multusNetconf.BinDir, "/host") {
+			strings.ReplaceAll(multusNetconf.BinDir, "/host", "")
+		}
+		logging.Verbosef("the MUTATED multus config: %+v", *multusNetconf)
+		result, err := pnc.cniPlugin.AddNetworks(k8sClient, pod, &cniParams.CniCmdArgs, k8sArgs, delegateConf, cniParams.BuildRuntimeConf(), multusNetconf)
+		if err != nil {
+			return logging.Errorf("failed to remove network. error: %v", err)
+		}
+
+		logging.Verbosef("added network %s with iface name %s to pod %s; res: %+v", netToAdd.Name, cniParams.CniCmdArgs.IfName, pod.GetName(), result)
+	}
+	return nil
+}
+
+func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSelectionElement, pod *corev1.Pod) error {
+	for _, netToRemove := range netsToRemove {
+		cniParams, err := pnc.getCNIParams(pod, netToRemove)
+		if err != nil {
+			return logging.Errorf("failed to extract CNI params to remove existing interface from pod %s: %v", pod.GetName(), err)
+		}
+		logging.Verbosef("CNI params for pod %s: %+v", pod.GetName(), cniParams)
+
+		k8sClient, err := pnc.k8sClient()
+		if err != nil {
+			return err
+		}
+
+		delegateConf, _, err := k8sclient.GetKubernetesDelegate(k8sClient, &netToRemove, pnc.confDir, pod, nil)
+		if err != nil {
+			return fmt.Errorf("error retrieving the delegate info: %w", err)
+		}
+		k8sArgs, _ := k8sclient.GetK8sArgs(&cniParams.CniCmdArgs)
+
+		//rtConf := &libcni.RuntimeConf{
+		//	ContainerID: cniParams.CniCmdArgs.ContainerID,
+		//	IfName:      cniParams.CniCmdArgs.IfName,
+		//	NetNS:       cniParams.CniCmdArgs.Netns,
+		//	Args: [][2]string{
+		//		{"IgnoreUnknown", "true"},
+		//		{"K8S_POD_NAMESPACE", cniParams.Namespace},
+		//		{"K8S_POD_NAME", cniParams.PodName},
+		//		{"K8S_POD_INFRA_CONTAINER_ID", cniParams.CniCmdArgs.ContainerID},
+		//		{"K8S_POD_NETWORK", cniParams.NetworkName},
+		//	},
+		//}
+
+		multusNetconf, err := pnc.multusConf()
+
+		rtConf := types.DelegateRuntimeConfig(cniParams.CniCmdArgs.ContainerID, delegateConf, multusNetconf.RuntimeConfig, cniParams.CniCmdArgs.IfName)
+
+		if err != nil {
+			return logging.Errorf("failed to retrieve the multus network: %v", err)
+		}
+
+		logging.Verbosef("the multus config: %+v", *multusNetconf)
+		if strings.HasPrefix(multusNetconf.BinDir, "/host") {
+			strings.ReplaceAll(multusNetconf.BinDir, "/host", "")
+		}
+		logging.Verbosef("the MUTATED multus config: %+v", *multusNetconf)
+		if err := pnc.cniPlugin.RemoveNetworks(pod, &cniParams.CniCmdArgs, k8sArgs, delegateConf, rtConf, multusNetconf); err != nil {
+			//if err := multus.DelPlugins(nil, pod, &cniParams.CniCmdArgs, k8sArgs, []*types.DelegateNetConf{delegateConf}, 0, rtConf, multusNetconf); err != nil {
+			return logging.Errorf("failed to remove network. error: %v", err)
+		}
+		logging.Verbosef("removed network %s from pod %s with interface name: %s", netToRemove.Name, pod.GetName(), cniParams.CniCmdArgs.IfName)
+	}
+	return nil
+}
+
+func (pnc *PodNetworksController) k8sClient() (*k8sclient.ClientInfo, error) {
+	multusAPIClient, err := netclient.NewForConfig(pnc.k8sClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to instantiate a multus API client from the in-pod cluster config: %w", err)
+	}
+	k8sClient := &k8sclient.ClientInfo{
+		Client:           pnc.k8sClientSet,
+		NetClient:        multusAPIClient,
+		EventBroadcaster: nil,
+		EventRecorder:    pnc.recorder,
+	}
+	return k8sClient, nil
 }
 
 func networkSelectionElements(podAnnotations map[string]string, podNamespace string) ([]*types.NetworkSelectionElement, error) {
@@ -163,8 +267,8 @@ func networkSelectionElements(podAnnotations map[string]string, podNamespace str
 }
 
 func exclusiveNetworks(needles []*types.NetworkSelectionElement, haystack []*types.NetworkSelectionElement) []types.NetworkSelectionElement {
-	setOfNeedles := listToSet(needles)
-	haystackSet := listToSet(haystack)
+	setOfNeedles := indexNetworkSelectionElements(needles)
+	haystackSet := indexNetworkSelectionElements(haystack)
 
 	var unmatchedNetworks []types.NetworkSelectionElement
 	for needleNetName, needle := range setOfNeedles {
@@ -175,36 +279,64 @@ func exclusiveNetworks(needles []*types.NetworkSelectionElement, haystack []*typ
 	return unmatchedNetworks
 }
 
-func listToSet(list []*types.NetworkSelectionElement) map[string]types.NetworkSelectionElement {
-	set := make(map[string]types.NetworkSelectionElement) // New empty set
+func indexNetworkSelectionElements(list []*types.NetworkSelectionElement) map[string]types.NetworkSelectionElement {
+	indexedNetworkSelectionElements := make(map[string]types.NetworkSelectionElement)
 	for k := range list {
-		set[list[k].Name] = *list[k]
+		indexedNetworkSelectionElements[networkSelectionElementIndexKey(*list[k])] = *list[k]
 	}
-	return set
+	return indexedNetworkSelectionElements
 }
 
-func (pnc *PodNetworksController) getCNIParams(podObj *corev1.Pod, netSelectionElement types.NetworkSelectionElement) (*CNIParams, error) {
+func networkSelectionElementIndexKey(netSelectionElement types.NetworkSelectionElement) string {
+	if netSelectionElement.InterfaceRequest != "" {
+		return fmt.Sprintf(
+			"%s/%s/%s",
+			netSelectionElement.Namespace,
+			netSelectionElement.Name,
+			netSelectionElement.InterfaceRequest)
+	}
+
+	return fmt.Sprintf(
+		"%s/%s",
+		netSelectionElement.Namespace,
+		netSelectionElement.Name)
+}
+
+func (pnc *PodNetworksController) getCNIParams(podObj *corev1.Pod, netSelectionElement types.NetworkSelectionElement) (*cniclient.CNIParams, error) {
 	podName := podObj.ObjectMeta.Name
 	namespace := podObj.ObjectMeta.Namespace
-	if containerID := getContainerID(podObj); containerID != "" {
+	if containerID := podContainerID(podObj); containerID != "" {
 		netns, err := pnc.containerRuntime.NetNS(containerID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get netns for container [%s] netns: %w", containerID, err)
 		}
 
-		return &CNIParams{
+		interfaceName := netSelectionElement.InterfaceRequest
+		if interfaceName == "" {
+			// TODO: what is the correct default ?... for hotplug, at least,
+			// this *must* be defined.
+			interfaceName = "net1"
+		}
+
+		cmdArgs := skel.CmdArgs{
+			ContainerID: containerID,
+			Netns:       netns,
+			IfName:      interfaceName,
+			Args:        fmt.Sprintf("IgnoreUnknown=true;K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", podName, namespace),
+			Path:        "/opt/cni/bin", // TODO: what to put here ?
+			StdinData:   nil,            // TODO: what to put here ?
+		}
+		return &cniclient.CNIParams{
 			Namespace:   namespace,
 			PodName:     podName,
-			SandboxID:   containerID,
-			NetnsPath:   netns,
 			NetworkName: netSelectionElement.Name,
-			IfMAC:       netSelectionElement.MacRequest,
+			CniCmdArgs:  cmdArgs,
 		}, nil
 	}
 	return nil, fmt.Errorf("failed to get pod %s container ID", podName)
 }
 
-func getContainerID(pod *corev1.Pod) string {
+func podContainerID(pod *corev1.Pod) string {
 	cidURI := pod.Status.ContainerStatuses[0].ContainerID
 	// format is docker://<cid>
 	parts := strings.Split(cidURI, "//")
@@ -212,4 +344,14 @@ func getContainerID(pod *corev1.Pod) string {
 		return parts[1]
 	}
 	return cidURI
+}
+
+func (pnc *PodNetworksController) multusConf() (*types.NetConf, error) {
+	multusConfPath := types.CniPluginConfigFilePath(pnc.confDir, types.MultusConfigFileName)
+	multusConfData, err := ioutil.ReadFile(multusConfPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the multus conf from %s: %w", multusConfPath, err)
+	}
+
+	return types.LoadNetConf(multusConfData)
 }

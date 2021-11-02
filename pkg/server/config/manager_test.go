@@ -23,6 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const suiteName = "Configuration Manager"
@@ -106,7 +108,7 @@ var _ = Describe(suiteName, func() {
 			newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"yoyo-newnet\",\"type\":\"mycni\"}"
 			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), UserRWPermission)).To(Succeed())
 
-			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName)
+			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, types.MultusConfigFileName)
 			Eventually(func() (string, error) {
 				multusCniData, err := ioutil.ReadFile(multusCniConfigFile)
 				return string(multusCniData), err

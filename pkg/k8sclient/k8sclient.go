@@ -136,57 +136,64 @@ func SetPodNetworkStatusAnnotation(client *ClientInfo, podName string, podNamesp
 	return nil
 }
 
-func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
+// GetKubernetesDelegate returns the delegate configuration for a given `NetworkSelectionElement` on a pod.
+func GetKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
-	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
+	logging.Debugf("GetKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
 	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
 	if err != nil {
 		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 		if client != nil {
 			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
 		}
-		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: " + errMsg)
+		return nil, resourceMap, logging.Errorf("GetKubernetesDelegate: " + errMsg)
 	}
 
+	logging.Debugf("GetKubernetesDelegate: found custom resource: %+v", *customResource)
 	// Get resourceName annotation from NetworkAttachmentDefinition
 	deviceID := ""
 	resourceName, ok := customResource.GetAnnotations()[resourceNameAnnot]
 	if ok && pod.Name != "" && pod.Namespace != "" {
 		// ResourceName annotation is found; try to get device info from resourceMap
-		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
+		logging.Debugf("GetKubernetesDelegate: found resourceName annotation : %s", resourceName)
 
 		if resourceMap == nil {
 			ck, err := kubeletclient.GetResourceClient("")
 			if err != nil {
-				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get a ResourceClient instance: %v", err)
+				return nil, resourceMap, logging.Errorf("GetKubernetesDelegate: failed to get a ResourceClient instance: %v", err)
 			}
 			resourceMap, err = ck.GetPodResourceMap(pod)
 			if err != nil {
-				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from ResourceClient: %v", err)
+				return nil, resourceMap, logging.Errorf("GetKubernetesDelegate: failed to get resourceMap from ResourceClient: %v", err)
 			}
-			logging.Debugf("getKubernetesDelegate: resourceMap instance: %+v", resourceMap)
+			logging.Debugf("GetKubernetesDelegate: resourceMap instance: %+v", resourceMap)
 		}
 
 		entry, ok := resourceMap[resourceName]
 		if ok {
 			if idCount := len(entry.DeviceIDs); idCount > 0 && idCount > entry.Index {
 				deviceID = entry.DeviceIDs[entry.Index]
-				logging.Debugf("getKubernetesDelegate: podName: %s deviceID: %s", pod.Name, deviceID)
+				logging.Debugf("GetKubernetesDelegate: podName: %s deviceID: %s", pod.Name, deviceID)
 				entry.Index++ // increment Index for next delegate
 			}
 		}
 	}
-
+	logging.Debugf("GetKubernetesDelegate: about to read the custom resource CNI config for %s", customResource.Name)
 	configBytes, err := netutils.GetCNIConfig(customResource, confdir)
 	if err != nil {
 		return nil, resourceMap, err
 	}
 
+	logging.Debugf("GetKubernetesDelegate: got all tha tasty bytes from the custom resource. they are: %s", string(configBytes))
 	delegate, err := types.LoadDelegateNetConf(configBytes, net, deviceID, resourceName)
 	if err != nil {
 		return nil, resourceMap, err
 	}
-
+	if delegate != nil {
+		logging.Debugf("GetKubernetesDelegate: loaded those delegates: %+v", *delegate)
+	} else {
+		logging.Debugf("GetKubernetesDelegate: loaded those delegates: %+v", delegate)
+	}
 	return delegate, resourceMap, nil
 }
 
@@ -388,7 +395,7 @@ func GetNetworkDelegates(k8sclient *ClientInfo, pod *v1.Pod, networks []*types.N
 			}
 		}
 
-		delegate, updatedResourceMap, err := getKubernetesDelegate(k8sclient, net, conf.ConfDir, pod, resourceMap)
+		delegate, updatedResourceMap, err := GetKubernetesDelegate(k8sclient, net, conf.ConfDir, pod, resourceMap)
 		if err != nil {
 			return nil, logging.Errorf("GetNetworkDelegates: failed getting the delegate: %v", err)
 		}
@@ -415,7 +422,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 		Name:      netname,
 		Namespace: namespace,
 	}
-	delegate, resourceMap, err := getKubernetesDelegate(client, net, confdir, pod, resourceMap)
+	delegate, resourceMap, err := GetKubernetesDelegate(client, net, confdir, pod, resourceMap)
 	if err == nil {
 		return delegate, resourceMap, nil
 	}
@@ -519,7 +526,7 @@ func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, conf *type
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: more than one default network is specified: %s", netAnnot)
 	}
 
-	delegate, _, err := getKubernetesDelegate(kubeClient, networks[0], conf.ConfDir, pod, nil)
+	delegate, _, err := GetKubernetesDelegate(kubeClient, networks[0], conf.ConfDir, pod, nil)
 	if err != nil {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed getting the delegate: %v", err)
 	}

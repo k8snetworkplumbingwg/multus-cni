@@ -23,11 +23,11 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 // MultusDefaultNetworkName holds the default name of the multus network
 const (
-	multusConfigFileName     = "00-multus.conf"
 	MultusDefaultNetworkName = "multus-cni-network"
 	UserRWPermission         = 0600
 )
@@ -41,8 +41,8 @@ type Manager struct {
 	multusConfigDir      string
 	multusConfigFilePath string
 	primaryCNIConfigPath string
-	cniVersion	string
-	forceCNIVersion	bool
+	cniVersion           string
+	forceCNIVersion      bool
 }
 
 // NewManager returns a config manager object, configured to persist the
@@ -65,7 +65,7 @@ func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigD
 	return newManager(config, multusAutoconfigDir, primaryCNIPluginName, forceCNIVersion)
 }
 
-func newManager(config MultusConf, multusConfigDir,  defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
+func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
 	watcher, err := newWatcher(multusConfigDir)
 	if err != nil {
 		return nil, err
@@ -75,9 +75,9 @@ func newManager(config MultusConf, multusConfigDir,  defaultCNIPluginName string
 		configWatcher:        watcher,
 		multusConfig:         &config,
 		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
-		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
-		forceCNIVersion: forceCNIVersion,
+		forceCNIVersion:      forceCNIVersion,
+		multusConfigFilePath: types.CniPluginConfigFilePath(multusConfigDir, types.MultusConfigFileName),
+		primaryCNIConfigPath: types.CniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -188,10 +188,6 @@ func primaryCNIPluginName(multusAutoconfigDir string) (string, error) {
 		return "", fmt.Errorf("failed to find the cluster master CNI plugin: %w", err)
 	}
 	return masterCniConfigFileName, nil
-}
-
-func cniPluginConfigFilePath(cniConfigDir string, cniConfigFileName string) string {
-	return cniConfigDir + fmt.Sprintf("/%s", cniConfigFileName)
 }
 
 func newWatcher(cniConfigDir string) (*fsnotify.Watcher, error) {

@@ -35,6 +35,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/controller"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
@@ -226,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}()
 
-	networkController, err := newPodNetworksController(stopChan)
+	networkController, err := newPodNetworksController("/opt/cni/bin", *cniConfigDir, stopChan)
 	if err != nil {
 		_ = logging.Errorf("could not create the pod networks controller: %v", err)
 	}
@@ -288,7 +289,7 @@ func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error 
 	return nil
 }
 
-func newPodNetworksController(stopChannel chan struct{}) (*controller.PodNetworksController, error) {
+func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string, stopChannel chan struct{}) (*controller.PodNetworksController, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to implicitly generate the kubeconfig: %w", err)
@@ -305,7 +306,13 @@ func newPodNetworksController(stopChannel chan struct{}) (*controller.PodNetwork
 		syncPeriod,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		filterByHostSelector)
-	networkController, err := controller.NewPodNetworksController(k8sClientSet, k8sPodFilteredInformer)
+
+	networkController, err := controller.NewPodNetworksController(
+		k8sClientSet,
+		k8sPodFilteredInformer,
+		cniclient.NewCNI(hostNamespaceCniBinDir),
+		cniConfigDir,
+		cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the pod networks controller: %w", err)
 	}
