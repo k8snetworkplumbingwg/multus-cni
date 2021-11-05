@@ -158,6 +158,13 @@ type K8sArgs struct {
 	K8S_POD_NAMESPACE          types.UnmarshallableString //revive:disable-line
 	K8S_POD_INFRA_CONTAINER_ID types.UnmarshallableString //revive:disable-line
 	K8S_POD_UID                types.UnmarshallableString //revive:disable-line
+	K8S_POD_NETWORK            types.UnmarshallableString //revive:disable-line
+}
+
+// IsMutatingRunningPod indicates if Multus is supposed to add / remove an
+// interface to / from a running pod.
+func (k *K8sArgs) IsMutatingRunningPod() bool {
+	return k.K8S_POD_NETWORK != ""
 }
 
 // ResourceInfo is struct to hold Pod device allocation information

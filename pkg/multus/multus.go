@@ -604,9 +604,15 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		n.Delegates[0].MasterPlugin = true
 	}
 
-	_, kc, err := k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
-	if err != nil {
-		return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
+	var kc *k8s.ClientInfo
+	if !k8sArgs.IsMutatingRunningPod() {
+		var err error
+		_, kc, err = k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
+		if err != nil {
+			return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
+		}
+	} else {
+		// TODO: load delegates from the specific network / interface.
 	}
 
 	// cache the multus config
@@ -707,6 +713,9 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	// set the network status annotation in apiserver, only in case Multus as kubeconfig
 	if n.Kubeconfig != "" && kc != nil {
+		if k8sArgs.IsMutatingRunningPod() {
+			// TODO: must gather existing net status, and append the new status to it
+		}
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
@@ -813,8 +822,13 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				in.Delegates[0].MasterPlugin = true
 			}
 
-			// Get pod annotation and so on
-			_, _, err := k8s.TryLoadPodDelegates(pod, in, kubeClient, nil)
+			var err error
+			if !k8sArgs.IsMutatingRunningPod() {
+				// Get pod annotation and so on
+				_, _, err = k8s.TryLoadPodDelegates(pod, in, kubeClient, nil)
+			} else {
+				// TODO: load delegates from the specific network / interface.
+			}
 			if err != nil {
 				if len(in.Delegates) == 0 {
 					// No delegate available so send error
@@ -830,18 +844,22 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			return nil
 		}
 	} else {
-		defer os.Remove(path)
-		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
-			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
-		}
-		// check plugins field and enable ConfListPlugin if there is
-		for _, v := range in.Delegates {
-			if len(v.ConfList.Plugins) != 0 {
-				v.ConfListPlugin = true
+		if !k8sArgs.IsMutatingRunningPod() {
+			defer os.Remove(path)
+			if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
+				return cmdErr(k8sArgs, "failed to load netconf: %v", err)
 			}
+			// check plugins field and enable ConfListPlugin if there is
+			for _, v := range in.Delegates {
+				if len(v.ConfList.Plugins) != 0 {
+					v.ConfListPlugin = true
+				}
+			}
+			// First delegate is always the master plugin
+			in.Delegates[0].MasterPlugin = true
+		} else {
+			// TODO: just create the delegate for the **single** network / interface to be hot-unplugged.
 		}
-		// First delegate is always the master plugin
-		in.Delegates[0].MasterPlugin = true
 	}
 
 	// set CNIVersion in delegate CNI config if there is no CNIVersion and multus conf have CNIVersion.
@@ -859,8 +877,13 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if in.Kubeconfig != "" {
 		if netnsfound {
+			var networkStatusToPersist []nettypes.NetworkStatus
+			if k8sArgs.IsMutatingRunningPod() {
+				// TODO: must extract the current network-status, and remove the entry corresponding to the
+				// network / interface being hot-unplugged.
+			}
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
-				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)
+				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, networkStatusToPersist, in)
 				if err != nil {
 					// error happen but continue to delete
 					logging.Errorf("Multus: error unsetting the networks status: %v", err)
