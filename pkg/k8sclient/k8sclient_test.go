@@ -32,6 +32,7 @@ import (
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	. "github.com/onsi/ginkgo"
@@ -227,7 +228,7 @@ var _ = Describe("k8sclient operations", func() {
 		pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
 		networks, err := GetPodNetwork(pod)
 		Expect(len(networks)).To(Equal(0))
-		Expect(err).To(MatchError("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
+		Expect(err).To(MatchError("ParsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: invalid character 'a' looking for beginning of value"))
 	})
 
 	It("can set the default-gateway on an additional interface", func() {
@@ -1507,6 +1508,113 @@ users:
 
 			err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Context("hotplug new interfaces", func() {
+		var k8sClient *ClientInfo
+		var pod *v1.Pod
+		var conf *types.NetConf
+
+		BeforeEach(func() {
+			net1 := `{ "name": "net1", "type": "fakecni", "ips": [ "10.10.10.10/24" ], "interface": "pluggediface1", "namespace": "kube-system" }`
+			podNetworksAnnotations := fmt.Sprintf("[ %s ]", net1)
+			fakePod := testutils.NewFakePod(fakePodName, podNetworksAnnotations, "")
+
+			k8sClient = NewFakeClientInfo()
+			pod, err = k8sClient.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = k8sClient.AddNetAttachDef(testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			confString := `{
+    "name":"node-cni-network",
+    "type":"multus",
+    "clusterNetwork": "net2",
+    "multusNamespace" : "kube-system",
+    "kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+}`
+			conf, err = types.LoadNetConf([]byte(confString))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Loads delegates for network + interface being hot-plugged", func() {
+			numK8sDelegates, _, err := TryLoadPodHotpluggedDelegates(pod, conf, k8sClient, nil, "net1", "pluggediface1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(numK8sDelegates).To(Equal(1))
+			Expect(conf.Delegates[0].Conf.Name).To(Equal("net1"))
+			Expect(conf.Delegates[0].Conf.Type).To(Equal("fakecni"))
+		})
+
+		It("fails to load delegate while adding an interface when an un-existing *network* is requested", func() {
+			numK8sDelegates, _, err := TryLoadPodHotpluggedDelegates(pod, conf, k8sClient, nil, "net2", "pluggediface1")
+			Expect(err).To(MatchError(&NoK8sNetworkError{message: "could not find network: net2; iface: pluggediface1 in the pod's annotations"}))
+			Expect(numK8sDelegates).To(Equal(0))
+		})
+
+		It("fails to load delegate while adding an interface when an un-existing *interface* is requested", func() {
+			numK8sDelegates, _, err := TryLoadPodHotpluggedDelegates(pod, conf, k8sClient, nil, "net1", "pluggediface2")
+			Expect(err).To(MatchError(&NoK8sNetworkError{message: "could not find network: net1; iface: pluggediface2 in the pod's annotations"}))
+			Expect(numK8sDelegates).To(Equal(0))
+		})
+	})
+
+	Context("hot unplug existing interfaces", func() {
+		const (
+			nsName  = "kube-system"
+			netName = "net1"
+		)
+
+		var k8sClient *ClientInfo
+		var pod *v1.Pod
+		var conf *types.NetConf
+
+		BeforeEach(func() {
+			net1 := `{ "name": "net1", "type": "fakecni", "ips": [ "10.10.10.10/24" ], "interface": "pluggediface1", "namespace": "kube-system" }`
+			fakePod := testutils.NewFakePod(fakePodName, "", "")
+
+			iface1NetStatus := nettypes.NetworkStatus{
+				Name:      networkName(nsName, netName),
+				Interface: "pluggediface1",
+				IPs:       []string{"10.10.10.10/24"},
+			}
+
+			k8sClient = NewFakeClientInfo()
+			Expect(testutils.WithNetworkStatusAnnotation(iface1NetStatus)(fakePod)).To(Succeed())
+			pod, err = k8sClient.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = k8sClient.AddNetAttachDef(testutils.NewFakeNetAttachDef("kube-system", "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			confString := `{
+    "name":"node-cni-network",
+    "type":"multus",
+    "clusterNetwork": "net2",
+    "multusNamespace" : "kube-system",
+    "kubeconfig":"/etc/kubernetes/node-kubeconfig.yaml"
+}`
+			conf, err = types.LoadNetConf([]byte(confString))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("Loads delegates for network + interface being removed", func() {
+			numK8sDelegates, _, err := TryLoadPodHotUnpluggedDelegates(pod, conf, k8sClient, nil, "net1", "pluggediface1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(numK8sDelegates).To(Equal(1))
+			Expect(conf.Delegates[0].Conf.Name).To(Equal("net1"))
+			Expect(conf.Delegates[0].Conf.Type).To(Equal("fakecni"))
+		})
+
+		It("fails to load delegate on interface removal when an un-existing *network* is requested", func() {
+			numK8sDelegates, _, err := TryLoadPodHotUnpluggedDelegates(pod, conf, k8sClient, nil, "net2", "pluggediface1")
+			Expect(err).To(MatchError(&NoK8sNetworkError{message: "could not find network: net2; iface: pluggediface1 in the pod's annotations"}))
+			Expect(numK8sDelegates).To(Equal(0))
+		})
+
+		It("fails to load delegate on interface removal when an un-existing *interface* is requested", func() {
+			numK8sDelegates, _, err := TryLoadPodHotUnpluggedDelegates(pod, conf, k8sClient, nil, "net1", "pluggediface2")
+			Expect(err).To(MatchError(&NoK8sNetworkError{message: "could not find network: net1; iface: pluggediface2 in the pod's annotations"}))
+			Expect(numK8sDelegates).To(Equal(0))
 		})
 	})
 })

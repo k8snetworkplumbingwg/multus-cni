@@ -106,6 +106,19 @@ func NewFakePod(name string, netAnnotation string, defaultNetAnnotation string) 
 	return pod
 }
 
+// WithNetworkStatusAnnotation annotates a pod with the supplied CNCF
+// `network-status`.
+func WithNetworkStatusAnnotation(status ...netv1.NetworkStatus) func(pod *v1.Pod) error {
+	return func(pod *v1.Pod) error {
+		statusBytes, err := json.Marshal(&status)
+		if err != nil {
+			return err
+		}
+		pod.Annotations["k8s.v1.cni.cncf.io/network-status"] = string(statusBytes)
+		return nil
+	}
+}
+
 // EnsureCIDR parses/verify CIDR ip string and convert to net.IPNet
 func EnsureCIDR(cidr string) *net.IPNet {
 	ip, net, err := net.ParseCIDR(cidr)

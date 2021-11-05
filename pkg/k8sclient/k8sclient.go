@@ -16,12 +16,8 @@ package k8sclient
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -47,9 +43,10 @@ import (
 )
 
 const (
-	resourceNameAnnot      = "k8s.v1.cni.cncf.io/resourceName"
-	defaultNetAnnot        = "v1.multus-cni.io/default-network"
-	networkAttachmentAnnot = "k8s.v1.cni.cncf.io/networks"
+	resourceNameAnnot            = "k8s.v1.cni.cncf.io/resourceName"
+	defaultNetAnnot              = "v1.multus-cni.io/default-network"
+	networkAttachmentAnnot       = "k8s.v1.cni.cncf.io/networks"
+	networkAttachmentStatusAnnot = "k8s.v1.cni.cncf.io/network-status"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -132,116 +129,6 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 	}
 
 	return nil
-}
-
-func parsePodNetworkObjectName(podnetwork string) (string, string, string, error) {
-	var netNsName string
-	var netIfName string
-	var networkName string
-
-	logging.Debugf("parsePodNetworkObjectName: %s", podnetwork)
-	slashItems := strings.Split(podnetwork, "/")
-	if len(slashItems) == 2 {
-		netNsName = strings.TrimSpace(slashItems[0])
-		networkName = slashItems[1]
-	} else if len(slashItems) == 1 {
-		networkName = slashItems[0]
-	} else {
-		return "", "", "", logging.Errorf("parsePodNetworkObjectName: Invalid network object (failed at '/')")
-	}
-
-	atItems := strings.Split(networkName, "@")
-	networkName = strings.TrimSpace(atItems[0])
-	if len(atItems) == 2 {
-		netIfName = strings.TrimSpace(atItems[1])
-	} else if len(atItems) != 1 {
-		return "", "", "", logging.Errorf("parsePodNetworkObjectName: Invalid network object (failed at '@')")
-	}
-
-	// Check and see if each item matches the specification for valid attachment name.
-	// "Valid attachment names must be comprised of units of the DNS-1123 label format"
-	// [a-z0-9]([-a-z0-9]*[a-z0-9])?
-	// And we allow at (@), and forward slash (/) (units separated by commas)
-	// It must start and end alphanumerically.
-	allItems := []string{netNsName, networkName, netIfName}
-	for i := range allItems {
-		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
-		if !matched && len([]rune(allItems[i])) > 0 {
-			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
-		}
-	}
-
-	logging.Debugf("parsePodNetworkObjectName: parsed: %s, %s, %s", netNsName, networkName, netIfName)
-	return netNsName, networkName, netIfName, nil
-}
-
-func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
-	var networks []*types.NetworkSelectionElement
-
-	logging.Debugf("parsePodNetworkAnnotation: %s, %s", podNetworks, defaultNamespace)
-	if podNetworks == "" {
-		return nil, logging.Errorf("parsePodNetworkAnnotation: pod annotation does not have \"network\" as key")
-	}
-
-	if strings.IndexAny(podNetworks, "[{\"") >= 0 {
-		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
-			return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
-		}
-	} else {
-		// Comma-delimited list of network attachment object names
-		for _, item := range strings.Split(podNetworks, ",") {
-			// Remove leading and trailing whitespace.
-			item = strings.TrimSpace(item)
-
-			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
-			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(item)
-			if err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: %v", err)
-			}
-
-			networks = append(networks, &types.NetworkSelectionElement{
-				Name:             networkName,
-				Namespace:        netNsName,
-				InterfaceRequest: netIfName,
-			})
-		}
-	}
-
-	for _, n := range networks {
-		if n.Namespace == "" {
-			n.Namespace = defaultNamespace
-		}
-		if n.MacRequest != "" {
-			// validate MAC address
-			if _, err := net.ParseMAC(n.MacRequest); err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to mac: %v", err)
-			}
-		}
-		if n.InfinibandGUIDRequest != "" {
-			// validate GUID address
-			if _, err := net.ParseMAC(n.InfinibandGUIDRequest); err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to validate infiniband GUID: %v", err)
-			}
-		}
-		if n.IPRequest != nil {
-			for _, ip := range n.IPRequest {
-				// validate IP address
-				if strings.Contains(ip, "/") {
-					if _, _, err := net.ParseCIDR(ip); err != nil {
-						return nil, logging.Errorf("failed to parse CIDR %q: %v", ip, err)
-					}
-				} else if net.ParseIP(ip) == nil {
-					return nil, logging.Errorf("failed to parse IP address %q", ip)
-				}
-			}
-		}
-		// compatibility pre v3.2, will be removed in v4.0
-		if n.DeprecatedInterfaceRequest != "" && n.InterfaceRequest == "" {
-			n.InterfaceRequest = n.DeprecatedInterfaceRequest
-		}
-	}
-
-	return networks, nil
 }
 
 func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
@@ -340,42 +227,46 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		conf.Delegates[0] = delegate
 	}
 
-	networks, err := GetPodNetwork(pod)
-	if networks != nil {
-		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, conf, resourceMap)
-
-		if err != nil {
-			if _, ok := err.(*NoK8sNetworkError); ok {
-				return 0, clientInfo, nil
-			}
-			return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network for pod: %v", err)
-		}
-
-		if err = conf.AddDelegates(delegates); err != nil {
-			return 0, nil, err
-		}
-
-		// Check gatewayRequest is configured in delegates
-		// and mark its config if gateway filter is required
-		isGatewayConfigured := false
-		for _, delegate := range conf.Delegates {
-			if delegate.GatewayRequest != nil {
-				isGatewayConfigured = true
-				break
-			}
-		}
-
-		if isGatewayConfigured == true {
-			types.CheckGatewayConfig(conf.Delegates)
-		}
-
-		return len(delegates), clientInfo, nil
-	}
-
+	confGenerator, err := NewNetConfGenerator(clientInfo, conf, pod, resourceMap)
 	if _, ok := err.(*NoK8sNetworkError); ok {
 		return 0, clientInfo, nil
+	} else if err != nil {
+		return 0, clientInfo, err
 	}
-	return 0, clientInfo, err
+
+	conf, err = confGenerator.generate()
+	if err != nil {
+		return 0, clientInfo, err
+	}
+	return len(conf.Delegates), clientInfo, nil
+}
+
+// TryLoadPodHotpluggedDelegates attempts to load Kubernetes-defined delegates and add them to the Multus config.
+// Returns the number of Kubernetes-defined delegates added or an error.
+func TryLoadPodHotpluggedDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInfo, resourceMap map[string]*types.ResourceInfo, networkName string, ifaceName string) (int, *ClientInfo, error) {
+	confGenerator, err := NewHotplugNetConfGenerator(clientInfo, conf, pod, resourceMap, networkName, ifaceName)
+	if err != nil {
+		return 0, clientInfo, err
+	}
+	conf, err = confGenerator.generate()
+	if err != nil {
+		return 0, clientInfo, err
+	}
+	return len(conf.Delegates), clientInfo, nil
+}
+
+// TryLoadPodHotUnpluggedDelegates attempts to load Kubernetes-defined delegates and add them to the Multus config.
+// Returns the number of Kubernetes-defined delegates added or an error.
+func TryLoadPodHotUnpluggedDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInfo, resourceMap map[string]*types.ResourceInfo, networkName string, ifaceName string) (int, *ClientInfo, error) {
+	confGenerator, err := NewHotUnplugNetConfGenerator(clientInfo, conf, pod, resourceMap, networkName, ifaceName)
+	if err != nil {
+		return 0, clientInfo, err
+	}
+	conf, err = confGenerator.generate()
+	if err != nil {
+		return 0, clientInfo, err
+	}
+	return len(conf.Delegates), clientInfo, nil
 }
 
 // GetK8sClient gets client info from kubeconfig
@@ -438,6 +329,21 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	}, nil
 }
 
+// FilterNetwork returns the first Network on the Pod's annotations that matches the provided predicate.
+func FilterNetwork(
+	networks []*types.NetworkSelectionElement,
+	desiredNetworkPredicate func(element types.NetworkSelectionElement) bool) (*types.NetworkSelectionElement, error) {
+
+	for _, net := range networks {
+		if desiredNetworkPredicate(*net) {
+			return net, nil
+		}
+	}
+	return nil, &NoK8sNetworkError{
+		message: "could not find pod network matching the provided predicate",
+	}
+}
+
 // GetPodNetwork gets net-attach-def annotation from pod
 func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 	logging.Debugf("GetPodNetwork: %v", pod)
@@ -449,10 +355,30 @@ func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 		return nil, &NoK8sNetworkError{"no kubernetes network found"}
 	}
 
-	networks, err := parsePodNetworkAnnotation(netAnnot, defaultNamespace)
+	networks, err := types.ParsePodNetworkAnnotation(netAnnot, defaultNamespace)
 	if err != nil {
 		return nil, err
 	}
+
+	return networks, nil
+}
+
+// GetPodNetworkFromStatus gets net-attach-def annotation from pod
+func GetPodNetworkFromStatus(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
+	logging.Debugf("GetPodNetworkFromStatus: %v", pod)
+
+	netAnnot := pod.Annotations[networkAttachmentStatusAnnot]
+	defaultNamespace := pod.ObjectMeta.Namespace
+
+	if len(netAnnot) == 0 {
+		return nil, &NoK8sNetworkError{"no kubernetes network found"}
+	}
+
+	networks, err := types.ParsePodNetworkAnnotation(netAnnot, defaultNamespace)
+	if err != nil {
+		return nil, err
+	}
+
 	return networks, nil
 }
 
@@ -600,7 +526,7 @@ func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, conf *type
 	}
 
 	// The CRD object of default network should only be defined in multusNamespace
-	networks, err := parsePodNetworkAnnotation(netAnnot, conf.MultusNamespace)
+	networks, err := types.ParsePodNetworkAnnotation(netAnnot, conf.MultusNamespace)
 	if err != nil {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed to parse CRD object: %v", err)
 	}
