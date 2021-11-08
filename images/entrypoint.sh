@@ -12,9 +12,11 @@ trap exitonsigterm SIGTERM
 
 # Set our known directories.
 CNI_CONF_DIR="/host/etc/cni/net.d"
+CNI_BIN_DIR="/host/opt/cni/bin"
 ADDITIONAL_BIN_DIR=""
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
 MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
+MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
 MULTUS_TEMP_KUBECONFIG="/tmp/multus.kubeconfig"
 MULTUS_MASTER_CNI_FILE_NAME=""
@@ -44,9 +46,11 @@ function usage()
     echo -e ""
     echo -e "./entrypoint.sh"
     echo -e "\t-h --help"
+    echo -e "\t--cni-bin-dir=$CNI_BIN_DIR"
     echo -e "\t--cni-conf-dir=$CNI_CONF_DIR"
     echo -e "\t--cni-version=<cniVersion (e.g. 0.3.1)>"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
+    echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--skip-multus-binary-copy=$SKIP_BINARY_COPY"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
     echo -e "\t--multus-master-cni-file-name=$MULTUS_MASTER_CNI_FILE_NAME (empty by default, example: 10-calico.conflist)"
@@ -95,8 +99,14 @@ while [ "$1" != "" ]; do
         --cni-version)
             CNI_VERSION=$VALUE
             ;;
+        --cni-bin-dir)
+            CNI_BIN_DIR=$VALUE
+            ;;
         --cni-conf-dir)
             CNI_CONF_DIR=$VALUE
+            ;;
+        --cni-bin-dir)
+            CNI_BIN_DIR=$VALUE
             ;;
         --multus-conf-file)
             MULTUS_CONF_FILE=$VALUE
@@ -155,7 +165,7 @@ done
 
 
 # Create array of known locations
-declare -a arr=($CNI_CONF_DIR)
+declare -a arr=($CNI_CONF_DIR $CNI_BIN_DIR $MULTUS_BIN_FILE)
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   arr+=($MULTUS_CONF_FILE)
 fi
@@ -169,6 +179,14 @@ do
     exit 1;
   fi
 done
+
+# Copy files into place and atomically move into final binary name
+if [ "$SKIP_BINARY_COPY" = false ]; then
+  cp -f $MULTUS_BIN_FILE $CNI_BIN_DIR/_multus
+  mv -f $CNI_BIN_DIR/_multus $CNI_BIN_DIR/multus
+else
+  log "Entrypoint skipped copying Multus binary."
+fi
 
 if [ "$MULTUS_CONF_FILE" != "auto" ]; then
   cp -f $MULTUS_CONF_FILE $CNI_CONF_DIR
