@@ -606,13 +606,12 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	var kc *k8s.ClientInfo
 	if !k8sArgs.IsMutatingRunningPod() {
-		var err error
 		_, kc, err = k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
-		if err != nil {
-			return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
-		}
 	} else {
-		// TODO: load delegates from the specific network / interface.
+		_, kc, err = k8s.TryLoadPodHotpluggedDelegates(pod, n, kubeClient, resourceMap, k8sArgs.NetworkToAddOrRemove(), args.IfName)
+	}
+	if err != nil {
+		return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
 	}
 
 	// cache the multus config
@@ -714,7 +713,14 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	// set the network status annotation in apiserver, only in case Multus as kubeconfig
 	if n.Kubeconfig != "" && kc != nil {
 		if k8sArgs.IsMutatingRunningPod() {
-			// TODO: must gather existing net status, and append the new status to it
+			var currentNetstatus []nettypes.NetworkStatus
+			currentNetStatusAnnot, ok := pod.Annotations[nettypes.NetworkStatusAnnot]
+			if ok {
+				if err := json.Unmarshal([]byte(currentNetStatusAnnot), &currentNetstatus); err != nil {
+					return nil, cmdErr(k8sArgs, "error hot-plugging interface for network: %s. error: %v", k8sArgs.NetworkToAddOrRemove(), err)
+				}
+				netStatus = append(netStatus, currentNetstatus...)
+			}
 		}
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
@@ -827,7 +833,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				// Get pod annotation and so on
 				_, _, err = k8s.TryLoadPodDelegates(pod, in, kubeClient, nil)
 			} else {
-				// TODO: load delegates from the specific network / interface.
+				_, _, err = k8s.TryLoadPodHotUnpluggedDelegates(pod, in, kubeClient, nil, string(k8sArgs.K8S_POD_NAME), args.IfName)
 			}
 			if err != nil {
 				if len(in.Delegates) == 0 {
@@ -858,7 +864,10 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			// First delegate is always the master plugin
 			in.Delegates[0].MasterPlugin = true
 		} else {
-			// TODO: just create the delegate for the **single** network / interface to be hot-unplugged.
+			_, _, err = k8s.TryLoadPodHotUnpluggedDelegates(pod, in, kubeClient, nil, k8sArgs.NetworkToAddOrRemove(), args.IfName)
+			if err != nil {
+				_ = logging.Errorf("error loading delegate: %v", err)
+			}
 		}
 	}
 
@@ -879,8 +888,18 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		if netnsfound {
 			var networkStatusToPersist []nettypes.NetworkStatus
 			if k8sArgs.IsMutatingRunningPod() {
-				// TODO: must extract the current network-status, and remove the entry corresponding to the
-				// network / interface being hot-unplugged.
+				var currentNetstatus []nettypes.NetworkStatus
+				currentNetStatusAnnot, ok := pod.Annotations[nettypes.NetworkStatusAnnot]
+				if ok {
+					if err := json.Unmarshal([]byte(currentNetStatusAnnot), &currentNetstatus); err != nil {
+						return cmdErr(k8sArgs, "error removing network interface for network: %s. error: %v", k8sArgs.K8S_POD_NETWORK, err)
+					}
+					for _, currentNet := range currentNetstatus {
+						if fmt.Sprintf("%s/%s", currentNet.Name, currentNet.Interface) != ifaceToUnplugName(k8sArgs, args.IfName) {
+							networkStatusToPersist = append(networkStatusToPersist, currentNet)
+						}
+					}
+				}
 			}
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
 				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, networkStatusToPersist, in)
@@ -895,4 +914,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+}
+
+func ifaceToUnplugName(k8sArgs *types.K8sArgs, ifaceName string) string {
+	return fmt.Sprintf("%s/%s", k8sArgs.K8S_POD_NETWORK, ifaceName)
 }

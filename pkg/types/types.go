@@ -167,6 +167,12 @@ func (k *K8sArgs) IsMutatingRunningPod() bool {
 	return k.K8S_POD_NETWORK != ""
 }
 
+// NetworkToAddOrRemove returns the name of the network for which an interface
+// will be created and added to the pod, or removed from it.
+func (k *K8sArgs) NetworkToAddOrRemove() string {
+	return string(k.K8S_POD_NETWORK)
+}
+
 // ResourceInfo is struct to hold Pod device allocation information
 type ResourceInfo struct {
 	Index     int
