@@ -176,7 +176,7 @@ EOF
 You may now inspect the pod and see what interfaces are attached, like so:
 
 ```
-$ kubectl exec -it samplepod -- ip a
+kubectl exec -it samplepod -- ip a
 ```
 
 You should note that there are 3 interfaces:
