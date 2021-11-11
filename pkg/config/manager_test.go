@@ -49,15 +49,22 @@ var _ = Describe(suiteName, func() {
   "dns": {}
 }
 `
-		tmpDir = "/tmp"
 	)
 
 	var configManager *Manager
+	var multusConfigDir string
 	var multusConfigFilePath string
 
 	BeforeEach(func() {
+		var err error
+		multusConfigDir, err = ioutil.TempDir("", "multus-config")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(os.MkdirAll(multusConfigDir, 0755)).To(Succeed())
+	})
+
+	BeforeEach(func() {
 		format.TruncatedDiff = false
-		multusConfigFilePath = fmt.Sprintf("%s/%s", tmpDir, primaryCNIPluginName)
+		multusConfigFilePath = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
 		Expect(ioutil.WriteFile(multusConfigFilePath, []byte(primaryCNIPluginTemplate), userRWPermission)).To(Succeed())
 
 		multusConf := NewMultusConfig(
@@ -65,12 +72,12 @@ var _ = Describe(suiteName, func() {
 			cniVersion,
 			kubeconfig)
 		var err error
-		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, tmpDir, primaryCNIPluginName)
+		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
 	AfterEach(func() {
-		Expect(os.Remove(multusConfigFilePath)).To(Succeed())
+		Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
 	})
 
 	It("Generates a configuration, based on the contents of the delegated CNI config file", func() {
