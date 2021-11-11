@@ -51,7 +51,7 @@ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cn
 We'll apply a YAML file with `kubectl` from this repo.
 
 ```
-$ cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
+cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
 ```
 
 ### What the Multus daemonset does
@@ -66,7 +66,7 @@ $ cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
 Generally, the first step in validating your installation is to ensure that the Multus pods have run without error, you may see an overview of those by looking at:
 
 ```
-$ kubectl get pods --all-namespaces | grep -i multus
+kubectl get pods --all-namespaces | grep -i multus
 ```
 
 You may further validate that it has ran by looking at the `/etc/cni/net.d/` directory and ensure that the auto-generated `/etc/cni/net.d/00-multus.conf` exists corresponding to the alphabetically first configuration file.
@@ -176,7 +176,7 @@ EOF
 You may now inspect the pod and see what interfaces are attached, like so:
 
 ```
-$ kubectl exec -it samplepod -- ip a
+kubectl exec -it samplepod -- ip a
 ```
 
 You should note that there are 3 interfaces:

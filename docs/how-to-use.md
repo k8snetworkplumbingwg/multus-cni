@@ -15,13 +15,13 @@ Generally we recommend two options: Manually place a Multus binary in your `/opt
 
 You may acquire the Multus binary via compilation (see the [developer guide](development.md)) or download the a binary from the [GitHub releases](https://github.com/k8snetworkplumbingwg/multus-cni/releases) page. Copy multus binary into CNI binary directory, usually `/opt/cni/bin`. Perform this on all nodes in your cluster (master and nodes).
 
-    $ cp multus /opt/cni/bin
+    cp multus /opt/cni/bin
 
 *Via Daemonset method*
 
 As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
-    $ cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+    cat ./deployments/multus-daemonset.yml | kubectl apply -f -
 
 If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
@@ -34,8 +34,8 @@ You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alp
 Execute following commands at all Kubernetes nodes (i.e. master and minions)
 
 ```
-$ mkdir -p /etc/cni/net.d
-$ cat >/etc/cni/net.d/00-multus.conf <<EOF
+mkdir -p /etc/cni/net.d
+cat >/etc/cni/net.d/00-multus.conf <<EOF
 {
   "name": "multus-cni-network",
   "type": "multus",
@@ -72,7 +72,7 @@ Create resources for multus to access CRD objects as following command:
 
 ```
 # Execute following commands at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -119,13 +119,13 @@ Create kubeconfig at master node as following commands:
 
 ```
 # Execute following command at Kubernetes master
-$ mkdir -p /etc/cni/net.d/multus.d
-$ SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
-$ SERVICEACCOUNT_TOKEN=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data.token' | base64 -d )
-$ KUBERNETES_SERVICE_PROTO=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)
-$ KUBERNETES_SERVICE_HOST=$(kubectl get all -o json | jq -r .items[0].spec.clusterIP)
-$ KUBERNETES_SERVICE_PORT=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].port)
-$ cat > /etc/cni/net.d/multus.d/multus.kubeconfig <<EOF
+mkdir -p /etc/cni/net.d/multus.d
+SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
+SERVICEACCOUNT_TOKEN=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data.token' | base64 -d )
+KUBERNETES_SERVICE_PROTO=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)
+KUBERNETES_SERVICE_HOST=$(kubectl get all -o json | jq -r .items[0].spec.clusterIP)
+KUBERNETES_SERVICE_PORT=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].port)
+cat > /etc/cni/net.d/multus.d/multus.kubeconfig <<EOF
 # Kubeconfig file for Multus CNI plugin.
 apiVersion: v1
 kind: Config
@@ -151,7 +151,7 @@ Copy `/etc/cni/net.d/multus.d/multus.kubeconfig` into other Kubernetes nodes
 **NOTE: Recommend to exec 'chmod 600 /etc/cni/net.d/multus.d/multus.kubeconfig' to keep secure**
 
 ```
-$ scp /etc/cni/net.d/multus.d/multus.kubeconfig ...
+scp /etc/cni/net.d/multus.d/multus.kubeconfig ...
 ```
 
 ### Setup CRDs (daemonset automatically does)
@@ -162,7 +162,7 @@ Create CRD definition in Kubernetes as following command at master node:
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -200,7 +200,7 @@ Following command creates NetworkAttachmentDefinition. CNI config is in `config:
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -232,7 +232,7 @@ If NetworkAttachmentDefinition has no spec, multus find a file in defaultConfDir
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -242,7 +242,7 @@ EOF
 
 ```
 # Execute following commands at all Kubernetes nodes (i.e. master and minions)
-$ cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
+cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
 {
   "cniVersion": "0.3.0",
   "type": "macvlan",
@@ -268,7 +268,7 @@ $ cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -290,7 +290,7 @@ You can also specify NetworkAttachmentDefinition with its namespace as adding `<
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
@@ -314,7 +314,7 @@ spec:
             }
         }'
 EOF
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -336,7 +336,7 @@ You can also specify interface name as adding `@<ifname>`.
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -356,7 +356,7 @@ EOF
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -381,7 +381,7 @@ You can also specify NetworkAttachmentDefinition with its namespace as adding `"
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -406,7 +406,7 @@ You can also specify interface name as adding `"interface": "<ifname>"`.
 
 ```
 # Execute following command at Kubernetes master
-$ cat <<EOF | kubectl create -f -
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -432,7 +432,8 @@ Following the example of `ip -d address` output of above pod, "pod-case-06":
 
 ```
 # Execute following command at Kubernetes master
-$ kubectl exec -it pod-case-06 -- ip -d address
+kubectl exec -it pod-case-06 -- ip -d address
+
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00 promiscuity 0 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
     inet 127.0.0.1/8 scope host lo
@@ -529,7 +530,8 @@ EOF
 This will set `192.168.2.1` as the default route over the `net1` interface, such as:
 
 ```
-$ kubectl exec -it samplepod -- ip route
+kubectl exec -it samplepod -- ip route
+
 default via 192.168.2.1 dev net1 
 10.244.0.0/24 dev eth0  proto kernel  scope link  src 10.244.0.169 
 10.244.0.0/16 via 10.244.0.1 dev eth0 
