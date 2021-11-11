@@ -27,7 +27,7 @@ The quickstart installation method for Multus requires that you have first insta
 Clone this GitHub repository, we'll apply a daemonset which installs Multus using to `kubectl` from this repo. From the root directory of the clone, apply the daemonset YAML file:
 
 ```
-$ cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
+cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](docs/quickstart.md)
