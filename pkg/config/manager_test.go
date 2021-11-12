@@ -16,18 +16,13 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/format"
-
-	"github.com/fsnotify/fsnotify"
 )
 
 const suiteName = "Configuration Manager"
@@ -53,7 +48,7 @@ var _ = Describe(suiteName, func() {
 
 	var configManager *Manager
 	var multusConfigDir string
-	var multusConfigFilePath string
+	var defaultCniConfig string
 
 	BeforeEach(func() {
 		var err error
@@ -63,9 +58,8 @@ var _ = Describe(suiteName, func() {
 	})
 
 	BeforeEach(func() {
-		format.TruncatedDiff = false
-		multusConfigFilePath = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
-		Expect(ioutil.WriteFile(multusConfigFilePath, []byte(primaryCNIPluginTemplate), userRWPermission)).To(Succeed())
+		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
+		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), userRWPermission)).To(Succeed())
 
 		multusConf := NewMultusConfig(
 			primaryCNIName,
@@ -87,28 +81,37 @@ var _ = Describe(suiteName, func() {
 		Expect(config).To(Equal(expectedResult))
 	})
 
-	It("Reacts to updates of the delegated CNI configuration", func() {
-		stopChan := make(chan struct{})
-		doneChan := make(chan struct{})
-		go func(stopChannel, doneChan chan struct{}) {
-			Expect(configManager.MonitorDelegatedPluginConfiguration(stopChannel, doneChan)).To(Succeed())
-		}(stopChan, doneChan)
+	Context("Updates to the delegate CNI configuration", func() {
+		var (
+			doneChannel chan struct{}
+			stopChannel chan struct{}
+		)
 
-		newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"mycni-name\",\"type\":\"mycni\"}"
-		Expect(ioutil.WriteFile(multusConfigFilePath, []byte(newCNIConfig), userRWPermission)).To(Succeed())
-		Eventually(<-configManager.configWatcher.Events, time.Second).Should(Equal(
-			fsnotify.Event{
-				Name: multusConfigFilePath,
-				Op:   fsnotify.Write,
-			}))
+		BeforeEach(func() {
+			doneChannel = make(chan struct{})
+			stopChannel = make(chan struct{})
+			go func() {
+				Expect(configManager.MonitorDelegatedPluginConfiguration(stopChannel, doneChannel)).To(Succeed())
+			}()
+		})
 
-		bytes, err := json.Marshal(configManager.cniConfigData)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(bytes)).To(Equal(newCNIConfig))
+		AfterEach(func() {
+			go func() { stopChannel <- struct{}{} }()
+			Eventually(<-doneChannel).Should(Equal(struct{}{}))
+			close(doneChannel)
+			close(stopChannel)
+		})
 
-		// cleanup the watcher
-		go func() { stopChan <- struct{}{} }()
-		Eventually(<-doneChan, time.Second).Should(Equal(struct{}{}))
+		It("Trigger the re-generation of the Multus CNI configuration", func() {
+			newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"yoyo-newnet\",\"type\":\"mycni\"}"
+			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), userRWPermission)).To(Succeed())
+
+			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName)
+			Eventually(func() (string, error) {
+				multusCniData, err := ioutil.ReadFile(multusCniConfigFile)
+				return string(multusCniData), err
+			}).Should(Equal(multusConfigFromDelegate(newCNIConfig)))
+		})
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
@@ -124,3 +127,7 @@ var _ = Describe(suiteName, func() {
 		})
 	})
 })
+
+func multusConfigFromDelegate(delegateConfig string) string {
+	return fmt.Sprintf("{\"cniVersion\":\"0.4.0\",\"delegates\":[%s],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}", delegateConfig)
+}

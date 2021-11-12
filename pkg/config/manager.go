@@ -35,7 +35,7 @@ const (
 // Manager monitors the configuration of the primary CNI plugin, and
 // regenerates multus configuration whenever it gets updated.
 type Manager struct {
-	cniConfigData	     map[string]interface{}
+	cniConfigData        map[string]interface{}
 	configWatcher        *fsnotify.Watcher
 	multusConfig         *MultusConf
 	multusConfigDir      string
@@ -154,6 +154,9 @@ func (m Manager) MonitorDelegatedPluginConfiguration(shutDown chan struct{}, don
 			logging.Debugf("Re-generated MultusCNI config: %s", updatedConfig)
 			if err := m.PersistMultusConfig(updatedConfig); err != nil {
 				_ = logging.Errorf("failed to persist the multus configuration: %v", err)
+			}
+			if err := m.loadPrimaryCNIConfigFromFile(); err != nil {
+				_ = logging.Errorf("failed to reload the updated config: %v", err)
 			}
 
 		case err := <-m.configWatcher.Errors:
