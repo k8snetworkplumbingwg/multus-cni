@@ -913,7 +913,21 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
-	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+	deleteDelegatesErr := delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+	if deleteDelegatesErr != nil {
+		return deleteDelegatesErr
+	}
+	if k8sArgs.IsMutatingRunningPod() && pod != nil {
+		// send kubernetes events
+		if in.Delegates[0].Name != "" {
+			kubeClient.Eventf(
+				pod, v1.EventTypeNormal, "RemovedInterface", "Removed %s from %s", args.IfName, in.Delegates[0].Name)
+		} else {
+			kubeClient.Eventf(
+				pod, v1.EventTypeNormal, "RemovedInterface", "Removed %s", args.IfName)
+		}
+	}
+	return nil
 }
 
 func ifaceToUnplugName(k8sArgs *types.K8sArgs, ifaceName string) string {
