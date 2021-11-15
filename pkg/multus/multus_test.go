@@ -34,11 +34,13 @@ import (
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
+	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -3511,4 +3513,168 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())
 	})
+
+	Context("Hot{plug | unplug} interfaces to a running pod", func() {
+		type cniCmd string
+		const (
+			cmdAdd cniCmd = "ADD"
+			cmdDel cniCmd = "DEL"
+		)
+
+		const (
+			dynamicMultusInterfaceName = "pluggediface1"
+			initialMultusNetworkName   = "net1"
+			multusNetworkToHotplugName = "net2"
+			namespace                  = "test"
+			podName                    = "pod1"
+		)
+		const (
+			initialMultusNetworkSpec = `{
+    "name": "net1",
+    "type": "weave-net",
+    "cniVersion": "0.4.0"
+}`
+			dynamicMultusNetwork = `{
+    "name": "net2",
+    "type": "weave-net",
+    "cniVersion": "0.4.0"
+}`
+		)
+
+		var cniArgs *skel.CmdArgs
+		var clientInfo *k8sclient.ClientInfo
+		var fexec *fakeExec
+		var pod *v1.Pod
+		var recorder *record.FakeRecorder
+
+		bootstrapScenario := func() (*v1.Pod, error) {
+			_, err := clientInfo.AddNetAttachDef(
+				testhelpers.NewFakeNetAttachDef(namespace, initialMultusNetworkName, initialMultusNetworkSpec))
+			if err != nil {
+				return nil, fmt.Errorf("failed to provision net-attach-def %s/%s: %w", namespace, initialMultusNetworkName, err)
+			}
+
+			_, err = clientInfo.AddNetAttachDef(
+				testhelpers.NewFakeNetAttachDef(namespace, multusNetworkToHotplugName, dynamicMultusNetwork))
+			if err != nil {
+				return nil, fmt.Errorf("failed to provision net-attach-def %s/%s: %w", namespace, multusNetworkToHotplugName, err)
+			}
+
+			podNetworksAnnotation := `{ "name": "net2", "interface": "pluggediface1", "namespace": "test" }`
+			fakePod := testhelpers.NewFakePod(podName, fmt.Sprintf("[ %s ]", podNetworksAnnotation), "")
+
+			iface1NetStatus := nettypes.NetworkStatus{
+				Name:      fmt.Sprintf("%s/%s", namespace, multusNetworkToHotplugName),
+				Interface: dynamicMultusInterfaceName,
+				IPs:       []string{"10.10.10.10/24"},
+			}
+
+			if err := testhelpers.WithNetworkStatusAnnotation(iface1NetStatus)(fakePod); err != nil {
+				return nil, fmt.Errorf("failed to add network-status to pod %s/%s: %w", pod.GetNamespace(), pod.GetName(), err)
+			}
+
+			pod, err = clientInfo.Client.CoreV1().Pods(namespace).Create(
+				context.TODO(),
+				fakePod,
+				metav1.CreateOptions{})
+			return pod, nil
+		}
+
+		BeforeEach(func() {
+			clientInfo = NewFakeClientInfo()
+			recorder = clientInfo.EventRecorder.(*record.FakeRecorder)
+
+			var err error
+			pod, err = bootstrapScenario()
+			Expect(err).NotTo(HaveOccurred())
+
+			cniArgs = generateExampleCNICmdArgs(testNS.Path(), dynamicMultusInterfaceName, multusNetworkToHotplugName, pod)
+			fexec = generateDummyCNIExecEnv(
+				dynamicMultusInterfaceName, dynamicMultusNetwork, &current.Result{CNIVersion: "0.4.0"})
+		})
+
+		execCNICmd := func(cniCmdName cniCmd, args *skel.CmdArgs, exec *fakeExec, k8sClient *k8sclient.ClientInfo) error {
+			_ = os.Setenv("CNI_COMMAND", string(cniCmdName))
+			_ = os.Setenv("CNI_IFNAME", dynamicMultusInterfaceName)
+
+			switch cniCmdName {
+			case cmdAdd:
+				_, err := CmdAdd(args, exec, clientInfo)
+				return err
+			case cmdDel:
+				return CmdDel(args, exec, k8sClient)
+			default:
+				return fmt.Errorf(
+					"unsupported cmd requested: %s. Allowed values are: %s or %s",
+					cniCmdName, cmdAdd, cmdDel)
+			}
+		}
+
+		Context("*Add* interface", func() {
+			It("successfully creates a new interface in the pod", func() {
+				Expect(execCNICmd(cmdAdd, cniArgs, fexec, clientInfo)).To(Succeed())
+			})
+
+			Context("events", func() {
+				BeforeEach(func() { Expect(execCNICmd(cmdAdd, cniArgs, fexec, clientInfo)).To(Succeed()) })
+
+				It("throws an `AddedInterface` event when an interface is dynamically added", func() {
+					events := collectEvents(recorder.Events)
+					Expect(len(events)).To(Equal(1))
+					Expect(events[0]).To(Equal(
+						fmt.Sprintf("Normal AddedInterface Add %s [] from %s",
+							dynamicMultusInterfaceName,
+							networkName(namespace, multusNetworkToHotplugName))))
+				})
+			})
+		})
+
+		Context("*Remove* interface", func() {
+			It("successfully removes an existing interface from the pod", func() {
+				Expect(execCNICmd(cmdDel, cniArgs, fexec, clientInfo)).To(Succeed())
+			})
+
+			Context("events", func() {
+				BeforeEach(func() { Expect(execCNICmd(cmdDel, cniArgs, fexec, clientInfo)).To(Succeed()) })
+
+				It("throws a `RemovedInterface` event when an interface is dynamically deleted", func() {
+					events := collectEvents(recorder.Events)
+					Expect(len(events)).To(Equal(1))
+					Expect(events[0]).To(Equal(
+						fmt.Sprintf("Normal RemovedInterface Removed %s from %s",
+							dynamicMultusInterfaceName,
+							networkName(namespace, multusNetworkToHotplugName))))
+				})
+			})
+		})
+	})
 })
+
+func generateDummyCNIExecEnv(ifaceName string, networkSpec string, expectedResult *current.Result) *fakeExec {
+	fexec := &fakeExec{}
+	fexec.addPlugin(nil, ifaceName, networkSpec, expectedResult, nil)
+	return fexec
+}
+
+func generateExampleCNICmdArgs(netnsPath string, ifaceName string, networkName string, pod *v1.Pod) *skel.CmdArgs {
+	return &skel.CmdArgs{
+		ContainerID: "123456789",
+		Netns:       netnsPath,
+		IfName:      ifaceName,
+		Args:        fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s;K8S_POD_NETWORK=%s", pod.GetName(), pod.GetNamespace(), networkName),
+		StdinData: []byte(`{
+					"name": "node-cni-network",
+					"type": "multus",
+					"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+					"delegates": [{
+					    "name": "weave1",
+					    "cniVersion": "0.4.0",
+					    "type": "weave-net"
+					}]
+				}`),
+	}
+}
+
+func networkName(namespace string, networkName string) string {
+	return fmt.Sprintf("%s/%s", namespace, networkName)
+}
