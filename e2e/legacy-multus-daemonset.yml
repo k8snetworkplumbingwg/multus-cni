@@ -182,41 +182,6 @@ spec:
           - name: cnibin
             mountPath: /host/opt/cni/bin
             mountPropagation: Bidirectional
-      - name: generate-kubeconfig
-        image: localhost:5000/multus:e2e
-        command:
-          - "/usr/src/multus-cni/bin/generate-kubeconfig"
-        args:
-          - "-k8s-service-host=$(KUBERNETES_SERVICE_HOST)"
-          - "-k8s-service-port=$(KUBERNETES_SERVICE_PORT)"
-        resources:
-          requests:
-            cpu: "10m"
-            memory: "15Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-          - name: cni
-            mountPath: /host/etc/cni/net.d
-            mountPropagation: Bidirectional
-      - name: generate-multus-config
-        image: localhost:5000/multus:e2e
-        command:
-          - "/usr/src/multus-cni/bin/generate-multus-cni-config"
-        args:
-          - "-cni-version=0.3.1"
-          - "-cni-config-dir=/host/etc/cni/net.d"
-          - "-multus-autoconfig-dir=/host/etc/cni/net.d"
-        resources:
-          requests:
-            cpu: "10m"
-            memory: "15Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - name: cni
-          mountPath: /host/etc/cni/net.d
-          mountPropagation: Bidirectional
       volumes:
         - name: cni
           hostPath:
