@@ -521,7 +521,7 @@ func isCriticalRequestRetriable(err error) bool {
 	return false
 }
 
-func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, ignoreNotFound bool) (*v1.Pod, error) {
+func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (*v1.Pod, error) {
 	if kubeClient == nil {
 		return nil, nil
 	}
@@ -542,7 +542,7 @@ func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, ignoreNotFound b
 			if waitErr != nil {
 				return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
 			}
-		} else if ignoreNotFound && errors.IsNotFound(err) {
+		} else if warnOnly && errors.IsNotFound(err) {
 			// If not found, proceed to remove interface with cache
 			return nil, nil
 		} else {
@@ -552,7 +552,14 @@ func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, ignoreNotFound b
 	}
 
 	if podUID != "" && string(pod.UID) != podUID {
-		return nil, cmdErr(k8sArgs, "expected pod UID %q but got %q from Kube API", podUID, pod.UID)
+		msg := fmt.Sprintf("expected pod UID %q but got %q from Kube API", podUID, pod.UID)
+		if warnOnly {
+			// On CNI DEL we just operate on the cache when these mismatch, we don't error out.
+			// For example: stateful sets namespace/name can remain the same while podUID changes.
+			logging.Verbosef("warning: %s", msg)
+			return nil, nil
+		}
+		return nil, cmdErr(k8sArgs, msg)
 	}
 
 	return pod, nil
