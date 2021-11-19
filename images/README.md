@@ -5,7 +5,7 @@ This is used for distribution of Multus in a Docker image.
 Typically you'd build this from the root of your Multus clone, as such:
 
 ```
-$ docker build -t dougbtv/multus .
+$ docker build -t dougbtv/multus -f images/Dockerfile .
 ```
 
 ---
