@@ -504,15 +504,45 @@ func addCNIArgsInConfList(inBytes []byte, cniArgs *map[string]interface{}) ([]by
 	return configBytes, nil
 }
 
-// CheckGatewayConfig check gatewayRequest and mark IsFilterGateway flag if
+// CheckGatewayConfig check gatewayRequest and mark IsFilter{V4,V6}Gateway flag if
 // gw filtering is required
-func CheckGatewayConfig(delegates []*DelegateNetConf) {
-	// Check the Gateway
-	for i, delegate := range delegates {
-		if delegate.GatewayRequest == nil {
-			delegates[i].IsFilterGateway = true
+func CheckGatewayConfig(delegates []*DelegateNetConf) error {
+
+	v4Gateways := 0
+	v6Gateways := 0
+
+	// Check the gateway
+	for _, delegate := range delegates {
+		for _, gw := range delegate.GatewayRequest {
+			if gw.To4() != nil {
+				v4Gateways++
+			} else {
+				v6Gateways++
+			}
 		}
 	}
+
+	if v4Gateways > 1 || v6Gateways > 1 {
+		return fmt.Errorf("multus does not support ECMP for default-route")
+	}
+
+	// set filter flag for each delegate
+	for i, delegate := range delegates {
+		// no GatewayRequest
+		if delegate.GatewayRequest == nil {
+			delegates[i].IsFilterV4Gateway = true
+			delegates[i].IsFilterV6Gateway = true
+		} else {
+			for _, gw := range delegate.GatewayRequest {
+				if gw.To4() != nil {
+					delegates[i].IsFilterV6Gateway = true
+				} else {
+					delegates[i].IsFilterV4Gateway = true
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // CheckSystemNamespaces checks whether given namespace is in systemNamespaces or not.

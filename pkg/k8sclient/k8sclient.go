@@ -366,10 +366,13 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		}
 
 		if isGatewayConfigured == true {
-			types.CheckGatewayConfig(conf.Delegates)
+			err = types.CheckGatewayConfig(conf.Delegates)
+			if err != nil {
+				return 0, nil, err
+			}
 		}
 
-		return len(delegates), clientInfo, nil
+		return len(delegates), clientInfo, err
 	}
 
 	if _, ok := err.(*NoK8sNetworkError); ok {
