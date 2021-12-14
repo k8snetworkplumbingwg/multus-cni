@@ -17,12 +17,15 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/blang/semver"
 )
 
 const (
@@ -52,7 +55,7 @@ type MultusConf struct {
 
 // NewMultusConfig creates a basic configuration generator. It can be mutated
 // via the `With...` methods.
-func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, configurationOptions ...Option) *MultusConf {
+func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, configurationOptions ...Option) (*MultusConf, error) {
 	multusConfig := &MultusConf{
 		Name:         MultusDefaultNetworkName,
 		CNIVersion:   cniVersion,
@@ -61,10 +64,45 @@ func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, co
 		Kubeconfig:   kubeconfig,
 		Delegates:    []interface{}{},
 	}
-	for _, configOption := range configurationOptions {
-		configOption(multusConfig)
+
+	err := multusConfig.Mutate(configurationOptions...)
+	return multusConfig, err
+}
+
+// CheckVersionCompatibility checks compatibilty of the
+// top level cni version with the delegate cni version.
+// Since version 0.4.0, CHECK was introduced, which
+// causes incompatibility.
+func CheckVersionCompatibility(mc *MultusConf) error {
+	const versionFmt = "delegate cni version is %s while top level cni version is %s"
+	v040, _ := semver.Make("0.4.0")
+	multusCNIVersion, err := semver.Make(mc.CNIVersion)
+
+	if err != nil {
+		return errors.New("couldn't get top level cni version")
 	}
-	return multusConfig
+
+	if multusCNIVersion.GTE(v040) {
+		for _, delegate := range mc.Delegates {
+			delegatesMap, ok := delegate.(map[string]interface{})
+			if !ok {
+				return errors.New("couldn't get cni version of delegate")
+			}
+			delegateVersion, ok := delegatesMap["cniVersion"].(string)
+			if !ok {
+				return errors.New("couldn't get cni version of delegate")
+			}
+			v, err := semver.Make(delegateVersion)
+			if err != nil {
+				return err
+			}
+			if v.LT(v040) {
+				return fmt.Errorf(versionFmt, delegateVersion, mc.CNIVersion)
+			}
+		}
+	}
+
+	return nil
 }
 
 // Generate generates the multus configuration from whatever state is currently
@@ -76,10 +114,12 @@ func (mc *MultusConf) Generate() (string, error) {
 
 // Mutate updates the MultusConf attributes according to the provided
 // configuration `Option`s
-func (mc *MultusConf) Mutate(configurationOptions ...Option) {
+func (mc *MultusConf) Mutate(configurationOptions ...Option) error {
 	for _, configOption := range configurationOptions {
 		configOption(mc)
 	}
+
+	return CheckVersionCompatibility(mc)
 }
 
 // WithNamespaceIsolation mutates the inner state to enable the
