@@ -636,10 +636,11 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			}
 		}
 
+		netName := ""
 		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n, cniArgs)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
-			netName := delegate.Conf.Name
+			netName = delegate.Conf.Name
 			if netName == "" {
 				netName = delegate.ConfList.Name
 			}
@@ -649,11 +650,12 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		// Remove gateway from routing table if the gateway is not used
-		deletegateway := false
+		deleteV4gateway := false
+		deleteV6gateway := false
 		adddefaultgateway := false
-		if delegate.IsFilterGateway {
-			deletegateway = true
-			logging.Debugf("Marked interface %v for gateway deletion", ifName)
+		if delegate.IsFilterV4Gateway {
+			deleteV4gateway = true
+			logging.Debugf("Marked interface %v for v4 gateway deletion", ifName)
 		} else {
 			// Otherwise, determine if this interface now gets our default route.
 			// According to
@@ -661,24 +663,53 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
 			// else we'll update the defaultgateway to the one specified.
 			if delegate.GatewayRequest != nil && delegate.GatewayRequest[0] != nil {
-				deletegateway = true
+				deleteV4gateway = true
 				adddefaultgateway = true
 				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
 			}
 		}
 
-		if deletegateway {
-			tmpResult, err = netutils.DeleteDefaultGW(args, ifName, &tmpResult)
-			if err != nil {
-				return nil, cmdErr(k8sArgs, "error deleting default gateway: %v", err)
+		if delegate.IsFilterV6Gateway {
+			deleteV6gateway = true
+			logging.Debugf("Marked interface %v for v6 gateway deletion", ifName)
+		} else {
+			// Otherwise, determine if this interface now gets our default route.
+			// According to
+			// https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ (4.1.2.1.9)
+			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
+			// else we'll update the defaultgateway to the one specified.
+			if delegate.GatewayRequest != nil && delegate.GatewayRequest[0] != nil {
+				deleteV6gateway = true
+				adddefaultgateway = true
+				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
 			}
 		}
 
-		// Here we'll set the default gateway
+		// Remove namespace from delegate.Name for Add/Del CNI cache
+		nameSlice := strings.Split(delegate.Name, "/")
+		netName = nameSlice[len(nameSlice) - 1]
+
+		// Remove gateway if `default-route` network selection is specified
+		if deleteV4gateway || deleteV6gateway  {
+			err = netutils.DeleteDefaultGW(args, ifName)
+			if err != nil {
+				return nil, cmdErr(k8sArgs, "error deleting default gateway: %v", err)
+			}
+			err = netutils.DeleteDefaultGWCache(n.CNIDir, rt, netName, ifName, deleteV4gateway, deleteV6gateway)
+			if err != nil {
+				return nil, cmdErr(k8sArgs, "error deleting default gateway in cache: %v", err)
+			}
+		}
+
+		// Here we'll set the default gateway which specified in `default-route` network selection
 		if adddefaultgateway {
-			tmpResult, err = netutils.SetDefaultGW(args, ifName, delegate.GatewayRequest, &tmpResult)
+			err = netutils.SetDefaultGW(args, ifName, delegate.GatewayRequest)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error setting default gateway: %v", err)
+			}
+			err = netutils.AddDefaultGWCache(n.CNIDir, rt, netName, ifName, delegate.GatewayRequest)
+			if err != nil {
+				return nil, cmdErr(k8sArgs, "error setting default gateway in cache: %v", err)
 			}
 		}
 

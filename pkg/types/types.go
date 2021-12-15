@@ -98,7 +98,8 @@ type DelegateNetConf struct {
 	PortMappingsRequest   []*PortMapEntry `json:"-"`
 	BandwidthRequest      *BandwidthEntry `json:"-"`
 	GatewayRequest        []net.IP        `json:"default-route,omitempty"`
-	IsFilterGateway       bool
+	IsFilterV4Gateway     bool
+	IsFilterV6Gateway     bool
 	// MasterPlugin is only used internal housekeeping
 	MasterPlugin bool `json:"-"`
 	// Conflist plugin is only used internal housekeeping
