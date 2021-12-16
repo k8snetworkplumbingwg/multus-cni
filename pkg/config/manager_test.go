@@ -59,7 +59,7 @@ var _ = Describe(suiteName, func() {
 
 	BeforeEach(func() {
 		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
-		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), userRWPermission)).To(Succeed())
+		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
 
 		multusConf := NewMultusConfig(
 			primaryCNIName,
@@ -104,7 +104,7 @@ var _ = Describe(suiteName, func() {
 
 		It("Trigger the re-generation of the Multus CNI configuration", func() {
 			newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"yoyo-newnet\",\"type\":\"mycni\"}"
-			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), userRWPermission)).To(Succeed())
+			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), UserRWPermission)).To(Succeed())
 
 			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName)
 			Eventually(func() (string, error) {

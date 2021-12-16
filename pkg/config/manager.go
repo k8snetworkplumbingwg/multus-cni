@@ -29,7 +29,7 @@ import (
 const (
 	multusConfigFileName     = "00-multus.conf"
 	MultusDefaultNetworkName = "multus-cni-network"
-	userRWPermission         = 0600
+	UserRWPermission         = 0600
 )
 
 // Manager monitors the configuration of the primary CNI plugin, and
@@ -177,7 +177,7 @@ func (m Manager) MonitorDelegatedPluginConfiguration(shutDown chan struct{}, don
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
 func (m Manager) PersistMultusConfig(config string) error {
-	return ioutil.WriteFile(m.multusConfigFilePath, []byte(config), userRWPermission)
+	return ioutil.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
 func primaryCNIPluginName(multusAutoconfigDir string) (string, error) {

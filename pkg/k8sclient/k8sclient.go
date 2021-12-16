@@ -96,8 +96,17 @@ func (e *NoK8sNetworkError) Error() string { return string(e.message) }
 
 // SetNetworkStatus sets network status into Pod annotation
 func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []nettypes.NetworkStatus, conf *types.NetConf) error {
+	podName := string(k8sArgs.K8S_POD_NAME)
+	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podUID := string(k8sArgs.K8S_POD_UID)
+
+	return SetPodNetworkStatusAnnotation(client, podName, podNamespace, podUID, netStatus, conf)
+}
+
+// SetPodNetworkStatusAnnotation sets network status into Pod annotation
+func SetPodNetworkStatusAnnotation(client *ClientInfo, podName string, podNamespace string, podUID string, netStatus []nettypes.NetworkStatus, conf *types.NetConf) error {
 	var err error
-	logging.Debugf("SetNetworkStatus: %v, %v, %v, %v", client, k8sArgs, netStatus, conf)
+	logging.Debugf("SetPodNetworkStatusAnnotation: %v, %v, %v", client, netStatus, conf)
 
 	client, err = GetK8sClient(conf.Kubeconfig, client)
 	if err != nil {
@@ -108,16 +117,13 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 			// No available kube client and no delegates, we can't do anything
 			return logging.Errorf("SetNetworkStatus: must have either Kubernetes config or delegates")
 		}
-		logging.Debugf("SetNetworkStatus: kube client info is not defined, skip network status setup")
+		logging.Debugf("SetPodNetworkStatusAnnotation: kube client info is not defined, skip network status setup")
 		return nil
 	}
 
-	podName := string(k8sArgs.K8S_POD_NAME)
-	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
-	podUID := string(k8sArgs.K8S_POD_UID)
 	pod, err := client.GetPod(podNamespace, podName)
 	if err != nil {
-		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", podName, err)
+		return logging.Errorf("SetPodNetworkStatusAnnotation: failed to query the pod %v in out of cluster comm: %v", podName, err)
 	}
 
 	if podUID != "" && string(pod.UID) != podUID && !IsStaticPod(pod) {
@@ -127,7 +133,7 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 	if netStatus != nil {
 		err = netutils.SetNetworkStatus(client.Client, pod, netStatus)
 		if err != nil {
-			return logging.Errorf("SetNetworkStatus: failed to update the pod %v in out of cluster comm: %v", podName, err)
+			return logging.Errorf("SetPodNetworkStatusAnnotation: failed to update the pod %v in out of cluster comm: %v", podName, err)
 		}
 	}
 
@@ -381,6 +387,18 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 	return 0, clientInfo, err
 }
 
+// InClusterK8sClient returns the `k8s.ClientInfo` struct to use to connect to
+// the k8s API.
+func InClusterK8sClient() (*ClientInfo, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	logging.Debugf("InClusterK8sClient: in cluster config: %+v", config)
+	return NewClientInfo(config)
+}
+
 // GetK8sClient gets client info from kubeconfig
 func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error) {
 	logging.Debugf("GetK8sClient: %s, %v", kubeconfig, kubeClient)
@@ -417,7 +435,12 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	// Set the config timeout to one minute.
 	config.Timeout = time.Minute
 
-	// creates the clientset
+	return NewClientInfo(config)
+}
+
+// NewClientInfo returns a `ClientInfo` from a configuration created from an
+// existing kubeconfig file.
+func NewClientInfo(config *rest.Config) (*ClientInfo, error) {
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -432,7 +455,6 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	broadcaster.StartLogging(klog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
-
 	return &ClientInfo{
 		Client:           client,
 		NetClient:        netclient,

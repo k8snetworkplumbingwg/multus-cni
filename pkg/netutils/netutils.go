@@ -23,15 +23,14 @@ import (
 	"path/filepath"
 
 	"github.com/containernetworking/cni/libcni"
-	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 )
 
 // DeleteDefaultGW removes the default gateway from marked interfaces.
-func DeleteDefaultGW(args *skel.CmdArgs, ifName string) error {
-	netns, err := ns.GetNS(args.Netns)
+func DeleteDefaultGW(netnsPath string, ifName string) error {
+	netns, err := ns.GetNS(netnsPath)
 	if err != nil {
 		return logging.Errorf("DeleteDefaultGW: Error getting namespace %v", err)
 	}
@@ -52,9 +51,9 @@ func DeleteDefaultGW(args *skel.CmdArgs, ifName string) error {
 }
 
 // SetDefaultGW adds a default gateway on a specific interface
-func SetDefaultGW(args *skel.CmdArgs, ifName string, gateways []net.IP) error {
+func SetDefaultGW(netnsPath string, ifName string, gateways []net.IP) error {
 	// This ensures we're acting within the net namespace for the pod.
-	netns, err := ns.GetNS(args.Netns)
+	netns, err := ns.GetNS(netnsPath)
 	if err != nil {
 		return logging.Errorf("SetDefaultGW: Error getting namespace %v", err)
 	}
