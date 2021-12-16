@@ -22,6 +22,10 @@ import (
 	"os"
 	"path/filepath"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cni"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
@@ -45,6 +49,9 @@ const (
 	defaultMultusMasterCNIFile          = ""
 	defaultMultusNamespaceIsolation     = false
 	defaultMultusReadinessIndicatorFile = ""
+	defaultMultusRunDir                 = "/host/var/run/multus-cni/"
+	defaultMultusBinDir                 = "/host/opt/cni/bin"
+	defaultMultusCNIDir                 = "/host/var/lib/cni/multus"
 )
 
 const (
@@ -61,6 +68,9 @@ const (
 	multusMasterCNIFileVarName    = "multus-master-cni-file"
 	multusNamespaceIsolation      = "namespace-isolation"
 	multusReadinessIndicatorFile  = "readiness-indicator-file"
+	multusRunDir                  = "multus-rundir"
+	multusCNIDirVarName           = "cniDir"
+	multusBinDirVarName           = "binDir"
 )
 
 func main() {
@@ -81,6 +91,10 @@ func main() {
 	readinessIndicator := flag.String(multusReadinessIndicatorFile, defaultMultusReadinessIndicatorFile, "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	multusKubeconfig := flag.String(multusKubeconfigPath, defaultMultusKubeconfigPath, "The path to the kubeconfig")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when ")
+	multusSocketDir := flag.String(multusRunDir, defaultMultusRunDir, "The directory where the unix socket for the thick plugin will live")
+	multusBinDir := flag.String(multusBinDirVarName, defaultMultusBinDir, "The directory where the CNI plugin binaries are available")
+	multusCniDir := flag.String(multusCNIDirVarName, defaultMultusCNIDir, "The directory where the multus CNI cache is located")
+
 	flag.BoolVar(&versionOpt, "version", false, "Show application version")
 	flag.BoolVar(&versionOpt, "v", false, "Show application version")
 	flag.Parse()
@@ -99,12 +113,34 @@ func main() {
 		logging.SetLogLevel(*logLevel)
 	}
 
+	if err := cni.FilesystemPreRequirements(*multusSocketDir); err != nil {
+		logging.Panicf("failed to prepare the cni-socket for communicating with the shim: %v", err)
+	}
+	server, err := cni.NewCNIServer(*multusSocketDir)
+	if err != nil {
+		logging.Panicf("failed to create the server: %v", err)
+	}
+	l, err := cni.ServerListener(cni.SocketPath(*multusSocketDir))
+	if err != nil {
+		logging.Panicf("failed to start the CNI server using socket %s. Reason: %+v", cni.SocketPath(*multusSocketDir), err)
+	}
+
+	server.SetKeepAlivesEnabled(false)
+	go utilwait.Forever(func() {
+		if err := server.Serve(l); err != nil {
+			utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
+		}
+	}, 0)
+
 	if *multusConfigFile == defaultMultusConfigFile {
 		if *cniVersion == defaultMultusCNIVersion {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
 		var configurationOptions []config.Option
+		configurationOptions = append(configurationOptions, config.WithAdditionalBinaryFileDir(*multusBinDir))
+		configurationOptions = append(configurationOptions, config.WithCniDir(*multusCniDir))
+
 		if *namespaceIsolation {
 			configurationOptions = append(
 				configurationOptions, config.WithNamespaceIsolation())

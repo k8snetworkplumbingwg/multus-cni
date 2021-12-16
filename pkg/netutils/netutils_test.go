@@ -198,7 +198,7 @@ var _ = Describe("netutil netlink function testing", func() {
 			Expect(originalNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 
-				Expect(DeleteDefaultGW(args, IFNAME)).Should(Succeed())
+				Expect(DeleteDefaultGW(args.Netns, IFNAME)).Should(Succeed())
 				return nil
 			})).Should(Succeed())
 		})
@@ -232,7 +232,7 @@ var _ = Describe("netutil netlink function testing", func() {
 			Expect(originalNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 
-				Expect(SetDefaultGW(args, IFNAME, []net.IP{net.ParseIP("10.0.0.1")})).Should(Succeed())
+				Expect(SetDefaultGW(args.Netns, IFNAME, []net.IP{net.ParseIP("10.0.0.1")})).Should(Succeed())
 				return nil
 			})).Should(Succeed())
 		})

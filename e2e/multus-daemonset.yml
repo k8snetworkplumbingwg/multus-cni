@@ -145,6 +145,7 @@ spec:
         name: multus
     spec:
       hostNetwork: true
+      hostPID: true
       nodeSelector:
         kubernetes.io/arch: amd64
       tolerations:
@@ -164,6 +165,8 @@ spec:
         - "-multus-log-to-stderr=true"
         - "-multus-log-level=debug"
         - "-multus-log-file=/tmp/multus.log"
+        - "-binDir=/host/opt/cni/bin"
+        - "-cniDir=/host/var/lib/cni/multus"
         resources:
           requests:
             cpu: "100m"
@@ -180,12 +183,17 @@ spec:
           mountPath: /host/opt/cni/bin
         - name: multus-cfg
           mountPath: /tmp/multus-conf
+        - name: host-var-run-multus-cni
+          mountPath: /host/var/run/multus-cni
+        - name: host-var-run-netns
+          mountPath: /var/run/netns
+          mountPropagation: HostToContainer
       initContainers:
-      - name: install-multus-binary
+      - name: install-multus-shim
         image: localhost:5000/multus:e2e
         command:
           - "cp"
-          - "/usr/src/multus-cni/bin/multus"
+          - "/usr/src/multus-cni/bin/multus-shim"
           - "/host/opt/cni/bin/multus"
         resources:
           requests:
@@ -214,6 +222,21 @@ spec:
           - name: cni
             mountPath: /host/etc/cni/net.d
             mountPropagation: Bidirectional
+      - name: config-cni-socket-permissions
+        image: localhost:5000/multus:e2e
+        command:
+          - "chmod"
+          - "0700"
+          - "/host/var/run/multus-cni"
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "15Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: host-var-run-multus-cni
+            mountPath: /host/var/run/multus-cni
       volumes:
         - name: cni
           hostPath:
@@ -227,6 +250,12 @@ spec:
             items:
             - key: cni-conf.json
               path: 70-multus.conf
+        - name: host-var-run-multus-cni
+          hostPath:
+            path: /var/run/multus-cni
+        - name: host-var-run-netns
+          hostPath:
+            path: /var/run/netns/
 ---
 apiVersion: apps/v1
 kind: DaemonSet
