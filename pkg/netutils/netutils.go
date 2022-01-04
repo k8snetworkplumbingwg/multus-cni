@@ -182,7 +182,7 @@ func deleteDefaultGWResult(result map[string]interface{}, ipv4, ipv6 bool) (map[
 	}
 
 	_, ok = result["routes"]
-	if !ok  {
+	if !ok {
 		// No route in result, hence we do nothing
 		return result, nil
 	}
@@ -335,7 +335,7 @@ func addDefaultGWResult(result map[string]interface{}, gw []net.IP) (map[string]
 
 	routes := []interface{}{}
 	_, ok = result["routes"]
-	if ok  {
+	if ok {
 		routes, ok = result["routes"].([]interface{})
 		if !ok {
 			return nil, fmt.Errorf("wrong routes format: %v", result["routes"])
@@ -349,7 +349,7 @@ func addDefaultGWResult(result map[string]interface{}, gw []net.IP) (map[string]
 		}
 		routes = append(routes, map[string]string{
 			"dst": dst,
-			"gw": g.String(),
+			"gw":  g.String(),
 		})
 	}
 	result["routes"] = routes
@@ -376,7 +376,7 @@ func addDefaultGWResult020(result map[string]interface{}, gw []net.IP) (map[stri
 				}
 				ip4["routes"] = append(routes, map[string]string{
 					"dst": "0.0.0.0/0",
-					"gw": g.String(),
+					"gw":  g.String(),
 				})
 			}
 		} else {
@@ -396,7 +396,7 @@ func addDefaultGWResult020(result map[string]interface{}, gw []net.IP) (map[stri
 				}
 				ip6["routes"] = append(routes, map[string]string{
 					"dst": "::/0",
-					"gw": g.String(),
+					"gw":  g.String(),
 				})
 			}
 		}
