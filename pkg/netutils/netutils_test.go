@@ -33,22 +33,22 @@ import (
 )
 
 func TestNetutils(t *testing.T) {
-    RegisterFailHandler(Fail)
-    RunSpecs(t, "netutils")
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "netutils")
 }
 
 // helper function
 func testAddRoute(link netlink.Link, ip net.IP, mask net.IPMask, gw net.IP) error {
-    dst := &net.IPNet{
-        IP:   ip,
-        Mask: mask,
-    }
-    route := netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst, Gw: gw}
-    return netlink.RouteAdd(&route)
+	dst := &net.IPNet{
+		IP:   ip,
+		Mask: mask,
+	}
+	route := netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst, Gw: gw}
+	return netlink.RouteAdd(&route)
 }
 
 func testAddAddr(link netlink.Link, ip net.IP, mask net.IPMask) error {
-    return netlink.AddrAdd(link, &netlink.Addr{IPNet: &net.IPNet{IP: ip, Mask: mask}})
+	return netlink.AddrAdd(link, &netlink.Addr{IPNet: &net.IPNet{IP: ip, Mask: mask}})
 }
 
 func testGetResultFromCache(data []byte) []byte {
@@ -148,9 +148,9 @@ var _ = Describe("netutil netlink function testing", func() {
 
 			Expect(netlink.LinkAdd(&netlink.Dummy{
 				LinkAttrs: netlink.LinkAttrs{
-					Name: IFNAME,
+					Name:         IFNAME,
 					HardwareAddr: IFMAC,
-					Index: 10,
+					Index:        10,
 				},
 			})).Should(Succeed())
 
@@ -291,17 +291,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -364,17 +364,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -449,7 +449,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`
@@ -523,7 +523,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`
@@ -563,7 +563,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     }
   }
 }`)
-			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10.1.1.1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(test020ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -571,17 +571,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -631,7 +631,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     }
   }
 }`)
-			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10.1.1.1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(test020ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -639,17 +639,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -689,7 +689,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     }
   }
 }`)
-                        newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10::1:1:1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(test020ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -697,17 +697,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -757,7 +757,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     }
   }
 }`)
-                        newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10::1:1:1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(test020ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -765,17 +765,17 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 010/020 Result
 			type CNICacheResult020 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					IP4 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
 						} `json:"routes"`
 					} `json:"ip4"`
 					IP6 struct {
-						IP string `json:"ip"`
+						IP     string `json:"ip"`
 						Routes []struct {
 							Dst string `json:"dst"`
 							Gw  string `json:"gw"`
@@ -815,7 +815,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     ]
   }
 }`)
-			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10.1.1.1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -823,7 +823,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`
@@ -881,7 +881,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     ]
   }
 }`)
-			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10.1.1.1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -889,7 +889,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`
@@ -929,7 +929,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     ]
   }
 }`)
-                        newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10::1:1:1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
@@ -937,7 +937,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`
@@ -999,7 +999,7 @@ var _ = Describe("netutil cnicache function testing", func() {
     ]
   }
 }`)
-                        newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{ net.ParseIP("10::1:1:1") })
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
@@ -1007,7 +1007,7 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
-				Kind string `json:"kind"`
+				Kind   string `json:"kind"`
 				Result struct {
 					Routes []struct {
 						Dst string `json:"dst"`

@@ -687,10 +687,10 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 		// Remove namespace from delegate.Name for Add/Del CNI cache
 		nameSlice := strings.Split(delegate.Name, "/")
-		netName = nameSlice[len(nameSlice) - 1]
+		netName = nameSlice[len(nameSlice)-1]
 
 		// Remove gateway if `default-route` network selection is specified
-		if deleteV4gateway || deleteV6gateway  {
+		if deleteV4gateway || deleteV6gateway {
 			err = netutils.DeleteDefaultGW(args, ifName)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error deleting default gateway: %v", err)
