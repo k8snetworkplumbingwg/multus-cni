@@ -909,4 +909,72 @@ var _ = Describe("config operations", func() {
 		Expect(n.Delegates[0].Name).To(Equal("weave-list"))
 	})
 
+	It("test LoadDelegateNetConf keeps without GatewayRequest", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave-list",
+				"plugins": [ {"type" :"weave"} ]
+			}]
+		}`
+
+		nsJSON := `{ "name": "foobar" }`
+		ns := &NetworkSelectionElement{}
+
+		err := json.Unmarshal([]byte(nsJSON), ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netconf.GatewayRequest).To(BeNil())
+	})
+
+	It("test LoadDelegateNetConf keeps empty GatewayRequest", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave-list",
+				"plugins": [ {"type" :"weave"} ]
+			}]
+		}`
+
+		nsJSON := `{ "name": "foobar", "default-route": [] }`
+		ns := &NetworkSelectionElement{}
+
+		err := json.Unmarshal([]byte(nsJSON), ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netconf.GatewayRequest).NotTo(BeNil())
+		Expect(len(*netconf.GatewayRequest)).To(BeEquivalentTo(0))
+	})
+
+	It("test LoadDelegateNetConf keeps GatewayRequest", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave-list",
+				"plugins": [ {"type" :"weave"} ]
+			}]
+		}`
+
+		nsJSON := `{ "name": "foobar", "default-route": [ "10.1.1.1" ] }`
+		ns := &NetworkSelectionElement{}
+
+		err := json.Unmarshal([]byte(nsJSON), ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(netconf.GatewayRequest).NotTo(BeNil())
+		Expect(len(*netconf.GatewayRequest)).To(BeEquivalentTo(1))
+	})
+
 })
