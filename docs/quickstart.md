@@ -57,7 +57,7 @@ cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
 ### What the Multus daemonset does
 
 * Starts a Multus daemonset, this runs a pod on each node which places a Multus binary on each node in `/opt/cni/bin`
-* Reads the lexicographically (alphabetically) first configuration file in `/etc/cni/net.d`, and creates a new configuration file for Multus as `/etc/cni/net.d/00-multus.conf`, this configuration is auto-generated and is based on the default network configuration (which is assumed to be the alphabetically first configuration)
+* Reads the lexicographically (alphabetically) first configuration file in `/etc/cni/net.d`, and creates a new configuration file for Multus on each node as `/etc/cni/net.d/00-multus.conf`, this configuration is auto-generated and is based on the default network configuration (which is assumed to be the alphabetically first configuration)
 * Creates a `/etc/cni/net.d/multus.d` directory on each node with authentication information for Multus to access the Kubernetes API.
 
 
