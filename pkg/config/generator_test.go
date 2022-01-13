@@ -238,6 +238,22 @@ func invalidDelegateCNIVersion(delegateCNIVersion, multusCNIVersion string) erro
 	return fmt.Errorf("delegate cni version is %s while top level cni version is %s", delegateCNIVersion, multusCNIVersion)
 }
 
+func TestVersionIncompatibility(t *testing.T) {
+	const delegateCNIVersion = "0.3.0"
+
+	primaryCNIConfigOld := primaryCNIConfig
+	tmpVer := primaryCNIConfig["cniVersion"]
+	primaryCNIConfig["cniVersion"] = delegateCNIVersion
+	_, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfigOld)
+	primaryCNIConfig["cniVersion"] = tmpVer
+
+	assertError(t, invalidDelegateCNIVersion(delegateCNIVersion, cniVersion), err)
+}
+
 func TestMultusConfigWithOverriddenName(t *testing.T) {
 	newNetworkName := "mega-net-2000"
 	multusConfig, _ := newMultusConfigWithDelegates(
