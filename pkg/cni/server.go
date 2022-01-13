@@ -245,7 +245,7 @@ func (pr *PodRequest) cmdAdd() ([]byte, error) {
 		return nil, fmt.Errorf("error getting pod [%s/%s]: %v", pr.Namespace, pr.Name, err)
 	}
 
-	result, err := multus.NewMultusCmd(
+	multusAddCmd := multus.NewCmd(
 		pr.ContainerID,
 		pr.SandboxID,
 		pr.IfName,
@@ -253,7 +253,8 @@ func (pr *PodRequest) cmdAdd() ([]byte, error) {
 		pr.Name,
 		pr.Namespace,
 		pr.UID,
-	).Add(pr.CNIConf, pod, pr.exec, pr.kubeclient)
+	)
+	result, err := multus.Add(multusAddCmd, pr.CNIConf, pod, pr.exec, pr.kubeclient)
 	if err != nil {
 		return nil, fmt.Errorf("error configuring pod [%s/%s] networking: %v", pr.Namespace, pr.Name, err)
 	}
@@ -268,7 +269,7 @@ func (pr *PodRequest) cmdDelete() error {
 		return fmt.Errorf("error getting pod [%s/%s]: %v", pr.Namespace, pr.Name, err)
 	}
 
-	return multus.NewMultusCmd(
+	multusDeleteCmd := multus.NewCmd(
 		pr.ContainerID,
 		pr.SandboxID,
 		pr.IfName,
@@ -276,7 +277,8 @@ func (pr *PodRequest) cmdDelete() error {
 		pr.Name,
 		pr.Namespace,
 		pr.UID,
-	).Delete(pr.CNIConf, pod, pr.exec, pr.kubeclient)
+	)
+	return multus.Delete(multusDeleteCmd, pr.CNIConf, pod, pr.exec, pr.kubeclient)
 }
 
 func (pr *PodRequest) cmdCheck() error {
@@ -288,14 +290,15 @@ func (pr *PodRequest) cmdCheck() error {
 
 	logging.Debugf("CmdCheck for [%s/%s]. CNI conf: %+v", namespace, podName, *pr.CNIConf)
 
-	return multus.NewMultusCmd(
+	multusCheckCmd := multus.NewCmd(
 		pr.ContainerID,
 		pr.SandboxID,
 		pr.IfName,
 		pr.Netns,
 		pr.Name,
 		pr.Namespace,
-		pr.UID).Check(pr.CNIConf, pr.exec)
+		pr.UID)
+	return multus.Check(multusCheckCmd, pr.CNIConf, pr.exec)
 }
 
 func serializeResult(result cnitypes.Result) ([]byte, error) {

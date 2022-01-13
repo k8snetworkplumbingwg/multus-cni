@@ -473,7 +473,7 @@ type Cmd struct {
 // delPlugins deletes plugins in reverse order from lastdIdx
 // Uses netRt as base RuntimeConf (coming from NetConf) but merges it
 // with each of the delegates' configuration
-func (mc *Cmd) delPlugins(exec invoke.Exec, pod *v1.Pod, delegates []*types.DelegateNetConf, lastIdx int, netRt *types.RuntimeConfig, multusNetconf *types.NetConf) error {
+func delPlugins(multusCmd *Cmd, exec invoke.Exec, pod *v1.Pod, delegates []*types.DelegateNetConf, lastIdx int, netRt *types.RuntimeConfig, multusNetconf *types.NetConf) error {
 	logging.Debugf("delPlugins: %v, %v, %v, %d, %v", exec, pod, delegates, lastIdx, netRt)
 	if os.Setenv("CNI_COMMAND", "DEL") != nil {
 		return logging.Errorf("delPlugins: error setting environment variable CNI_COMMAND to a value of DEL")
@@ -481,10 +481,10 @@ func (mc *Cmd) delPlugins(exec invoke.Exec, pod *v1.Pod, delegates []*types.Dele
 
 	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
-		ifName := getIfname(delegates[idx], mc.InterfaceName, idx)
+		ifName := getIfname(delegates[idx], multusCmd.InterfaceName, idx)
 
 		rt, cniDeviceInfoPath := types.NewCNIRuntimeConf(
-			mc.ContainerID, mc.SandboxID, mc.PodName, mc.PodNamespace, mc.PodUID, mc.NetnsPath, ifName, netRt, delegates[idx])
+			multusCmd.ContainerID, multusCmd.SandboxID, multusCmd.PodName, multusCmd.PodNamespace, multusCmd.PodUID, multusCmd.NetnsPath, ifName, netRt, delegates[idx])
 
 		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, pod, ifName, delegates[idx], rt, multusNetconf); err != nil {
@@ -621,14 +621,16 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if interfaceName, found := os.LookupEnv("CNI_IFNAME"); found {
 		ifName = interfaceName
 	}
-	result, err := NewMultusCmd(
+	multusAddCmd := NewCmd(
 		args.ContainerID,
 		string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID),
 		ifName,
 		netnsPath,
 		string(k8sArgs.K8S_POD_NAME),
 		string(k8sArgs.K8S_POD_NAMESPACE),
-		string(k8sArgs.K8S_POD_UID)).Add(n, pod, exec, kubeClient)
+		string(k8sArgs.K8S_POD_UID))
+
+	result, err := Add(multusAddCmd, n, pod, exec, kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("%v", err)
 	}
@@ -648,14 +650,15 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 		return cmdErr(nil, "error getting k8s args: %v", err)
 	}
 
-	return NewMultusCmd(
+	multusCheckCmd := NewCmd(
 		args.ContainerID,
 		string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID),
 		args.IfName,
 		args.Netns,
 		string(k8sArgs.K8S_POD_NAME),
 		string(k8sArgs.K8S_POD_NAMESPACE),
-		string(k8sArgs.K8S_POD_UID)).Check(in, exec)
+		string(k8sArgs.K8S_POD_UID))
+	return Check(multusCheckCmd, in, exec)
 }
 
 //CmdDel ...
@@ -681,7 +684,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return err
 	}
 
-	return NewMultusCmd(
+	multusCommand := NewCmd(
 		args.ContainerID,
 		string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID),
 		args.IfName,
@@ -689,11 +692,12 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		string(k8sArgs.K8S_POD_NAME),
 		string(k8sArgs.K8S_POD_NAMESPACE),
 		string(k8sArgs.K8S_POD_UID),
-	).Delete(in, pod, exec, kubeClient)
+	)
+	return Delete(multusCommand, in, pod, exec, kubeClient)
 }
 
-// NewMultusCmd return a new ADD / CHECK / DEL command
-func NewMultusCmd(containerID, sandboxID, ifaceName, netnsPath, podName, podNamespace, podUID string) *Cmd {
+// NewCmd return a new ADD / CHECK / DEL command
+func NewCmd(containerID, sandboxID, ifaceName, netnsPath, podName, podNamespace, podUID string) *Cmd {
 	return &Cmd{
 		ContainerID:   containerID,
 		SandboxID:     sandboxID,
@@ -706,7 +710,7 @@ func NewMultusCmd(containerID, sandboxID, ifaceName, netnsPath, podName, podName
 }
 
 // Add is the handler of the CNI ADD command
-func (mc *Cmd) Add(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kubeclient *k8s.ClientInfo) (cnitypes.Result, error) {
+func Add(mc *Cmd, cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kubeclient *k8s.ClientInfo) (cnitypes.Result, error) {
 	var err error
 	if cniConf.ReadinessIndicatorFile != "" {
 		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
@@ -767,7 +771,7 @@ func (mc *Cmd) Add(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kubecl
 				netName = delegate.ConfList.Name
 			}
 			// Ignore errors; DEL must be idempotent anyway
-			_ = mc.delPlugins(exec, nil, cniConf.Delegates, idx, cniConf.RuntimeConfig, cniConf)
+			_ = delPlugins(mc, exec, nil, cniConf.Delegates, idx, cniConf.RuntimeConfig, cniConf)
 			return nil, cmdPluginErr(mc.PodNamespace, mc.PodName, mc.PodUID, netName, "error adding container to network %q: %v", netName, err)
 		}
 
@@ -889,17 +893,17 @@ func (mc *Cmd) printableK8sArgs() *types.K8sArgs {
 }
 
 // Check is the handler of the CNI CHECK command
-func (mc *Cmd) Check(cniConf *types.NetConf, exec invoke.Exec) error {
+func Check(multusCommand *Cmd, cniConf *types.NetConf, exec invoke.Exec) error {
 	for idx, delegate := range cniConf.Delegates {
-		ifName := getIfname(delegate, mc.InterfaceName, idx)
+		ifName := getIfname(delegate, multusCommand.InterfaceName, idx)
 
 		rt, _ := types.NewCNIRuntimeConf(
-			mc.ContainerID,
-			mc.SandboxID,
-			mc.PodName,
-			mc.PodNamespace,
-			mc.PodUID,
-			mc.NetnsPath,
+			multusCommand.ContainerID,
+			multusCommand.SandboxID,
+			multusCommand.PodName,
+			multusCommand.PodNamespace,
+			multusCommand.PodUID,
+			multusCommand.NetnsPath,
 			ifName,
 			cniConf.RuntimeConfig,
 			delegate)
@@ -911,7 +915,7 @@ func (mc *Cmd) Check(cniConf *types.NetConf, exec invoke.Exec) error {
 }
 
 // Delete is the handler of the CNI DEL command
-func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kubeclient *k8s.ClientInfo) error {
+func Delete(multusCommand *Cmd, cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kubeclient *k8s.ClientInfo) error {
 	var err error
 	if cniConf.ReadinessIndicatorFile != "" {
 		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
@@ -919,12 +923,12 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 			return err == nil, nil
 		})
 		if err != nil {
-			return cmdErr(mc.printableK8sArgs(), "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", cniConf.ReadinessIndicatorFile, err)
+			return cmdErr(multusCommand.printableK8sArgs(), "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", cniConf.ReadinessIndicatorFile, err)
 		}
 	}
 
 	netnsfound := true
-	netns, err := ns.GetNS(mc.NetnsPath)
+	netns, err := ns.GetNS(multusCommand.NetnsPath)
 	if err != nil {
 		// if NetNs is passed down by the Cloud Orchestration Engine, or if it called multiple times
 		// so don't return an error if the device is already removed.
@@ -932,9 +936,9 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 		_, ok := err.(ns.NSPathNotExistErr)
 		if ok {
 			netnsfound = false
-			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", mc.NetnsPath, err)
+			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", multusCommand.NetnsPath, err)
 		} else {
-			return cmdErr(mc.printableK8sArgs(), "failed to open netns %q: %v", netns, err)
+			return cmdErr(multusCommand.printableK8sArgs(), "failed to open netns %q: %v", netns, err)
 		}
 	}
 
@@ -943,14 +947,14 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 	}
 
 	// Read the cache to get delegates json for the GetPod
-	netconfBytes, path, err := consumeScratchNetConf(mc.ContainerID, cniConf.CNIDir)
+	netconfBytes, path, err := consumeScratchNetConf(multusCommand.ContainerID, cniConf.CNIDir)
 	if err != nil {
 		// Fetch delegates again if cache is not exist and pod info can be read
 		if os.IsNotExist(err) && pod != nil {
 			if cniConf.ClusterNetwork != "" {
 				_, err = k8s.GetDefaultNetworks(pod, cniConf, kubeclient, nil)
 				if err != nil {
-					return cmdErr(mc.printableK8sArgs(), "failed to get clusterNetwork/defaultNetworks: %v", err)
+					return cmdErr(multusCommand.printableK8sArgs(), "failed to get clusterNetwork/defaultNetworks: %v", err)
 				}
 				// First delegate is always the master plugin
 				cniConf.Delegates[0].MasterPlugin = true
@@ -961,7 +965,7 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 			if err != nil {
 				if len(cniConf.Delegates) == 0 {
 					// No delegate available so send error
-					return cmdErr(mc.printableK8sArgs(), "failed to get delegates: %v", err)
+					return cmdErr(multusCommand.printableK8sArgs(), "failed to get delegates: %v", err)
 				}
 				// Get clusterNetwork before, so continue to delete
 				logging.Errorf("Multus: failed to get delegates: %v, but continue to delete clusterNetwork", err)
@@ -975,7 +979,7 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 	} else {
 		defer os.Remove(path)
 		if err := json.Unmarshal(netconfBytes, &cniConf.Delegates); err != nil {
-			return cmdErr(mc.printableK8sArgs(), "failed to load netconf: %v", err)
+			return cmdErr(multusCommand.printableK8sArgs(), "failed to load netconf: %v", err)
 		}
 		// check plugins field and enable ConfListPlugin if there is
 		for _, v := range cniConf.Delegates {
@@ -1002,8 +1006,8 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if cniConf.Kubeconfig != "" {
 		if netnsfound {
-			if !types.CheckSystemNamespaces(mc.PodNamespace, cniConf.SystemNamespaces) {
-				err := k8s.SetPodNetworkStatusAnnotation(kubeclient, mc.PodName, mc.PodNamespace, mc.PodUID, nil, cniConf)
+			if !types.CheckSystemNamespaces(multusCommand.PodNamespace, cniConf.SystemNamespaces) {
+				err := k8s.SetPodNetworkStatusAnnotation(kubeclient, multusCommand.PodName, multusCommand.PodNamespace, multusCommand.PodUID, nil, cniConf)
 				if err != nil {
 					// error happen but continue to delete
 					logging.Errorf("Multus: error unsetting the networks status: %v", err)
@@ -1014,5 +1018,5 @@ func (mc *Cmd) Delete(cniConf *types.NetConf, pod *v1.Pod, exec invoke.Exec, kub
 		}
 	}
 
-	return mc.delPlugins(exec, pod, cniConf.Delegates, len(cniConf.Delegates)-1, cniConf.RuntimeConfig, cniConf)
+	return delPlugins(multusCommand, exec, pod, cniConf.Delegates, len(cniConf.Delegates)-1, cniConf.RuntimeConfig, cniConf)
 }
