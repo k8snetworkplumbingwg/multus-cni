@@ -25,7 +25,7 @@ func NewRuntime(socketPath string, runtimeType RuntimeType) (*ContainerRuntime, 
 
 	switch runtimeType {
 	case Crio:
-		// TODO
+		runtime, err = NewCrioRuntime(socketPath, 5*time.Second)
 	case Containerd:
 		runtime, err = NewContainerdRuntime(socketPath, time.Second)
 	}
