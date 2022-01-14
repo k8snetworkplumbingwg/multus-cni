@@ -35,7 +35,7 @@ cd multus-cni
 Multus has go unit tests (based on ginkgo framework).The following commands drive CI tests manually in your environment:
 
 ```
-sudo ./scripts/test.sh
+sudo ./hack/test-go.sh
 ```
 
 ## What are the best practices for logging?
