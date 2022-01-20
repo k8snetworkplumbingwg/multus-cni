@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -13,11 +12,18 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 // CmdAdd implements the CNI spec ADD command handler
 func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
-	body, err := p.DoCNI("http://dummy/", newCNIRequest(args))
+	cniRequest, err := newCNIRequest(args)
+	if err != nil {
+		return err
+	}
+	body, err := p.DoCNI("http://dummy/", cniRequest)
 	if err != nil {
 		return err
 	}
@@ -34,7 +40,11 @@ func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 
 // CmdCheck implements the CNI spec CHECK command handler
 func (p *Plugin) CmdCheck(args *skel.CmdArgs) error {
-	body, err := p.DoCNI("http://dummy/", newCNIRequest(args))
+	cniRequest, err := newCNIRequest(args)
+	if err != nil {
+		return err
+	}
+	body, err := p.DoCNI("http://dummy/", cniRequest)
 	if err != nil {
 		return err
 	}
@@ -51,7 +61,11 @@ func (p *Plugin) CmdCheck(args *skel.CmdArgs) error {
 
 // CmdDel implements the CNI spec DEL command handler
 func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
-	body, err := p.DoCNI("http://dummy/", newCNIRequest(args))
+	cniRequest, err := newCNIRequest(args)
+	if err != nil {
+		return err
+	}
+	body, err := p.DoCNI("http://dummy/", cniRequest)
 	if err != nil {
 		return err
 	}
@@ -68,7 +82,7 @@ func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
 
 // Create and fill a Request with this Plugin's environment and stdin which
 // contain the CNI variables and configuration
-func newCNIRequest(args *skel.CmdArgs) *Request {
+func newCNIRequest(args *skel.CmdArgs) (*Request, error) {
 	envMap := make(map[string]string)
 	for _, item := range os.Environ() {
 		idx := strings.Index(item, "=")
@@ -77,10 +91,22 @@ func newCNIRequest(args *skel.CmdArgs) *Request {
 		}
 	}
 
+	if err := validateCNIRequest(args.StdinData); err != nil {
+		return nil, fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
+	}
+
 	return &Request{
 		Env:    envMap,
 		Config: args.StdinData,
+	}, nil
+}
+
+func validateCNIRequest(cniConfig []byte) error {
+	multusConfig := &types.NetConf{}
+	if err := json.Unmarshal(cniConfig, multusConfig); err != nil {
+		return fmt.Errorf("failed to gather the multus configuration: %w", err)
 	}
+	return nil
 }
 
 // DoCNI sends a CNI request to the CNI server via JSON + HTTP over a root-owned unix socket,
