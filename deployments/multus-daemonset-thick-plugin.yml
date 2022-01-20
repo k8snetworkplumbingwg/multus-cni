@@ -114,6 +114,7 @@ spec:
         name: multus
     spec:
       hostNetwork: true
+      hostPID: true
       tolerations:
         - operator: Exists
           effect: NoSchedule
@@ -130,6 +131,8 @@ spec:
             - "-multus-autoconfig-dir=/host/etc/cni/net.d"
             - "-multus-log-to-stderr=true"
             - "-multus-log-level=verbose"
+            - "-binDir=/host/opt/cni/bin"
+            - "-cniDir=/host/var/lib/cni/multus"
           resources:
             requests:
               cpu: "100m"
@@ -144,6 +147,11 @@ spec:
               mountPath: /host/etc/cni/net.d
             - name: cnibin
               mountPath: /host/opt/cni/bin
+            - name: host-var-run-multus-cni
+              mountPath: /host/var/run/multus-cni
+            - name: host-var-run-netns
+              mountPath: /var/run/netns
+              mountPropagation: HostToContainer
       initContainers:
         - name: install-multus-binary
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
@@ -178,6 +186,21 @@ spec:
             - name: cni
               mountPath: /host/etc/cni/net.d
               mountPropagation: Bidirectional
+        - name: config-cni-socket-permissions
+            image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
+            command:
+              - "chmod"
+              - "0700"
+              - "/host/var/run/multus-cni"
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "15Mi"
+            securityContext:
+              privileged: true
+            volumeMounts:
+              - name: host-var-run-multus-cni
+                mountPath: /host/var/run/multus-cni
       terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
@@ -186,4 +209,9 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
-
+        - name: host-var-run-multus-cni
+          hostPath:
+            path: /var/run/multus-cni
+        - name: host-var-run-netns
+          hostPath:
+            path: /var/run/netns/
