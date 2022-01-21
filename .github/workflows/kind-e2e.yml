@@ -76,6 +76,9 @@ jobs:
         working-directory: ./e2e
         run: ./test-default-route1.sh
 
+      - name: Run golang e2e tests
+        run: ./hack/test-e2e.sh
+
       - name: cleanup cluster and registry
         run: |
           kind delete cluster
