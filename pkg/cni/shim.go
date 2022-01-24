@@ -17,67 +17,65 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
+const (
+	defaultMultusRunDir = "/var/run/multus-cni/"
+)
+
 // CmdAdd implements the CNI spec ADD command handler
-func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
-	cniRequest, err := newCNIRequest(args)
-	if err != nil {
-		return err
-	}
-	body, err := p.DoCNI("http://dummy/", cniRequest)
+func CmdAdd(args *skel.CmdArgs) error {
+	response, err := postRequest(args)
 	if err != nil {
 		return err
 	}
 
-	response := &Response{}
-	if err = json.Unmarshal(body, response); err != nil {
-		err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
-		return err
-	}
-
-	logging.Verbosef("CmdAdd (shim): %s", string(body))
+	logging.Verbosef("CmdAdd (shim): %v", *response.Result)
 	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
 }
 
 // CmdCheck implements the CNI spec CHECK command handler
-func (p *Plugin) CmdCheck(args *skel.CmdArgs) error {
-	cniRequest, err := newCNIRequest(args)
-	if err != nil {
-		return err
-	}
-	body, err := p.DoCNI("http://dummy/", cniRequest)
+func CmdCheck(args *skel.CmdArgs) error {
+	response, err := postRequest(args)
 	if err != nil {
 		return err
 	}
 
-	response := &Response{}
-	if err = json.Unmarshal(body, response); err != nil {
-		err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
-		return err
-	}
-
-	logging.Verbosef("CmdAdd (shim): %s", string(body))
+	logging.Verbosef("CmdCheck (shim): %v", *response.Result)
 	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
 }
 
 // CmdDel implements the CNI spec DEL command handler
-func (p *Plugin) CmdDel(args *skel.CmdArgs) error {
-	cniRequest, err := newCNIRequest(args)
+func CmdDel(args *skel.CmdArgs) error {
+	response, err := postRequest(args)
 	if err != nil {
 		return err
 	}
-	body, err := p.DoCNI("http://dummy/", cniRequest)
+
+	logging.Verbosef("CmdDel (shim): %v", *response.Result)
+	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
+}
+
+func postRequest(args *skel.CmdArgs) (*Response, error) {
+	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
+	}
+
+	cniRequest, err := newCNIRequest(args)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := DoCNI("http://dummy/", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
+	if err != nil {
+		return nil, err
 	}
 
 	response := &Response{}
 	if err = json.Unmarshal(body, response); err != nil {
 		err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
-		return err
+		return nil, err
 	}
-
-	logging.Verbosef("CmdAdd (shim): %s", string(body))
-	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
+	return response, nil
 }
 
 // Create and fill a Request with this Plugin's environment and stdin which
@@ -91,27 +89,34 @@ func newCNIRequest(args *skel.CmdArgs) (*Request, error) {
 		}
 	}
 
-	if err := validateCNIRequest(args.StdinData); err != nil {
-		return nil, fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
-	}
-
 	return &Request{
 		Env:    envMap,
 		Config: args.StdinData,
 	}, nil
 }
 
-func validateCNIRequest(cniConfig []byte) error {
-	multusConfig := &types.NetConf{}
+func shimConfig(cniConfig []byte) (*types.ShimNetConf, error) {
+	multusConfig := &types.ShimNetConf{}
 	if err := json.Unmarshal(cniConfig, multusConfig); err != nil {
-		return fmt.Errorf("failed to gather the multus configuration: %w", err)
+		return nil, fmt.Errorf("failed to gather the multus configuration: %w", err)
 	}
-	return nil
+	if multusConfig.MultusSocketDir == "" {
+		multusConfig.MultusSocketDir = defaultMultusRunDir
+	}
+	// Logging
+	logging.SetLogStderr(multusConfig.LogToStderr)
+	if multusConfig.LogFile != "" {
+		logging.SetLogFile(multusConfig.LogFile)
+	}
+	if multusConfig.LogLevel != "" {
+		logging.SetLogLevel(multusConfig.LogLevel)
+	}
+	return multusConfig, nil
 }
 
 // DoCNI sends a CNI request to the CNI server via JSON + HTTP over a root-owned unix socket,
 // and returns the result
-func (p *Plugin) DoCNI(url string, req interface{}) ([]byte, error) {
+func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal CNI request %v: %v", req, err)
@@ -120,7 +125,7 @@ func (p *Plugin) DoCNI(url string, req interface{}) ([]byte, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			Dial: func(proto, addr string) (net.Conn, error) {
-				return net.Dial("unix", p.SocketPath)
+				return net.Dial("unix", socketPath)
 			},
 		},
 	}

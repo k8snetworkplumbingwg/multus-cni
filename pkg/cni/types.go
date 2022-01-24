@@ -1,14 +1,14 @@
 package cni
 
 import (
-	"context"
+	"net/http"
+
 	"github.com/containernetworking/cni/pkg/invoke"
+	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types/current"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
-	"net/http"
-	"time"
-
-	"github.com/containernetworking/cni/pkg/types/current"
 )
 
 type cniRequestFunc func(request *PodRequest) ([]byte, error)
@@ -20,31 +20,15 @@ type command string
 type PodRequest struct {
 	// The CNI command of the operation
 	Command command
-	// kubernetes namespace name
-	Namespace string
-	// kubernetes pod name
-	Name string
-	// kubernetes pod UID
-	UID string
-	// kubernetes container ID
-	SandboxID string
-	// CNI container ID
-	ContainerID string
-	// kernel network namespace path
-	Netns string
-	// Interface name to be configured
-	IfName string
-	// CNI conf obtained from stdin conf
-	CNIConf *types.NetConf
-	// Timestamp when the request was started
-	timestamp time.Time
-	// ctx is a context tracking this request's lifetime
-	ctx context.Context
-	// cancel should be called to cancel this request
-	cancel context.CancelFunc
-	// kubeclient has the kubernetes API client
-	kubeclient *k8sclient.ClientInfo
-	// exec execs
+
+	// embed the Kubernetes runtime args
+	types.K8sArgs
+
+	// embed the CniArgs
+	skel.CmdArgs
+
+	kubeClient *k8sclient.ClientInfo
+
 	exec invoke.Exec
 }
 
@@ -64,11 +48,6 @@ type Server struct {
 	rundir      string
 	kubeclient  *k8sclient.ClientInfo
 	exec        invoke.Exec
-}
-
-// Plugin represents the connection between the CNI shim and server.
-type Plugin struct {
-	SocketPath string
 }
 
 // Response represents the response (computed in the CNI server) for

@@ -28,7 +28,7 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cni"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const (
@@ -74,7 +74,6 @@ const (
 )
 
 func main() {
-	versionOpt := false
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	cniConfigDir := flag.String(cniConfigDirVarName, defaultCniConfigDir, "CNI config dir")
@@ -91,46 +90,23 @@ func main() {
 	readinessIndicator := flag.String(multusReadinessIndicatorFile, defaultMultusReadinessIndicatorFile, "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	multusKubeconfig := flag.String(multusKubeconfigPath, defaultMultusKubeconfigPath, "The path to the kubeconfig")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when ")
-	multusSocketDir := flag.String(multusRunDir, defaultMultusRunDir, "The directory where the unix socket for the thick plugin will live")
 	multusBinDir := flag.String(multusBinDirVarName, defaultMultusBinDir, "The directory where the CNI plugin binaries are available")
 	multusCniDir := flag.String(multusCNIDirVarName, defaultMultusCNIDir, "The directory where the multus CNI cache is located")
 
-	flag.BoolVar(&versionOpt, "version", false, "Show application version")
-	flag.BoolVar(&versionOpt, "v", false, "Show application version")
+	configFilePath := flag.String("config", types.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
+
 	flag.Parse()
-	if versionOpt == true {
-		fmt.Printf("%s\n", multus.PrintVersionString())
-		return
-	}
 
-	if *logToStdErr {
-		logging.SetLogStderr(*logToStdErr)
-	}
-	if *logFile != defaultMultusLogFile {
-		logging.SetLogFile(*logFile)
-	}
-	if *logLevel != defaultMultusLogLevel {
-		logging.SetLogLevel(*logLevel)
-	}
-
-	if err := cni.FilesystemPreRequirements(*multusSocketDir); err != nil {
-		logging.Panicf("failed to prepare the cni-socket for communicating with the shim: %v", err)
-	}
-	server, err := cni.NewCNIServer(*multusSocketDir)
+	daemonConfig, err := types.LoadDaemonNetConf(*configFilePath)
 	if err != nil {
-		logging.Panicf("failed to create the server: %v", err)
-	}
-	l, err := cni.ServerListener(cni.SocketPath(*multusSocketDir))
-	if err != nil {
-		logging.Panicf("failed to start the CNI server using socket %s. Reason: %+v", cni.SocketPath(*multusSocketDir), err)
+		logging.Panicf("failed to load the multus-daemon configuration: %v", err)
+		os.Exit(1)
 	}
 
-	server.SetKeepAlivesEnabled(false)
-	go utilwait.Forever(func() {
-		if err := server.Serve(l); err != nil {
-			utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
-		}
-	}, 0)
+	if err := startMultusDaemon(daemonConfig); err != nil {
+		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
+		os.Exit(3)
+	}
 
 	if *multusConfigFile == defaultMultusConfigFile {
 		if *cniVersion == defaultMultusCNIVersion {
@@ -222,6 +198,32 @@ func main() {
 			logging.Errorf("failed to copy the user provided configuration %s: %v", *multusConfigFile, err)
 		}
 	}
+}
+
+func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
+	if err := cni.FilesystemPreRequirements(daemonConfig.MultusSocketDir); err != nil {
+		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
+	}
+
+	server, err := cni.NewCNIServer(daemonConfig.MultusSocketDir)
+	if err != nil {
+		return fmt.Errorf("failed to create the server: %v", err)
+	}
+
+	l, err := cni.ServerListener(cni.SocketPath(daemonConfig.MultusSocketDir))
+	if err != nil {
+		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", cni.SocketPath(daemonConfig.MultusSocketDir), err)
+	}
+
+	server.SetKeepAlivesEnabled(false)
+	go utilwait.Forever(func() {
+		logging.Debugf("open for business")
+		if err := server.Serve(l); err != nil {
+			utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
+		}
+	}, 0)
+
+	return nil
 }
 
 func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error {

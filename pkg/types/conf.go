@@ -18,6 +18,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strings"
 
@@ -36,6 +37,13 @@ const (
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
+)
+
+// const block for multus-daemon configs
+const (
+	// DefaultMultusDaemonConfigFile is the default path of the config file
+	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	defaultMultusRunDir           = "/var/run/multus-cni/"
 )
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
@@ -385,6 +393,66 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	return netconf, nil
+}
+
+// LoadDaemonNetConf loads the configuration for the multus daemon
+func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
+	config, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the config file's contents: %w", err)
+	}
+
+	daemonNetConf := &ControllerNetConf{}
+	if err := json.Unmarshal(config, daemonNetConf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+	}
+
+	logging.SetLogStderr(daemonNetConf.LogToStderr)
+	if daemonNetConf.LogFile != DefaultMultusDaemonConfigFile {
+		logging.SetLogFile(daemonNetConf.LogFile)
+	}
+	if daemonNetConf.LogLevel != "" {
+		logging.SetLogLevel(daemonNetConf.LogLevel)
+	}
+
+	if daemonNetConf.CNIDir == "" {
+		daemonNetConf.CNIDir = defaultCNIDir
+	}
+
+	if daemonNetConf.ConfDir == "" {
+		daemonNetConf.ConfDir = defaultConfDir
+	}
+
+	if daemonNetConf.BinDir == "" {
+		daemonNetConf.BinDir = defaultBinDir
+	}
+
+	if len(daemonNetConf.SystemNamespaces) == 0 {
+		daemonNetConf.SystemNamespaces = []string{"kube-system"}
+	}
+
+	if daemonNetConf.MultusNamespace == "" {
+		daemonNetConf.MultusNamespace = defaultMultusNamespace
+	}
+
+	// setup namespace isolation
+	if daemonNetConf.RawNonIsolatedNamespaces == "" {
+		daemonNetConf.NonIsolatedNamespaces = []string{defaultNonIsolatedNamespace}
+	} else {
+		// Parse the comma separated list
+		nonisolated := strings.Split(daemonNetConf.RawNonIsolatedNamespaces, ",")
+		// Cleanup the whitespace
+		for i, nonv := range nonisolated {
+			nonisolated[i] = strings.TrimSpace(nonv)
+		}
+		daemonNetConf.NonIsolatedNamespaces = nonisolated
+	}
+
+	if daemonNetConf.MultusSocketDir == "" {
+		daemonNetConf.MultusSocketDir = defaultMultusRunDir
+	}
+
+	return daemonNetConf, nil
 }
 
 // AddDelegates appends the new delegates to the delegates list

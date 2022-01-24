@@ -103,32 +103,19 @@ var _ = Describe(suiteName, func() {
 			podName     = "my-little-pod"
 		)
 
-		const referenceConfig = `{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.3.1",
-	        "type": "weave-net"
-	    }]}`
-
 		var (
 			cniServer *Server
 			K8sClient *k8s.ClientInfo
 			netns     ns.NetNS
-			shim      *Plugin
 		)
 
 		BeforeEach(func() {
 			var err error
-			K8sClient = fakeK8sClient(10)
+			K8sClient = fakeK8sClient()
 
+			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
 			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient)
 			Expect(err).NotTo(HaveOccurred())
-
-			shim = &Plugin{SocketPath: SocketPath(thickPluginRunDir)}
 
 			netns, err = testutils.NewNS()
 			Expect(err).NotTo(HaveOccurred())
@@ -146,30 +133,25 @@ var _ = Describe(suiteName, func() {
 		})
 
 		It("ADD works successfully", func() {
-			Expect(
-				shim.CmdAdd(
-					cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig))).To(Succeed())
+			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 		})
 
 		It("DEL works successfully", func() {
-			Expect(
-				shim.CmdDel(
-					cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig))).To(Succeed())
+			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 		})
 
 		It("CHECK works successfully", func() {
-			Expect(
-				shim.CmdCheck(
-					cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig))).To(Succeed())
+			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 		})
 	})
 })
 
-func fakeK8sClient(buffSize int) *k8s.ClientInfo {
+func fakeK8sClient() *k8s.ClientInfo {
+	const magicNumber = 10
 	return &k8s.ClientInfo{
 		Client:        fake.NewSimpleClientset(),
 		NetClient:     netfake.NewSimpleClientset().K8sCniCncfIoV1(),
-		EventRecorder: record.NewFakeRecorder(buffSize),
+		EventRecorder: record.NewFakeRecorder(magicNumber),
 	}
 }
 
@@ -224,7 +206,7 @@ func createFakePod(k8sClient *k8s.ClientInfo, podName string) error {
 
 func startCNIServer(runDir string, k8sClient *k8s.ClientInfo) (*Server, error) {
 	const period = 0
-	Expect(FilesystemPreRequirements(runDir)).To(Succeed())
+
 	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{})
 	if err != nil {
 		return nil, err
@@ -242,4 +224,19 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo) (*Server, error) {
 		}
 	}, period)
 	return cniServer, nil
+}
+
+func referenceConfig(thickPluginSocketDir string) string {
+	const referenceConfigTemplate = `{
+        "name": "node-cni-network",
+        "type": "multus",
+        "socketDir": "%s",
+        "defaultnetworkfile": "/tmp/foo.multus.conf",
+        "defaultnetworkwaitseconds": 3,
+        "delegates": [{
+            "name": "weave1",
+            "cniVersion": "0.3.1",
+            "type": "weave-net"
+        }]}`
+	return fmt.Sprintf(referenceConfigTemplate, thickPluginSocketDir)
 }

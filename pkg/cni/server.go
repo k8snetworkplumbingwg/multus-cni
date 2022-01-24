@@ -16,7 +16,6 @@
 package cni
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -24,9 +23,9 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/containernetworking/cni/pkg/invoke"
+	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/gorilla/mux"
@@ -35,7 +34,6 @@ import (
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
-	multustypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 // HandleCNIRequest is the CNI server handler function; it is invoked whenever
@@ -128,7 +126,6 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer req.cancel()
 
 	result, err := s.requestFunc(req)
 	if err != nil {
@@ -146,8 +143,8 @@ func cniRequestToPodRequest(cniRequest *Request, kubeclient *k8s.ClientInfo, exe
 
 	req := &PodRequest{
 		Command:    command(cmd),
-		kubeclient: kubeclient,
 		exec:       exec,
+		kubeClient: kubeclient,
 	}
 
 	req.ContainerID, ok = cniRequest.Env["CNI_CONTAINERID"]
@@ -164,36 +161,39 @@ func cniRequestToPodRequest(cniRequest *Request, kubeclient *k8s.ClientInfo, exe
 		req.IfName = "eth0"
 	}
 
-	cniArgs, err := gatherCNIArgs(cniRequest.Env)
+	cniArgs, found := cniRequest.Env["CNI_ARGS"]
+	if !found {
+		return nil, fmt.Errorf("missing CNI_ARGS")
+	}
+	req.Args = cniArgs
+	req.StdinData = cniRequest.Config
+
+	cniEnv, err := gatherCNIArgs(cniRequest.Env)
 	if err != nil {
 		return nil, err
 	}
-
-	req.Namespace, ok = cniArgs["K8S_POD_NAMESPACE"]
-	if !ok {
+	podNamespace, found := cniEnv["K8S_POD_NAMESPACE"]
+	if !found {
 		return nil, fmt.Errorf("missing K8S_POD_NAMESPACE")
 	}
 
-	req.Name, ok = cniArgs["K8S_POD_NAME"]
-	if !ok {
+	podName, found := cniEnv["K8S_POD_NAME"]
+	if !found {
 		return nil, fmt.Errorf("missing K8S_POD_NAME")
 	}
 
-	req.UID, err = podUID(kubeclient, cniArgs, req.Namespace, req.Name)
+	uid, err := podUID(kubeclient, cniEnv, podNamespace, podName)
 	if err != nil {
 		return nil, err
 	}
 
-	req.SandboxID = cniRequest.Env["K8S_POD_INFRA_CONTAINER_ID"]
+	sandboxID := cniRequest.Env["K8S_POD_INFRA_CONTAINER_ID"]
 
-	conf, err := multustypes.LoadNetConf(cniRequest.Config)
-	if err != nil {
-		return nil, fmt.Errorf("broken stdin args")
-	}
+	req.K8S_POD_NAMESPACE = cnitypes.UnmarshallableString(podNamespace)
+	req.K8S_POD_NAME = cnitypes.UnmarshallableString(podName)
+	req.K8S_POD_INFRA_CONTAINER_ID = cnitypes.UnmarshallableString(sandboxID)
+	req.K8S_POD_UID = cnitypes.UnmarshallableString(uid)
 
-	req.CNIConf = conf
-	req.timestamp = time.Now()
-	req.ctx, req.cancel = context.WithTimeout(context.Background(), time.Minute)
 	return req, nil
 }
 
@@ -233,72 +233,52 @@ func podUID(kubeclient *k8s.ClientInfo, cniArgs map[string]string, podNamespace,
 	return uid, nil
 }
 
+func (pr *PodRequest) cniSkel() *skel.CmdArgs {
+	return &skel.CmdArgs{
+		ContainerID: pr.ContainerID,
+		Netns:       pr.Netns,
+		IfName:      pr.IfName,
+		Args:        pr.Args,
+		Path:        pr.Path,
+		StdinData:   pr.StdinData,
+	}
+}
+
 func (pr *PodRequest) cmdAdd() ([]byte, error) {
-	namespace := pr.Namespace
-	podName := pr.Name
+	namespace := string(pr.K8S_POD_NAMESPACE)
+	podName := string(pr.K8S_POD_NAME)
 	if namespace == "" || podName == "" {
-		return nil, fmt.Errorf("required CNI variable missing")
+		return nil, fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
 	}
 
-	pod, err := multus.GetPod(pr.kubeclient, pr.Namespace, pr.Name, pr.UID, false)
+	logging.Debugf("CmdAdd for [%s/%s]. CNI conf: %+v", namespace, podName, *pr)
+	result, err := multus.CmdAdd(pr.cniSkel(), pr.exec, pr.kubeClient)
 	if err != nil {
-		return nil, fmt.Errorf("error getting pod [%s/%s]: %v", pr.Namespace, pr.Name, err)
-	}
-
-	multusAddCmd := multus.NewCmd(
-		pr.ContainerID,
-		pr.SandboxID,
-		pr.IfName,
-		pr.Netns,
-		pr.Name,
-		pr.Namespace,
-		pr.UID,
-	)
-	result, err := multus.Add(multusAddCmd, pr.CNIConf, pod, pr.exec, pr.kubeclient)
-	if err != nil {
-		return nil, fmt.Errorf("error configuring pod [%s/%s] networking: %v", pr.Namespace, pr.Name, err)
+		return nil, fmt.Errorf("error configuring pod [%s/%s] networking: %v", namespace, podName, err)
 	}
 	return serializeResult(result)
 }
 
 func (pr *PodRequest) cmdDelete() error {
-	logging.Debugf("CmdDel: %+v", *pr.CNIConf)
-
-	pod, err := multus.GetPod(pr.kubeclient, pr.Namespace, pr.Name, pr.UID, true)
-	if err != nil {
-		return fmt.Errorf("error getting pod [%s/%s]: %v", pr.Namespace, pr.Name, err)
+	namespace := string(pr.K8S_POD_NAMESPACE)
+	podName := string(pr.K8S_POD_NAME)
+	if namespace == "" || podName == "" {
+		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
 	}
 
-	multusDeleteCmd := multus.NewCmd(
-		pr.ContainerID,
-		pr.SandboxID,
-		pr.IfName,
-		pr.Netns,
-		pr.Name,
-		pr.Namespace,
-		pr.UID,
-	)
-	return multus.Delete(multusDeleteCmd, pr.CNIConf, pod, pr.exec, pr.kubeclient)
+	logging.Debugf("CmdDel for [%s/%s]. CNI conf: %+v", namespace, podName, *pr)
+	return multus.CmdDel(pr.cniSkel(), pr.exec, pr.kubeClient)
 }
 
 func (pr *PodRequest) cmdCheck() error {
-	namespace := pr.Namespace
-	podName := pr.Name
+	namespace := string(pr.K8S_POD_NAMESPACE)
+	podName := string(pr.K8S_POD_NAME)
 	if namespace == "" || podName == "" {
-		return fmt.Errorf("required CNI variable missing")
+		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
 	}
 
-	logging.Debugf("CmdCheck for [%s/%s]. CNI conf: %+v", namespace, podName, *pr.CNIConf)
-
-	multusCheckCmd := multus.NewCmd(
-		pr.ContainerID,
-		pr.SandboxID,
-		pr.IfName,
-		pr.Netns,
-		pr.Name,
-		pr.Namespace,
-		pr.UID)
-	return multus.Check(multusCheckCmd, pr.CNIConf, pr.exec)
+	logging.Debugf("CmdCheck for [%s/%s]. CNI conf: %+v", namespace, podName, *pr)
+	return multus.CmdCheck(pr.cniSkel(), pr.exec, pr.kubeClient)
 }
 
 func serializeResult(result cnitypes.Result) ([]byte, error) {

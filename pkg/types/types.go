@@ -172,3 +172,40 @@ type ResourceClient interface {
 	// GetPodResourceMap returns an instance of a map of Pod ResourceInfo given a (Pod name, namespace) tuple
 	GetPodResourceMap(*v1.Pod) (map[string]*ResourceInfo, error)
 }
+
+// ShimNetConf for the SHIM cni config file written in json
+type ShimNetConf struct {
+	types.NetConf
+
+	MultusSocketDir string `json:"socketDir"`
+	LogFile         string `json:"logFile,omitempty"`
+	LogLevel        string `json:"logLevel,omitempty"`
+	LogToStderr     bool   `json:"logToStderr,omitempty"`
+}
+
+// ControllerNetConf for the controller cni configuration
+type ControllerNetConf struct {
+	ConfDir string `json:"confDir"`
+	CNIDir  string `json:"cniDir"`
+	BinDir  string `json:"binDir"`
+
+	ClusterNetwork  string   `json:"clusterNetwork"`
+	DefaultNetworks []string `json:"defaultNetworks"`
+	LogFile         string   `json:"logFile"`
+	LogLevel        string   `json:"logLevel"`
+	LogToStderr     bool     `json:"logToStderr,omitempty"`
+
+	// Option to isolate the usage of CR's to the namespace in which a pod resides.
+	NamespaceIsolation       bool     `json:"namespaceIsolation"`
+	RawNonIsolatedNamespaces string   `json:"globalNamespaces"`
+	NonIsolatedNamespaces    []string `json:"-"`
+
+	// Option to set system namespaces (to avoid to add defaultNetworks)
+	SystemNamespaces []string `json:"systemNamespaces"`
+	// Option to set the namespace that multus-cni uses (clusterNetwork/defaultNetworks)
+	MultusNamespace string `json:"multusNamespace"`
+
+	// Option to point to the path of the unix domain socket through which the
+	// multus client / server communicate.
+	MultusSocketDir string `json:"socketDir"`
+}

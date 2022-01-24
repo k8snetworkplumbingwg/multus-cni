@@ -30,11 +30,6 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
 )
 
-const (
-	defaultMultusRunDir = "/var/run/multus-cni/"
-	socketDirVarName    = "socketDir"
-)
-
 func main() {
 	// Init command line flags to clear vendored packages' one, especially in init()
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -44,17 +39,21 @@ func main() {
 	flag.BoolVar(&versionOpt, "version", false, "Show application version")
 	flag.BoolVar(&versionOpt, "v", false, "Show application version")
 
-	runDir := flag.String(socketDirVarName, defaultMultusRunDir, "point to socket")
 	flag.Parse()
 	if versionOpt == true {
 		fmt.Printf("%s\n", multus.PrintVersionString())
 		return
 	}
 
-	p := cni.Plugin{SocketPath: cni.SocketPath(*runDir)}
 	skel.PluginMain(
-		p.CmdAdd,
-		p.CmdCheck,
-		p.CmdDel,
+		func(args *skel.CmdArgs) error {
+			return cni.CmdAdd(args)
+		},
+		func(args *skel.CmdArgs) error {
+			return cni.CmdCheck(args)
+		},
+		func(args *skel.CmdArgs) error {
+			return cni.CmdDel(args)
+		},
 		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }
