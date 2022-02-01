@@ -623,7 +623,6 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	var result, tmpResult cnitypes.Result
 	var netStatus []nettypes.NetworkStatus
-	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
@@ -637,7 +636,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		netName := ""
-		tmpResult, err = delegateAdd(exec, kubeClient, pod, args.Netns, ifName, delegate, rt, n, cniArgs)
+		tmpResult, err = delegateAdd(exec, kubeClient, pod, args.Netns, ifName, delegate, rt, n, args.Args)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
 			netName = delegate.Conf.Name
