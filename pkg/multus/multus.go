@@ -551,7 +551,8 @@ func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (
 		}
 	}
 
-	if podUID != "" && string(pod.UID) != podUID {
+	// In case of static pod, UID through kube api is different because of mirror pod, hence it is expected.
+	if podUID != "" && string(pod.UID) != podUID && !k8s.IsStaticPod(pod) {
 		msg := fmt.Sprintf("expected pod UID %q but got %q from Kube API", podUID, pod.UID)
 		if warnOnly {
 			// On CNI DEL we just operate on the cache when these mismatch, we don't error out.

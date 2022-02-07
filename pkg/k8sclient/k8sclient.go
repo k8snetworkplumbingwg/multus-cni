@@ -120,7 +120,7 @@ func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []ne
 		return logging.Errorf("SetNetworkStatus: failed to query the pod %v in out of cluster comm: %v", podName, err)
 	}
 
-	if podUID != "" && string(pod.UID) != podUID {
+	if podUID != "" && string(pod.UID) != podUID && !IsStaticPod(pod) {
 		return logging.Errorf("SetNetworkStatus: expected pod %s/%s UID %q but got %q from Kube API", podNamespace, podName, podUID, pod.UID)
 	}
 
@@ -618,4 +618,17 @@ func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, conf *type
 	delegate.MasterPlugin = true
 
 	return delegate, nil
+}
+
+// ConfigSourceAnnotationKey specifies kubernetes annotation, defined in k8s.io/kubernetes/pkg/kubelet/types
+const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
+
+// IsStaticPod returns true if the pod is static pod.
+func IsStaticPod(pod *v1.Pod) bool {
+	if pod.Annotations != nil {
+		if source, ok := pod.Annotations[ConfigSourceAnnotationKey]; ok == true {
+			return source != "api"
+		}
+	}
+	return false
 }
