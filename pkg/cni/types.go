@@ -11,26 +11,7 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
-type cniRequestFunc func(request *PodRequest) ([]byte, error)
-
-// Explicit type for CNI commands the server handles
-type command string
-
-// PodRequest represents a request for ADD / DEL / CHECK for a Pod
-type PodRequest struct {
-	// The CNI command of the operation
-	Command command
-
-	// embed the Kubernetes runtime args
-	types.K8sArgs
-
-	// embed the CniArgs
-	skel.CmdArgs
-
-	kubeClient *k8sclient.ClientInfo
-
-	exec invoke.Exec
-}
+type cniRequestFunc func(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8sclient.ClientInfo) ([]byte, error)
 
 // Request sent to the Server by the multus-shim
 type Request struct {
