@@ -185,25 +185,12 @@ type ShimNetConf struct {
 
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
-	ConfDir string `json:"confDir"`
-	CNIDir  string `json:"cniDir"`
-	BinDir  string `json:"binDir"`
-
-	ClusterNetwork  string   `json:"clusterNetwork"`
-	DefaultNetworks []string `json:"defaultNetworks"`
-	LogFile         string   `json:"logFile"`
-	LogLevel        string   `json:"logLevel"`
-	LogToStderr     bool     `json:"logToStderr,omitempty"`
-
-	// Option to isolate the usage of CR's to the namespace in which a pod resides.
-	NamespaceIsolation       bool     `json:"namespaceIsolation"`
-	RawNonIsolatedNamespaces string   `json:"globalNamespaces"`
-	NonIsolatedNamespaces    []string `json:"-"`
-
-	// Option to set system namespaces (to avoid to add defaultNetworks)
-	SystemNamespaces []string `json:"systemNamespaces"`
-	// Option to set the namespace that multus-cni uses (clusterNetwork/defaultNetworks)
-	MultusNamespace string `json:"multusNamespace"`
+	ConfDir     string `json:"confDir"`
+	CNIDir      string `json:"cniDir"`
+	BinDir      string `json:"binDir"`
+	LogFile     string `json:"logFile"`
+	LogLevel    string `json:"logLevel"`
+	LogToStderr bool   `json:"logToStderr,omitempty"`
 
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.

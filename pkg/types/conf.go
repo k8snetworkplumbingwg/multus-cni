@@ -427,27 +427,6 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
 		daemonNetConf.BinDir = defaultBinDir
 	}
 
-	if len(daemonNetConf.SystemNamespaces) == 0 {
-		daemonNetConf.SystemNamespaces = []string{"kube-system"}
-	}
-
-	if daemonNetConf.MultusNamespace == "" {
-		daemonNetConf.MultusNamespace = defaultMultusNamespace
-	}
-
-	// setup namespace isolation
-	if daemonNetConf.RawNonIsolatedNamespaces == "" {
-		daemonNetConf.NonIsolatedNamespaces = []string{defaultNonIsolatedNamespace}
-	} else {
-		// Parse the comma separated list
-		nonisolated := strings.Split(daemonNetConf.RawNonIsolatedNamespaces, ",")
-		// Cleanup the whitespace
-		for i, nonv := range nonisolated {
-			nonisolated[i] = strings.TrimSpace(nonv)
-		}
-		daemonNetConf.NonIsolatedNamespaces = nonisolated
-	}
-
 	if daemonNetConf.MultusSocketDir == "" {
 		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}
