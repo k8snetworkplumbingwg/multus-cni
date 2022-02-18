@@ -34,6 +34,10 @@ import (
 	"github.com/onsi/gomega"
 )
 
+const implementedSpecVersion string = "0.2.0"
+
+var supportedVersions = []string{"", "0.1.0", implementedSpecVersion}
+
 // NewFakeNetAttachDef returns net-attach-def for testing
 func NewFakeNetAttachDef(namespace, name, config string) *netv1.NetworkAttachmentDefinition {
 	return &netv1.NetworkAttachmentDefinition{
@@ -129,13 +133,13 @@ func (r *Result) Version() string {
 
 // GetAsVersion returns a Result object given a version
 func (r *Result) GetAsVersion(version string) (types.Result, error) {
-	for _, supportedVersion := range types020.SupportedVersions {
+	for _, supportedVersion := range supportedVersions {
 		if version == supportedVersion {
 			r.CNIVersion = version
 			return r, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot convert version %q to %s", types020.SupportedVersions, version)
+	return nil, fmt.Errorf("cannot convert version %q to %s", supportedVersions, version)
 }
 
 // Print prints a Result's information to std out

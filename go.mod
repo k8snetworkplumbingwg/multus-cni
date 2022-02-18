@@ -3,16 +3,16 @@ module gopkg.in/k8snetworkplumbingwg/multus-cni.v3
 go 1.16
 
 require (
-	github.com/containernetworking/cni v0.8.1
-	github.com/containernetworking/plugins v0.9.1
+	github.com/containernetworking/cni v1.0.1
+	github.com/containernetworking/plugins v1.0.1
 	github.com/fsnotify/fsnotify v1.4.9
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20210510153419-66a699ae3b05
-	github.com/onsi/ginkgo v1.12.1
-	github.com/onsi/gomega v1.10.3
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.2.0
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.15.0
 	github.com/pkg/errors v0.9.1
-	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
-	google.golang.org/grpc v1.27.1
+	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	google.golang.org/grpc v1.33.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.20.10
 	k8s.io/apimachinery v0.20.10
