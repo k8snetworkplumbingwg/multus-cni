@@ -18,6 +18,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strings"
 
@@ -36,6 +37,13 @@ const (
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
+)
+
+// const block for multus-daemon configs
+const (
+	// DefaultMultusDaemonConfigFile is the default path of the config file
+	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	defaultMultusRunDir           = "/var/run/multus-cni/"
 )
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
@@ -184,41 +192,24 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 // CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
 // exists, merge data with the runtime config.
 func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
-	logging.Debugf("LoadCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
-	var cniDeviceInfoFile string
-	var delegateRc *RuntimeConfig
+	podName := string(k8sArgs.K8S_POD_NAME)
+	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podUID := string(k8sArgs.K8S_POD_UID)
+	sandboxID := string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)
+	return NewCNIRuntimeConf(args.ContainerID, sandboxID, podName, podNamespace, podUID, args.Netns, ifName, rc, delegate)
+}
 
-	if delegate != nil {
-		delegateRc = mergeCNIRuntimeConfig(rc, delegate)
-		if delegateRc.DeviceID != "" {
-			if delegateRc.CNIDeviceInfoFile != "" {
-				logging.Debugf("Warning: Existing value of CNIDeviceInfoFile will be overwritten %s", delegateRc.CNIDeviceInfoFile)
-			}
-			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, args.ContainerID, ifName)
-			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
-			cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
-			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
-		}
-	} else {
-		delegateRc = rc
-	}
+// NewCNIRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func NewCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, netNs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
+	logging.Debugf("LoadCNIRuntimeConf: %s, %v %v", ifName, rc, delegate)
 
+	delegateRc := DelegateRuntimeConfig(containerID, delegate, rc, ifName)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
-	rt := &libcni.RuntimeConf{
-		ContainerID: args.ContainerID,
-		NetNS:       args.Netns,
-		IfName:      ifName,
-		// NOTE: Verbose logging depends on this order, so please keep Args order.
-		Args: [][2]string{
-			{"IgnoreUnknown", string("true")},
-			{"K8S_POD_NAMESPACE", string(k8sArgs.K8S_POD_NAMESPACE)},
-			{"K8S_POD_NAME", string(k8sArgs.K8S_POD_NAME)},
-			{"K8S_POD_INFRA_CONTAINER_ID", string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)},
-			{"K8S_POD_UID", string(k8sArgs.K8S_POD_UID)},
-		},
-	}
+	rt := CreateRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName)
 
+	var cniDeviceInfoFile string
 	if delegateRc != nil {
+		cniDeviceInfoFile = delegateRc.CNIDeviceInfoFile
 		capabilityArgs := map[string]interface{}{}
 		if len(delegateRc.PortMaps) != 0 {
 			capabilityArgs["portMappings"] = delegateRc.PortMaps
@@ -244,6 +235,43 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		rt.CapabilityArgs = capabilityArgs
 	}
 	return rt, cniDeviceInfoFile
+}
+
+// CreateRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func CreateRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName string) *libcni.RuntimeConf {
+	return &libcni.RuntimeConf{
+		ContainerID: containerID,
+		NetNS:       netNs,
+		IfName:      ifName,
+		// NOTE: Verbose logging depends on this order, so please keep Args order.
+		Args: [][2]string{
+			{"IgnoreUnknown", "true"},
+			{"K8S_POD_NAMESPACE", podNamespace},
+			{"K8S_POD_NAME", podName},
+			{"K8S_POD_INFRA_CONTAINER_ID", sandboxID},
+			{"K8S_POD_UID", podUID},
+		},
+	}
+}
+
+// DelegateRuntimeConfig creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func DelegateRuntimeConfig(containerID string, delegate *DelegateNetConf, rc *RuntimeConfig, ifName string) *RuntimeConfig {
+	var delegateRc *RuntimeConfig
+
+	if delegate != nil {
+		delegateRc = mergeCNIRuntimeConfig(rc, delegate)
+		if delegateRc.DeviceID != "" {
+			if delegateRc.CNIDeviceInfoFile != "" {
+				logging.Debugf("Warning: Existing value of CNIDeviceInfoFile will be overwritten %s", delegateRc.CNIDeviceInfoFile)
+			}
+			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, containerID, ifName)
+			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+		}
+	} else {
+		delegateRc = rc
+	}
+	return delegateRc
 }
 
 // GetGatewayFromResult retrieves gateway IP addresses from CNI result
@@ -365,6 +393,45 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	}
 
 	return netconf, nil
+}
+
+// LoadDaemonNetConf loads the configuration for the multus daemon
+func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
+	config, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the config file's contents: %w", err)
+	}
+
+	daemonNetConf := &ControllerNetConf{}
+	if err := json.Unmarshal(config, daemonNetConf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+	}
+
+	logging.SetLogStderr(daemonNetConf.LogToStderr)
+	if daemonNetConf.LogFile != DefaultMultusDaemonConfigFile {
+		logging.SetLogFile(daemonNetConf.LogFile)
+	}
+	if daemonNetConf.LogLevel != "" {
+		logging.SetLogLevel(daemonNetConf.LogLevel)
+	}
+
+	if daemonNetConf.CNIDir == "" {
+		daemonNetConf.CNIDir = defaultCNIDir
+	}
+
+	if daemonNetConf.ConfDir == "" {
+		daemonNetConf.ConfDir = defaultConfDir
+	}
+
+	if daemonNetConf.BinDir == "" {
+		daemonNetConf.BinDir = defaultBinDir
+	}
+
+	if daemonNetConf.MultusSocketDir == "" {
+		daemonNetConf.MultusSocketDir = defaultMultusRunDir
+	}
+
+	return daemonNetConf, nil
 }
 
 // AddDelegates appends the new delegates to the delegates list

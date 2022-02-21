@@ -48,6 +48,7 @@ type MultusConf struct {
 	RawNonIsolatedNamespaces string          `json:"globalNamespaces,omitempty"`
 	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
 	Type                     string          `json:"type"`
+	CniDir                   string          `json:"cniDir,omitempty"`
 }
 
 // NewMultusConfig creates a basic configuration generator. It can be mutated
@@ -143,6 +144,14 @@ func WithAdditionalBinaryFileDir(directoryPath string) Option {
 func WithOverriddenName(networkName string) Option {
 	return func(conf *MultusConf) {
 		conf.Name = networkName
+	}
+}
+
+// WithCniDir mutates the inner state to set the
+// multus CNI cache directory
+func WithCniDir(cniDir string) Option {
+	return func(conf *MultusConf) {
+		conf.CniDir = cniDir
 	}
 }
 

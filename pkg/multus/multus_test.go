@@ -231,7 +231,6 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		var err error
 		testNS, err = testutils.NewNS()
 		Expect(err).NotTo(HaveOccurred())
-		os.Setenv("CNI_NETNS", testNS.Path())
 		os.Setenv("CNI_PATH", "/some/path")
 
 		tmpDir, err = ioutil.TempDir("", "multus_tmp")
@@ -323,10 +322,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("executes delegates given faulty namespace", func() {
+	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
-			Netns:       "fsdadfad",
+			Netns:       testNS.Path(),
 			IfName:      "eth0",
 			StdinData: []byte(`{
 	    "name": "node-cni-network",
@@ -344,7 +343,8 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 	    }]
 	}`),
 		}
-		// Netns is given garbage value
+
+		logging.SetLogLevel("verbose")
 
 		// Touch the default network file.
 		configPath := "/tmp/foo.multus.conf"
@@ -385,6 +385,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		// Check is not supported until v 0.4.0
+		err = CmdCheck(args, fExec, nil)
+		Expect(err).To(HaveOccurred())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -480,82 +484,6 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("executes delegates given faulty namespace", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       "fsdadfad",
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.2.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.2.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-		// Netns is given garbage value
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.2.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.2.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
 	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
@@ -637,83 +565,6 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 	})
 
-	It("executes delegates given faulty namespace", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       "fsdadfad",
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.2.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.2.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-		// Netns is given garbage value
-		fmt.Println("args.Netns: ", args.Netns)
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.2.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.2.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
 	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
@@ -781,239 +632,6 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		// Check is not supported until v 0.4.0
 		err = CmdCheck(args, fExec, nil)
 		Expect(err).To(HaveOccurred())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
-	It("executes delegates given faulty namespace", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       "fsdadfad",
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.2.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.2.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-		// Netns is given garbage value
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.2.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.2.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
-	It("returns the previous result using CmdCheck", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       testNS.Path(),
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.2.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.2.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-
-		logging.SetLogLevel("verbose")
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.2.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.2.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
-
-		// Check is not supported until v 0.4.0
-		err = CmdCheck(args, fExec, nil)
-		Expect(err).To(HaveOccurred())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
-	It("executes delegates given faulty namespace", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       "fsdadfad",
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.2.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.2.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-		// Netns is given garbage value
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.2.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin020(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &types020.Result{
-			CNIVersion: "0.2.0",
-			IP4: &types020.IPConfig{
-				IP: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.2.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*types020.Result)
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")
@@ -2410,83 +2028,6 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		os.Setenv("CNI_COMMAND", "CHECK")
 		err = CmdCheck(args, fExec, nil)
 		Expect(err).NotTo(HaveOccurred())
-
-		os.Setenv("CNI_COMMAND", "DEL")
-		os.Setenv("CNI_IFNAME", "eth0")
-		err = CmdDel(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
-
-		// Cleanup default network file.
-		if _, errStat := os.Stat(configPath); errStat == nil {
-			errRemove := os.Remove(configPath)
-			Expect(errRemove).NotTo(HaveOccurred())
-		}
-	})
-
-	It("executes delegates given faulty namespace", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       "fsdadfad",
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "defaultnetworkfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "0.4.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "0.4.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-		// Netns is given garbage value
-
-		// Touch the default network file.
-		configPath := "/tmp/foo.multus.conf"
-		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
-
-		fExec := &fakeExec{}
-		expectedResult1 := &current.Result{
-			CNIVersion: "0.4.0",
-			IPs: []*current.IPConfig{{
-				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "0.4.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &current.Result{
-			CNIVersion: "0.4.0",
-			IPs: []*current.IPConfig{{
-				Address: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "0.4.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		os.Setenv("CNI_COMMAND", "ADD")
-		os.Setenv("CNI_IFNAME", "eth0")
-		result, err := CmdAdd(args, fExec, nil)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		// plugin 1 is the masterplugin
-		Expect(reflect.DeepEqual(result, expectedResult1)).To(BeTrue())
 
 		os.Setenv("CNI_COMMAND", "DEL")
 		os.Setenv("CNI_IFNAME", "eth0")

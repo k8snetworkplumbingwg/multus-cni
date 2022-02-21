@@ -285,13 +285,13 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf, cniArgs string) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, netns string, ifName string, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf, cniArgs string) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %s, %v, %v", exec, ifName, delegate, rt)
 	if os.Setenv("CNI_IFNAME", ifName) != nil {
 		return nil, logging.Errorf("delegateAdd: error setting environment variable CNI_IFNAME")
 	}
 
-	if err := validateIfName(os.Getenv("CNI_NETNS"), ifName); err != nil {
+	if err := validateIfName(netns, ifName); err != nil {
 		return nil, logging.Errorf("delegateAdd: cannot set %q interface name to %q: %v", delegate.Conf.Type, ifName, err)
 	}
 
@@ -386,7 +386,6 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, ifNa
 		// for further debug https://github.com/k8snetworkplumbingwg/multus-cni/issues/481
 		logging.Errorf("delegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
 	}
-
 	return result, nil
 }
 
@@ -624,7 +623,6 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	var result, tmpResult cnitypes.Result
 	var netStatus []nettypes.NetworkStatus
-	cniArgs := os.Getenv("CNI_ARGS")
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
@@ -638,7 +636,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		netName := ""
-		tmpResult, err = delegateAdd(exec, kubeClient, pod, ifName, delegate, rt, n, cniArgs)
+		tmpResult, err = delegateAdd(exec, kubeClient, pod, args.Netns, ifName, delegate, rt, n, args.Args)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
 			netName = delegate.Conf.Name
@@ -692,7 +690,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 		// Remove gateway if `default-route` network selection is specified
 		if deleteV4gateway || deleteV6gateway {
-			err = netutils.DeleteDefaultGW(args, ifName)
+			err = netutils.DeleteDefaultGW(args.Netns, ifName)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error deleting default gateway: %v", err)
 			}
@@ -704,7 +702,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 		// Here we'll set the default gateway which specified in `default-route` network selection
 		if adddefaultgateway {
-			err = netutils.SetDefaultGW(args, ifName, delegate.GatewayRequest)
+			err = netutils.SetDefaultGW(args.Netns, ifName, delegate.GatewayRequest)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error setting default gateway: %v", err)
 			}

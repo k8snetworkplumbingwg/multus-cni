@@ -122,6 +122,26 @@ data:
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
     }
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-daemon-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+data:
+  daemon-config.json: |
+    {
+        "confDir": "/host/etc/cni/net.d",
+        "logToStderr": true,
+        "logLevel": "debug",
+        "logFile": "/tmp/multus.log",
+        "binDir": "/host/opt/cni/bin",
+        "cniDir": "/host/var/lib/cni/multus",
+        "socketDir": "/host/var/run/multus-cni/"
+    }
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -145,6 +165,7 @@ spec:
         name: multus
     spec:
       hostNetwork: true
+      hostPID: true
       nodeSelector:
         kubernetes.io/arch: amd64
       tolerations:
@@ -161,9 +182,6 @@ spec:
         - "-cni-version=0.3.1"
         - "-cni-config-dir=/host/etc/cni/net.d"
         - "-multus-autoconfig-dir=/host/etc/cni/net.d"
-        - "-multus-log-to-stderr=true"
-        - "-multus-log-level=debug"
-        - "-multus-log-file=/tmp/multus.log"
         resources:
           requests:
             cpu: "100m"
@@ -178,14 +196,20 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
+        - name: host-var-run-multus-cni
+          mountPath: /host/var/run/multus-cni
+        - name: host-var-run-netns
+          mountPath: /var/run/netns
+          mountPropagation: HostToContainer
+        - name: multus-daemon-config
+          mountPath: /etc/cni/net.d/multus.d
+          readOnly: true
       initContainers:
-      - name: install-multus-binary
+      - name: install-multus-shim
         image: localhost:5000/multus:e2e
         command:
           - "cp"
-          - "/usr/src/multus-cni/bin/multus"
+          - "/usr/src/multus-cni/bin/multus-shim"
           - "/host/opt/cni/bin/multus"
         resources:
           requests:
@@ -214,6 +238,21 @@ spec:
           - name: cni
             mountPath: /host/etc/cni/net.d
             mountPropagation: Bidirectional
+      - name: config-cni-socket-permissions
+        image: localhost:5000/multus:e2e
+        command:
+          - "chmod"
+          - "0700"
+          - "/host/var/run/multus-cni"
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "15Mi"
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: host-var-run-multus-cni
+            mountPath: /host/var/run/multus-cni
       volumes:
         - name: cni
           hostPath:
@@ -221,12 +260,18 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
-        - name: multus-cfg
+        - name: multus-daemon-config
           configMap:
-            name: multus-cni-config
+            name: multus-daemon-config
             items:
-            - key: cni-conf.json
-              path: 70-multus.conf
+            - key: daemon-config.json
+              path: daemon-config.json
+        - name: host-var-run-multus-cni
+          hostPath:
+            path: /var/run/multus-cni
+        - name: host-var-run-netns
+          hostPath:
+            path: /var/run/netns/
 ---
 apiVersion: apps/v1
 kind: DaemonSet
