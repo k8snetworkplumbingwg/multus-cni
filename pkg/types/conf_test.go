@@ -47,7 +47,6 @@ var _ = Describe("config operations", func() {
 		var err error
 		testNS, err = testutils.NewNS()
 		Expect(err).NotTo(HaveOccurred())
-		os.Setenv("CNI_NETNS", testNS.Path())
 		os.Setenv("CNI_PATH", "/some/path")
 
 		tmpDir, err = ioutil.TempDir("", "multus_tmp")
@@ -57,7 +56,6 @@ var _ = Describe("config operations", func() {
 	AfterEach(func() {
 		Expect(testNS.Close()).To(Succeed())
 		os.Unsetenv("CNI_PATH")
-		os.Unsetenv("CNI_ARGS")
 		err := os.RemoveAll(tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 	})
