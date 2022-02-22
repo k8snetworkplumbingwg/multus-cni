@@ -3,6 +3,14 @@ on: [push, pull_request]
 jobs:
   e2e-kind:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - docker-file: images/Dockerfile.thick
+            multus-manifest: multus-thick-daemonset.yml
+          - docker-file: images/Dockerfile
+            multus-manifest: multus-daemonset.yml
+
     if: >
       (( github.event.pull_request.head.repo.owner.login != github.event.pull_request.base.repo.owner.login ) &&
         github.event_name == 'pull_request' ) || (github.event_name == 'push' && github.event.commits != '[]' )
@@ -12,10 +20,10 @@ jobs:
 
       - name: Setup registry
         run: docker run -d --restart=always -p "5000:5000" --name "kind-registry" registry:2
-  
+
       - name: Build latest-amd64
-        run: docker build -t localhost:5000/multus:e2e -f images/Dockerfile.thick .
- 
+        run: docker build -t localhost:5000/multus:e2e -f ${{ matrix.docker-file }} .
+
       - name: Push to local registry
         run: docker push localhost:5000/multus:e2e
 
@@ -25,7 +33,7 @@ jobs:
 
       - name: Setup cluster
         working-directory: ./e2e
-        run: ./setup_cluster.sh
+        run: MULTUS_MANIFEST=${{ matrix.multus-manifest }} ./setup_cluster.sh
 
       - name: Test simple pod
         working-directory: ./e2e
