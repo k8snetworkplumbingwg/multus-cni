@@ -26,8 +26,8 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cni"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 )
 
 func main() {
@@ -47,13 +47,13 @@ func main() {
 
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
-			return cni.CmdAdd(args)
+			return server.CmdAdd(args)
 		},
 		func(args *skel.CmdArgs) error {
-			return cni.CmdCheck(args)
+			return server.CmdCheck(args)
 		},
 		func(args *skel.CmdArgs) error {
-			return cni.CmdDel(args)
+			return server.CmdDel(args)
 		},
 		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }

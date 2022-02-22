@@ -1,4 +1,4 @@
-package cni
+package server
 
 import (
 	"bytes"

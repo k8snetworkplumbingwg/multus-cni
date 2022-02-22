@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-package cni
+package server
 
 import (
 	"context"
@@ -212,7 +212,7 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo) (*Server, error) {
 		return nil, err
 	}
 
-	l, err := ServerListener(SocketPath(runDir))
+	l, err := GetListener(SocketPath(runDir))
 	if err != nil {
 		return nil, fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", SocketPath(runDir), err)
 	}

@@ -40,10 +40,10 @@ if [ "$GO111MODULE" == "off" ]; then
 	export GO15VENDOREXPERIMENT=1
 	export GOBIN=${PWD}/bin
 	export GOPATH=${PWD}/gopath
-	go build -o ${PWD}/bin/multus -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd
-	go build -o ${PWD}/bin/generate-kubeconfig -tags no_openssl -ldflags "${LDFLAGS}" ${REPO_PATH}/cmd/config-generation
-	go build -o ${PWD}/bin/multus-daemon -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd/controller/
-	go build -o ${PWD}/bin/multus-shim -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd/shim/
+	go build -o ${PWD}/bin/multus -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd/multus
+	go build -o ${PWD}/bin/generate-kubeconfig -tags no_openssl -ldflags "${LDFLAGS}" ${REPO_PATH}/cmd/generate-kubeconfig
+	go build -o ${PWD}/bin/multus-daemon -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd/multus-daemon
+	go build -o ${PWD}/bin/multus-shim -tags no_openssl -ldflags "${LDFLAGS}" "$@" ${REPO_PATH}/cmd/multus-shim
 else
 	# build with go modules
 	export GO111MODULE=on
@@ -53,11 +53,11 @@ else
 	fi
 
 	echo "Building plugins"
-	go build ${BUILD_ARGS[*]} -ldflags "${LDFLAGS}" "$@" ./cmd
+	go build ${BUILD_ARGS[*]} -ldflags "${LDFLAGS}" "$@" ./cmd/multus
 	echo "Building spec generators"
-	go build -o "${DEST_DIR}"/generate-kubeconfig -ldflags "${LDFLAGS}" ./cmd/config-generation
+	go build -o "${DEST_DIR}"/generate-kubeconfig -ldflags "${LDFLAGS}" ./cmd/generate-kubeconfig
 	echo "Building multus controller"
-	go build -o "${DEST_DIR}"/multus-daemon -ldflags "${LDFLAGS}" ./cmd/controller/
+	go build -o "${DEST_DIR}"/multus-daemon -ldflags "${LDFLAGS}" ./cmd/multus-daemon
 	echo "Building multus shim"
-	go build -o "${DEST_DIR}"/multus-shim -ldflags "${LDFLAGS}" ./cmd/shim/
+	go build -o "${DEST_DIR}"/multus-shim -ldflags "${LDFLAGS}" ./cmd/multus-shim
 fi

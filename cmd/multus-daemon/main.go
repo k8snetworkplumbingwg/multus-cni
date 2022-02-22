@@ -25,9 +25,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cni"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
@@ -201,18 +201,18 @@ func main() {
 }
 
 func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
-	if err := cni.FilesystemPreRequirements(daemonConfig.MultusSocketDir); err != nil {
+	if err := srv.FilesystemPreRequirements(daemonConfig.MultusSocketDir); err != nil {
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
-	server, err := cni.NewCNIServer(daemonConfig.MultusSocketDir)
+	server, err := srv.NewCNIServer(daemonConfig.MultusSocketDir)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
 	}
 
-	l, err := cni.ServerListener(cni.SocketPath(daemonConfig.MultusSocketDir))
+	l, err := srv.GetListener(srv.SocketPath(daemonConfig.MultusSocketDir))
 	if err != nil {
-		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", cni.SocketPath(daemonConfig.MultusSocketDir), err)
+		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", srv.SocketPath(daemonConfig.MultusSocketDir), err)
 	}
 
 	server.SetKeepAlivesEnabled(false)
