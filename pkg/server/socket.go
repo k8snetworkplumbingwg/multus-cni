@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-package cni
+package server
 
 import (
 	"fmt"

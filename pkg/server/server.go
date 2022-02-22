@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-package cni
+package server
 
 import (
 	"encoding/json"
@@ -62,8 +62,8 @@ func HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdAr
 	return result, nil
 }
 
-// ServerListener creates a listener to a unix socket located in `socketPath`
-func ServerListener(socketPath string) (net.Listener, error) {
+// GetListener creates a listener to a unix socket located in `socketPath`
+func GetListener(socketPath string) (net.Listener, error) {
 	l, err := net.Listen("unix", socketPath)
 	if err != nil {
 		return nil, logging.Errorf("failed to listen on pod info socket: %v", err)
