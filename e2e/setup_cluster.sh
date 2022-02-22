@@ -8,9 +8,9 @@ export PATH=${PATH}:./bin
 OCI_BIN="${OCI_BIN:-docker}"
 
 # define the deployment spec to use when deploying multus.
-# Acceptable values are `legacy-multus-daemonset.yml`. `multus-daemonset.yml`.
-# Defaults to `multus-daemonset.yml`.
-MULTUS_MANIFEST="${MULTUS_MANIFEST:-multus-daemonset.yml}"
+# Acceptable values are `multus-daemonset.yml`. `multus-thick-daemonset.yml`.
+# Defaults to `multus-thick-daemonset.yml`.
+MULTUS_MANIFEST="${MULTUS_MANIFEST:-multus-thick-daemonset.yml}"
 
 kind_network='kind'
 reg_name='kind-registry'
