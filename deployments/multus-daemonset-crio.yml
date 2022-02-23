@@ -193,6 +193,7 @@ spec:
         volumeMounts:
         - name: run
           mountPath: /run
+          mountPropagation: HostToContainer
         - name: cni
           mountPath: /host/etc/cni/net.d
         - name: cnibin
