@@ -3,6 +3,7 @@ module gopkg.in/k8snetworkplumbingwg/multus-cni.v3
 go 1.16
 
 require (
+	github.com/blang/semver v3.5.1+incompatible
 	github.com/containernetworking/cni v0.8.1
 	github.com/containernetworking/plugins v0.9.1
 	github.com/fsnotify/fsnotify v1.4.9
