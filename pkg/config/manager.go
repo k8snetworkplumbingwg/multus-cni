@@ -78,8 +78,9 @@ func newManager(config MultusConf, multusConfigDir string, defaultCNIPluginName 
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
-		return nil, fmt.Errorf("failed to load the primary CNI configuration as a multus delegate")
+		return nil, fmt.Errorf("failed to load the primary CNI configuration as a multus delegate with error '%v'", err)
 	}
+
 	return configManager, nil
 }
 
@@ -88,8 +89,7 @@ func (m *Manager) loadPrimaryCNIConfigFromFile() error {
 	if err != nil {
 		return logging.Errorf("failed to access the primary CNI configuration from %s: %v", m.primaryCNIConfigPath, err)
 	}
-	m.loadPrimaryCNIConfigurationData(primaryCNIConfigData)
-	return nil
+	return m.loadPrimaryCNIConfigurationData(primaryCNIConfigData)
 }
 
 // OverrideNetworkName overrides the name of the multus configuration with the
@@ -104,15 +104,14 @@ func (m *Manager) OverrideNetworkName() error {
 	if networkName == "" {
 		return fmt.Errorf("the primary CNI Configuration does not feature the network name: %v", m.cniConfigData)
 	}
-	m.multusConfig.Mutate(WithOverriddenName(networkName))
-	return nil
+	return m.multusConfig.Mutate(WithOverriddenName(networkName))
 }
 
-func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface{}) {
+func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface{}) error {
 	cniConfigData := primaryCNIConfigData.(map[string]interface{})
 
 	m.cniConfigData = cniConfigData
-	m.multusConfig.Mutate(
+	return m.multusConfig.Mutate(
 		withDelegates(cniConfigData),
 		withCapabilities(cniConfigData))
 }

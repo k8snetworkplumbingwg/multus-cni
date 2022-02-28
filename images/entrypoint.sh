@@ -87,6 +87,25 @@ if ! type python3 &> /dev/null; then
 	alias python=python3
 fi
 
+function checkCniVersion {
+      cniversion_python_tmpfile=$(mktemp)
+      cat << EOF > $cniversion_python_tmpfile
+import json, sys
+
+def version(v):
+    return [int(x) for x in v.split(".")]
+
+v_040 = version("0.4.0")
+v_top_level = sys.argv[2]
+with open(sys.argv[1], "r") as f:
+    v_nested = json.load(f)["cniVersion"]
+if version(v_top_level) >= v_040 and version(v_nested) < v_040:
+    msg = "Multus cni version is %s while master plugin cni version is %s"
+    print(msg % (v_top_level, v_nested))
+EOF
+      python $cniversion_python_tmpfile $1 $2
+}
+
 # Parse parameters given as arguments to this script.
 while [ "$1" != "" ]; do
     PARAM=`echo $1 | awk -F= '{print $1}'`
@@ -317,7 +336,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
           *)
               error "Log levels should be one of: debug/verbose/error/panic, did not understand $MULTUS_LOG_LEVEL"
               usage
-              exit 1     
+              exit 1
         esac
         LOG_LEVEL_STRING="\"logLevel\": \"$MULTUS_LOG_LEVEL\","
       fi
@@ -369,11 +388,17 @@ EOF
       NESTED_CAPABILITIES_STRING="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
             python $capabilities_python_filter_tmpfile)"
       rm $capabilities_python_filter_tmpfile
-      log "Nested capabilities string: $NESTED_CAPABILITIES_STRING" 
+      log "Nested capabilities string: $NESTED_CAPABILITIES_STRING"
 
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
       MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
       log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
+      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
+      if [ "$CHECK_CNI_VERSION" != "" ] ; then
+        error "$CHECK_CNI_VERSION"
+        exit 1
+      fi
+
       CONF=$(cat <<-EOF
         {
           $CNI_VERSION_STRING
@@ -399,7 +424,7 @@ EOF
       mv $tmpfile $CNI_CONF_DIR/00-multus.conf
       log "Config file created @ $CNI_CONF_DIR/00-multus.conf"
       echo $CONF
-      
+
       # If we're not performing the cleanup on exit, we can safely rename the config file.
       if [ "$RENAME_SOURCE_CONFIG_FILE" == true ]; then
         mv ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN} ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old
