@@ -151,10 +151,14 @@ func main() {
 			configurationOptions = append(
 				configurationOptions, config.WithReadinessFileIndicator(*readinessIndicator))
 		}
-		multusConfig := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig, configurationOptions...)
+
+		multusConfig, err := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig, configurationOptions...)
+		if err != nil {
+			_ = logging.Errorf("Failed to create multus config: %v", err)
+			os.Exit(3)
+		}
 
 		var configManager *config.Manager
-		var err error
 		if *multusMasterCni == "" {
 			configManager, err = config.NewManager(*multusConfig, *multusAutoconfigDir)
 		} else {
