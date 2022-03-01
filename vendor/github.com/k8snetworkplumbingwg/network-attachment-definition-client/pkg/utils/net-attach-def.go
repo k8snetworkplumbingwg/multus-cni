@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -129,9 +129,9 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 	netStatus.Default = defaultNetwork
 
 	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
+	result, err := cni100.NewResultFromResult(r)
 	if err != nil {
-		return netStatus, fmt.Errorf("error convert the type.Result to current.Result: %v", err)
+		return netStatus, fmt.Errorf("error convert the type.Result to cni100.Result: %v", err)
 	}
 
 	for _, ifs := range result.Interfaces {
@@ -143,13 +143,7 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 	}
 
 	for _, ipconfig := range result.IPs {
-		if ipconfig.Version == "4" && ipconfig.Address.IP.To4() != nil {
-			netStatus.IPs = append(netStatus.IPs, ipconfig.Address.IP.String())
-		}
-
-		if ipconfig.Version == "6" && ipconfig.Address.IP.To16() != nil {
-			netStatus.IPs = append(netStatus.IPs, ipconfig.Address.IP.String())
-		}
+		netStatus.IPs = append(netStatus.IPs, ipconfig.Address.IP.String())
 	}
 
 	v1dns := convertDNS(result.DNS)
