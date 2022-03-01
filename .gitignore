@@ -1,6 +1,7 @@
 # Binary output dir
 bin/
 e2e/bin/
+e2e/yamls/
 
 # GOPATH created by the build script
 gopath/

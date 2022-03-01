@@ -24,7 +24,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
-	current "github.com/containernetworking/cni/pkg/types/current"
+	cni040 "github.com/containernetworking/cni/pkg/types/040"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
@@ -468,9 +468,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 
 		fExec := newFakeExec()
-		expectedResult1 := &current.Result{
+		expectedResult1 := &cni040.Result{
 			CNIVersion: resultCNIVersion,
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 			},
@@ -512,10 +512,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		},
 		"cniVersion": "0.3.1"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", expectedNet1, &current.Result{
+		fExec.addPlugin040(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin040(nil, "net1", expectedNet1, &cni040.Result{
 			CNIVersion: "0.3.1",
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 			},
@@ -533,7 +533,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*current.Result)
+		r := result.(*cni040.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -601,9 +601,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 
 		fExec := newFakeExec()
-		expectedResult1 := &current.Result{
+		expectedResult1 := &cni040.Result{
 			CNIVersion: resultCNIVersion,
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 			},
@@ -618,10 +618,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		"type": "mynet",
 		"cniVersion": "0.3.1"
 	}`
-		fExec.addPlugin(nil, "eth0", expectedConf1, expectedResult1, nil)
-		fExec.addPlugin(nil, "net1", expectedNet1, &current.Result{
+		fExec.addPlugin040(nil, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin040(nil, "net1", expectedNet1, &cni040.Result{
 			CNIVersion: "0.3.1",
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.3/24"),
 			},
 			},
@@ -639,7 +639,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*current.Result)
+		r := result.(*cni040.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -664,9 +664,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 
 		fExec := newFakeExec()
-		expectedResult1 := &current.Result{
+		expectedResult1 := &cni040.Result{
 			CNIVersion: resultCNIVersion,
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 			},
@@ -681,7 +681,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 			"CNI_COMMAND=ADD",
 			"CNI_IFNAME=eth0",
 		}
-		fExec.addPlugin(expectedEnv, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin040(expectedEnv, "eth0", expectedConf1, expectedResult1, nil)
 
 		clientInfo := NewFakeClientInfo()
 		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
@@ -691,7 +691,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*current.Result)
+		r := result.(*cni040.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -716,9 +716,9 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		}
 
 		fExec := newFakeExec()
-		expectedResult1 := &current.Result{
+		expectedResult1 := &cni040.Result{
 			CNIVersion: resultCNIVersion,
-			IPs: []*current.IPConfig{{
+			IPs: []*cni040.IPConfig{{
 				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
 			},
 			},
@@ -733,7 +733,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 			"CNI_COMMAND=ADD",
 			"CNI_IFNAME=eth0",
 		}
-		fExec.addPlugin(expectedEnv, "eth0", expectedConf1, expectedResult1, nil)
+		fExec.addPlugin040(expectedEnv, "eth0", expectedConf1, expectedResult1, nil)
 
 		clientInfo := NewFakeClientInfo()
 		_, err := clientInfo.Client.CoreV1().Pods(fakePod.ObjectMeta.Namespace).Create(
@@ -743,7 +743,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		result, err := CmdAdd(args, fExec, clientInfo)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
-		r := result.(*current.Result)
+		r := result.(*cni040.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
@@ -1383,5 +1383,3 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
-
-

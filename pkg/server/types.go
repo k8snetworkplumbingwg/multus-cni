@@ -5,7 +5,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
@@ -34,7 +34,7 @@ type Server struct {
 // Response represents the response (computed in the CNI server) for
 // ADD / DEL / CHECK for a Pod.
 type Response struct {
-	Result *current.Result
+	Result *cni100.Result
 }
 
 // ShimNetConf for the shim cni config file written in json

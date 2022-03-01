@@ -24,8 +24,9 @@ import (
 	"testing"
 
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	types020 "github.com/containernetworking/cni/pkg/types/020"
-	current "github.com/containernetworking/cni/pkg/types/current"
+	cni020 "github.com/containernetworking/cni/pkg/types/020"
+	cni040 "github.com/containernetworking/cni/pkg/types/040"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
@@ -56,7 +57,7 @@ type fakeExec struct {
 	delIndex        int
 	chkIndex        int
 	expectedDelSkip int
-	plugins map[string]*fakePlugin
+	plugins         map[string]*fakePlugin
 }
 
 func newFakeExec() *fakeExec {
@@ -65,7 +66,7 @@ func newFakeExec() *fakeExec {
 	}
 }
 
-func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf string, result *current.Result, err error) {
+func (f *fakeExec) addPlugin100(expectedEnv []string, expectedIfname, expectedConf string, result *cni100.Result, err error) {
 	f.plugins[expectedIfname] = &fakePlugin{
 		expectedEnv:    expectedEnv,
 		expectedConf:   expectedConf,
@@ -78,7 +79,20 @@ func (f *fakeExec) addPlugin(expectedEnv []string, expectedIfname, expectedConf 
 	}
 }
 
-func (f *fakeExec) addPlugin020(expectedEnv []string, expectedIfname, expectedConf string, result *types020.Result, err error) {
+func (f *fakeExec) addPlugin040(expectedEnv []string, expectedIfname, expectedConf string, result *cni040.Result, err error) {
+	f.plugins[expectedIfname] = &fakePlugin{
+		expectedEnv:    expectedEnv,
+		expectedConf:   expectedConf,
+		expectedIfname: expectedIfname,
+		result:         result,
+		err:            err,
+	}
+	if err != nil && err.Error() == "missing network name" {
+		f.expectedDelSkip++
+	}
+}
+
+func (f *fakeExec) addPlugin020(expectedEnv []string, expectedIfname, expectedConf string, result *cni020.Result, err error) {
 	f.plugins[expectedIfname] = &fakePlugin{
 		expectedEnv:    expectedEnv,
 		expectedConf:   expectedConf,

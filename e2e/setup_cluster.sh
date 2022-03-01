@@ -72,9 +72,9 @@ kind export kubeconfig
 sudo env PATH=${PATH} koko -p "$worker1_pid,eth1" -p "$worker2_pid,eth1"
 sleep 1
 kubectl -n kube-system wait --for=condition=available deploy/coredns --timeout=300s
-kubectl create -f "$MULTUS_MANIFEST"
+kubectl create -f yamls/$MULTUS_MANIFEST
 sleep 1
 kubectl -n kube-system wait --for=condition=ready -l name=multus pod --timeout=300s
-kubectl create -f cni-install.yml
+kubectl create -f yamls/cni-install.yml
 sleep 1
 kubectl -n kube-system wait --for=condition=ready -l name=cni-plugins pod --timeout=300s
