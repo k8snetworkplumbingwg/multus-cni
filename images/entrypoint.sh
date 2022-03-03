@@ -32,6 +32,7 @@ RESTART_CRIO=false
 CRIO_RESTARTED_ONCE=false
 RENAME_SOURCE_CONFIG_FILE=false
 SKIP_BINARY_COPY=false
+FORCE_CNI_VERSION=false # force-cni-version is only for e2e-kind.
 
 # Give help text for parameters.
 function usage()
@@ -117,6 +118,10 @@ while [ "$1" != "" ]; do
             ;;
         --cni-version)
             CNI_VERSION=$VALUE
+            ;;
+	# force-cni-version is only for e2e-kind testing
+	--force-cni-version)
+            FORCE_CNI_VERSION=$VALUE
             ;;
         --cni-bin-dir)
             CNI_BIN_DIR=$VALUE
@@ -391,12 +396,16 @@ EOF
       log "Nested capabilities string: $NESTED_CAPABILITIES_STRING"
 
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
-      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
-      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
-      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
-      if [ "$CHECK_CNI_VERSION" != "" ] ; then
-        error "$CHECK_CNI_VERSION"
-        exit 1
+      if [ "$FORCE_CNI_VERSION" == true ]; then
+	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION | sed -e "s/\"cniVersion.*/\"cniVersion\": \"$CNI_VERSION\",/g")"
+      else
+	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
+	      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
+	      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
+	      if [ "$CHECK_CNI_VERSION" != "" ] ; then
+		      error "$CHECK_CNI_VERSION"
+		      exit 1
+	      fi
       fi
 
       CONF=$(cat <<-EOF

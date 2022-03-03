@@ -4,25 +4,33 @@ go 1.16
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/containernetworking/cni v0.8.1
-	github.com/containernetworking/plugins v0.9.1
+	github.com/containernetworking/cni v1.0.1
+	github.com/containernetworking/plugins v1.1.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.1-0.20210510153419-66a699ae3b05
-	github.com/onsi/ginkgo v1.12.1
-	github.com/onsi/gomega v1.10.3
+	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.2.0
+	github.com/kr/text v0.2.0 // indirect
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/onsi/ginkgo v1.16.4
+	github.com/onsi/gomega v1.15.0
 	github.com/pkg/errors v0.9.1
-	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
-	golang.org/x/sys v0.0.0-20201119102817-f84b799fce68 // indirect
-	google.golang.org/grpc v1.27.1
+	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
+	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
+	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9 // indirect
+	google.golang.org/grpc v1.33.2
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.20.10
 	k8s.io/apimachinery v0.20.10
 	k8s.io/client-go v0.20.10
 	k8s.io/klog v1.0.0
+	k8s.io/klog/v2 v2.40.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20220124234850-424119656bbf // indirect
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.20.10
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 replace (

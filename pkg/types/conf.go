@@ -25,7 +25,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
@@ -303,7 +303,7 @@ func DelegateRuntimeConfig(containerID string, delegate *DelegateNetConf, rc *Ru
 }
 
 // GetGatewayFromResult retrieves gateway IP addresses from CNI result
-func GetGatewayFromResult(result *current.Result) []net.IP {
+func GetGatewayFromResult(result *cni100.Result) []net.IP {
 	var gateways []net.IP
 
 	for _, route := range result.Routes {
@@ -344,7 +344,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 			return nil, logging.Errorf("LoadNetConf: could not parse prevResult: %v", err)
 		}
 		netconf.RawPrevResult = nil
-		netconf.PrevResult, err = current.NewResultFromResult(res)
+		netconf.PrevResult, err = cni100.NewResultFromResult(res)
 		if err != nil {
 			return nil, logging.Errorf("LoadNetConf: could not convert result to current version: %v", err)
 		}

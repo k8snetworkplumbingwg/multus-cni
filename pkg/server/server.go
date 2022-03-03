@@ -27,7 +27,7 @@ import (
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	cnicurrent "github.com/containernetworking/cni/pkg/types/current"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/gorilla/mux"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
@@ -277,7 +277,7 @@ func cmdCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, k
 }
 
 func serializeResult(result cnitypes.Result) ([]byte, error) {
-	realResult, err := cnicurrent.NewResultFromResult(result)
+	realResult, err := cni100.NewResultFromResult(result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate the CNI result: %w", err)
 	}

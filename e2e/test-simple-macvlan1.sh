@@ -3,7 +3,7 @@ set -o errexit
 
 export PATH=${PATH}:./bin
 
-kubectl create -f simple-macvlan1.yml
+kubectl create -f yamls/simple-macvlan1.yml
 kubectl wait --for=condition=ready -l app=macvlan --timeout=300s pod
 
 echo "check macvlan1-worker1 interface: net1"
@@ -27,4 +27,4 @@ if [ $ipaddr != "10.1.1.12" ]; then
 fi
 
 echo "cleanup resources"
-kubectl delete -f simple-macvlan1.yml
+kubectl delete -f yamls/simple-macvlan1.yml
