@@ -780,11 +780,11 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		// so don't return an error if the device is already removed.
 		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
 		_, ok := err.(ns.NSPathNotExistErr)
+		netnsfound = false
 		if ok {
-			netnsfound = false
 			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
-			return cmdErr(nil, "failed to open netns %q: %v", netns, err)
+			logging.Debugf("CmdDel: WARNING failed to open netns %q: %v", netns, err)
 		}
 	}
 
