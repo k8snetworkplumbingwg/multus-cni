@@ -147,8 +147,8 @@ spec:
               mountPath: /host/etc/cni/net.d
             - name: cnibin
               mountPath: /host/opt/cni/bin
-            - name: host-var-run-multus-cni
-              mountPath: /host/var/run/multus-cni
+            - name: host-var-run
+              mountPath: /host/var/run
             - name: host-var-run-netns
               mountPath: /var/run/netns
               mountPropagation: HostToContainer
@@ -186,21 +186,6 @@ spec:
             - name: cni
               mountPath: /host/etc/cni/net.d
               mountPropagation: Bidirectional
-        - name: config-cni-socket-permissions
-            image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
-            command:
-              - "chmod"
-              - "0700"
-              - "/host/var/run/multus-cni"
-            resources:
-              requests:
-                cpu: "10m"
-                memory: "15Mi"
-            securityContext:
-              privileged: true
-            volumeMounts:
-              - name: host-var-run-multus-cni
-                mountPath: /host/var/run/multus-cni
       terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
@@ -209,9 +194,9 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
-        - name: host-var-run-multus-cni
+        - name: host-var-run
           hostPath:
-            path: /var/run/multus-cni
+            path: /var/run
         - name: host-var-run-netns
           hostPath:
             path: /var/run/netns/

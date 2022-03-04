@@ -179,6 +179,7 @@ spec:
         command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
         args:
         - "-multus-conf-file=auto"
+        - "-force-cni-version=true"
         - "-cni-version={{ CNI_VERSION }}"
         - "-cni-config-dir=/host/etc/cni/net.d"
         - "-multus-autoconfig-dir=/host/etc/cni/net.d"
@@ -196,8 +197,8 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
-        - name: host-var-run-multus-cni
-          mountPath: /host/var/run/multus-cni
+        - name: host-var-run
+          mountPath: /host/var/run
         - name: host-var-run-netns
           mountPath: /var/run/netns
           mountPropagation: HostToContainer
@@ -238,21 +239,6 @@ spec:
           - name: cni
             mountPath: /host/etc/cni/net.d
             mountPropagation: Bidirectional
-      - name: config-cni-socket-permissions
-        image: localhost:5000/multus:e2e
-        command:
-          - "chmod"
-          - "0700"
-          - "/host/var/run/multus-cni"
-        resources:
-          requests:
-            cpu: "10m"
-            memory: "15Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-          - name: host-var-run-multus-cni
-            mountPath: /host/var/run/multus-cni
       volumes:
         - name: cni
           hostPath:
@@ -266,9 +252,9 @@ spec:
             items:
             - key: daemon-config.json
               path: daemon-config.json
-        - name: host-var-run-multus-cni
+        - name: host-var-run
           hostPath:
-            path: /var/run/multus-cni
+            path: /var/run
         - name: host-var-run-netns
           hostPath:
             path: /var/run/netns/

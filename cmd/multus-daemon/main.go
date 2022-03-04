@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
@@ -38,9 +39,6 @@ const (
 
 const (
 	defaultCniConfigDir                 = "/etc/cni/net.d"
-	defaultMultusAdditionalBinDir       = ""
-	defaultMultusCNIVersion             = ""
-	defaultMultusConfigFile             = "auto"
 	defaultMultusGlobalNamespaces       = ""
 	defaultMultusKubeconfigPath         = "/etc/cni/net.d/multus.d/multus.kubeconfig"
 	defaultMultusLogFile                = ""
@@ -77,17 +75,18 @@ func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	cniConfigDir := flag.String(cniConfigDirVarName, defaultCniConfigDir, "CNI config dir")
-	multusConfigFile := flag.String(multusConfigFileVarName, defaultMultusConfigFile, "The multus configuration file to use. By default, a new configuration is generated.")
-	multusMasterCni := flag.String(multusMasterCNIFileVarName, defaultMultusMasterCNIFile, "The relative name of the configuration file of the cluster primary CNI.")
+	multusConfigFile := flag.String(multusConfigFileVarName, "auto", "The multus configuration file to use. By default, a new configuration is generated.")
+	multusMasterCni := flag.String(multusMasterCNIFileVarName, "", "The relative name of the configuration file of the cluster primary CNI.")
 	multusAutoconfigDir := flag.String(multusAutoconfigDirVarName, *cniConfigDir, "The directory path for the generated multus configuration.")
-	namespaceIsolation := flag.Bool(multusNamespaceIsolation, defaultMultusNamespaceIsolation, "If the network resources are only available within their defined namespaces.")
-	globalNamespaces := flag.String(multusGlobalNamespaces, defaultMultusGlobalNamespaces, "Comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled.")
-	logToStdErr := flag.Bool(multusLogToStdErr, defaultMultusLogToStdErr, "If the multus logs are also to be echoed to stderr.")
-	logLevel := flag.String(multusLogLevel, defaultMultusLogLevel, "One of: debug/verbose/error/panic. Used only with --multus-conf-file=auto.")
-	logFile := flag.String(multusLogFile, defaultMultusLogFile, "Path where to multus will log. Used only with --multus-conf-file=auto.")
-	cniVersion := flag.String(multusCNIVersion, defaultMultusCNIVersion, "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
-	additionalBinDir := flag.String(multusAdditionalBinDirVarName, defaultMultusAdditionalBinDir, "Additional binary directory to specify in the configurations. Used only with --multus-conf-file=auto.")
-	readinessIndicator := flag.String(multusReadinessIndicatorFile, defaultMultusReadinessIndicatorFile, "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
+	namespaceIsolation := flag.Bool(multusNamespaceIsolation, false, "If the network resources are only available within their defined namespaces.")
+	globalNamespaces := flag.String(multusGlobalNamespaces, "", "Comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled.")
+	logToStdErr := flag.Bool(multusLogToStdErr, false, "If the multus logs are also to be echoed to stderr.")
+	logLevel := flag.String(multusLogLevel, "", "One of: debug/verbose/error/panic. Used only with --multus-conf-file=auto.")
+	logFile := flag.String(multusLogFile, "", "Path where to multus will log. Used only with --multus-conf-file=auto.")
+	cniVersion := flag.String(multusCNIVersion, "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
+	forceCNIVersion := flag.Bool("force-cni-version", false, "force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
+	additionalBinDir := flag.String(multusAdditionalBinDirVarName, "", "Additional binary directory to specify in the configurations. Used only with --multus-conf-file=auto.")
+	readinessIndicator := flag.String(multusReadinessIndicatorFile, "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	multusKubeconfig := flag.String(multusKubeconfigPath, defaultMultusKubeconfigPath, "The path to the kubeconfig")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
 	multusBinDir := flag.String(multusBinDirVarName, defaultMultusBinDir, "The directory where the CNI plugin binaries are available")
@@ -108,8 +107,9 @@ func main() {
 		os.Exit(3)
 	}
 
-	if *multusConfigFile == defaultMultusConfigFile {
-		if *cniVersion == defaultMultusCNIVersion {
+	// Generate multus CNI config from current CNI config
+	if *multusConfigFile == "auto" {
+		if *cniVersion == "" {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
@@ -142,7 +142,7 @@ func main() {
 				configurationOptions, config.WithLogFile(*logFile))
 		}
 
-		if *additionalBinDir != defaultMultusAdditionalBinDir {
+		if *additionalBinDir != "" {
 			configurationOptions = append(
 				configurationOptions, config.WithAdditionalBinaryFileDir(*additionalBinDir))
 		}
@@ -160,10 +160,10 @@ func main() {
 
 		var configManager *config.Manager
 		if *multusMasterCni == "" {
-			configManager, err = config.NewManager(*multusConfig, *multusAutoconfigDir)
+			configManager, err = config.NewManager(*multusConfig, *multusAutoconfigDir, *forceCNIVersion)
 		} else {
 			configManager, err = config.NewManagerWithExplicitPrimaryCNIPlugin(
-				*multusConfig, *multusAutoconfigDir, *multusMasterCni)
+				*multusConfig, *multusAutoconfigDir, *multusMasterCni, *forceCNIVersion)
 		}
 		if err != nil {
 			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
@@ -205,6 +205,10 @@ func main() {
 }
 
 func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
+	if user, err := user.Current(); err != nil || user.Uid != "0" {
+		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
+	}
+
 	if err := srv.FilesystemPreRequirements(daemonConfig.MultusSocketDir); err != nil {
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}

@@ -50,7 +50,7 @@ func newMultusConfigWithDelegates(pluginName string, cniVersion string, kubeconf
 	if err != nil {
 		return multusConfig, err
 	}
-	return multusConfig, multusConfig.Mutate(withDelegates(primaryCNIPluginConfig.(map[string]interface{})))
+	return multusConfig, multusConfig.Mutate(withDelegates(primaryCNIPluginConfig.(map[string]interface{}), "", false))
 }
 
 func TestBasicMultusConfig(t *testing.T) {
