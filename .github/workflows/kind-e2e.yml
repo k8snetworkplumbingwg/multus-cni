@@ -6,15 +6,15 @@ jobs:
     strategy:
       matrix:
         include:
-#          - docker-file: images/Dockerfile.thick
-#            cni-version: "0.3.1"
-#            multus-manifest: multus-thick-daemonset.yml
+          - docker-file: images/Dockerfile.thick
+            cni-version: "0.3.1"
+            multus-manifest: multus-thick-daemonset.yml
           - docker-file: images/Dockerfile
             cni-version: "0.3.1"
             multus-manifest: multus-daemonset.yml
-#          - docker-file: images/Dockerfile.thick
-#            cni-version: "0.4.0"
-#            multus-manifest: multus-thick-daemonset.yml
+          - docker-file: images/Dockerfile.thick
+            cni-version: "0.4.0"
+            multus-manifest: multus-thick-daemonset.yml
           - docker-file: images/Dockerfile
             cni-version: "0.4.0"
             multus-manifest: multus-daemonset.yml

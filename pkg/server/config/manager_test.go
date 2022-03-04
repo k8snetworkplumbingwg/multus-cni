@@ -66,7 +66,7 @@ var _ = Describe(suiteName, func() {
 			cniVersion,
 			kubeconfig)
 		var err error
-		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName)
+		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
