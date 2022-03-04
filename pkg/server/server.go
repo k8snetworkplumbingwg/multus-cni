@@ -30,7 +30,7 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/gorilla/mux"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"

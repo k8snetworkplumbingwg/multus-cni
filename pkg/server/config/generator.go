@@ -222,7 +222,13 @@ func withCapabilities(cniData interface{}) Option {
 	}
 }
 
-func withDelegates(primaryCNIConfigData map[string]interface{}) Option {
+func withDelegates(primaryCNIConfigData map[string]interface{}, cniVersion string, forceCNIVersion bool) Option {
+
+	// override delegates CNIVersion with multus CNIVersion
+	if forceCNIVersion {
+		primaryCNIConfigData["cniVersion"] = cniVersion
+	}
+
 	return func(conf *MultusConf) {
 		conf.Delegates = []interface{}{primaryCNIConfigData}
 	}

@@ -41,29 +41,31 @@ type Manager struct {
 	multusConfigDir      string
 	multusConfigFilePath string
 	primaryCNIConfigPath string
+	cniVersion	string
+	forceCNIVersion	bool
 }
 
 // NewManager returns a config manager object, configured to persist the
 // configuration to `multusAutoconfigDir`. This constructor will auto-discover
 // the primary CNI for which it will delegate.
-func NewManager(config MultusConf, multusAutoconfigDir string) (*Manager, error) {
+func NewManager(config MultusConf, multusAutoconfigDir string, forceCNIVersion bool) (*Manager, error) {
 	defaultCNIPluginName, err := primaryCNIPluginName(multusAutoconfigDir)
 	if err != nil {
 		_ = logging.Errorf("failed to find the primary CNI plugin: %v", err)
 		return nil, err
 	}
-	return newManager(config, multusAutoconfigDir, defaultCNIPluginName)
+	return newManager(config, multusAutoconfigDir, defaultCNIPluginName, forceCNIVersion)
 }
 
 // NewManagerWithExplicitPrimaryCNIPlugin returns a config manager object,
 // configured to persist the configuration to `multusAutoconfigDir`. This
 // constructor will use the primary CNI plugin indicated by the user, via the
 // primaryCNIPluginName variable.
-func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigDir string, primaryCNIPluginName string) (*Manager, error) {
-	return newManager(config, multusAutoconfigDir, primaryCNIPluginName)
+func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigDir, primaryCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
+	return newManager(config, multusAutoconfigDir, primaryCNIPluginName, forceCNIVersion)
 }
 
-func newManager(config MultusConf, multusConfigDir string, defaultCNIPluginName string) (*Manager, error) {
+func newManager(config MultusConf, multusConfigDir,  defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
 	watcher, err := newWatcher(multusConfigDir)
 	if err != nil {
 		return nil, err
@@ -75,6 +77,7 @@ func newManager(config MultusConf, multusConfigDir string, defaultCNIPluginName 
 		multusConfigDir:      multusConfigDir,
 		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
+		forceCNIVersion: forceCNIVersion,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -112,7 +115,7 @@ func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface
 
 	m.cniConfigData = cniConfigData
 	return m.multusConfig.Mutate(
-		withDelegates(cniConfigData),
+		withDelegates(cniConfigData, m.multusConfig.CNIVersion, m.forceCNIVersion),
 		withCapabilities(cniConfigData))
 }
 
