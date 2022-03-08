@@ -157,8 +157,8 @@ spec:
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
           command:
             - "cp"
-            - "/usr/src/multus-cni/bin/multus"
-            - "/host/opt/cni/bin/multus"
+            - "/usr/src/multus-cni/bin/multus-shim"
+            - "/host/opt/cni/bin/multus-shim"
           resources:
             requests:
               cpu: "10m"
