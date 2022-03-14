@@ -79,55 +79,6 @@ metadata:
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: multus-cni-config
-  namespace: kube-system
-  labels:
-    tier: node
-    app: multus
-data:
-  # NOTE: If you'd prefer to manually apply a configuration file, you may create one here.
-  # In the case you'd like to customize the Multus installation, you should change the arguments to the Multus pod
-  # change the "args" line below from
-  # - "--multus-conf-file=auto"
-  # to:
-  # "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
-  # Additionally -- you should ensure that the name "70-multus.conf" is the alphabetically first name in the
-  # /etc/cni/net.d/ directory on each node, otherwise, it will not be used by the Kubelet.
-  cni-conf.json: |
-    {
-      "name": "multus-cni-network",
-      "type": "multus",
-      "capabilities": {
-        "portMappings": true
-      },
-      "delegates": [
-        {
-          "cniVersion": "0.3.1",
-          "name": "default-cni-network",
-          "plugins": [
-            {
-              "type": "flannel",
-              "name": "flannel.1",
-                "delegate": {
-                  "isDefaultGateway": true,
-                  "hairpinMode": true
-                }
-              },
-              {
-                "type": "portmap",
-                "capabilities": {
-                  "portMappings": true
-                }
-              }
-          ]
-        }
-      ],
-      "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
-    }
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
   name: multus-daemon-config
   namespace: kube-system
   labels:
@@ -207,8 +158,6 @@ spec:
           mountPropagation: HostToContainer
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
-        - name: multus-cfg
-          mountPath: /tmp/multus-conf
         - name: cri
           mountPath: /run/containerd/containerd.sock
           readOnly: true
@@ -253,14 +202,10 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
-<<<<<<< HEAD:e2e/templates/multus-thick-daemonset.yml.j2
-        - name: multus-daemon-config
-=======
         - name: cri
           hostPath:
             path: /run/containerd/containerd.sock
-        - name: multus-cfg
->>>>>>> af05f6a9 (controller, containerd: add CRI runtime):e2e/multus-daemonset.yml
+        - name: multus-daemon-config
           configMap:
             name: multus-daemon-config
             items:
