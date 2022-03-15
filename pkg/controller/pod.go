@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -19,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
@@ -31,6 +33,7 @@ import (
 const allNamespaces = ""
 const controllerName = "multus-cni-pod-networks-controller"
 const podNetworksAnnot = "k8s.v1.cni.cncf.io/networks"
+const podNetworkStatus = "k8s.v1.cni.cncf.io/network-status"
 
 // PodNetworksController handles the cncf networks annotations update, and
 // triggers adding / removing networks from a running pod.
@@ -186,6 +189,15 @@ func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelection
 }
 
 func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSelectionElement, pod *corev1.Pod) error {
+	var (
+		multusNetconf *types.NetConf
+		podNetStatus  []nadv1.NetworkStatus
+	)
+	k8sClient, err := pnc.k8sClient()
+	if err != nil {
+		return err
+	}
+
 	for _, netToRemove := range netsToRemove {
 		cniParams, err := pnc.getCNIParams(pod, netToRemove)
 		if err != nil {
@@ -193,38 +205,18 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 		}
 		logging.Verbosef("CNI params for pod %s: %+v", pod.GetName(), cniParams)
 
-		k8sClient, err := pnc.k8sClient()
-		if err != nil {
-			return err
-		}
-
 		delegateConf, _, err := k8sclient.GetKubernetesDelegate(k8sClient, &netToRemove, pnc.confDir, pod, nil)
 		if err != nil {
 			return fmt.Errorf("error retrieving the delegate info: %w", err)
 		}
 		k8sArgs, _ := k8sclient.GetK8sArgs(&cniParams.CniCmdArgs)
 
-		//rtConf := &libcni.RuntimeConf{
-		//	ContainerID: cniParams.CniCmdArgs.ContainerID,
-		//	IfName:      cniParams.CniCmdArgs.IfName,
-		//	NetNS:       cniParams.CniCmdArgs.Netns,
-		//	Args: [][2]string{
-		//		{"IgnoreUnknown", "true"},
-		//		{"K8S_POD_NAMESPACE", cniParams.Namespace},
-		//		{"K8S_POD_NAME", cniParams.PodName},
-		//		{"K8S_POD_INFRA_CONTAINER_ID", cniParams.CniCmdArgs.ContainerID},
-		//		{"K8S_POD_NETWORK", cniParams.NetworkName},
-		//	},
-		//}
-
-		multusNetconf, err := pnc.multusConf()
-
-		rtConf := types.DelegateRuntimeConfig(cniParams.CniCmdArgs.ContainerID, delegateConf, multusNetconf.RuntimeConfig, cniParams.CniCmdArgs.IfName)
-
+		multusNetconf, err = pnc.multusConf()
 		if err != nil {
 			return logging.Errorf("failed to retrieve the multus network: %v", err)
 		}
 
+		rtConf := types.DelegateRuntimeConfig(cniParams.CniCmdArgs.ContainerID, delegateConf, multusNetconf.RuntimeConfig, cniParams.CniCmdArgs.IfName)
 		logging.Verbosef("the multus config: %+v", *multusNetconf)
 		if strings.HasPrefix(multusNetconf.BinDir, "/host") {
 			strings.ReplaceAll(multusNetconf.BinDir, "/host", "")
@@ -235,7 +227,31 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 			return logging.Errorf("failed to remove network. error: %v", err)
 		}
 		logging.Verbosef("removed network %s from pod %s with interface name: %s", netToRemove.Name, pod.GetName(), cniParams.CniCmdArgs.IfName)
+
+		oldNetStatus, err := networkStatus(pod.Annotations)
+		if err != nil {
+			return fmt.Errorf("failed to extract the pod's network status: %+v", err)
+		}
+
+		for _, netStatus := range oldNetStatus {
+			if fmt.Sprintf("%s/%s", netToRemove.Namespace, netToRemove.Name) != netStatus.Name {
+				podNetStatus = append(podNetStatus, netStatus)
+			}
+		}
 	}
+
+	if multusNetconf == nil {
+		multusNetconf, err = pnc.multusConf()
+		if err != nil {
+			logging.Verbosef("error accessing the multus configuration: %+v", err)
+		}
+	}
+
+	if err := k8sclient.SetPodNetworkStatusAnnotation(k8sClient, pod.GetName(), pod.GetNamespace(), string(pod.GetUID()), podNetStatus, multusNetconf); err != nil {
+		// error happen but continue to delete
+		logging.Errorf("Multus: error unsetting the networks status: %v", err)
+	}
+
 	return nil
 }
 
@@ -264,6 +280,19 @@ func networkSelectionElements(podAnnotations map[string]string, podNamespace str
 		return nil, err
 	}
 	return podNetworkSelectionElements, nil
+}
+
+func networkStatus(podAnnotations map[string]string) ([]nadv1.NetworkStatus, error) {
+	podNetworkstatus, ok := podAnnotations[nadv1.NetworkStatusAnnot]
+	if !ok {
+		return nil, fmt.Errorf("the pod is missing the \"%s\" annotation on its annotations: %+v", podNetworksAnnot, podAnnotations)
+	}
+	var netStatus []nadv1.NetworkStatus
+	if err := json.Unmarshal([]byte(podNetworkstatus), &netStatus); err != nil {
+		return nil, err
+	}
+
+	return netStatus, nil
 }
 
 func exclusiveNetworks(needles []*types.NetworkSelectionElement, haystack []*types.NetworkSelectionElement) []types.NetworkSelectionElement {
