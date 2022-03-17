@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"reflect"
@@ -22,7 +23,8 @@ import (
 
 	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
-
+	nadinformers "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
+	nadlisterv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
@@ -38,22 +40,26 @@ const podNetworkStatus = "k8s.v1.cni.cncf.io/network-status"
 // PodNetworksController handles the cncf networks annotations update, and
 // triggers adding / removing networks from a running pod.
 type PodNetworksController struct {
-	k8sClientSet     kubernetes.Interface
-	arePodsSynced    cache.InformerSynced
-	podsInformer     cache.SharedIndexInformer
-	podsLister       v1corelisters.PodLister
-	broadcaster      record.EventBroadcaster
-	recorder         record.EventRecorder
-	workqueue        workqueue.RateLimitingInterface
-	containerRuntime containerruntimes.ContainerRuntime
-	cniPlugin        *cniclient.CniPlugin
-	confDir          string
-	k8sClientConfig  *rest.Config
+	k8sClientSet            kubernetes.Interface
+	arePodsSynched          cache.InformerSynced
+	areNetAttachDefsSynched cache.InformerSynced
+	podsInformer            cache.SharedIndexInformer
+	netAttachDefInformer    cache.SharedIndexInformer
+	podsLister              v1corelisters.PodLister
+	netAttachDefLister      nadlisterv1.NetworkAttachmentDefinitionLister
+	broadcaster             record.EventBroadcaster
+	recorder                record.EventRecorder
+	workqueue               workqueue.RateLimitingInterface
+	containerRuntime        containerruntimes.ContainerRuntime
+	cniPlugin               *cniclient.CniPlugin
+	confDir                 string
+	k8sClientConfig         *rest.Config
 }
 
 // NewPodNetworksController returns new PodNetworksController instance
 func NewPodNetworksController(
 	k8sCoreInformerFactory v1coreinformerfactory.SharedInformerFactory,
+	nadInformers nadinformers.SharedInformerFactory,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
 	cniPlugin *cniclient.CniPlugin,
@@ -63,16 +69,20 @@ func NewPodNetworksController(
 	containerRuntime containerruntimes.ContainerRuntime,
 ) (*PodNetworksController, error) {
 	podInformer := k8sCoreInformerFactory.Core().V1().Pods().Informer()
+	nadInformer := nadInformers.K8sCniCncfIo().V1().NetworkAttachmentDefinitions().Informer()
 
 	podNetworksController := &PodNetworksController{
-		arePodsSynced:    podInformer.HasSynced,
-		podsInformer:     podInformer,
-		podsLister:       k8sCoreInformerFactory.Core().V1().Pods().Lister(),
-		recorder:         recorder,
-		broadcaster:      broadcaster,
-		containerRuntime: containerRuntime,
-		cniPlugin:        cniPlugin,
-		confDir:          confDir,
+		arePodsSynched:          podInformer.HasSynced,
+		areNetAttachDefsSynched: nadInformer.HasSynced,
+		podsInformer:            podInformer,
+		podsLister:              k8sCoreInformerFactory.Core().V1().Pods().Lister(),
+		netAttachDefInformer:    nadInformer,
+		netAttachDefLister:      nadInformers.K8sCniCncfIo().V1().NetworkAttachmentDefinitions().Lister(),
+		recorder:                recorder,
+		broadcaster:             broadcaster,
+		containerRuntime:        containerRuntime,
+		cniPlugin:               cniPlugin,
+		confDir:                 confDir,
 		workqueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"pod-networks-updates"),
@@ -92,7 +102,7 @@ func (pnc *PodNetworksController) Start(stopChan <-chan struct{}) {
 	logging.Verbosef("starting network controller")
 	defer pnc.workqueue.ShutDown()
 
-	if ok := cache.WaitForCacheSync(stopChan, pnc.arePodsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopChan, pnc.arePodsSynched, pnc.areNetAttachDefsSynched); !ok {
 		logging.Verbosef("failed waiting for caches to sync")
 	}
 
@@ -164,7 +174,7 @@ func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelection
 			return err
 		}
 
-		delegateConf, _, err := k8sclient.GetKubernetesDelegate(k8sClient, &netToAdd, pnc.confDir, pod, nil)
+		delegateConf, _, err := pnc.GetKubernetesDelegate(&netToAdd, pnc.confDir, pod, nil)
 		if err != nil {
 			return fmt.Errorf("error retrieving the delegate info: %w", err)
 		}
@@ -207,7 +217,7 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 		}
 		logging.Verbosef("CNI params for pod %s: %+v", pod.GetName(), cniParams)
 
-		delegateConf, _, err := k8sclient.GetKubernetesDelegate(k8sClient, &netToRemove, pnc.confDir, pod, nil)
+		delegateConf, _, err := pnc.GetKubernetesDelegate(&netToRemove, pnc.confDir, pod, nil)
 		if err != nil {
 			return fmt.Errorf("error retrieving the delegate info: %w", err)
 		}
@@ -385,4 +395,25 @@ func (pnc *PodNetworksController) multusConf() (*types.NetConf, error) {
 	}
 
 	return types.LoadNetConf(multusConfData)
+}
+
+// GetKubernetesDelegate uses the pod controller net-attach-def lister to retrieve the attachment info and parse it into
+// a kubernetes delegate.
+func (pnc *PodNetworksController) GetKubernetesDelegate(net *types.NetworkSelectionElement, confdir string, pod *corev1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
+	logging.Debugf("GetKubernetesDelegate: %v, %s, %v, %v", *net, confdir, *pod, resourceMap)
+	customResource, err := pnc.netAttachDefLister.NetworkAttachmentDefinitions(net.Namespace).Get(net.Name)
+	if err != nil {
+		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
+		pnc.Eventf(pod, corev1.EventTypeWarning, "NoNetworkFound", errMsg)
+		return nil, resourceMap, logging.Errorf("GetKubernetesDelegate: " + errMsg)
+	}
+
+	return k8sclient.K8sDelegate(customResource, pod, resourceMap, confdir, net)
+}
+
+// Eventf puts event into kubernetes events
+func (pnc *PodNetworksController) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+	if pnc != nil && pnc.recorder != nil {
+		pnc.recorder.Eventf(object, eventtype, reason, messageFmt, args...)
+	}
 }

@@ -149,6 +149,10 @@ func GetKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		return nil, resourceMap, logging.Errorf("GetKubernetesDelegate: " + errMsg)
 	}
 
+	return K8sDelegate(customResource, pod, resourceMap, confdir, net)
+}
+
+func K8sDelegate(customResource *nettypes.NetworkAttachmentDefinition, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo, confdir string, net *types.NetworkSelectionElement) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 	logging.Debugf("GetKubernetesDelegate: found custom resource: %+v", *customResource)
 	// Get resourceName annotation from NetworkAttachmentDefinition
 	deviceID := ""

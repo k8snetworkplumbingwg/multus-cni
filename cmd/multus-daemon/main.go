@@ -36,6 +36,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 
+	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
+	nadinformers "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/controller"
@@ -318,10 +321,15 @@ func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string
 		k8sClientSet, noResyncPeriod, v1coreinformerfactory.WithTweakListOptions(
 			filterByHostSelector))
 
-	broadcaster := newBroadcaster(k8sClientSet)
+	nadClient, err := netclient.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	netAttachDefInformerFactory := nadinformers.NewSharedInformerFactory(nadClient, noResyncPeriod)
 
+	broadcaster := newBroadcaster(k8sClientSet)
 	networkController, err := controller.NewPodNetworksController(
-		podInformerFactory, broadcaster, newEventRecorder(broadcaster),
+		podInformerFactory, netAttachDefInformerFactory, broadcaster, newEventRecorder(broadcaster),
 		cniclient.NewCNI(hostNamespaceCniBinDir),
 		cniConfigDir,
 		k8sClientSet,
@@ -332,6 +340,7 @@ func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string
 	}
 
 	podInformerFactory.Start(stopChannel)
+	netAttachDefInformerFactory.Start(stopChannel)
 
 	return networkController, nil
 }

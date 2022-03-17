@@ -186,6 +186,11 @@ github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/scheme
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1/fake
+github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions
+github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/internalinterfaces
+github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/k8s.cni.cncf.io
+github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/k8s.cni.cncf.io/v1
+github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1
 github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils
 # github.com/klauspost/compress v1.11.13
 github.com/klauspost/compress/fse
