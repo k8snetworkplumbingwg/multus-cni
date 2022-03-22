@@ -34,19 +34,18 @@ const (
 )
 
 // Option mutates the `conf` object
-type Option func(conf *MultusConf)
+type Option func(conf *MultusConf) error
 
 // MultusConf holds the multus configuration, and persists it to disk
 type MultusConf struct {
 	BinDir                   string          `json:"binDir,omitempty"`
 	Capabilities             map[string]bool `json:"capabilities,omitempty"`
 	CNIVersion               string          `json:"cniVersion"`
-	Delegates                []interface{}   `json:"delegates"`
 	LogFile                  string          `json:"logFile,omitempty"`
 	LogLevel                 string          `json:"logLevel,omitempty"`
 	LogToStderr              bool            `json:"logToStderr,omitempty"`
-	Kubeconfig               string          `json:"kubeconfig"`
 	Name                     string          `json:"name"`
+	ClusterNetwork           string          `json:"clusterNetwork,omitempty"`
 	NamespaceIsolation       bool            `json:"namespaceIsolation,omitempty"`
 	RawNonIsolatedNamespaces string          `json:"globalNamespaces,omitempty"`
 	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
@@ -56,14 +55,12 @@ type MultusConf struct {
 
 // NewMultusConfig creates a basic configuration generator. It can be mutated
 // via the `With...` methods.
-func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, configurationOptions ...Option) (*MultusConf, error) {
+func NewMultusConfig(pluginName string, cniVersion string, configurationOptions ...Option) (*MultusConf, error) {
 	multusConfig := &MultusConf{
 		Name:         MultusDefaultNetworkName,
 		CNIVersion:   cniVersion,
 		Type:         pluginName,
 		Capabilities: map[string]bool{},
-		Kubeconfig:   kubeconfig,
-		Delegates:    []interface{}{},
 	}
 
 	err := multusConfig.Mutate(configurationOptions...)
@@ -74,7 +71,7 @@ func NewMultusConfig(pluginName string, cniVersion string, kubeconfig string, co
 // top level cni version with the delegate cni version.
 // Since version 0.4.0, CHECK was introduced, which
 // causes incompatibility.
-func CheckVersionCompatibility(mc *MultusConf) error {
+func CheckVersionCompatibility(mc *MultusConf, delegate interface{}) error {
 	const versionFmt = "delegate cni version is %s while top level cni version is %s"
 	v040, _ := semver.Make("0.4.0")
 	multusCNIVersion, err := semver.Make(mc.CNIVersion)
@@ -84,22 +81,20 @@ func CheckVersionCompatibility(mc *MultusConf) error {
 	}
 
 	if multusCNIVersion.GTE(v040) {
-		for _, delegate := range mc.Delegates {
-			delegatesMap, ok := delegate.(map[string]interface{})
-			if !ok {
-				return errors.New("couldn't get cni version of delegate")
-			}
-			delegateVersion, ok := delegatesMap["cniVersion"].(string)
-			if !ok {
-				return errors.New("couldn't get cni version of delegate")
-			}
-			v, err := semver.Make(delegateVersion)
-			if err != nil {
-				return err
-			}
-			if v.LT(v040) {
-				return fmt.Errorf(versionFmt, delegateVersion, mc.CNIVersion)
-			}
+		delegatesMap, ok := delegate.(map[string]interface{})
+		if !ok {
+			return errors.New("couldn't get cni version of delegate")
+		}
+		delegateVersion, ok := delegatesMap["cniVersion"].(string)
+		if !ok {
+			return errors.New("couldn't get cni version of delegate")
+		}
+		v, err := semver.Make(delegateVersion)
+		if err != nil {
+			return err
+		}
+		if v.LT(v040) {
+			return fmt.Errorf(versionFmt, delegateVersion, mc.CNIVersion)
 		}
 	}
 
@@ -117,81 +112,100 @@ func (mc *MultusConf) Generate() (string, error) {
 // configuration `Option`s
 func (mc *MultusConf) Mutate(configurationOptions ...Option) error {
 	for _, configOption := range configurationOptions {
-		configOption(mc)
+		err := configOption(mc)
+		if err != nil {
+			return err
+		}
 	}
 
-	return CheckVersionCompatibility(mc)
+	return nil
 }
 
 // WithNamespaceIsolation mutates the inner state to enable the
 // NamespaceIsolation attribute
 func WithNamespaceIsolation() Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.NamespaceIsolation = true
+		return nil
 	}
 }
 
 // WithGlobalNamespaces mutates the inner state to set the
 // RawNonIsolatedNamespaces attribute
 func WithGlobalNamespaces(globalNamespaces string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.RawNonIsolatedNamespaces = globalNamespaces
+		return nil
 	}
 }
 
 // WithLogToStdErr mutates the inner state to enable the
 // WithLogToStdErr attribute
 func WithLogToStdErr() Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.LogToStderr = true
+		return nil
 	}
 }
 
 // WithLogLevel mutates the inner state to set the
 // LogLevel attribute
 func WithLogLevel(logLevel string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.LogLevel = logLevel
+		return nil
 	}
 }
 
 // WithLogFile mutates the inner state to set the
 // logFile attribute
 func WithLogFile(logFile string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.LogFile = logFile
+		return nil
 	}
 }
 
 // WithReadinessFileIndicator mutates the inner state to set the
 // ReadinessIndicatorFile attribute
 func WithReadinessFileIndicator(path string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.ReadinessIndicatorFile = path
+		return nil
 	}
 }
 
 // WithAdditionalBinaryFileDir mutates the inner state to set the
 // BinDir attribute
 func WithAdditionalBinaryFileDir(directoryPath string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.BinDir = directoryPath
+		return nil
 	}
 }
 
 // WithOverriddenName mutates the inner state to set the
 // Name attribute
 func WithOverriddenName(networkName string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.Name = networkName
+		return nil
 	}
 }
 
 // WithCniDir mutates the inner state to set the
 // multus CNI cache directory
 func WithCniDir(cniDir string) Option {
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		conf.CniDir = cniDir
+		return nil
+	}
+}
+
+func withClusterNetwork(clusterNetwork string) Option {
+	return func(conf *MultusConf) error {
+		conf.ClusterNetwork = clusterNetwork
+		return nil
 	}
 }
 
@@ -202,6 +216,10 @@ func withCapabilities(cniData interface{}) Option {
 	if ok {
 		if pluginsListEntry, ok := cniDataMap[configListCapabilityKey]; ok {
 			pluginsList = pluginsListEntry.([]interface{})
+		}
+	} else {
+		return func(conf *MultusConf) error {
+			return errors.New("couldn't get cni config from delegate")
 		}
 	}
 
@@ -215,22 +233,11 @@ func withCapabilities(cniData interface{}) Option {
 		enabledCapabilities = extractCapabilities(cniData)
 	}
 
-	return func(conf *MultusConf) {
+	return func(conf *MultusConf) error {
 		for _, capability := range enabledCapabilities {
 			conf.Capabilities[capability] = true
 		}
-	}
-}
-
-func withDelegates(primaryCNIConfigData map[string]interface{}, cniVersion string, forceCNIVersion bool) Option {
-
-	// override delegates CNIVersion with multus CNIVersion
-	if forceCNIVersion {
-		primaryCNIConfigData["cniVersion"] = cniVersion
-	}
-
-	return func(conf *MultusConf) {
-		conf.Delegates = []interface{}{primaryCNIConfigData}
+		return nil
 	}
 }
 

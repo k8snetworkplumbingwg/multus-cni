@@ -114,7 +114,61 @@ var _ = Describe(suiteName, func() {
 			K8sClient = fakeK8sClient()
 
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
-			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient)
+			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			netns, err = testutils.NewNS()
+			Expect(err).NotTo(HaveOccurred())
+
+			// the namespace and podUID parameters below are hard-coded in the generation function
+			Expect(prepareCNIEnv(netns.Path(), "test", podName, "testUID")).To(Succeed())
+			Expect(createFakePod(K8sClient, podName)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			Expect(cniServer.Close()).To(Succeed())
+			Expect(teardownCNIEnv()).To(Succeed())
+			Expect(K8sClient.Client.CoreV1().Pods("test").Delete(
+				context.TODO(), podName, metav1.DeleteOptions{}))
+		})
+
+		It("ADD works successfully", func() {
+			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+
+		It("DEL works successfully", func() {
+			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+
+		It("CHECK works successfully", func() {
+			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+	})
+
+	Context("CNI operations started from the shim with CNI config override with server config", func() {
+		const (
+			containerID = "123456789"
+			ifaceName   = "eth0"
+			podName     = "my-little-pod"
+		)
+
+		var (
+			cniServer *Server
+			K8sClient *k8s.ClientInfo
+			netns     ns.NetNS
+		)
+
+		BeforeEach(func() {
+			var err error
+			K8sClient = fakeK8sClient()
+
+			dummyServerConfig := `{
+				"dummy_key1": "dummy_val1",
+				"dummy_key2": "dummy_val2"
+			}`
+
+			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
+			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient, []byte(dummyServerConfig))
 			Expect(err).NotTo(HaveOccurred())
 
 			netns, err = testutils.NewNS()
@@ -204,10 +258,10 @@ func createFakePod(k8sClient *k8s.ClientInfo, podName string) error {
 	return err
 }
 
-func startCNIServer(runDir string, k8sClient *k8s.ClientInfo) (*Server, error) {
+func startCNIServer(runDir string, k8sClient *k8s.ClientInfo, servConfig []byte) (*Server, error) {
 	const period = 0
 
-	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{})
+	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{}, servConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -228,6 +282,7 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo) (*Server, error) {
 
 func referenceConfig(thickPluginSocketDir string) string {
 	const referenceConfigTemplate = `{
+	"cniVersion": "0.4.0",
         "name": "node-cni-network",
         "type": "multus",
         "socketDir": "%s",

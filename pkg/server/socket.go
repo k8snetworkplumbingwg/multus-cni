@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	serverSocketName                   = "multus-cni.sock"
+	serverSocketName                   = "multus.sock"
 	fullReadWriteExecutePermissions    = 0777
 	thickPluginSocketRunDirPermissions = 0700
 )

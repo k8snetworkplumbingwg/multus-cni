@@ -91,6 +91,26 @@ metadata:
   name: multus
   namespace: kube-system
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-daemon-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+data:
+  daemon-config.json: |
+    {
+        "confDir": "/host/etc/cni/net.d",
+        "logToStderr": true,
+        "logLevel": "debug",
+        "logFile": "/tmp/multus.log",
+        "binDir": "/host/opt/cni/bin",
+        "cniDir": "/host/var/lib/cni/multus",
+        "socketDir": "/host/var/run/multus/"
+    }
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -131,8 +151,6 @@ spec:
             - "-multus-autoconfig-dir=/host/etc/cni/net.d"
             - "-multus-log-to-stderr=true"
             - "-multus-log-level=verbose"
-            - "-binDir=/host/opt/cni/bin"
-            - "-cniDir=/host/var/lib/cni/multus"
           resources:
             requests:
               cpu: "100m"
@@ -152,6 +170,9 @@ spec:
             - name: host-var-run-netns
               mountPath: /var/run/netns
               mountPropagation: HostToContainer
+            - name: multus-daemon-config
+              mountPath: /etc/cni/net.d/multus.d
+              readOnly: true
       initContainers:
         - name: install-multus-binary
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
@@ -169,23 +190,6 @@ spec:
             - name: cnibin
               mountPath: /host/opt/cni/bin
               mountPropagation: Bidirectional
-        - name: generate-kubeconfig
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
-          command:
-            - "/usr/src/multus-cni/bin/generate-kubeconfig"
-          args:
-            - "-k8s-service-host=$(KUBERNETES_SERVICE_HOST)"
-            - "-k8s-service-port=$(KUBERNETES_SERVICE_PORT)"
-          resources:
-            requests:
-              cpu: "10m"
-              memory: "15Mi"
-          securityContext:
-            privileged: true
-          volumeMounts:
-            - name: cni
-              mountPath: /host/etc/cni/net.d
-              mountPropagation: Bidirectional
       terminationGracePeriodSeconds: 10
       volumes:
         - name: cni
@@ -194,6 +198,12 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
+        - name: multus-daemon-config
+          configMap:
+            name: multus-daemon-config
+            items:
+            - key: daemon-config.json
+              path: daemon-config.json
         - name: host-var-run
           hostPath:
             path: /var/run

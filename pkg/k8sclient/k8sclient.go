@@ -522,32 +522,40 @@ func isValidNamespaceReference(targetns string, allowednamespaces []string) bool
 	return false
 }
 
+// getNetDelegate loads delegate network for clusterNetwork/defaultNetworks
 func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace string, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 	logging.Debugf("getNetDelegate: %v, %v, %v, %s", client, netname, confdir, namespace)
-	// option1) search CRD object for the network
-	net := &types.NetworkSelectionElement{
-		Name:      netname,
-		Namespace: namespace,
-	}
-	delegate, resourceMap, err := getKubernetesDelegate(client, net, confdir, pod, resourceMap)
-	if err == nil {
-		return delegate, resourceMap, nil
-	}
-
-	// option2) search CNI json config file
 	var configBytes []byte
-	configBytes, err = netutils.GetCNIConfigFromFile(netname, confdir)
-	if err == nil {
-		delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
-		if err != nil {
-			return nil, resourceMap, err
-		}
-		return delegate, resourceMap, nil
-	}
+	isNetnamePath := strings.Contains(netname, "/")
 
-	// option3) search directory
-	fInfo, err := os.Stat(netname)
-	if err == nil {
+	// if netname is not directory or file, it must be net-attach-def name or CNI config name
+	if ! isNetnamePath {
+		// option1) search CRD object for the network
+		net := &types.NetworkSelectionElement{
+			Name:      netname,
+			Namespace: namespace,
+		}
+		delegate, resourceMap, err := getKubernetesDelegate(client, net, confdir, pod, resourceMap)
+		if err == nil {
+			return delegate, resourceMap, nil
+		}
+
+		// option2) search CNI json config file, which has <netname> as CNI name, from confDir
+		configBytes, err = netutils.GetCNIConfigFromFile(netname, confdir)
+		if err == nil {
+			delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
+			if err != nil {
+				return nil, resourceMap, err
+			}
+			return delegate, resourceMap, nil
+		}
+	} else {
+		fInfo, err := os.Stat(netname)
+		if err != nil {
+			return nil, resourceMap, err 
+		}
+
+		// option3) search directory
 		if fInfo.IsDir() {
 			files, err := libcni.ConfFiles(netname, []string{".conf", ".conflist"})
 			if err != nil {
@@ -565,6 +573,29 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 				}
 				return nil, resourceMap, err
 			}
+		} else {
+			// option4) if file path (absolute), then load it directly
+			if strings.HasSuffix(netname, ".conflist") {
+				confList, err := libcni.ConfListFromFile(netname)
+				if err != nil {
+					return nil, resourceMap, fmt.Errorf("Error loading CNI conflist file %s: %v", netname, err)
+				}
+				configBytes = confList.Bytes
+			} else {
+				conf, err := libcni.ConfFromFile(netname)
+				if err != nil {
+					return nil, resourceMap, fmt.Errorf("Error loading CNI config file %s: %v", netname, err)
+				}
+				if conf.Network.Type == "" {
+					return nil, resourceMap, fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", netname)
+				}
+				configBytes = conf.Bytes
+			}
+			delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
+			if err != nil {
+				return nil, resourceMap, err
+			}
+			return delegate, resourceMap, nil
 		}
 	}
 	return nil, resourceMap, logging.Errorf("getNetDelegate: cannot find network: %v", netname)

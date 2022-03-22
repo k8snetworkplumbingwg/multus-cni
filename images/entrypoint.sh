@@ -292,6 +292,10 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   while [ $found_master == false ]; do
     if [ "$MULTUS_MASTER_CNI_FILE_NAME" != "" ]; then
         MASTER_PLUGIN="$MULTUS_MASTER_CNI_FILE_NAME"
+	if [ ! -f "$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN" ]; then
+		error "Cannot find master cni file $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN"
+		exit 1;
+	fi
     else
         MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     fi

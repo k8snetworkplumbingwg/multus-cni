@@ -30,21 +30,24 @@ type NetConf struct {
 	// support chaining for master interface and IP decisions
 	// occurring prior to running ipvlan plugin
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
-	PrevResult    *cni100.Result         `json:"-"`
+	PrevResult    *cni100.Result          `json:"-"`
 
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
 	BinDir  string `json:"binDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
-	RawDelegates    []map[string]interface{} `json:"delegates"`
-	Delegates       []*DelegateNetConf       `json:"-"`
-	Kubeconfig      string                   `json:"kubeconfig"`
-	ClusterNetwork  string                   `json:"clusterNetwork"`
-	DefaultNetworks []string                 `json:"defaultNetworks"`
-	LogFile         string                   `json:"logFile"`
-	LogLevel        string                   `json:"logLevel"`
-	LogToStderr     bool                     `json:"logToStderr,omitempty"`
-	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	RawDelegates []map[string]interface{} `json:"delegates"`
+	// These parameters are exclusive in one config file:
+	//  - Delegates (directly add delegate CNI config into multus CNI config)
+	//  - ClusterNetwork+DefaultNetworks  (add CNI config through CRD, directory or file)
+	Delegates       []*DelegateNetConf `json:"-"`
+	ClusterNetwork  string             `json:"clusterNetwork"`
+	DefaultNetworks []string           `json:"defaultNetworks"`
+	Kubeconfig      string             `json:"kubeconfig"`
+	LogFile         string             `json:"logFile"`
+	LogLevel        string             `json:"logLevel"`
+	LogToStderr     bool               `json:"logToStderr,omitempty"`
+	RuntimeConfig   *RuntimeConfig     `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.

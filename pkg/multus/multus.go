@@ -612,7 +612,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			// Even if the filename is set, file may not be present. Ignore error,
 			// but log and in the future may need to filter on specific errors.
 			if err != nil {
-				logging.Debugf("cmdAdd: CopyDeviceInfoForCNIFromDP returned an error - err=%v", err)
+				logging.Debugf("CmdAdd: CopyDeviceInfoForCNIFromDP returned an error - err=%v", err)
 			}
 		}
 
@@ -704,7 +704,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		if err != nil {
 			// Even if the filename is set, file may not be present. Ignore error,
 			// but log and in the future may need to filter on specific errors.
-			logging.Debugf("cmdAdd: getDelegateDeviceInfo returned an error - err=%v", err)
+			logging.Debugf("CmdAdd: getDelegateDeviceInfo returned an error - err=%v", err)
 		}
 
 		// create the network status, only in case Multus as kubeconfig

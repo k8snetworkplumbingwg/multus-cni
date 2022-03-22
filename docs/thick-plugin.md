@@ -32,6 +32,15 @@ described above:
 
 ## How to use it
 
+### Configure Deployment
+
+If your delegate CNI plugin requires some files which is in container host, please update
+update `deployments/multus-daemonset-thick.yml` to add directory into multus-daemon pod.
+For example, flannel requires `/run/flannel/subnet.env`, so you need to mount this directory
+into the multus-daemon pod.
+
+Required directory/files are different for each CNI plugin, so please refer your CNI plugin.
+
 ### Deployment
 
 There is a dedicated multus daemonset specification for users wanting to use
@@ -39,7 +48,7 @@ this thick plugin variant. This reference deployment spec of multus can be
 deployed by following these commands:
 
 ```bash
-kubectl apply -f deployments/multus-daemonset-thick-plugin.yml
+kubectl apply -f deployments/multus-daemonset-thick.yml
 ```
 
 ### Command line parameters
@@ -48,10 +57,14 @@ Multus thick plugin variant accepts the same
 [entrypoint arguments](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/how-to-use.md#entrypoint-script-parameters)
 its thin counterpart allows - with the following exceptions:
 
-- `skip-multus-binary-copy`
-- `restart-crio`
+- `additional-bin-dir`
+- `binDir`
 - `cleanup-config-on-exit`
+- `cniDir`
+- `multus-kubeconfig-file-host`
 - `rename-conf-file`
+- `restart-crio`
+- `skip-multus-binary-copy`
 
 It is important to refer that these are command line parameters to the golang
 binary; as such, they should be passed using a single dash ("-") e.g.
@@ -66,12 +79,7 @@ specifies the path to the server configuration:
 
 The server configuration is encoded in JSON, and allows the following keys:
 
-- `"confDir"`: specifies the path to the CNI configuration directory.
-- `"cniDir"`: specifies the path to the multus CNI cache.
-- `"binDir"`: specifies the path to the CNI binary executables.
-- `"logFile"`: specifies where the daemon log file will be persisted.
-- `"logLevel"`: indicates the logging level of the multus daemon. 
-- `"logToStderr"`: Whether or not to also log to stderr. Default to `true`.
 - `"socketDir"`: Specify the location where the unix domain socket used for
 client/server communication will be located. Defaults to `"/var/run/multus-cni/"`.
 
+In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)

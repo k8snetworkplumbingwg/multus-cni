@@ -26,21 +26,19 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const (
-	multusPluginName     = "multus"
-	multusConfigFileName = "00-multus.conf"
+	multusPluginName = "multus-shim"
 )
 
 const (
 	defaultCniConfigDir                 = "/etc/cni/net.d"
 	defaultMultusGlobalNamespaces       = ""
-	defaultMultusKubeconfigPath         = "/etc/cni/net.d/multus.d/multus.kubeconfig"
 	defaultMultusLogFile                = ""
 	defaultMultusLogLevel               = ""
 	defaultMultusLogToStdErr            = false
@@ -48,27 +46,21 @@ const (
 	defaultMultusNamespaceIsolation     = false
 	defaultMultusReadinessIndicatorFile = ""
 	defaultMultusRunDir                 = "/host/var/run/multus-cni/"
-	defaultMultusBinDir                 = "/host/opt/cni/bin"
-	defaultMultusCNIDir                 = "/host/var/lib/cni/multus"
 )
 
 const (
-	cniConfigDirVarName           = "cni-config-dir"
-	multusAdditionalBinDirVarName = "additional-bin-dir"
-	multusAutoconfigDirVarName    = "multus-autoconfig-dir"
-	multusCNIVersion              = "cni-version"
-	multusConfigFileVarName       = "multus-conf-file"
-	multusGlobalNamespaces        = "global-namespaces"
-	multusLogFile                 = "multus-log-file"
-	multusLogLevel                = "multus-log-level"
-	multusLogToStdErr             = "multus-log-to-stderr"
-	multusKubeconfigPath          = "multus-kubeconfig-file-host"
-	multusMasterCNIFileVarName    = "multus-master-cni-file"
-	multusNamespaceIsolation      = "namespace-isolation"
-	multusReadinessIndicatorFile  = "readiness-indicator-file"
-	multusRunDir                  = "multus-rundir"
-	multusCNIDirVarName           = "cniDir"
-	multusBinDirVarName           = "binDir"
+	cniConfigDirVarName          = "cni-config-dir"
+	multusAutoconfigDirVarName   = "multus-autoconfig-dir"
+	multusCNIVersion             = "cni-version"
+	multusConfigFileVarName      = "multus-conf-file"
+	multusGlobalNamespaces       = "global-namespaces"
+	multusLogFile                = "multus-log-file"
+	multusLogLevel               = "multus-log-level"
+	multusLogToStdErr            = "multus-log-to-stderr"
+	multusMasterCNIFileVarName   = "multus-master-cni-file"
+	multusNamespaceIsolation     = "namespace-isolation"
+	multusReadinessIndicatorFile = "readiness-indicator-file"
+	multusRunDir                 = "multus-rundir"
 )
 
 func main() {
@@ -85,24 +77,14 @@ func main() {
 	logFile := flag.String(multusLogFile, "", "Path where to multus will log. Used only with --multus-conf-file=auto.")
 	cniVersion := flag.String(multusCNIVersion, "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
 	forceCNIVersion := flag.Bool("force-cni-version", false, "force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
-	additionalBinDir := flag.String(multusAdditionalBinDirVarName, "", "Additional binary directory to specify in the configurations. Used only with --multus-conf-file=auto.")
 	readinessIndicator := flag.String(multusReadinessIndicatorFile, "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
-	multusKubeconfig := flag.String(multusKubeconfigPath, defaultMultusKubeconfigPath, "The path to the kubeconfig")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
-	multusBinDir := flag.String(multusBinDirVarName, defaultMultusBinDir, "The directory where the CNI plugin binaries are available")
-	multusCniDir := flag.String(multusCNIDirVarName, defaultMultusCNIDir, "The directory where the multus CNI cache is located")
 
 	configFilePath := flag.String("config", types.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
 
 	flag.Parse()
 
-	daemonConfig, err := types.LoadDaemonNetConf(*configFilePath)
-	if err != nil {
-		logging.Panicf("failed to load the multus-daemon configuration: %v", err)
-		os.Exit(1)
-	}
-
-	if err := startMultusDaemon(daemonConfig); err != nil {
+	if err := startMultusDaemon(*configFilePath); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
 		os.Exit(3)
 	}
@@ -114,8 +96,6 @@ func main() {
 		}
 
 		var configurationOptions []config.Option
-		configurationOptions = append(configurationOptions, config.WithAdditionalBinaryFileDir(*multusBinDir))
-		configurationOptions = append(configurationOptions, config.WithCniDir(*multusCniDir))
 
 		if *namespaceIsolation {
 			configurationOptions = append(
@@ -142,17 +122,12 @@ func main() {
 				configurationOptions, config.WithLogFile(*logFile))
 		}
 
-		if *additionalBinDir != "" {
-			configurationOptions = append(
-				configurationOptions, config.WithAdditionalBinaryFileDir(*additionalBinDir))
-		}
-
 		if *readinessIndicator != defaultMultusReadinessIndicatorFile {
 			configurationOptions = append(
 				configurationOptions, config.WithReadinessFileIndicator(*readinessIndicator))
 		}
 
-		multusConfig, err := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig, configurationOptions...)
+		multusConfig, err := config.NewMultusConfig(multusPluginName, *cniVersion, configurationOptions...)
 		if err != nil {
 			_ = logging.Errorf("Failed to create multus config: %v", err)
 			os.Exit(3)
@@ -191,7 +166,7 @@ func main() {
 			defer func() {
 				stopChannel <- struct{}{}
 			}()
-			if err := configManager.MonitorDelegatedPluginConfiguration(stopChannel, configWatcherDoneChannel); err != nil {
+			if err := configManager.MonitorPluginConfiguration(stopChannel, configWatcherDoneChannel); err != nil {
 				_ = logging.Errorf("error watching file: %v", err)
 			}
 		}(make(chan struct{}), configWatcherDoneChannel)
@@ -204,7 +179,13 @@ func main() {
 	}
 }
 
-func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
+func startMultusDaemon(configFilePath string) error {
+	daemonConfig, config, err := types.LoadDaemonNetConf(configFilePath)
+	if err != nil {
+		logging.Panicf("failed to load the multus-daemon configuration: %v", err)
+		os.Exit(1)
+	}
+
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -213,7 +194,7 @@ func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
-	server, err := srv.NewCNIServer(daemonConfig.MultusSocketDir)
+	server, err := srv.NewCNIServer(daemonConfig.MultusSocketDir, config)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
 	}

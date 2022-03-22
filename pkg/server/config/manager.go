@@ -41,8 +41,6 @@ type Manager struct {
 	multusConfigDir      string
 	multusConfigFilePath string
 	primaryCNIConfigPath string
-	cniVersion	string
-	forceCNIVersion	bool
 }
 
 // NewManager returns a config manager object, configured to persist the
@@ -65,10 +63,43 @@ func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigD
 	return newManager(config, multusAutoconfigDir, primaryCNIPluginName, forceCNIVersion)
 }
 
-func newManager(config MultusConf, multusConfigDir,  defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
+// overrideCNIVersion overrides cniVersion in cniConfigFile, it should be used only in kind case
+func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
+	masterCNIConfigData, err := ioutil.ReadFile(cniConfigFile)
+	if err != nil {
+		return fmt.Errorf("failed to read cni config %s: %v", cniConfigFile, err)
+	}
+
+	var primaryCNIConfigData map[string]interface{}
+	if err := json.Unmarshal(masterCNIConfigData, &primaryCNIConfigData); err != nil {
+		return fmt.Errorf("failed to unmarshall cni config %s: %w", cniConfigFile, err)
+	}
+
+	primaryCNIConfigData["cniVersion"] = multusCNIVersion
+	configBytes, err := json.Marshal(primaryCNIConfigData)
+	if err != nil {
+		return fmt.Errorf("couldn't update cluster network config: %v", err)
+	}
+
+	err = ioutil.WriteFile(cniConfigFile, configBytes, 0644)
+	if err != nil {
+		return fmt.Errorf("couldn't update cluster network config: %v", err)
+	}
+	return nil
+}
+
+func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
+	if forceCNIVersion {
+		overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+	}
+
 	watcher, err := newWatcher(multusConfigDir)
 	if err != nil {
 		return nil, err
+	}
+
+	if defaultCNIPluginName == fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName) {
+		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", multusConfigDir, multusConfigFileName)
 	}
 
 	configManager := &Manager{
@@ -77,7 +108,6 @@ func newManager(config MultusConf, multusConfigDir,  defaultCNIPluginName string
 		multusConfigDir:      multusConfigDir,
 		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
-		forceCNIVersion: forceCNIVersion,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -92,6 +122,11 @@ func (m *Manager) loadPrimaryCNIConfigFromFile() error {
 	if err != nil {
 		return logging.Errorf("failed to access the primary CNI configuration from %s: %v", m.primaryCNIConfigPath, err)
 	}
+
+	if err = CheckVersionCompatibility(m.multusConfig, primaryCNIConfigData); err != nil {
+		return err
+	}
+
 	return m.loadPrimaryCNIConfigurationData(primaryCNIConfigData)
 }
 
@@ -115,7 +150,7 @@ func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface
 
 	m.cniConfigData = cniConfigData
 	return m.multusConfig.Mutate(
-		withDelegates(cniConfigData, m.multusConfig.CNIVersion, m.forceCNIVersion),
+		withClusterNetwork(m.primaryCNIConfigPath),
 		withCapabilities(cniConfigData))
 }
 
@@ -128,10 +163,10 @@ func (m Manager) GenerateConfig() (string, error) {
 	return m.multusConfig.Generate()
 }
 
-// MonitorDelegatedPluginConfiguration monitors the configuration file pointed
+// MonitorPluginConfiguration monitors the configuration file pointed
 // to by the primaryCNIPluginName attribute, and re-generates the multus
 // configuration whenever the primary CNI config is updated.
-func (m Manager) MonitorDelegatedPluginConfiguration(shutDown chan struct{}, done chan struct{}) error {
+func (m Manager) MonitorPluginConfiguration(shutDown chan struct{}, done chan struct{}) error {
 	logging.Verbosef("started to watch file %s", m.primaryCNIConfigPath)
 
 	for {
@@ -143,6 +178,7 @@ func (m Manager) MonitorDelegatedPluginConfiguration(shutDown chan struct{}, don
 				logging.Debugf("skipping un-related event %v", event)
 				continue
 			}
+			logging.Debugf("process event: %v", event)
 
 			if !shouldRegenerateConfig(event) {
 				continue
