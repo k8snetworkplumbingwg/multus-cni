@@ -34,6 +34,12 @@ type CNIParams struct {
 	NetworkName string
 }
 
+type Client interface {
+	PluginPath() []string
+	AddNetworks(kubeclient *k8sclient.ClientInfo, pod *v1.Pod, cniArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, delegateConf *types.DelegateNetConf, rtConf *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error)
+	RemoveNetworks(pod *v1.Pod, cniArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, delegateConf *types.DelegateNetConf, rtConf *types.RuntimeConfig, multusNetconf *types.NetConf) error
+}
+
 // CniPlugin represents a CNI plugin, along with the default cluster network
 // configuration.
 type CniPlugin struct {
@@ -64,6 +70,10 @@ func (cniParams *CNIParams) BuildRuntimeConf() *libcni.RuntimeConf {
 	}
 }
 
+func (cni *CniPlugin) PluginPath() []string {
+	return cni.plugin.Path
+}
+
 // AddNetworks taps into the host namespace filesystem (akin to chroot) and
 // triggers a CNI_ADD for an existing interface over the delegate CNI plugin.
 func (cni *CniPlugin) AddNetworks(kubeclient *k8sclient.ClientInfo, pod *v1.Pod, cniArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, delegateConf *types.DelegateNetConf, rtConf *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
@@ -80,18 +90,21 @@ func (cni *CniPlugin) AddNetworks(kubeclient *k8sclient.ClientInfo, pod *v1.Pod,
 		}
 	}(err == nil)
 
-	netStatusString, wasFound := pod.Annotations[multinetspecv1.NetworkStatusAnnot]
-	var netStatus []multinetspecv1.NetworkStatus
-	if wasFound {
-		if err := json.Unmarshal([]byte(netStatusString), &netStatus); err != nil {
-			return nil, fmt.Errorf("failed to unmarshall the netstatus annotation: %v", err)
-		}
+	netStatus, err := networkStatus(pod)
+	if err != nil {
+		return nil, err
 	}
 
 	res, netStatus, err := multus.AddDelegate(cniArgs, nil, kubeclient, delegateConf, 0, k8sArgs, multusNetconf, pod, netStatus, rtConf)
 	if err != nil {
 		return nil, err
 	}
+
+	ips, err := multus.IPsFromResult(res)
+	if err != nil {
+		return nil, err
+	}
+	multus.SendKubernetesEvents(pod, delegateConf.Name, kubeclient, rtConf, ips)
 
 	if err := k8sclient.SetNetworkStatus(kubeclient, k8sArgs, netStatus, multusNetconf); err != nil {
 		if strings.Contains(err.Error(), "failed to query the pod") {
@@ -101,6 +114,18 @@ func (cni *CniPlugin) AddNetworks(kubeclient *k8sclient.ClientInfo, pod *v1.Pod,
 	}
 
 	return res, nil
+}
+
+func networkStatus(pod *v1.Pod) ([]multinetspecv1.NetworkStatus, error) {
+	netStatusString, wasFound := pod.Annotations[multinetspecv1.NetworkStatusAnnot]
+
+	var netStatus []multinetspecv1.NetworkStatus
+	if wasFound {
+		if err := json.Unmarshal([]byte(netStatusString), &netStatus); err != nil {
+			return nil, fmt.Errorf("failed to unmarshall the netstatus annotation: %v", err)
+		}
+	}
+	return netStatus, nil
 }
 
 // RemoveNetworks taps into the host namespace filesystem (akin to chroot) and

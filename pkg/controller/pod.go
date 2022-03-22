@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"reflect"
 	"strings"
 	"time"
@@ -22,7 +21,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
+	nadclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	nadinformers "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
 	nadlisterv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
@@ -32,10 +31,16 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
-const allNamespaces = ""
-const controllerName = "multus-cni-pod-networks-controller"
-const podNetworksAnnot = "k8s.v1.cni.cncf.io/networks"
-const podNetworkStatus = "k8s.v1.cni.cncf.io/network-status"
+const maxRetries = 2
+
+type DynamicAttachmentRequestType string
+
+type DynamicAttachmentRequest struct {
+	PodName         string
+	PodNamespace    string
+	AttachmentNames []types.NetworkSelectionElement
+	Type            DynamicAttachmentRequestType
+}
 
 // PodNetworksController handles the cncf networks annotations update, and
 // triggers adding / removing networks from a running pod.
@@ -51,9 +56,9 @@ type PodNetworksController struct {
 	recorder                record.EventRecorder
 	workqueue               workqueue.RateLimitingInterface
 	containerRuntime        containerruntimes.ContainerRuntime
-	cniPlugin               *cniclient.CniPlugin
+	cniPlugin               cniclient.Client
 	confDir                 string
-	k8sClientConfig         *rest.Config
+	nadClientSet            nadclient.Interface
 }
 
 // NewPodNetworksController returns new PodNetworksController instance
@@ -62,10 +67,10 @@ func NewPodNetworksController(
 	nadInformers nadinformers.SharedInformerFactory,
 	broadcaster record.EventBroadcaster,
 	recorder record.EventRecorder,
-	cniPlugin *cniclient.CniPlugin,
+	cniPlugin cniclient.Client,
 	confDir string,
 	k8sClientSet kubernetes.Interface,
-	k8sClientConfig *rest.Config,
+	nadClientSet nadclient.Interface,
 	containerRuntime containerruntimes.ContainerRuntime,
 ) (*PodNetworksController, error) {
 	podInformer := k8sCoreInformerFactory.Core().V1().Pods().Informer()
@@ -86,8 +91,8 @@ func NewPodNetworksController(
 		workqueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"pod-networks-updates"),
-		k8sClientSet:    k8sClientSet,
-		k8sClientConfig: k8sClientConfig,
+		k8sClientSet: k8sClientSet,
+		nadClientSet: nadClientSet,
 	}
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -118,25 +123,72 @@ func (pnc *PodNetworksController) worker() {
 }
 
 func (pnc *PodNetworksController) processNextWorkItem() bool {
-	key, shouldQuit := pnc.workqueue.Get()
+	queueItem, shouldQuit := pnc.workqueue.Get()
 	if shouldQuit {
 		return false
 	}
-	defer pnc.workqueue.Done(key)
+	defer pnc.workqueue.Done(queueItem)
+
+	dynAttachmentRequest := queueItem.(*DynamicAttachmentRequest)
+	logging.Verbosef("extracted request [%v] from the queue", dynAttachmentRequest)
+	err := pnc.handleDynamicInterfaceRequest(dynAttachmentRequest)
+	pnc.handleResult(err, dynAttachmentRequest)
 
 	return true
+}
+
+func (pnc *PodNetworksController) handleDynamicInterfaceRequest(dynamicAttachmentRequest *DynamicAttachmentRequest) error {
+	logging.Verbosef("handleDynamicInterfaceRequest: read from queue: %v", dynamicAttachmentRequest)
+	if dynamicAttachmentRequest.Type == "add" {
+		pod, err := pnc.podsLister.Pods(dynamicAttachmentRequest.PodNamespace).Get(dynamicAttachmentRequest.PodName)
+		if err != nil {
+			return err
+		}
+		return pnc.addNetworks(dynamicAttachmentRequest.AttachmentNames, pod)
+	} else if dynamicAttachmentRequest.Type == "remove" {
+		pod, err := pnc.podsLister.Pods(dynamicAttachmentRequest.PodNamespace).Get(dynamicAttachmentRequest.PodName)
+		if err != nil {
+			return err
+		}
+		return pnc.removeNetworks(dynamicAttachmentRequest.AttachmentNames, pod)
+	} else {
+		logging.Verbosef("very weird attachment request: %+v", dynamicAttachmentRequest)
+	}
+	logging.Verbosef("handleDynamicInterfaceRequest: exited & successfully processed: %v", dynamicAttachmentRequest)
+	return nil
+}
+
+func (pnc *PodNetworksController) handleResult(err error, dynamicAttachmentRequest *DynamicAttachmentRequest) {
+	if err == nil {
+		pnc.workqueue.Forget(dynamicAttachmentRequest)
+		return
+	}
+
+	currentRetries := pnc.workqueue.NumRequeues(dynamicAttachmentRequest)
+	if currentRetries <= maxRetries {
+		_ = logging.Errorf("re-queued request for: %v", dynamicAttachmentRequest)
+		pnc.workqueue.AddRateLimited(dynamicAttachmentRequest)
+		return
+	}
+
+	pnc.workqueue.Forget(dynamicAttachmentRequest)
 }
 
 func (pnc *PodNetworksController) handlePodUpdate(oldObj interface{}, newObj interface{}) {
 	oldPod := oldObj.(*corev1.Pod)
 	newPod := newObj.(*corev1.Pod)
 
+	const (
+		add    DynamicAttachmentRequestType = "add"
+		remove DynamicAttachmentRequestType = "remove"
+	)
+
 	if reflect.DeepEqual(oldPod.Annotations, newPod.Annotations) {
 		return
 	}
 	podNamespace := oldPod.GetNamespace()
 	podName := oldPod.GetName()
-	logging.Debugf("pod [%s] update", fmt.Sprintf("%s/%s", podNamespace, podName))
+	logging.Debugf("pod [%s] updated", namespacedName(podNamespace, podName))
 
 	oldNetworkSelectionElements, err := networkSelectionElements(oldPod.Annotations, podNamespace)
 	if err != nil {
@@ -151,14 +203,32 @@ func (pnc *PodNetworksController) handlePodUpdate(oldObj interface{}, newObj int
 	}
 
 	toAdd := exclusiveNetworks(newNetworkSelectionElements, oldNetworkSelectionElements)
-	if err := pnc.addNetworks(toAdd, newPod); err != nil {
-		_ = logging.Errorf("failed to *add* networks: %v", err)
+	logging.Verbosef("%d attachments to add to pod %s", len(toAdd), namespacedName(podNamespace, podName))
+	if len(toAdd) > 0 {
+		pnc.workqueue.Add(
+			&DynamicAttachmentRequest{
+				PodName:         podName,
+				PodNamespace:    podNamespace,
+				AttachmentNames: toAdd,
+				Type:            add,
+			})
 	}
 
 	toRemove := exclusiveNetworks(oldNetworkSelectionElements, newNetworkSelectionElements)
-	if err := pnc.removeNetworks(toRemove, newPod); err != nil {
-		_ = logging.Errorf("failed to *remove* networks: %v", err)
+	logging.Verbosef("%d attachments to remove from pod %s", len(toRemove), namespacedName(podNamespace, podName))
+	if len(toRemove) > 0 {
+		pnc.workqueue.Add(
+			&DynamicAttachmentRequest{
+				PodName:         podName,
+				PodNamespace:    podNamespace,
+				AttachmentNames: toRemove,
+				Type:            remove,
+			})
 	}
+}
+
+func namespacedName(podNamespace string, podName string) string {
+	return fmt.Sprintf("%s/%s", podNamespace, podName)
 }
 
 func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelectionElement, pod *corev1.Pod) error {
@@ -168,11 +238,6 @@ func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelection
 			return logging.Errorf("failed to extract CNI params to hotplug new interface for pod %s: %v", pod.GetName(), err)
 		}
 		logging.Verbosef("CNI params for pod %s: %+v", pod.GetName(), cniParams)
-
-		k8sClient, err := pnc.k8sClient()
-		if err != nil {
-			return err
-		}
 
 		delegateConf, _, err := pnc.GetKubernetesDelegate(&netToAdd, pnc.confDir, pod, nil)
 		if err != nil {
@@ -185,12 +250,7 @@ func (pnc *PodNetworksController) addNetworks(netsToAdd []types.NetworkSelection
 			return logging.Errorf("failed to retrieve the multus network: %v", err)
 		}
 
-		logging.Verbosef("the multus config: %+v", *multusNetconf)
-		if strings.HasPrefix(multusNetconf.BinDir, "/host") {
-			strings.ReplaceAll(multusNetconf.BinDir, "/host", "")
-		}
-		logging.Verbosef("the MUTATED multus config: %+v", *multusNetconf)
-		result, err := pnc.cniPlugin.AddNetworks(k8sClient, pod, &cniParams.CniCmdArgs, k8sArgs, delegateConf, cniParams.BuildRuntimeConf(), multusNetconf)
+		result, err := pnc.cniPlugin.AddNetworks(pnc.k8sClient(), pod, &cniParams.CniCmdArgs, k8sArgs, delegateConf, cniParams.BuildRuntimeConf(), multusNetconf)
 		if err != nil {
 			return logging.Errorf("failed to remove network. error: %v", err)
 		}
@@ -205,11 +265,7 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 		multusNetconf *types.NetConf
 		podNetStatus  []nadv1.NetworkStatus
 	)
-	k8sClient, err := pnc.k8sClient()
-	if err != nil {
-		return err
-	}
-
+	podNetStatus = make([]nadv1.NetworkStatus, 0) // SetPodNetworkStatusAnnotation won't set the status if this is nil
 	for _, netToRemove := range netsToRemove {
 		cniParams, err := pnc.getCNIParams(pod, netToRemove)
 		if err != nil {
@@ -229,13 +285,8 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 		}
 
 		rtConf := types.DelegateRuntimeConfig(cniParams.CniCmdArgs.ContainerID, delegateConf, multusNetconf.RuntimeConfig, cniParams.CniCmdArgs.IfName)
-		logging.Verbosef("the multus config: %+v", *multusNetconf)
-		if strings.HasPrefix(multusNetconf.BinDir, "/host") {
-			strings.ReplaceAll(multusNetconf.BinDir, "/host", "")
-		}
-		logging.Verbosef("the MUTATED multus config: %+v", *multusNetconf)
+
 		if err := pnc.cniPlugin.RemoveNetworks(pod, &cniParams.CniCmdArgs, k8sArgs, delegateConf, rtConf, multusNetconf); err != nil {
-			//if err := multus.DelPlugins(nil, pod, &cniParams.CniCmdArgs, k8sArgs, []*types.DelegateNetConf{delegateConf}, 0, rtConf, multusNetconf); err != nil {
 			return logging.Errorf("failed to remove network. error: %v", err)
 		}
 		logging.Verbosef("removed network %s from pod %s with interface name: %s", netToRemove.Name, pod.GetName(), cniParams.CniCmdArgs.IfName)
@@ -246,20 +297,21 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 		}
 
 		for _, netStatus := range oldNetStatus {
-			if fmt.Sprintf("%s/%s", netToRemove.Namespace, netToRemove.Name) != netStatus.Name {
+			if namespacedName(netToRemove.Namespace, netToRemove.Name) != netStatus.Name {
 				podNetStatus = append(podNetStatus, netStatus)
 			}
 		}
 	}
 
 	if multusNetconf == nil {
+		var err error
 		multusNetconf, err = pnc.multusConf()
 		if err != nil {
 			logging.Verbosef("error accessing the multus configuration: %+v", err)
 		}
 	}
 
-	if err := k8sclient.SetPodNetworkStatusAnnotation(k8sClient, pod.GetName(), pod.GetNamespace(), string(pod.GetUID()), podNetStatus, multusNetconf); err != nil {
+	if err := k8sclient.SetPodNetworkStatusAnnotation(pnc.k8sClient(), pod.GetName(), pod.GetNamespace(), string(pod.GetUID()), podNetStatus, multusNetconf); err != nil {
 		// error happen but continue to delete
 		logging.Errorf("Multus: error unsetting the networks status: %v", err)
 	}
@@ -267,24 +319,19 @@ func (pnc *PodNetworksController) removeNetworks(netsToRemove []types.NetworkSel
 	return nil
 }
 
-func (pnc *PodNetworksController) k8sClient() (*k8sclient.ClientInfo, error) {
-	multusAPIClient, err := netclient.NewForConfig(pnc.k8sClientConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate a multus API client from the in-pod cluster config: %w", err)
-	}
-	k8sClient := &k8sclient.ClientInfo{
+func (pnc *PodNetworksController) k8sClient() *k8sclient.ClientInfo {
+	return &k8sclient.ClientInfo{
 		Client:           pnc.k8sClientSet,
-		NetClient:        multusAPIClient,
+		NetClient:        pnc.nadClientSet.K8sCniCncfIoV1(),
 		EventBroadcaster: nil,
 		EventRecorder:    pnc.recorder,
 	}
-	return k8sClient, nil
 }
 
 func networkSelectionElements(podAnnotations map[string]string, podNamespace string) ([]*types.NetworkSelectionElement, error) {
-	podNetworks, ok := podAnnotations[podNetworksAnnot]
+	podNetworks, ok := podAnnotations[nadv1.NetworkAttachmentAnnot]
 	if !ok {
-		return nil, fmt.Errorf("the pod is missing the \"%s\" annotation on its annotations: %+v", podNetworksAnnot, podAnnotations)
+		return nil, fmt.Errorf("the pod is missing the \"%s\" annotation on its annotations: %+v", nadv1.NetworkAttachmentAnnot, podAnnotations)
 	}
 	podNetworkSelectionElements, err := types.ParsePodNetworkAnnotation(podNetworks, podNamespace)
 	if err != nil {
@@ -297,7 +344,7 @@ func networkSelectionElements(podAnnotations map[string]string, podNamespace str
 func networkStatus(podAnnotations map[string]string) ([]nadv1.NetworkStatus, error) {
 	podNetworkstatus, ok := podAnnotations[nadv1.NetworkStatusAnnot]
 	if !ok {
-		return nil, fmt.Errorf("the pod is missing the \"%s\" annotation on its annotations: %+v", podNetworksAnnot, podAnnotations)
+		return nil, fmt.Errorf("the pod is missing the \"%s\" annotation on its annotations: %+v", nadv1.NetworkStatusAnnot, podAnnotations)
 	}
 	var netStatus []nadv1.NetworkStatus
 	if err := json.Unmarshal([]byte(podNetworkstatus), &netStatus); err != nil {
@@ -364,8 +411,8 @@ func (pnc *PodNetworksController) getCNIParams(podObj *corev1.Pod, netSelectionE
 			Netns:       netns,
 			IfName:      interfaceName,
 			Args:        fmt.Sprintf("IgnoreUnknown=true;K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s", podName, namespace),
-			Path:        "/opt/cni/bin", // TODO: what to put here ?
-			StdinData:   nil,            // TODO: what to put here ?
+			Path:        strings.Join(pnc.cniPlugin.PluginPath(), ";"), // TODO: what to put here ?
+			StdinData:   nil,                                           // TODO: what to put here ?
 		}
 		return &cniclient.CNIParams{
 			Namespace:   namespace,

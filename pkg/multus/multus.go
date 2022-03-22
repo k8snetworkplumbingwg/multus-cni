@@ -289,7 +289,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
+func delegateAdd(exec invoke.Exec, pod *v1.Pod, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
 	logging.Debugf("delegateAdd: %v, %v, %v", exec, delegate, rt)
 
 	if err := validateIfName(rt.NetNS, rt.IfName); err != nil {
@@ -358,21 +358,26 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 		logging.Verbosef("Add: %s:%s:%s:%s(%s):%s %s", rt.Args[1][1], rt.Args[2][1], podUID, delegate.Name, cniConfName, rt.IfName, string(data))
 	}
 
-	// get IP addresses from result
+	return result, nil
+}
+
+func IPsFromResult(result cnitypes.Result) ([]string, error) {
 	ips := []string{}
 	res, err := cni100.NewResultFromResult(result)
 	if err != nil {
-		logging.Errorf("delegateAdd: error converting result: %v", err)
-		return result, nil
+		return ips, logging.Errorf("delegateAdd: error converting result: %v", err)
 	}
 	for _, ip := range res.IPs {
 		ips = append(ips, ip.Address.String())
 	}
+	return ips, nil
+}
 
+func SendKubernetesEvents(pod *v1.Pod, delegateName string, kubeClient *k8s.ClientInfo, rt *libcni.RuntimeConf, ips []string) {
 	if pod != nil {
 		// send kubernetes events
-		if delegate.Name != "" {
-			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegate.Name)
+		if delegateName != "" {
+			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v from %s", rt.IfName, ips, delegateName)
 		} else {
 			kubeClient.Eventf(pod, v1.EventTypeNormal, "AddedInterface", "Add %s %v", rt.IfName, ips)
 		}
@@ -380,7 +385,6 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 		// for further debug https://github.com/k8snetworkplumbingwg/multus-cni/issues/481
 		logging.Errorf("delegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
 	}
-	return result, nil
 }
 
 func delegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
@@ -628,6 +632,12 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			return nil, err
 		}
 
+		ips, err := IPsFromResult(tmpResult)
+		if err != nil {
+			return nil, err
+		}
+		SendKubernetesEvents(pod, delegate.Name, kubeClient, rt, ips)
+
 		// Remove gateway from routing table if the gateway is not used
 		deleteV4gateway := false
 		deleteV6gateway := false
@@ -719,7 +729,7 @@ func AddDelegate(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInf
 	netName := ""
 
 	logging.Verbosef("invoking delegateAdd. multus config: %+v", multusConf)
-	result, err := delegateAdd(exec, kubeClient, pod, delegate, runtimeConf, multusConf)
+	result, err := delegateAdd(exec, pod, delegate, runtimeConf, multusConf)
 	if err != nil {
 		// If the add failed, tear down all networks we already added
 		netName = delegate.Conf.Name

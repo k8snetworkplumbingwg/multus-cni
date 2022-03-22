@@ -333,7 +333,7 @@ func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string
 		cniclient.NewCNI(hostNamespaceCniBinDir),
 		cniConfigDir,
 		k8sClientSet,
-		cfg,
+		nadClient,
 		containerRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the pod networks controller: %w", err)
