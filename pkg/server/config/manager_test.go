@@ -19,20 +19,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-const suiteName = "Configuration Manager"
-
-func TestMultusConfigurationManager(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, suiteName)
-}
-
-var _ = Describe(suiteName, func() {
+var _ = Describe("Configuration Manager", func() {
 	const (
 		primaryCNIPluginName     = "00-mycni.conf"
 		primaryCNIPluginTemplate = `
@@ -55,17 +47,13 @@ var _ = Describe(suiteName, func() {
 		multusConfigDir, err = ioutil.TempDir("", "multus-config")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(os.MkdirAll(multusConfigDir, 0755)).To(Succeed())
-	})
 
-	BeforeEach(func() {
 		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
 		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
 
 		multusConf, _ := NewMultusConfig(
 			primaryCNIName,
-			cniVersion,
-			kubeconfig)
-		var err error
+			cniVersion)
 		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -75,43 +63,10 @@ var _ = Describe(suiteName, func() {
 	})
 
 	It("Generates a configuration, based on the contents of the delegated CNI config file", func() {
-		expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"mycni-name\",\"type\":\"mycni\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+		expectedResult := fmt.Sprintf("{\"cniVersion\":\"0.4.0\",\"name\":\"multus-cni-network\",\"clusterNetwork\":\"%s\",\"type\":\"myCNI\"}", defaultCniConfig)
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config).To(Equal(expectedResult))
-	})
-
-	Context("Updates to the delegate CNI configuration", func() {
-		var (
-			doneChannel chan struct{}
-			stopChannel chan struct{}
-		)
-
-		BeforeEach(func() {
-			doneChannel = make(chan struct{})
-			stopChannel = make(chan struct{})
-			go func() {
-				Expect(configManager.MonitorDelegatedPluginConfiguration(stopChannel, doneChannel)).To(Succeed())
-			}()
-		})
-
-		AfterEach(func() {
-			go func() { stopChannel <- struct{}{} }()
-			Eventually(<-doneChannel).Should(Equal(struct{}{}))
-			close(doneChannel)
-			close(stopChannel)
-		})
-
-		It("Trigger the re-generation of the Multus CNI configuration", func() {
-			newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"yoyo-newnet\",\"type\":\"mycni\"}"
-			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), UserRWPermission)).To(Succeed())
-
-			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName)
-			Eventually(func() (string, error) {
-				multusCniData, err := ioutil.ReadFile(multusCniConfigFile)
-				return string(multusCniData), err
-			}).Should(Equal(multusConfigFromDelegate(newCNIConfig)))
-		})
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
@@ -120,7 +75,7 @@ var _ = Describe(suiteName, func() {
 		})
 
 		It("Overrides the name of the multus configuration when requested", func() {
-			expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"mycni-name\",\"type\":\"mycni\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"mycni-name\",\"type\":\"myCNI\"}"
+			expectedResult := fmt.Sprintf("{\"cniVersion\":\"0.4.0\",\"name\":\"mycni-name\",\"clusterNetwork\":\"%s\",\"type\":\"myCNI\"}", defaultCniConfig)
 			config, err := configManager.GenerateConfig()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(config).To(Equal(expectedResult))
@@ -128,6 +83,41 @@ var _ = Describe(suiteName, func() {
 	})
 })
 
-func multusConfigFromDelegate(delegateConfig string) string {
-	return fmt.Sprintf("{\"cniVersion\":\"0.4.0\",\"delegates\":[%s],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}", delegateConfig)
+var _ = Describe("Configuration Manager with mismatched cniVersion", func() {
+	const (
+		primaryCNIPluginName     = "00-mycni.conf"
+		primaryCNIPluginTemplate = `
+{
+  "cniVersion": "0.3.1",
+  "name": "mycni-name",
+  "type": "mycni",
+  "ipam": {},
+  "dns": {}
 }
+`
+	)
+
+	var multusConfigDir string
+	var defaultCniConfig string
+
+	It("test cni version incompatibility", func() {
+		var err error
+		multusConfigDir, err = ioutil.TempDir("", "multus-config")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(os.MkdirAll(multusConfigDir, 0755)).To(Succeed())
+
+		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
+		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
+
+		multusConf, _ := NewMultusConfig(
+			primaryCNIName,
+			cniVersion)
+		_, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
+		Expect(err).To(MatchError("failed to load the primary CNI configuration as a multus delegate with error 'delegate cni version is 0.3.1 while top level cni version is 0.4.0'"))
+	})
+
+	AfterEach(func() {
+		Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
+	})
+
+})

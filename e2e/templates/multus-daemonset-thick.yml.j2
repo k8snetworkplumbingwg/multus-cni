@@ -76,55 +76,6 @@ metadata:
 kind: ConfigMap
 apiVersion: v1
 metadata:
-  name: multus-cni-config
-  namespace: kube-system
-  labels:
-    tier: node
-    app: multus
-data:
-  # NOTE: If you'd prefer to manually apply a configuration file, you may create one here.
-  # In the case you'd like to customize the Multus installation, you should change the arguments to the Multus pod
-  # change the "args" line below from
-  # - "--multus-conf-file=auto"
-  # to:
-  # "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
-  # Additionally -- you should ensure that the name "70-multus.conf" is the alphabetically first name in the
-  # /etc/cni/net.d/ directory on each node, otherwise, it will not be used by the Kubelet.
-  cni-conf.json: |
-    {
-      "name": "multus-cni-network",
-      "type": "multus",
-      "capabilities": {
-        "portMappings": true
-      },
-      "delegates": [
-        {
-          "cniVersion": "0.3.1",
-          "name": "default-cni-network",
-          "plugins": [
-            {
-              "type": "flannel",
-              "name": "flannel.1",
-                "delegate": {
-                  "isDefaultGateway": true,
-                  "hairpinMode": true
-                }
-              },
-              {
-                "type": "portmap",
-                "capabilities": {
-                  "portMappings": true
-                }
-              }
-          ]
-        }
-      ],
-      "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
-    }
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
   name: multus-daemon-config
   namespace: kube-system
   labels:
@@ -139,7 +90,7 @@ data:
         "logFile": "/tmp/multus.log",
         "binDir": "/host/opt/cni/bin",
         "cniDir": "/host/var/lib/cni/multus",
-        "socketDir": "/host/var/run/multus-cni/"
+        "socketDir": "/host/var/run/multus/"
     }
 ---
 apiVersion: apps/v1
@@ -178,10 +129,10 @@ spec:
         imagePullPolicy: Always
         command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
         args:
-        - "-multus-conf-file=auto"
-        - "-force-cni-version=true"
         - "-cni-version={{ CNI_VERSION }}"
         - "-cni-config-dir=/host/etc/cni/net.d"
+        - "-force-cni-version=true"
+        - "-multus-conf-file=auto"
         - "-multus-autoconfig-dir=/host/etc/cni/net.d"
         resources:
           requests:
@@ -211,7 +162,7 @@ spec:
         command:
           - "cp"
           - "/usr/src/multus-cni/bin/multus-shim"
-          - "/host/opt/cni/bin/multus"
+          - "/host/opt/cni/bin/multus-shim"
         resources:
           requests:
             cpu: "10m"
@@ -221,23 +172,6 @@ spec:
         volumeMounts:
           - name: cnibin
             mountPath: /host/opt/cni/bin
-            mountPropagation: Bidirectional
-      - name: generate-kubeconfig
-        image: localhost:5000/multus:e2e
-        command:
-          - "/usr/src/multus-cni/bin/generate-kubeconfig"
-        args:
-          - "-k8s-service-host=$(KUBERNETES_SERVICE_HOST)"
-          - "-k8s-service-port=$(KUBERNETES_SERVICE_PORT)"
-        resources:
-          requests:
-            cpu: "10m"
-            memory: "15Mi"
-        securityContext:
-          privileged: true
-        volumeMounts:
-          - name: cni
-            mountPath: /host/etc/cni/net.d
             mountPropagation: Bidirectional
       volumes:
         - name: cni

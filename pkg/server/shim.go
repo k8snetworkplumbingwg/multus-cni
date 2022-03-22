@@ -18,64 +18,64 @@ import (
 )
 
 const (
-	defaultMultusRunDir = "/var/run/multus-cni/"
+	defaultMultusRunDir = "/var/run/multus/"
 )
 
 // CmdAdd implements the CNI spec ADD command handler
 func CmdAdd(args *skel.CmdArgs) error {
-	response, err := postRequest(args)
+	response, cniVersion, err := postRequest(args)
 	if err != nil {
 		return err
 	}
 
 	logging.Verbosef("CmdAdd (shim): %v", *response.Result)
-	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
+	return cnitypes.PrintResult(response.Result, cniVersion)
 }
 
 // CmdCheck implements the CNI spec CHECK command handler
 func CmdCheck(args *skel.CmdArgs) error {
-	response, err := postRequest(args)
+	response, cniVersion, err := postRequest(args)
 	if err != nil {
 		return err
 	}
 
 	logging.Verbosef("CmdCheck (shim): %v", *response.Result)
-	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
+	return cnitypes.PrintResult(response.Result, cniVersion)
 }
 
 // CmdDel implements the CNI spec DEL command handler
 func CmdDel(args *skel.CmdArgs) error {
-	response, err := postRequest(args)
+	response, cniVersion, err := postRequest(args)
 	if err != nil {
 		return err
 	}
 
 	logging.Verbosef("CmdDel (shim): %v", *response.Result)
-	return cnitypes.PrintResult(response.Result, response.Result.CNIVersion)
+	return cnitypes.PrintResult(response.Result, cniVersion)
 }
 
-func postRequest(args *skel.CmdArgs) (*Response, error) {
+func postRequest(args *skel.CmdArgs) (*Response, string, error) {
 	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {
-		return nil, fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
+		return nil, "", fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
 	}
 
 	cniRequest, err := newCNIRequest(args)
 	if err != nil {
-		return nil, err
+		return nil, multusShimConfig.CNIVersion, err
 	}
 
 	body, err := DoCNI("http://dummy/", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
 	if err != nil {
-		return nil, err
+		return nil, multusShimConfig.CNIVersion, err
 	}
 
 	response := &Response{}
 	if err = json.Unmarshal(body, response); err != nil {
 		err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
-		return nil, err
+		return nil, multusShimConfig.CNIVersion, err
 	}
-	return response, nil
+	return response, multusShimConfig.CNIVersion, nil
 }
 
 // Create and fill a Request with this Plugin's environment and stdin which

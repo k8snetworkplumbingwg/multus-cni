@@ -16,6 +16,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,10 +31,10 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/gorilla/mux"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
@@ -76,25 +77,33 @@ func GetListener(socketPath string) (net.Listener, error) {
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(rundir string) (*Server, error) {
+func NewCNIServer(rundir string, serverConfig []byte) (*Server, error) {
 	kubeClient, err := k8s.InClusterK8sClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting k8s client: %v", err)
 	}
 
-	return newCNIServer(rundir, kubeClient, nil)
+	return newCNIServer(rundir, kubeClient, nil, serverConfig)
 }
 
-func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec) (*Server, error) {
+func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte) (*Server, error) {
+
+	// preprocess server config to be used to override multus CNI config
+	// see extractCniData() for the detail
+	if servConfig != nil {
+		servConfig = bytes.Replace(servConfig, []byte("{"), []byte(","), 1)
+	}
+
 	router := mux.NewRouter()
 	s := &Server{
 		Server: http.Server{
 			Handler: router,
 		},
-		rundir:      rundir,
-		requestFunc: HandleCNIRequest,
-		kubeclient:  kubeClient,
-		exec:        exec,
+		rundir:       rundir,
+		requestFunc:  HandleCNIRequest,
+		kubeclient:   kubeClient,
+		exec:         exec,
+		serverConfig: servConfig,
 	}
 
 	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
@@ -124,7 +133,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	if err := json.Unmarshal(b, &cr); err != nil {
 		return nil, err
 	}
-	cmdType, cniCmdArgs, err := extractCniData(&cr)
+	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
@@ -142,7 +151,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	return result, nil
 }
 
-func extractCniData(cniRequest *Request) (string, *skel.CmdArgs, error) {
+func extractCniData(cniRequest *Request, overrideConf []byte) (string, *skel.CmdArgs, error) {
 	cmd, ok := cniRequest.Env["CNI_COMMAND"]
 	if !ok {
 		return "", nil, fmt.Errorf("unexpected or missing CNI_COMMAND")
@@ -168,7 +177,20 @@ func extractCniData(cniRequest *Request) (string, *skel.CmdArgs, error) {
 		return "", nil, fmt.Errorf("missing CNI_ARGS")
 	}
 	cniCmdArgs.Args = cniArgs
-	cniCmdArgs.StdinData = cniRequest.Config
+
+	if overrideConf != nil {
+		// trim the close bracket from multus CNI config and put the server config
+		// to override CNI config with server config.
+		// note: if there are two or more value in same key, then the
+		// latest one is used at golang json implementation
+		idx := bytes.LastIndex(cniRequest.Config, []byte("}"))
+		if idx == -1 {
+			return "", nil, fmt.Errorf("invalid CNI config")
+		}
+		cniCmdArgs.StdinData = append(cniRequest.Config[:idx], overrideConf...)
+	} else {
+		cniCmdArgs.StdinData = cniRequest.Config
+	}
 
 	return cmd, cniCmdArgs, nil
 }
@@ -277,6 +299,7 @@ func cmdCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, k
 }
 
 func serializeResult(result cnitypes.Result) ([]byte, error) {
+	// cni result is converted to latest here and decoded to specific cni version at multus-shim
 	realResult, err := cni100.NewResultFromResult(result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate the CNI result: %w", err)

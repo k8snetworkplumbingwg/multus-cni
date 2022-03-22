@@ -25,10 +25,11 @@ type Request struct {
 // the CNI shim requests issued when a pod is added / removed.
 type Server struct {
 	http.Server
-	requestFunc cniRequestFunc
-	rundir      string
-	kubeclient  *k8sclient.ClientInfo
-	exec        invoke.Exec
+	requestFunc  cniRequestFunc
+	rundir       string
+	kubeclient   *k8sclient.ClientInfo
+	exec         invoke.Exec
+	serverConfig []byte
 }
 
 // Response represents the response (computed in the CNI server) for

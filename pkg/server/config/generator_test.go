@@ -18,13 +18,17 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
 	primaryCNIName = "myCNI"
 	cniVersion     = "0.4.0"
-	kubeconfig     = "/a/b/c/kubeconfig.kubeconfig"
 )
 
 type testCase struct {
@@ -44,244 +48,308 @@ var primaryCNIConfig = map[string]interface{}{
 	"logfile-maxbackups": 5,
 	"logfile-maxage":     5,
 }
+var primaryCNIFile = "/etc/cni/net.d/10-flannel.conf"
 
-func newMultusConfigWithDelegates(pluginName string, cniVersion string, kubeconfig string, primaryCNIPluginConfig interface{}, configOptions ...Option) (*MultusConf, error) {
-	multusConfig, err := NewMultusConfig(pluginName, cniVersion, kubeconfig, configOptions...)
+func newMultusConfigWithDelegates(pluginName string, cniVersion string, primaryCNIFile string, configOptions ...Option) (*MultusConf, error) {
+	multusConfig, err := NewMultusConfig(pluginName, cniVersion, configOptions...)
 	if err != nil {
 		return multusConfig, err
 	}
-	return multusConfig, multusConfig.Mutate(withDelegates(primaryCNIPluginConfig.(map[string]interface{}), "", false))
+	return multusConfig, multusConfig.Mutate(withClusterNetwork(primaryCNIFile))
 }
 
-func TestBasicMultusConfig(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig)
-	assertError(t, err, nil)
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+var _ = Describe("Configuration Generator", func() {
+	var tmpDir string
+	var err error
 
-func TestMultusConfigWithNamespaceIsolation(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithNamespaceIsolation())
-	assertError(t, err, nil)
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"namespaceIsolation\":true,\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	BeforeEach(func() {
+		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-func TestMultusConfigWithReadinessIndicator(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithReadinessFileIndicator("/a/b/u/it-lives"))
-	assertError(t, err, nil)
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"readinessindicatorfile\":\"/a/b/u/it-lives\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	AfterEach(func() {
+		err := os.RemoveAll(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+	})
 
-func TestMultusConfigWithLoggingConfiguration(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithLogLevel("notice"),
-		WithLogToStdErr(),
-		WithLogFile("/u/y/w/log.1"))
-	assertError(t, err, nil)
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logFile\":\"/u/y/w/log.1\",\"logLevel\":\"notice\",\"logToStderr\":true,\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("basic multus config", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithGlobalNamespace(t *testing.T) {
-	const globalNamespace = "come-along-ns"
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithGlobalNamespaces(globalNamespace))
-	assertError(t, err, nil)
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"globalNamespaces\":\"come-along-ns\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with namespaceisolation", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithNamespaceIsolation())
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"namespaceIsolation":true,
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithAdditionalBinDir(t *testing.T) {
-	const anotherCNIBinDir = "a-dir-somewhere"
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithAdditionalBinaryFileDir(anotherCNIBinDir))
-	assertError(t, err, nil)
-	expectedResult := "{\"binDir\":\"a-dir-somewhere\",\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with readinessindicator", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithReadinessFileIndicator("/a/b/u/it-lives"))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"readinessindicatorfile":"/a/b/u/it-lives",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithCapabilities(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`{"capabilities": {"portMappings": true}}`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with logging configuration", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogLevel("notice"),
+			WithLogToStdErr(),
+			WithLogFile("/u/y/w/log.1"))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"logFile":"/u/y/w/log.1",
+				"logLevel":"notice",
+				"logToStderr":true, 
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithMultipleCapabilities(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with global namespace", func() {
+		const globalNamespace = "come-along-ns"
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithGlobalNamespaces(globalNamespace))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"globalNamespaces":"come-along-ns",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithMultipleCapabilitiesFilterOnlyEnabled(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with additional binDir", func() {
+		const anotherCNIBinDir = "a-dir-somewhere"
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithAdditionalBinaryFileDir(anotherCNIBinDir))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"binDir":"a-dir-somewhere",
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithMultipleCapabilitiesDefinedOnAPlugin(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with capabilities", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`{"capabilities": {"portMappings": true}}`)),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{
+					"portMappings":true
+				},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithCapabilitiesDefinedOnMultiplePlugins(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`{"plugins": [ {"capabilities": { "portMappings": true }}, {"capabilities": { "tuning": true }} ]}`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true,\"tuning\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with multiple capabilities", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{"portMappings":true,"tuning":true},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestMultusConfigWithCapabilitiesDefinedOnMultiplePluginsFilterOnlyEnabled(t *testing.T) {
-	multusConfig, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		withCapabilities(
-			documentHelper(`
-{
-    "plugins": [
-        {
-            "capabilities": {
-                "portMappings": true
-            }
-        },
-        {
-            "capabilities": {
-                "tuning": false
-            }
-        }
-    ]
-}`)))
-	assertError(t, err, nil)
-	expectedResult := "{\"capabilities\":{\"portMappings\":true},\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
+	It("multus config with multiple capabilities filter only enabled", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{"portMappings":true},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func assertError(t *testing.T, actual error, expected error) {
-	if actual != nil && expected != nil {
-		if actual.Error() != expected.Error() {
-			t.Fatalf("multus config generation failed.\nExpected:\n%v\nbut GOT:\n%v", expected.Error(), actual.Error())
-		}
-	}
+	It("multus config with multiple capabilities defined on a plugin", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{"portMappings":true,"tuning":true},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-	if actual == nil && expected != nil {
-		t.Fatalf("multus config generation failed.\nExpected:\n%v\nbut didn't get error", expected.Error())
-	} else if actual != nil && expected == nil {
-		t.Fatalf("multus config generation failed.\nDidn't expect error\nbut GOT: %v\n", actual.Error())
-	}
-}
+	It("multus config with multiple capabilities defined on multiple plugins", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`
+				{
+					"plugins": [
+					{
+						"capabilities": { "portMappings": true }
+					}, 
+					{
+						"capabilities": { "tuning": true }
+					}
+					]
+				}`)),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{"portMappings":true,"tuning":true},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func invalidDelegateCNIVersion(delegateCNIVersion, multusCNIVersion string) error {
-	return fmt.Errorf("delegate cni version is %s while top level cni version is %s", delegateCNIVersion, multusCNIVersion)
-}
+	It("multus config with multiple capabilities defined on multiple plugins filter only enabled", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			withCapabilities(
+				documentHelper(`
+				{
+					"plugins": [
+					{
+						"capabilities": {
+							"portMappings": true
+						}
+					},
+					{
+						"capabilities": {
+							"tuning": false
+						}
+					}
+					]
+				}`),
+			),
+		)
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"capabilities":{"portMappings":true},
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-func TestVersionIncompatibility(t *testing.T) {
-	const delegateCNIVersion = "0.3.0"
+	It("multus config with overridden name", func() {
+		newNetworkName := "mega-net-2000"
+		multusConfig, _ := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithOverriddenName(newNetworkName))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+		{
+			"cniVersion":"0.4.0",
+			"clusterNetwork":"%s",
+			"name":"mega-net-2000",
+			"type":"myCNI"
+		}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
 
-	primaryCNIConfigOld := primaryCNIConfig
-	tmpVer := primaryCNIConfig["cniVersion"]
-	primaryCNIConfig["cniVersion"] = delegateCNIVersion
-	_, err := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfigOld)
-	primaryCNIConfig["cniVersion"] = tmpVer
-
-	assertError(t, invalidDelegateCNIVersion(delegateCNIVersion, cniVersion), err)
-}
-
-func TestMultusConfigWithOverriddenName(t *testing.T) {
-	newNetworkName := "mega-net-2000"
-	multusConfig, _ := newMultusConfigWithDelegates(
-		primaryCNIName,
-		cniVersion,
-		kubeconfig,
-		primaryCNIConfig,
-		WithOverriddenName(newNetworkName))
-	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"mega-net-2000\",\"type\":\"myCNI\"}"
-	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
-}
-
-func newTestCase(t *testing.T, configGenerationFunc func() (string, error)) *testCase {
-	return &testCase{
-		t:                        t,
-		configGenerationFunction: configGenerationFunc,
-	}
-}
-
-func (tc testCase) assertResult(expectedResult string) {
-	multusCNIConfig, err := tc.configGenerationFunction()
-	if err != nil {
-		tc.t.Fatalf("error generating multus configuration: %v", err)
-	}
-	if multusCNIConfig != expectedResult {
-		tc.t.Fatalf("multus config generation failed.\nExpected:\n%s\nbut GOT:\n%s", expectedResult, multusCNIConfig)
-	}
-}
+})
 
 func documentHelper(pluginInfo string) interface{} {
 	dp, _ := documentCNIData([]byte(pluginInfo))

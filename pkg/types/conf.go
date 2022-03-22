@@ -44,7 +44,7 @@ const (
 const (
 	// DefaultMultusDaemonConfigFile is the default path of the config file
 	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
-	defaultMultusRunDir           = "/var/run/multus-cni/"
+	defaultMultusRunDir           = "/var/run/multus/"
 )
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
@@ -213,25 +213,28 @@ func NewCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, ne
 	// get CNI_ARGS and set it if it does not exist in rt.Args
 	cniArgs := os.Getenv("CNI_ARGS")
 	if cniArgs != "" {
+		logging.Debugf("ARGS: %s", cniArgs)
 		for _, arg := range strings.Split(cniArgs, ";") {
-			for _, keyval := range strings.Split(arg, "=") {
-				if len(keyval) != 2 {
-					logging.Errorf("CreateCNIRuntimeConf: CNI_ARGS %s %s %d is not recognized as CNI arg, skipped", arg, keyval, len(keyval))
-					continue
-				}
+			logging.Debugf("arg: /%v/", arg)
 
-				envKey := string(keyval[0])
-				envVal := string(keyval[1])
-				isExists := false
-				for _, rtArg := range rt.Args {
-					if rtArg[0] == envKey {
-						isExists = true
-					}
+			keyval := strings.Split(arg, "=")
+			logging.Debugf("arg: /%q/, keyval: /%q/", arg, keyval)
+			if len(keyval) != 2 {
+				logging.Errorf("CreateCNIRuntimeConf: CNI_ARGS %v %v %d is not recognized as CNI arg, skipped", arg, keyval, len(keyval))
+				continue
+			}
+
+			envKey := string(keyval[0])
+			envVal := string(keyval[1])
+			isExists := false
+			for _, rtArg := range rt.Args {
+				if rtArg[0] == envKey {
+					isExists = true
 				}
-				if isExists != false {
-					logging.Debugf("CreateCNIRuntimeConf: add new val: %s", arg)
-					rt.Args = append(rt.Args, [2]string{envKey, envVal})
-				}
+			}
+			if isExists != false {
+				logging.Debugf("CreateCNIRuntimeConf: add new val: %s", arg)
+				rt.Args = append(rt.Args, [2]string{envKey, envVal})
 			}
 		}
 	}
@@ -357,7 +360,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	// the existing delegate list and all delegates executed in-order.
 
 	if len(netconf.RawDelegates) == 0 && netconf.ClusterNetwork == "" {
-		return nil, logging.Errorf("LoadNetConf: at least one delegate/defaultNetwork must be specified")
+		return nil, logging.Errorf("LoadNetConf: at least one delegate/clusterNetwork must be specified")
 	}
 
 	if netconf.CNIDir == "" {
@@ -424,15 +427,15 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 }
 
 // LoadDaemonNetConf loads the configuration for the multus daemon
-func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
+func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 	config, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read the config file's contents: %w", err)
+		return nil, nil, fmt.Errorf("failed to read the config file's contents: %w", err)
 	}
 
 	daemonNetConf := &ControllerNetConf{}
 	if err := json.Unmarshal(config, daemonNetConf); err != nil {
-		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
 	}
 
 	logging.SetLogStderr(daemonNetConf.LogToStderr)
@@ -459,7 +462,7 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
 		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}
 
-	return daemonNetConf, nil
+	return daemonNetConf, config, nil
 }
 
 // AddDelegates appends the new delegates to the delegates list
