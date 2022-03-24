@@ -1,4 +1,4 @@
-package containerruntimes
+package containerd
 
 import (
 	"context"
@@ -15,7 +15,7 @@ const k8sNamespace = "k8s.io"
 
 // ContainerdRuntime represents a connection to the containerd runtime
 type ContainerdRuntime struct {
-	client            *containerd.Client
+	client            Client
 	namespacedContext context.Context
 }
 
@@ -28,10 +28,15 @@ func NewContainerdRuntime(socketPath string, timeout time.Duration) (*Containerd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
+
+	return newContainerdRuntime(containerdRuntime), nil
+}
+
+func newContainerdRuntime(client Client) *ContainerdRuntime {
 	return &ContainerdRuntime{
-		client:            containerdRuntime,
+		client:            client,
 		namespacedContext: namespaces.WithNamespace(context.Background(), k8sNamespace),
-	}, nil
+	}
 }
 
 // NetNS returns the netns path of a given container
@@ -43,6 +48,10 @@ func (cd *ContainerdRuntime) NetNS(containerID string) (string, error) {
 	containerSpec, err := cd.containerSpec(containerID)
 	if err != nil {
 		return "", err
+	}
+
+	if containerSpec.Linux == nil {
+		return "", fmt.Errorf("container does not feature platform-specific configuration for Linux based containers")
 	}
 
 	for _, ns := range containerSpec.Linux.Namespaces {

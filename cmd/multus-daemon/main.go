@@ -23,6 +23,8 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +43,8 @@ import (
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes/containerd"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes/crio"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/controller"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
@@ -223,7 +227,7 @@ func main() {
 	defer close(stopChan)
 	handleSignals(stopChan, os.Interrupt)
 
-	containerRuntime, err := newContainerRuntime(daemonConfig)
+	containerRuntime, err := newRuntime(*daemonConfig)
 	if err != nil {
 		_ = logging.Errorf("failed to connect to the CRI: %v", err)
 		os.Exit(3)
@@ -236,19 +240,6 @@ func main() {
 	}
 
 	networkController.Start(stopChan)
-}
-
-func newContainerRuntime(daemonConfig *types.ControllerNetConf) (containerruntimes.ContainerRuntime, error) {
-	runtimeType, err := containerruntimes.ParseRuntimeType(daemonConfig.CriType)
-	if err != nil {
-		return nil, err
-	}
-
-	containerRuntime, err := containerruntimes.NewRuntime(daemonConfig.CriSocketPath, runtimeType)
-	if err != nil {
-		return nil, err
-	}
-	return containerRuntime, nil
 }
 
 func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
@@ -370,4 +361,30 @@ func handleSignals(stopChannel chan struct{}, signals ...os.Signal) {
 		<-signalChannel
 		stopChannel <- struct{}{}
 	}()
+}
+
+func newRuntime(config types.ControllerNetConf) (containerruntimes.ContainerRuntime, error) {
+	var runtime containerruntimes.ContainerRuntime
+
+	rtType, err := parseRuntimeType(config.CriType)
+	switch rtType {
+	case containerruntimes.Crio:
+		runtime, err = crio.NewCrioRuntime(config.CriSocketPath, 5*time.Second)
+	case containerruntimes.Containerd:
+		runtime, err = containerd.NewContainerdRuntime(config.CriSocketPath, time.Second)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return runtime, nil
+}
+
+func parseRuntimeType(rt string) (containerruntimes.RuntimeType, error) {
+	if strings.ToLower(rt) == "crio" {
+		return containerruntimes.Crio, nil
+	} else if strings.ToLower(rt) == "containerd" {
+		return containerruntimes.Containerd, nil
+	}
+	return containerruntimes.Crio, fmt.Errorf("invalid runtime type: %s. Allowed values are: %s, %s", rt, "crio", "containerd")
 }
