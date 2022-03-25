@@ -366,12 +366,13 @@ func handleSignals(stopChannel chan struct{}, signals ...os.Signal) {
 func newRuntime(config types.ControllerNetConf) (containerruntimes.ContainerRuntime, error) {
 	var runtime containerruntimes.ContainerRuntime
 
+	timeout := time.Second
 	rtType, err := parseRuntimeType(config.CriType)
 	switch rtType {
 	case containerruntimes.Crio:
-		runtime, err = crio.NewCrioRuntime(config.CriSocketPath, 5*time.Second)
+		runtime, err = crio.NewCrioRuntime(config.CriSocketPath, timeout)
 	case containerruntimes.Containerd:
-		runtime, err = containerd.NewContainerdRuntime(config.CriSocketPath, time.Second)
+		runtime, err = containerd.NewContainerdRuntime(config.CriSocketPath, timeout)
 	}
 
 	if err != nil {

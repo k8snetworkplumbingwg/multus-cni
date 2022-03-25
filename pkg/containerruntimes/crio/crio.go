@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes/crio/types"
 	crioruntime "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
@@ -19,28 +20,6 @@ type CrioRuntime struct {
 	cancelFunc context.CancelFunc
 	client     crioruntime.RuntimeServiceClient
 	context    context.Context
-}
-
-// PodStatusResponseInfo represents the container status reply - crictl ps <containerID>
-type PodStatusResponseInfo struct {
-	SandboxID   string
-	RunTimeSpec RunTimeSpecInfo
-}
-
-// RunTimeSpecInfo represents the relevant part of the container status spec
-type RunTimeSpecInfo struct {
-	Linux NamespacesInfo
-}
-
-// NamespacesInfo represents the container status namespaces
-type NamespacesInfo struct {
-	Namespaces []NameSpaceInfo
-}
-
-// NameSpaceInfo represents the ns info
-type NameSpaceInfo struct {
-	Type string
-	Path string
 }
 
 // NewCrioRuntime returns a connection to the CRI-O runtime
@@ -98,17 +77,11 @@ func (cr *CrioRuntime) NetNS(containerID string) (string, error) {
 		Verbose:     true,
 	})
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get pod sandbox info")
+		return "", fmt.Errorf("failed to get pod sandbox info: %w", err) //errors.Wrap(err, "failed to get pod sandbox info")
 	}
 
-	mapInfo := reply.GetInfo()
-	var podStatusResponseInfo PodStatusResponseInfo
-	info := mapInfo["info"]
-	err = json.Unmarshal([]byte(info), &podStatusResponseInfo)
+	podStatusResponseInfo, err := ContainerStatus(reply)
 	if err != nil {
-		if e, ok := err.(*json.SyntaxError); ok {
-			return "", fmt.Errorf("error unmarshalling cri-o's response: syntax error at byte offset %d. Error: %w", e.Offset, e)
-		}
 		return "", err
 	}
 
@@ -119,4 +92,16 @@ func (cr *CrioRuntime) NetNS(containerID string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func ContainerStatus(reply *crioruntime.ContainerStatusResponse) (types.PodStatusResponseInfo, error) {
+	var podStatusResponseInfo types.PodStatusResponseInfo
+	info := reply.GetInfo()["info"]
+	if err := json.Unmarshal([]byte(info), &podStatusResponseInfo); err != nil {
+		if e, ok := err.(*json.SyntaxError); ok {
+			return types.PodStatusResponseInfo{}, fmt.Errorf("error unmarshalling cri-o's response: syntax error at byte offset %d. Error: %w", e.Offset, e)
+		}
+		return types.PodStatusResponseInfo{}, err
+	}
+	return podStatusResponseInfo, nil
 }
