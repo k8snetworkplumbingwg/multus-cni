@@ -93,7 +93,9 @@ data:
         "logFile": "/tmp/multus.log",
         "binDir": "/host/opt/cni/bin",
         "cniDir": "/host/var/lib/cni/multus",
-        "socketDir": "/host/var/run/multus-cni/"
+        "socketDir": "/host/var/run/multus-cni/",
+        "criSocketPath": "{{ CRI_SOCKET_PATH }}",
+        "criType": "{{ CRI_TYPE }}"
     }
 ---
 apiVersion: apps/v1
@@ -159,7 +161,7 @@ spec:
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
         - name: cri
-          mountPath: /run/containerd/containerd.sock
+          mountPath: {{ CRI_SOCKET_PATH }}
           readOnly: true
       initContainers:
       - name: install-multus-shim

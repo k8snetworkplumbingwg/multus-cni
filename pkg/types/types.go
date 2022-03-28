@@ -30,7 +30,7 @@ type NetConf struct {
 	// support chaining for master interface and IP decisions
 	// occurring prior to running ipvlan plugin
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
-	PrevResult    *cni100.Result         `json:"-"`
+	PrevResult    *cni100.Result          `json:"-"`
 
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
@@ -195,4 +195,9 @@ type ControllerNetConf struct {
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.
 	MultusSocketDir string `json:"socketDir"`
+
+	// path to the socket through which the controller will query the CRI
+	CriSocketPath string `json:"criSocketPath"`
+
+	CriType string `json:"criType"`
 }

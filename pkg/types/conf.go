@@ -461,6 +461,14 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, error) {
 		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}
 
+	if daemonNetConf.CriSocketPath == "" {
+		daemonNetConf.CriSocketPath = "/run/containerd/containerd.sock"
+	}
+
+	if daemonNetConf.CriType == "" {
+		daemonNetConf.CriType = "containerd"
+	}
+
 	return daemonNetConf, nil
 }
 
