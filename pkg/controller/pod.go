@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"reflect"
 	"strings"
 	"time"
@@ -12,10 +14,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
+	v1coreinformerfactory "k8s.io/client-go/informers"
+	v1corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -39,9 +39,12 @@ const podNetworkStatus = "k8s.v1.cni.cncf.io/network-status"
 // triggers adding / removing networks from a running pod.
 type PodNetworksController struct {
 	k8sClientSet     kubernetes.Interface
-	podsSynced       cache.InformerSynced
-	workqueue        workqueue.RateLimitingInterface
+	arePodsSynced    cache.InformerSynced
+	podsInformer     cache.SharedIndexInformer
+	podsLister       v1corelisters.PodLister
+	broadcaster      record.EventBroadcaster
 	recorder         record.EventRecorder
+	workqueue        workqueue.RateLimitingInterface
 	containerRuntime containerruntimes.ContainerRuntime
 	cniPlugin        *cniclient.CniPlugin
 	confDir          string
@@ -50,32 +53,31 @@ type PodNetworksController struct {
 
 // NewPodNetworksController returns new PodNetworksController instance
 func NewPodNetworksController(
-	k8sClientSet kubernetes.Interface,
-	podInformer cache.SharedIndexInformer,
+	k8sCoreInformerFactory v1coreinformerfactory.SharedInformerFactory,
+	broadcaster record.EventBroadcaster,
+	recorder record.EventRecorder,
 	cniPlugin *cniclient.CniPlugin,
 	confDir string,
-	k8sClientConfig *rest.Config) (*PodNetworksController, error) {
-
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logging.Verbosef)
-	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: k8sClientSet.CoreV1().Events(allNamespaces)})
-
-	containerRuntime, err := containerruntimes.NewRuntime("/run/containerd/containerd.sock", containerruntimes.Containerd)
-	if err != nil {
-		return nil, err
-	}
+	k8sClientSet kubernetes.Interface,
+	k8sClientConfig *rest.Config,
+	containerRuntime containerruntimes.ContainerRuntime,
+) (*PodNetworksController, error) {
+	podInformer := k8sCoreInformerFactory.Core().V1().Pods().Informer()
 
 	podNetworksController := &PodNetworksController{
-		k8sClientSet: k8sClientSet,
-		podsSynced:   podInformer.HasSynced,
+		arePodsSynced:    podInformer.HasSynced,
+		podsInformer:     podInformer,
+		podsLister:       k8sCoreInformerFactory.Core().V1().Pods().Lister(),
+		recorder:         recorder,
+		broadcaster:      broadcaster,
+		containerRuntime: containerRuntime,
+		cniPlugin:        cniPlugin,
+		confDir:          confDir,
 		workqueue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"pod-networks-updates"),
-		recorder:         eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName}),
-		containerRuntime: *containerRuntime,
-		cniPlugin:        cniPlugin,
-		confDir:          confDir,
-		k8sClientConfig:  k8sClientConfig,
+		k8sClientSet:    k8sClientSet,
+		k8sClientConfig: k8sClientConfig,
 	}
 
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -90,7 +92,7 @@ func (pnc *PodNetworksController) Start(stopChan <-chan struct{}) {
 	logging.Verbosef("starting network controller")
 	defer pnc.workqueue.ShutDown()
 
-	if ok := cache.WaitForCacheSync(stopChan, pnc.podsSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopChan, pnc.arePodsSynced); !ok {
 		logging.Verbosef("failed waiting for caches to sync")
 	}
 

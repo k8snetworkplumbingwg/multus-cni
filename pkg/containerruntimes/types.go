@@ -1,6 +1,10 @@
 package containerruntimes
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // RuntimeType indicates the type of runtime
 type RuntimeType int8
@@ -19,7 +23,7 @@ type ContainerRuntime interface {
 }
 
 // NewRuntime returns the correct runtime connection according to `RuntimeType`
-func NewRuntime(socketPath string, runtimeType RuntimeType) (*ContainerRuntime, error) {
+func NewRuntime(socketPath string, runtimeType RuntimeType) (ContainerRuntime, error) {
 	var runtime ContainerRuntime
 	var err error
 
@@ -33,5 +37,18 @@ func NewRuntime(socketPath string, runtimeType RuntimeType) (*ContainerRuntime, 
 	if err != nil {
 		return nil, err
 	}
-	return &runtime, nil
+	return runtime, nil
+}
+
+func ParseRuntimeType(rt string) (RuntimeType, error) {
+	const (
+		crio       = "crio"
+		containerd = "containerd"
+	)
+	if strings.ToLower(rt) == crio {
+		return Crio, nil
+	} else if strings.ToLower(rt) == containerd {
+		return Containerd, nil
+	}
+	return Crio, fmt.Errorf("invalid runtime type: %s. Allowed values are: %s, %s", rt, crio, containerd)
 }

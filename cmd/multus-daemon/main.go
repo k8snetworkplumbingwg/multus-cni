@@ -23,19 +23,21 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
-	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	v1coreinformers "k8s.io/client-go/informers/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	v1coreinformerfactory "k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cniclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/containerruntimes"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/controller"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
@@ -80,9 +82,6 @@ const (
 	multusCNIDirVarName           = "cniDir"
 	multusBinDirVarName           = "binDir"
 )
-
-// defines default resync period between k8s API server and controller
-const syncPeriod = time.Second * 5
 
 func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -219,20 +218,34 @@ func main() {
 
 	stopChan := make(chan struct{})
 	defer close(stopChan)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		<-c
-		stopChan <- struct{}{}
-		os.Exit(1)
-	}()
+	handleSignals(stopChan, os.Interrupt)
 
-	networkController, err := newPodNetworksController("/opt/cni/bin", *cniConfigDir, stopChan)
+	containerRuntime, err := newContainerRuntime(daemonConfig)
+	if err != nil {
+		_ = logging.Errorf("failed to connect to the CRI: %v", err)
+		os.Exit(3)
+	}
+
+	networkController, err := newPodNetworksController("/opt/cni/bin", *cniConfigDir, containerRuntime, stopChan)
 	if err != nil {
 		_ = logging.Errorf("could not create the pod networks controller: %v", err)
+		os.Exit(4)
 	}
 
 	networkController.Start(stopChan)
+}
+
+func newContainerRuntime(daemonConfig *types.ControllerNetConf) (containerruntimes.ContainerRuntime, error) {
+	runtimeType, err := containerruntimes.ParseRuntimeType(daemonConfig.CriType)
+	if err != nil {
+		return nil, err
+	}
+
+	containerRuntime, err := containerruntimes.NewRuntime(daemonConfig.CriSocketPath, runtimeType)
+	if err != nil {
+		return nil, err
+	}
+	return containerRuntime, nil
 }
 
 func startMultusDaemon(daemonConfig *types.ControllerNetConf) error {
@@ -289,7 +302,7 @@ func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error 
 	return nil
 }
 
-func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string, stopChannel chan struct{}) (*controller.PodNetworksController, error) {
+func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string, containerRuntime containerruntimes.ContainerRuntime, stopChannel chan struct{}) (*controller.PodNetworksController, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to implicitly generate the kubeconfig: %w", err)
@@ -300,27 +313,52 @@ func newPodNetworksController(hostNamespaceCniBinDir string, cniConfigDir string
 		return nil, fmt.Errorf("failed to create the Kubernetes client: %w", err)
 	}
 
-	k8sPodFilteredInformer := v1coreinformers.NewFilteredPodInformer(
-		k8sClientSet,
-		metav1.NamespaceAll,
-		syncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-		filterByHostSelector)
+	const noResyncPeriod = 0
+	podInformerFactory := v1coreinformerfactory.NewSharedInformerFactoryWithOptions(
+		k8sClientSet, noResyncPeriod, v1coreinformerfactory.WithTweakListOptions(
+			filterByHostSelector))
+
+	broadcaster := newBroadcaster(k8sClientSet)
 
 	networkController, err := controller.NewPodNetworksController(
-		k8sClientSet,
-		k8sPodFilteredInformer,
+		podInformerFactory, broadcaster, newEventRecorder(broadcaster),
 		cniclient.NewCNI(hostNamespaceCniBinDir),
 		cniConfigDir,
-		cfg)
+		k8sClientSet,
+		cfg,
+		containerRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the pod networks controller: %w", err)
 	}
 
-	k8sPodFilteredInformer.Run(stopChannel)
+	podInformerFactory.Start(stopChannel)
+
 	return networkController, nil
+}
+
+func newBroadcaster(k8sClientSet *kubernetes.Clientset) record.EventBroadcaster {
+	const allNamespaces = ""
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(logging.Verbosef)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: k8sClientSet.CoreV1().Events(allNamespaces)})
+	return eventBroadcaster
+}
+
+func newEventRecorder(broadcaster record.EventBroadcaster) record.EventRecorder {
+	const controllerName = "pod-networks-controller"
+	return broadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerName})
 }
 
 func filterByHostSelector(opts *metav1.ListOptions) {
 	opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", os.Getenv("HOSTNAME")).String()
+}
+
+func handleSignals(stopChannel chan struct{}, signals ...os.Signal) {
+	signalChannel := make(chan os.Signal, 1)
+	signal.Notify(signalChannel, signals...)
+	go func() {
+		<-signalChannel
+		stopChannel <- struct{}{}
+	}()
 }
