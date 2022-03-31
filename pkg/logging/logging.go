@@ -41,8 +41,41 @@ const (
 var loggingStderr bool
 var loggingW io.Writer
 var loggingLevel Level
+var logger *lumberjack.Logger
 
 const defaultTimestampFormat = time.RFC3339
+
+// LogOptions specifies the configuration of the log
+type LogOptions struct {
+	MaxAge     *int  `json:"maxAge,omitempty"`
+	MaxSize    *int  `json:"maxSize,omitempty"`
+	MaxBackups *int  `json:"maxBackups,omitempty"`
+	Compress   *bool `json:"compress,omitempty"`
+}
+
+// SetLogOptions set the LoggingOptions of NetConf
+func SetLogOptions(options *LogOptions) {
+	// give some default value
+	logger.MaxSize = 100
+	logger.MaxAge = 5
+	logger.MaxBackups = 5
+	logger.Compress = true
+	if options != nil {
+		if options.MaxAge != nil {
+			logger.MaxAge = *options.MaxAge
+		}
+		if options.MaxSize != nil {
+			logger.MaxSize = *options.MaxSize
+		}
+		if options.MaxBackups != nil {
+			logger.MaxBackups = *options.MaxBackups
+		}
+		if options.Compress != nil {
+			logger.Compress = *options.Compress
+		}
+	}
+	loggingW = logger
+}
 
 func (l Level) String() string {
 	switch l {
@@ -141,13 +174,8 @@ func SetLogFile(filename string) {
 		return
 	}
 
-	loggingW = &lumberjack.Logger{
-		Filename:   filename,
-		MaxSize:    100, // megabytes
-		MaxBackups: 5,
-		MaxAge:     5, // days
-		Compress:   true,
-	}
+	logger.Filename = filename
+	loggingW = logger
 
 }
 
@@ -155,4 +183,5 @@ func init() {
 	loggingStderr = true
 	loggingW = nil
 	loggingLevel = PanicLevel
+	logger = &lumberjack.Logger{}
 }

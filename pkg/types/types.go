@@ -16,6 +16,7 @@
 package types
 
 import (
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
@@ -44,6 +45,7 @@ type NetConf struct {
 	LogFile         string                   `json:"logFile"`
 	LogLevel        string                   `json:"logLevel"`
 	LogToStderr     bool                     `json:"logToStderr,omitempty"`
+	LogOptions      *logging.LogOptions      `json:"logOptions,omitempty"`
 	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`

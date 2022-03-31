@@ -112,25 +112,52 @@ var _ = Describe("config operations", func() {
 
 	It("checks if logFile and logLevel are set correctly", func() {
 		conf := `{
-	    "name": "node-cni-network",
-			"type": "multus",
-			"logLevel": "debug",
-			"logFile": "/var/log/multus.log",
-	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
-	    "delegates": [{
-	        "type": "weave-net"
-	    }],
-		"runtimeConfig": {
-	      "portMappings": [
-	        {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
-	      ]
-	    }
-
-	}`
+	"name": "node-cni-network",
+	"type": "multus",
+	"logLevel": "debug",
+	"logFile": "/var/log/multus.log",
+	"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	"delegates": [{
+		"type": "weave-net"
+	}],
+	"runtimeConfig": {
+		"portMappings": [
+			{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+		]
+	}
+}`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(netConf.LogLevel).To(Equal("debug"))
 		Expect(netConf.LogFile).To(Equal("/var/log/multus.log"))
+	})
+
+	It("checks if logOptions are set correctly", func() {
+		conf := `{
+	"name": "node-cni-network",
+	"type": "multus",
+	"logOptions": {
+		"maxAge": 5,
+		"maxSize": 100,
+		"maxBackups": 5,
+		"compress": true
+	},
+	"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	"delegates": [{
+		"type": "weave-net"
+	}],
+	"runtimeConfig": {
+		"portMappings": [
+			{"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
+		]
+	}
+}`
+		netConf, err := LoadNetConf([]byte(conf))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(*netConf.LogOptions.MaxAge).To(Equal(5))
+		Expect(*netConf.LogOptions.MaxBackups).To(Equal(5))
+		Expect(*netConf.LogOptions.MaxSize).To(Equal(100))
+		Expect(*netConf.LogOptions.Compress).To(Equal(true))
 	})
 
 	It("properly sets namespace isolation using the default namespace", func() {

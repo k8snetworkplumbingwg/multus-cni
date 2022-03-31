@@ -18,6 +18,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 	"testing"
 )
 
@@ -99,6 +100,79 @@ func TestMultusConfigWithLoggingConfiguration(t *testing.T) {
 		WithLogFile("/u/y/w/log.1"))
 	assertError(t, err, nil)
 	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logFile\":\"/u/y/w/log.1\",\"logLevel\":\"notice\",\"logToStderr\":true,\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
+func TestMultusConfigWithLogOptionsConfiguration(t *testing.T) {
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithLogOptions(&LogOptions{
+			MaxAge:     testutils.Int(5),
+			MaxSize:    testutils.Int(100),
+			MaxBackups: testutils.Int(5),
+			Compress:   testutils.Bool(true),
+		}))
+	assertError(t, err, nil)
+	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logOptions\":{\"maxAge\":5,\"maxSize\":100,\"maxBackups\":5,\"compress\":true},\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
+func TestMultusLogOptionsWithLogMaxAge(t *testing.T) {
+	logOption := &LogOptions{}
+	MutateLogOptions(logOption, WithLogMaxAge(testutils.Int(5)))
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithLogOptions(logOption))
+	assertError(t, err, nil)
+	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logOptions\":{\"maxAge\":5},\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
+func TestMultusLogOptionsWithLogMaxSize(t *testing.T) {
+	logOption := &LogOptions{}
+	MutateLogOptions(logOption, WithLogMaxSize(testutils.Int(100)))
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithLogOptions(logOption))
+	assertError(t, err, nil)
+	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logOptions\":{\"maxSize\":100},\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
+func TestMultusLogOptionsWithLogBackups(t *testing.T) {
+	logOption := &LogOptions{}
+	MutateLogOptions(logOption, WithLogMaxBackups(testutils.Int(5)))
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithLogOptions(logOption))
+	assertError(t, err, nil)
+	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logOptions\":{\"maxBackups\":5},\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
+func TestMultusLogOptionsWithLogCompress(t *testing.T) {
+	logOption := &LogOptions{}
+	MutateLogOptions(logOption, WithLogCompress(testutils.Bool(true)))
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithLogOptions(logOption))
+	assertError(t, err, nil)
+	expectedResult := "{\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"logOptions\":{\"compress\":true},\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
 
