@@ -815,7 +815,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	pod, err := getPod(kubeClient, k8sArgs, true)
 	if err != nil {
-		return err
+		// getPod may be failed but just do print error in its log and continue to delete
+		logging.Errorf("Multus: getPod failed: %v, but continue to delete", err)
 	}
 
 	// Read the cache to get delegates json for the pod
