@@ -199,7 +199,7 @@ func confCheck(rt *libcni.RuntimeConf, rawNetconf []byte, multusNetconf *types.N
 
 	err = cniNet.CheckNetwork(context.Background(), conf, rt)
 	if err != nil {
-		return logging.Errorf("error in getting result from DelNetwork: %v", err)
+		return logging.Errorf("error in getting result from CheckNetwork: %v", err)
 	}
 
 	return err
