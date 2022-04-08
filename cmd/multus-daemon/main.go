@@ -45,7 +45,7 @@ const (
 	defaultMultusMasterCNIFile          = ""
 	defaultMultusNamespaceIsolation     = false
 	defaultMultusReadinessIndicatorFile = ""
-	defaultMultusRunDir                 = "/host/var/run/multus-cni/"
+	defaultMultusRunDir                 = "/host/run/multus-cni/"
 )
 
 const (
@@ -194,7 +194,7 @@ func startMultusDaemon(configFilePath string) error {
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
-	server, err := srv.NewCNIServer(daemonConfig.MultusSocketDir, config)
+	server, err := srv.NewCNIServer(daemonConfig, config)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
 	}

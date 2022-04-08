@@ -529,7 +529,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 	isNetnamePath := strings.Contains(netname, "/")
 
 	// if netname is not directory or file, it must be net-attach-def name or CNI config name
-	if ! isNetnamePath {
+	if !isNetnamePath {
 		// option1) search CRD object for the network
 		net := &types.NetworkSelectionElement{
 			Name:      netname,
@@ -552,7 +552,7 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 	} else {
 		fInfo, err := os.Stat(netname)
 		if err != nil {
-			return nil, resourceMap, err 
+			return nil, resourceMap, err
 		}
 
 		// option3) search directory
@@ -578,16 +578,16 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 			if strings.HasSuffix(netname, ".conflist") {
 				confList, err := libcni.ConfListFromFile(netname)
 				if err != nil {
-					return nil, resourceMap, fmt.Errorf("Error loading CNI conflist file %s: %v", netname, err)
+					return nil, resourceMap, logging.Errorf("error loading CNI conflist file %s: %v", netname, err)
 				}
 				configBytes = confList.Bytes
 			} else {
 				conf, err := libcni.ConfFromFile(netname)
 				if err != nil {
-					return nil, resourceMap, fmt.Errorf("Error loading CNI config file %s: %v", netname, err)
+					return nil, resourceMap, logging.Errorf("error loading CNI config file %s: %v", netname, err)
 				}
 				if conf.Network.Type == "" {
-					return nil, resourceMap, fmt.Errorf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", netname)
+					return nil, resourceMap, logging.Errorf("error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", netname)
 				}
 				configBytes = conf.Bytes
 			}

@@ -89,8 +89,8 @@ data:
         "logLevel": "debug",
         "logFile": "/tmp/multus.log",
         "binDir": "/host/opt/cni/bin",
-        "cniDir": "/host/var/lib/cni/multus",
-        "socketDir": "/host/var/run/multus/"
+        "cniDir": "/var/lib/cni/multus",
+        "socketDir": "/host/run/multus"
     }
 ---
 apiVersion: apps/v1
@@ -148,10 +148,12 @@ spec:
           mountPath: /host/etc/cni/net.d
         - name: cnibin
           mountPath: /host/opt/cni/bin
-        - name: host-var-run
-          mountPath: /host/var/run
-        - name: host-var-run-netns
-          mountPath: /var/run/netns
+        - name: host-run
+          mountPath: /host/run
+        - name: host-var-lib-cni-multus
+          mountPath: /var/lib/cni/multus
+        - name: host-run-netns
+          mountPath: /run/netns
           mountPropagation: HostToContainer
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
@@ -186,9 +188,12 @@ spec:
             items:
             - key: daemon-config.json
               path: daemon-config.json
-        - name: host-var-run
+        - name: host-run
           hostPath:
-            path: /var/run
-        - name: host-var-run-netns
+            path: /run
+        - name: host-var-lib-cni-multus
           hostPath:
-            path: /var/run/netns/
+            path: /var/lib/cni/multus
+        - name: host-run-netns
+          hostPath:
+            path: /run/netns/

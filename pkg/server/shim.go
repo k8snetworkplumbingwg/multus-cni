@@ -18,13 +18,14 @@ import (
 )
 
 const (
-	defaultMultusRunDir = "/var/run/multus/"
+	defaultMultusRunDir = "/run/multus/"
 )
 
 // CmdAdd implements the CNI spec ADD command handler
 func CmdAdd(args *skel.CmdArgs) error {
 	response, cniVersion, err := postRequest(args)
 	if err != nil {
+		logging.Errorf("CmdAdd (shim): %v", err)
 		return err
 	}
 
@@ -34,24 +35,24 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 // CmdCheck implements the CNI spec CHECK command handler
 func CmdCheck(args *skel.CmdArgs) error {
-	response, cniVersion, err := postRequest(args)
+	_, _, err := postRequest(args)
 	if err != nil {
+		logging.Errorf("CmdCheck (shim): %v", err)
 		return err
 	}
 
-	logging.Verbosef("CmdCheck (shim): %v", *response.Result)
-	return cnitypes.PrintResult(response.Result, cniVersion)
+	return err
 }
 
 // CmdDel implements the CNI spec DEL command handler
 func CmdDel(args *skel.CmdArgs) error {
-	response, cniVersion, err := postRequest(args)
+	_, _, err := postRequest(args)
 	if err != nil {
-		return err
+		logging.Errorf("CmdDel (shim): %v", err)
+		return nil
 	}
 
-	logging.Verbosef("CmdDel (shim): %v", *response.Result)
-	return cnitypes.PrintResult(response.Result, cniVersion)
+	return nil
 }
 
 func postRequest(args *skel.CmdArgs) (*Response, string, error) {
