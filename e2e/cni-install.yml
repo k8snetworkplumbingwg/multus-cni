@@ -7,9 +7,9 @@ metadata:
 data:
   install_cni.sh: |
     cd /tmp
-    wget https://github.com/containernetworking/plugins/releases/download/v0.8.5/cni-plugins-linux-amd64-v0.8.5.tgz
+    wget https://github.com/containernetworking/plugins/releases/download/v1.1.1/cni-plugins-linux-amd64-v1.1.1.tgz
     cd /host/opt/cni/bin
-    tar xvfzp /tmp/cni-plugins-linux-amd64-v0.8.5.tgz
+    tar xvfzp /tmp/cni-plugins-linux-amd64-v1.1.1.tgz
     sleep infinite
 ---
 apiVersion: apps/v1
