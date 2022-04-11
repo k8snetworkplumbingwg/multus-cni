@@ -166,3 +166,13 @@ func (r *Result) String() string {
 	}
 	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
 }
+
+// Int returns a pointer to an int
+func Int(i int) *int {
+	return &i
+}
+
+// Bool returns a pointer to a bool.
+func Bool(b bool) *bool {
+	return &b
+}
