@@ -62,7 +62,7 @@ const (
 	multusLogMaxSize              = "multus-log-max-size"
 	multusLogMaxAge               = "multus-log-max-age"
 	multusLogMaxBackups           = "multus-log-max-backups"
-	multusLogCompress             = "multus-log-Compress"
+	multusLogCompress             = "multus-log-compress"
 	multusLogLevel                = "multus-log-level"
 	multusLogToStdErr             = "multus-log-to-stderr"
 	multusKubeconfigPath          = "multus-kubeconfig-file-host"
