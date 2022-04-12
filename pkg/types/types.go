@@ -16,6 +16,7 @@
 package types
 
 import (
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
@@ -40,14 +41,15 @@ type NetConf struct {
 	// These parameters are exclusive in one config file:
 	//  - Delegates (directly add delegate CNI config into multus CNI config)
 	//  - ClusterNetwork+DefaultNetworks  (add CNI config through CRD, directory or file)
-	Delegates       []*DelegateNetConf `json:"-"`
-	ClusterNetwork  string             `json:"clusterNetwork"`
-	DefaultNetworks []string           `json:"defaultNetworks"`
-	Kubeconfig      string             `json:"kubeconfig"`
-	LogFile         string             `json:"logFile"`
-	LogLevel        string             `json:"logLevel"`
-	LogToStderr     bool               `json:"logToStderr,omitempty"`
-	RuntimeConfig   *RuntimeConfig     `json:"runtimeConfig,omitempty"`
+	Delegates       []*DelegateNetConf  `json:"-"`
+	ClusterNetwork  string              `json:"clusterNetwork"`
+	DefaultNetworks []string            `json:"defaultNetworks"`
+	Kubeconfig      string              `json:"kubeconfig"`
+	LogFile         string              `json:"logFile"`
+	LogLevel        string              `json:"logLevel"`
+	LogToStderr     bool                `json:"logToStderr,omitempty"`
+	LogOptions      *logging.LogOptions `json:"logOptions,omitempty"`
+	RuntimeConfig   *RuntimeConfig      `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.

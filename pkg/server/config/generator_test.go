@@ -22,6 +22,8 @@ import (
 	"os"
 	"testing"
 
+	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -141,6 +143,122 @@ var _ = Describe("Configuration Generator", func() {
 				"logLevel":"notice",
 				"logToStderr":true, 
 				"name":"multus-cni-network",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("multus config with logging options configuration", func() {
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogOptions(&LogOptions{
+				MaxAge:     testutils.Int(5),
+				MaxSize:    testutils.Int(100),
+				MaxBackups: testutils.Int(5),
+				Compress:   testutils.Bool(true),
+			}))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"logOptions": {
+					"maxAge": 5,
+					"maxSize": 100,
+					"maxBackups": 5,
+					"compress": true
+				},
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("multus config with logging options with max age", func() {
+		logOption := &LogOptions{}
+		MutateLogOptions(logOption, WithLogMaxAge(testutils.Int(5)))
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogOptions(logOption))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"logOptions": {
+					"maxAge": 5
+				},
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("multus config with logging options with max size", func() {
+		logOption := &LogOptions{}
+		MutateLogOptions(logOption, WithLogMaxSize(testutils.Int(100)))
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogOptions(logOption))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"logOptions": {
+					"maxSize": 100
+				},
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("multus config with logging options with log max backups", func() {
+		logOption := &LogOptions{}
+		MutateLogOptions(logOption, WithLogMaxBackups(testutils.Int(5)))
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogOptions(logOption))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"logOptions": {
+					"maxBackups": 5
+				},
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("multus config with logging options with log compress", func() {
+		logOption := &LogOptions{}
+		MutateLogOptions(logOption, WithLogCompress(testutils.Bool(true)))
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithLogOptions(logOption))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"logOptions": {
+					"compress": true
+				},
 				"type":"myCNI"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))

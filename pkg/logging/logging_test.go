@@ -15,6 +15,8 @@
 package logging
 
 import (
+	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
+	"gopkg.in/natefinch/lumberjack.v2"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -79,4 +81,54 @@ var _ = Describe("logging operations", func() {
 		currentLevel := loggingLevel
 		Expect(currentLevel).To(Equal(GetLoggingLevel()))
 	})
+
+	It("Check user settings logOptions for logging", func() {
+		SetLogFile("/var/log/multus.log")
+		expectLogger := &lumberjack.Logger{
+			Filename:   "/var/log/multus.log",
+			MaxAge:     1,
+			MaxSize:    10,
+			MaxBackups: 1,
+			Compress:   true,
+		}
+		logOptions := &LogOptions{
+			MaxAge:     testutils.Int(1),
+			MaxSize:    testutils.Int(10),
+			MaxBackups: testutils.Int(1),
+			Compress:   testutils.Bool(true),
+		}
+		SetLogOptions(logOptions)
+		Expect(expectLogger).To(Equal(logger))
+	})
+
+	It("Check user settings logOptions and missing some options", func() {
+		SetLogFile("/var/log/multus.log")
+		expectLogger := &lumberjack.Logger{
+			Filename:   "/var/log/multus.log",
+			MaxAge:     5,
+			MaxSize:    100,
+			MaxBackups: 1,
+			Compress:   true,
+		}
+		logOptions := &LogOptions{
+			MaxBackups: testutils.Int(1),
+			Compress:   testutils.Bool(true),
+		}
+		SetLogOptions(logOptions)
+		Expect(expectLogger).To(Equal(logger))
+	})
+
+	It("Check user don't settings logOptions for logging", func() {
+		SetLogFile("/var/log/multus.log")
+		logger1 := &lumberjack.Logger{
+			Filename:   "/var/log/multus.log",
+			MaxAge:     5,
+			MaxSize:    100,
+			MaxBackups: 5,
+			Compress:   true,
+		}
+		SetLogOptions(nil)
+		Expect(logger1).To(Equal(logger))
+	})
+
 })

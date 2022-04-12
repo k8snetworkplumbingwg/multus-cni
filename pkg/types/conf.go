@@ -329,6 +329,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 	// Logging
 	logging.SetLogStderr(netconf.LogToStderr)
+	logging.SetLogOptions(netconf.LogOptions)
 	if netconf.LogFile != "" {
 		logging.SetLogFile(netconf.LogFile)
 	}

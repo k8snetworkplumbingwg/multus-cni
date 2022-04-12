@@ -40,6 +40,10 @@ const (
 	defaultCniConfigDir                 = "/etc/cni/net.d"
 	defaultMultusGlobalNamespaces       = ""
 	defaultMultusLogFile                = ""
+	defaultMultusLogMaxSize             = 100 // megabytes
+	defaultMultusLogMaxAge              = 5   // days
+	defaultMultusLogMaxBackups          = 5
+	defaultMultusLogCompress            = true
 	defaultMultusLogLevel               = ""
 	defaultMultusLogToStdErr            = false
 	defaultMultusMasterCNIFile          = ""
@@ -55,6 +59,10 @@ const (
 	multusConfigFileVarName      = "multus-conf-file"
 	multusGlobalNamespaces       = "global-namespaces"
 	multusLogFile                = "multus-log-file"
+	multusLogMaxSize             = "multus-log-max-size"
+	multusLogMaxAge              = "multus-log-max-age"
+	multusLogMaxBackups          = "multus-log-max-backups"
+	multusLogCompress            = "multus-log-compress"
 	multusLogLevel               = "multus-log-level"
 	multusLogToStdErr            = "multus-log-to-stderr"
 	multusMasterCNIFileVarName   = "multus-master-cni-file"
@@ -75,6 +83,10 @@ func main() {
 	logToStdErr := flag.Bool(multusLogToStdErr, false, "If the multus logs are also to be echoed to stderr.")
 	logLevel := flag.String(multusLogLevel, "", "One of: debug/verbose/error/panic. Used only with --multus-conf-file=auto.")
 	logFile := flag.String(multusLogFile, "", "Path where to multus will log. Used only with --multus-conf-file=auto.")
+	logMaxSize := flag.Int(multusLogMaxSize, defaultMultusLogMaxSize, "the maximum size in megabytes of the log file before it gets rotated")
+	logMaxAge := flag.Int(multusLogMaxAge, defaultMultusLogMaxAge, "the maximum number of days to retain old log files in their filename")
+	logMaxBackups := flag.Int(multusLogMaxBackups, defaultMultusLogMaxBackups, "the maximum number of old log files to retain")
+	logCompress := flag.Bool(multusLogCompress, defaultMultusLogCompress, "compress determines if the rotated log files should be compressed using gzip")
 	cniVersion := flag.String(multusCNIVersion, "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
 	forceCNIVersion := flag.Bool("force-cni-version", false, "force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
 	readinessIndicator := flag.String(multusReadinessIndicatorFile, "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
@@ -125,6 +137,28 @@ func main() {
 		if *readinessIndicator != defaultMultusReadinessIndicatorFile {
 			configurationOptions = append(
 				configurationOptions, config.WithReadinessFileIndicator(*readinessIndicator))
+		}
+
+		// logOptions
+
+		var logOptionFuncs []config.LogOptionFunc
+		if *logMaxAge != defaultMultusLogMaxAge {
+			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxAge(logMaxAge))
+		}
+		if *logMaxSize != defaultMultusLogMaxSize {
+			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxSize(logMaxSize))
+		}
+		if *logMaxBackups != defaultMultusLogMaxBackups {
+			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxBackups(logMaxBackups))
+		}
+		if *logCompress != defaultMultusLogCompress {
+			logOptionFuncs = append(logOptionFuncs, config.WithLogCompress(logCompress))
+		}
+
+		if len(logOptionFuncs) > 0 {
+			logOptions := &config.LogOptions{}
+			config.MutateLogOptions(logOptions, logOptionFuncs...)
+			configurationOptions = append(configurationOptions, config.WithLogOptions(logOptions))
 		}
 
 		multusConfig, err := config.NewMultusConfig(multusPluginName, *cniVersion, configurationOptions...)

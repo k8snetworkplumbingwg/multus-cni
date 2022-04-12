@@ -33,6 +33,9 @@ const (
 	singleConfigCapabilityKey = "capabilities"
 )
 
+// LogOptionFunc mutates the `LoggingOptions` object
+type LogOptionFunc func(logOptions *LogOptions)
+
 // Option mutates the `conf` object
 type Option func(conf *MultusConf) error
 
@@ -44,6 +47,7 @@ type MultusConf struct {
 	LogFile                  string          `json:"logFile,omitempty"`
 	LogLevel                 string          `json:"logLevel,omitempty"`
 	LogToStderr              bool            `json:"logToStderr,omitempty"`
+	LogOptions               *LogOptions     `json:"logOptions,omitempty"`
 	Name                     string          `json:"name"`
 	ClusterNetwork           string          `json:"clusterNetwork,omitempty"`
 	NamespaceIsolation       bool            `json:"namespaceIsolation,omitempty"`
@@ -51,6 +55,14 @@ type MultusConf struct {
 	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
 	Type                     string          `json:"type"`
 	CniDir                   string          `json:"cniDir,omitempty"`
+}
+
+// LogOptions specifies the configuration of the log
+type LogOptions struct {
+	MaxAge     *int  `json:"maxAge,omitempty"`
+	MaxSize    *int  `json:"maxSize,omitempty"`
+	MaxBackups *int  `json:"maxBackups,omitempty"`
+	Compress   *bool `json:"compress,omitempty"`
 }
 
 // NewMultusConfig creates a basic configuration generator. It can be mutated
@@ -166,6 +178,15 @@ func WithLogFile(logFile string) Option {
 	}
 }
 
+// WithLogOptions mutates the inner state to set the
+// LogOptions attribute
+func WithLogOptions(logOptions *LogOptions) Option {
+	return func(conf *MultusConf) error {
+		conf.LogOptions = logOptions
+		return nil
+	}
+}
+
 // WithReadinessFileIndicator mutates the inner state to set the
 // ReadinessIndicatorFile attribute
 func WithReadinessFileIndicator(path string) Option {
@@ -238,6 +259,46 @@ func withCapabilities(cniData interface{}) Option {
 			conf.Capabilities[capability] = true
 		}
 		return nil
+	}
+}
+
+// MutateLogOptions update the LoggingOptions of the MultusConf according
+// to the provided configuration `loggingOptions`
+func MutateLogOptions(logOption *LogOptions, logOptionFunc ...LogOptionFunc) {
+	for _, loggingOption := range logOptionFunc {
+		loggingOption(logOption)
+	}
+}
+
+// WithLogMaxSize mutates the inner state to set the
+// logMaxSize attribute
+func WithLogMaxSize(maxSize *int) LogOptionFunc {
+	return func(logOptions *LogOptions) {
+		logOptions.MaxSize = maxSize
+	}
+}
+
+// WithLogMaxAge mutates the inner state to set the
+// logMaxAge attribute
+func WithLogMaxAge(maxAge *int) LogOptionFunc {
+	return func(logOptions *LogOptions) {
+		logOptions.MaxAge = maxAge
+	}
+}
+
+// WithLogMaxBackups mutates the inner state to set the
+// logMaxBackups attribute
+func WithLogMaxBackups(maxBackups *int) LogOptionFunc {
+	return func(logOptions *LogOptions) {
+		logOptions.MaxBackups = maxBackups
+	}
+}
+
+// WithLogCompress mutates the inner state to set the
+// logCompress attribute
+func WithLogCompress(compress *bool) LogOptionFunc {
+	return func(logOptions *LogOptions) {
+		logOptions.Compress = compress
 	}
 }
 
