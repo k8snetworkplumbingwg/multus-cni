@@ -102,13 +102,14 @@ metadata:
 data:
   daemon-config.json: |
     {
+        "chrootDir": "/hostroot",
         "confDir": "/host/etc/cni/net.d",
         "logToStderr": true,
         "logLevel": "debug",
         "logFile": "/tmp/multus.log",
-        "binDir": "/host/opt/cni/bin",
-        "cniDir": "/host/var/lib/cni/multus",
-        "socketDir": "/host/var/run/multus/"
+        "binDir": "/opt/cni/bin",
+        "cniDir": "/var/lib/cni/multus",
+        "socketDir": "/host/run/multus/"
     }
 ---
 apiVersion: apps/v1
@@ -163,16 +164,19 @@ spec:
           volumeMounts:
             - name: cni
               mountPath: /host/etc/cni/net.d
-            - name: cnibin
-              mountPath: /host/opt/cni/bin
-            - name: host-var-run
-              mountPath: /host/var/run
-            - name: host-var-run-netns
-              mountPath: /var/run/netns
+            - name: host-run
+              mountPath: /host/run
+            - name: host-var-lib-cni-multus
+              mountPath: /var/lib/cni/multus
+            - name: host-run-netns
+              mountPath: /run/netns
               mountPropagation: HostToContainer
             - name: multus-daemon-config
               mountPath: /etc/cni/net.d/multus.d
               readOnly: true
+            - name: hostroot
+              mountPath: /hostroot
+              mountPropagation: HostToContainer
       initContainers:
         - name: install-multus-binary
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
@@ -198,15 +202,21 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
+        - name: hostroot
+          hostPath:
+            path: /
         - name: multus-daemon-config
           configMap:
             name: multus-daemon-config
             items:
             - key: daemon-config.json
               path: daemon-config.json
-        - name: host-var-run
+        - name: host-run
           hostPath:
-            path: /var/run
-        - name: host-var-run-netns
+            path: /run
+        - name: host-var-lib-cni-multus
           hostPath:
-            path: /var/run/netns/
+            path: /var/lib/cni/multus
+        - name: host-run-netns
+          hostPath:
+            path: /run/netns/

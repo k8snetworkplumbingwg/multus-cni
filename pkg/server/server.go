@@ -77,13 +77,22 @@ func GetListener(socketPath string) (net.Listener, error) {
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(rundir string, serverConfig []byte) (*Server, error) {
+func NewCNIServer(daemonConfig *types.ControllerNetConf, serverConfig []byte) (*Server, error) {
 	kubeClient, err := k8s.InClusterK8sClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting k8s client: %v", err)
 	}
 
-	return newCNIServer(rundir, kubeClient, nil, serverConfig)
+	exec := invoke.Exec(nil)
+	if daemonConfig.ChrootDir != "" {
+		exec = &ChrootExec{
+			Stderr:    os.Stderr,
+			chrootDir: daemonConfig.ChrootDir,
+		}
+		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
+	}
+
+	return newCNIServer(daemonConfig.MultusSocketDir, kubeClient, exec, serverConfig)
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte) (*Server, error) {

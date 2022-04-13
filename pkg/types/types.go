@@ -190,6 +190,7 @@ type ShimNetConf struct {
 
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
+	ChrootDir   string `json:"chrootDir,omitempty"`
 	ConfDir     string `json:"confDir"`
 	CNIDir      string `json:"cniDir"`
 	BinDir      string `json:"binDir"`

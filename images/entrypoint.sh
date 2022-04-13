@@ -223,7 +223,7 @@ MULTUS_KUBECONFIG=$CNI_CONF_DIR/multus.d/multus.kubeconfig
 
 # ------------------------------- Generate a "kube-config"
 # Inspired by: https://tinyurl.com/y7r2knme
-SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
+SERVICE_ACCOUNT_PATH=/run/secrets/kubernetes.io/serviceaccount
 KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
 SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_PATH/token)
 SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}

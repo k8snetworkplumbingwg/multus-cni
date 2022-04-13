@@ -44,7 +44,7 @@ const (
 const (
 	// DefaultMultusDaemonConfigFile is the default path of the config file
 	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
-	defaultMultusRunDir           = "/var/run/multus/"
+	defaultMultusRunDir           = "/run/multus/"
 )
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes

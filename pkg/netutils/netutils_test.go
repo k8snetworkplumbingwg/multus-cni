@@ -429,7 +429,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -503,7 +503,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -577,7 +577,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -649,7 +649,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -973,7 +973,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1021,7 +1021,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1087,7 +1087,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1135,7 +1135,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1205,7 +1205,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1251,7 +1251,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1315,7 +1315,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [
@@ -1361,7 +1361,7 @@ var _ = Describe("netutil cnicache function testing", func() {
       {
         "mac": "0a:c2:e6:3d:45:17",
         "name": "net1",
-        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
       }
     ],
     "ips": [

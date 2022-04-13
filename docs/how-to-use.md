@@ -39,7 +39,7 @@ cat >/etc/cni/net.d/00-multus.conf <<EOF
 {
   "name": "multus-cni-network",
   "type": "multus",
-  "readinessindicatorfile": "/var/run/flannel/subnet.env",
+  "readinessindicatorfile": "/run/flannel/subnet.env",
   "delegates": [
     {
       "NOTE1": "This is example, wrote your CNI config in delegates",
