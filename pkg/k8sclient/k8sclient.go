@@ -92,7 +92,7 @@ func (c *ClientInfo) Eventf(object runtime.Object, eventtype, reason, messageFmt
 	}
 }
 
-func (e *NoK8sNetworkError) Error() string { return string(e.message) }
+func (e *NoK8sNetworkError) Error() string { return e.message }
 
 // SetNetworkStatus sets network status into Pod annotation
 func SetNetworkStatus(client *ClientInfo, k8sArgs *types.K8sArgs, netStatus []nettypes.NetworkStatus, conf *types.NetConf) error {
