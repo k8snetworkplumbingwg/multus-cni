@@ -168,6 +168,10 @@ spec:
               mountPath: /host/run
             - name: host-var-lib-cni-multus
               mountPath: /var/lib/cni/multus
+            - name: host-var-lib-kubelet
+              mountPath: /var/lib/kubelet
+            - name: host-run-k8s-cni-cncf-io
+              mountPath: /run/k8s.cni.cncf.io
             - name: host-run-netns
               mountPath: /run/netns
               mountPropagation: HostToContainer
@@ -217,6 +221,12 @@ spec:
         - name: host-var-lib-cni-multus
           hostPath:
             path: /var/lib/cni/multus
+        - name: host-var-lib-kubelet
+          hostPath:
+            path: /var/lib/kubelet
+        - name: host-run-k8s-cni-cncf-io
+          hostPath:
+            path: /run/k8s.cni.cncf.io
         - name: host-run-netns
           hostPath:
             path: /run/netns/

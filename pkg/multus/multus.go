@@ -708,7 +708,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		// create the network status, only in case Multus as kubeconfig
-		if n.Kubeconfig != "" && kc != nil {
+		if kubeClient != nil && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
 				if err != nil {
@@ -724,7 +724,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	}
 
 	// set the network status annotation in apiserver, only in case Multus as kubeconfig
-	if n.Kubeconfig != "" && kc != nil {
+	if kubeClient != nil && kc != nil {
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
@@ -876,7 +876,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
-	if in.Kubeconfig != "" {
+	if kubeClient != nil {
 		if netnsfound {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
 				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)
