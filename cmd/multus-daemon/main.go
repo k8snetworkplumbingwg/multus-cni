@@ -49,7 +49,6 @@ const (
 	defaultMultusMasterCNIFile          = ""
 	defaultMultusNamespaceIsolation     = false
 	defaultMultusReadinessIndicatorFile = ""
-	defaultMultusRunDir                 = "/host/run/multus-cni/"
 )
 
 const (
@@ -68,7 +67,6 @@ const (
 	multusMasterCNIFileVarName   = "multus-master-cni-file"
 	multusNamespaceIsolation     = "namespace-isolation"
 	multusReadinessIndicatorFile = "readiness-indicator-file"
-	multusRunDir                 = "multus-rundir"
 )
 
 func main() {
