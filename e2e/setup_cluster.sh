@@ -39,6 +39,12 @@ containerdConfigPatches:
 nodes:
   - role: control-plane
   - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: InitConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          pod-manifest-path: "/etc/kubernetes/manifests/"
   - role: worker
 EOF
 
