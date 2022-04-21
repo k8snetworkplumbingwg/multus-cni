@@ -35,6 +35,10 @@ jobs:
         working-directory: ./e2e
         run: ./test-simple-macvlan1.sh
 
+      - name: Test static pod
+        working-directory: ./e2e
+        run: ./test-static-pod.sh
+
       - name: Test default route1
         working-directory: ./e2e
         run: ./test-default-route1.sh
