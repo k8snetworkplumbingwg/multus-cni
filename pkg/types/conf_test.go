@@ -56,6 +56,7 @@ var _ = Describe("config operations", func() {
 	AfterEach(func() {
 		Expect(testNS.Close()).To(Succeed())
 		os.Unsetenv("CNI_PATH")
+		os.Unsetenv("CNI_ARGS")
 		err := os.RemoveAll(tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -637,6 +638,44 @@ var _ = Describe("config operations", func() {
 		Expect(rt.NetNS).To(Equal(args.Netns))
 		Expect(rt.IfName).To(Equal(""))
 		Expect(rt.CapabilityArgs["portMappings"]).To(Equal(rc.PortMaps))
+	})
+
+	It("creates a valid CNI runtime config with K8s args passed via CNI_ARGS environment variable", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+    "name": "node-cni-network",
+    "type": "multus",
+    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "defaultnetworkwaitseconds": 3,
+    "delegates": [{
+        "name": "weave1",
+        "cniVersion": "0.2.0",
+        "type": "weave-net"
+    },{
+        "name": "other1",
+        "cniVersion": "0.2.0",
+        "type": "other-plugin"
+    }]
+}`),
+		}
+
+		os.Setenv("CNI_ARGS", "K8S_POD_NAME=dummy;K8S_POD_NAMESPACE=namespacedummy;K8S_POD_INFRA_CONTAINER_ID=123456789;K8S_POD_UID=aaaaa;BLAHBLAH=foo=bar")
+		k8sArgs := &K8sArgs{}
+		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", &RuntimeConfig{}, nil)
+		fmt.Println("rt.ContainerID: ", rt.ContainerID)
+		Expect(rt.ContainerID).To(Equal("123456789"))
+		Expect(rt.NetNS).To(Equal(args.Netns))
+		Expect(rt.IfName).To(Equal(""))
+		fmt.Println("rt.ContainerID: ", rt.ContainerID)
+		Expect(rt.Args[0]).To(Equal([2]string{"IgnoreUnknown", "true"}))
+		Expect(rt.Args[1]).To(Equal([2]string{"K8S_POD_NAMESPACE", "namespacedummy"}))
+		Expect(rt.Args[2]).To(Equal([2]string{"K8S_POD_NAME", "dummy"}))
+		Expect(rt.Args[3]).To(Equal([2]string{"K8S_POD_INFRA_CONTAINER_ID", "123456789"}))
+		Expect(rt.Args[4]).To(Equal([2]string{"K8S_POD_UID", "aaaaa"}))
+		Expect(rt.Args[5]).To(Equal([2]string{"BLAHBLAH", "foo=bar"}))
 	})
 
 	It("can loadnetworkstatus", func() {
