@@ -45,10 +45,11 @@ var _ = BeforeSuite(func() {
 				"PodUID": "970a395d-bb3b-11e8-89df-408d5c537d23",
 				"ContainerName": "appcntr1",
 				"ResourceName": "intel.com/sriov_net_A",
-				"DeviceIDs": [
-				"0000:03:02.3",
-				"0000:03:02.0"
-				],
+				"DeviceIDs": {"-1": [
+					"0000:03:02.3",
+					"0000:03:02.0"
+					]
+				},
 				"AllocResp": "CikKC3NyaW92X25ldF9BEhogMDAwMDowMzowMi4zIDAwMDA6MDM6MDIuMA=="
 			}
 			],
@@ -143,10 +144,10 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 						"PodUID": "970a395d-bb3b-11e8-89df-408d5c537d23",
 						"ContainerName": "appcntr1",
 						"ResourceName": "intel.com/sriov_net_A",
-						"DeviceIDs": [
+						"DeviceIDs": { "-1": [
 						"0000:03:02.3",
 						"0000:03:02.0"
-						],
+						] },
 						"AllocResp": "CikKC3NyaW92X25ldF9BEhogMDAwMDowMzowMi4zIDAwMDA6MDM6MDIuMA=="
 					}
 					],
