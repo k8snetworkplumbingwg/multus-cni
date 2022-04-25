@@ -219,28 +219,32 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		},
 	}
 
-	// get CNI_ARGS and set it if it does not exist in rt.Args
+	// Populate rt.Args with CNI_ARGS if the rt.Args value is not set
 	cniArgs := os.Getenv("CNI_ARGS")
 	if cniArgs != "" {
 		for _, arg := range strings.Split(cniArgs, ";") {
-			for _, keyval := range strings.Split(arg, "=") {
-				if len(keyval) != 2 {
-					logging.Errorf("CreateCNIRuntimeConf: CNI_ARGS %s %s %d is not recognized as CNI arg, skipped", arg, keyval, len(keyval))
-					continue
-				}
+			// SplitN to handle = within values, like BLAH=foo=bar
+			keyval := strings.SplitN(arg, "=", 2)
+			if len(keyval) != 2 {
+				logging.Errorf("CreateCNIRuntimeConf: CNI_ARGS %s %s %d is not recognized as CNI arg, skipped", arg, keyval, len(keyval))
+				continue
+			}
 
-				envKey := string(keyval[0])
-				envVal := string(keyval[1])
-				isExists := false
-				for _, rtArg := range rt.Args {
-					if rtArg[0] == envKey {
-						isExists = true
-					}
-				}
-				if isExists != false {
+			envKey := string(keyval[0])
+			envVal := string(keyval[1])
+			found := false
+			for i := range rt.Args {
+				// Update existing key if its value is empty
+				if rt.Args[i][0] == envKey && rt.Args[i][1] == "" && envVal != "" {
 					logging.Debugf("CreateCNIRuntimeConf: add new val: %s", arg)
-					rt.Args = append(rt.Args, [2]string{envKey, envVal})
+					rt.Args[i][1] = envVal
+					found = true
+					break
 				}
+			}
+			if !found {
+				// Add the new key if it didn't exist yet
+				rt.Args = append(rt.Args, [2]string{envKey, envVal})
 			}
 		}
 	}
