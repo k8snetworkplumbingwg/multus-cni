@@ -17,7 +17,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
-	//"k8s.io/kubernetes/pkg/kubelet/util"
 
 	mtypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -33,8 +32,6 @@ type fakeResourceServer struct {
 	server *grpc.Server
 }
 
-/* This is for 1.21.x or later. Uncomment it once we update vendor here!
- */
 //TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
 func (m *fakeResourceServer) GetAllocatableResources(ctx context.Context, req *podresourcesapi.AllocatableResourcesRequest) (*podresourcesapi.AllocatableResourcesResponse, error) {
 	return &podresourcesapi.AllocatableResourcesResponse{}, nil

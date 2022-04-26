@@ -6,32 +6,31 @@ require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/containernetworking/cni v1.0.1
 	github.com/containernetworking/plugins v1.1.0
-	github.com/fsnotify/fsnotify v1.4.9
-	github.com/go-logr/logr v1.2.2 // indirect
+	github.com/fsnotify/fsnotify v1.5.1
+	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.2.0
-	github.com/onsi/ginkgo v1.16.4
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.3.0
+	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.15.0
 	github.com/pkg/errors v0.9.1
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
-	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
-	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
-	google.golang.org/grpc v1.38.0
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
+	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
+	google.golang.org/grpc v1.40.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.22.8
 	k8s.io/apimachinery v0.22.8
 	k8s.io/client-go v0.22.8
 	k8s.io/klog v1.0.0
-	k8s.io/klog/v2 v2.40.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20220124234850-424119656bbf // indirect
+	k8s.io/klog/v2 v2.60.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20220413171646-5e7f5fdc6da6 // indirect
 	k8s.io/kubelet v0.0.0
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -39,18 +38,20 @@ require (
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/googleapis/gnostic v0.5.5 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d // indirect
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	google.golang.org/appengine v1.6.5 // indirect
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
-	google.golang.org/protobuf v1.27.1 // indirect
+	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -77,13 +78,15 @@ replace (
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.22.8
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.22.8
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.22.8
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.22.8
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.22.8
 	k8s.io/kubectl => k8s.io/kubectl v0.22.8
 	k8s.io/kubelet => k8s.io/kubelet v0.22.8
-	k8s.io/kubernetes => k8s.io/kubernetes v1.20.10
+	k8s.io/kubernetes => k8s.io/kubernetes v1.22.8
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.22.8
 	k8s.io/metrics => k8s.io/metrics v0.22.8
 	k8s.io/mount-utils => k8s.io/mount-utils v0.22.8
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.22.8
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.22.8
 )

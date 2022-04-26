@@ -16,8 +16,6 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
-	//"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	//"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
 const (

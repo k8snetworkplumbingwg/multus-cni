@@ -92,7 +92,6 @@ func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkst
 			pod.Annotations = make(map[string]string)
 		}
 		pod.Annotations[v1.NetworkStatusAnnot] = networkstatus
-		pod.Annotations[v1.OldNetworkStatusAnnot] = networkstatus
 		_, err = coreClient.Pods(namespace).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{})
 		return err
 	})
