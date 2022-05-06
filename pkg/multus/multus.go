@@ -616,14 +616,14 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			}
 		}
 
-		netName := ""
+		// We collect the delegate netName for the cachefile name as well as following errors
+		netName := delegate.Conf.Name
+		if netName == "" {
+			netName = delegate.ConfList.Name
+		}
 		tmpResult, err = delegateAdd(exec, kubeClient, pod, delegate, rt, n)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
-			netName = delegate.Conf.Name
-			if netName == "" {
-				netName = delegate.ConfList.Name
-			}
 			// Ignore errors; DEL must be idempotent anyway
 			_ = delPlugins(exec, nil, args, k8sArgs, n.Delegates, idx, n.RuntimeConfig, n)
 			return nil, cmdPluginErr(k8sArgs, netName, "error adding container to network %q: %v", netName, err)
@@ -664,10 +664,6 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
 			}
 		}
-
-		// Remove namespace from delegate.Name for Add/Del CNI cache
-		nameSlice := strings.Split(delegate.Name, "/")
-		netName = nameSlice[len(nameSlice)-1]
 
 		// Remove gateway if `default-route` network selection is specified
 		if deleteV4gateway || deleteV6gateway {
