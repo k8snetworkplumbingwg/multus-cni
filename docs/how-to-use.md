@@ -604,7 +604,7 @@ The `--multus-master-cni-file-name` can be used to select the cni file as the ma
     --multus-log-level=
     --multus-log-file=
 
-Used only with `--multus-conf-file=auto`. See the documentation for logging for which values are permitted.
+Used only with `--multus-conf-file=auto`. See the [documentation for logging](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#logging) for which values are permitted.
 
 Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to specify CNI spec version.
 
