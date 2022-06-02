@@ -74,6 +74,7 @@ Furthermore, it also accepts a new command line parameter, where the user
 specifies the path to the server configuration:
 
 - `config`: Defaults to `"/etc/cni/net.d/multus.d/daemon-config.json"`
+- `metricsPort`: Metrics port (of multus' metric exporter), default is disable
 
 ### Server configuration
 

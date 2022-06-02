@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -30,6 +31,8 @@ import (
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -229,6 +232,14 @@ func startMultusDaemon(configFilePath string) error {
 	server, err := srv.NewCNIServer(daemonConfig, config)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
+	}
+
+	if daemonConfig.MetricsPort != nil {
+		go utilwait.Forever(func() {
+			http.Handle("/metrics", promhttp.Handler())
+			logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
+			logging.Debugf("metrics: %s", http.ListenAndServe(fmt.Sprintf(":%d", *daemonConfig.MetricsPort), nil))
+		}, 0)
 	}
 
 	l, err := srv.GetListener(srv.SocketPath(daemonConfig.MultusSocketDir))

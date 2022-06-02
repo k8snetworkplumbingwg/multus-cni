@@ -30,6 +30,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -126,6 +128,7 @@ var _ = Describe(suiteName, func() {
 		})
 
 		AfterEach(func() {
+			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
 			Expect(K8sClient.Client.CoreV1().Pods("test").Delete(
@@ -180,6 +183,7 @@ var _ = Describe(suiteName, func() {
 		})
 
 		AfterEach(func() {
+			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
 			Expect(K8sClient.Client.CoreV1().Pods("test").Delete(
@@ -278,6 +282,13 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo, servConfig []byte)
 		}
 	}, period)
 	return cniServer, nil
+}
+
+// unregisterMetrics unregister registered metrics
+// it requires only for unit-testing because unit-tests calls newCNIServer() multiple times
+// in unit-testing.
+func unregisterMetrics(server *Server) {
+	ExpectWithOffset(1, prometheus.Unregister(server.metrics.requestCounter)).To(BeTrue())
 }
 
 func referenceConfig(thickPluginSocketDir string) string {

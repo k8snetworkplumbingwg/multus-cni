@@ -29,7 +29,10 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
+
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
@@ -113,22 +116,40 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		kubeclient:   kubeClient,
 		exec:         exec,
 		serverConfig: servConfig,
+		metrics: &Metrics{
+			requestCounter: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "multus_server_request_total",
+					Help: "Counter of HTTP requests",
+				},
+				[]string{"handler", "code", "method"},
+			),
+		},
 	}
+	// register metrics
+	prometheus.MustRegister(s.metrics.requestCounter)
 
-	router.NotFoundHandler = http.HandlerFunc(http.NotFound)
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		result, err := s.handleCNIRequest(r)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
-			return
-		}
+	router.NotFoundHandler = promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": "NotFound"}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = logging.Errorf("http not found: %v", r)
+			w.WriteHeader(http.StatusNotFound)
+		}))
 
-		// Empty response JSON means success with no body
-		w.Header().Set("Content-Type", "application/json")
-		if _, err := w.Write(result); err != nil {
-			_ = logging.Errorf("Error writing HTTP response: %v", err)
-		}
-	}).Methods("POST")
+	router.HandleFunc("/cni", promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": "/cni"}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			result, err := s.handleCNIRequest(r)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			// Empty response JSON means success with no body
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(result); err != nil {
+				_ = logging.Errorf("Error writing HTTP response: %v", err)
+			}
+		}))).Methods("POST")
 
 	return s, nil
 }

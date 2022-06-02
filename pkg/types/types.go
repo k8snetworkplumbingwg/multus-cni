@@ -198,6 +198,8 @@ type ControllerNetConf struct {
 	LogLevel    string `json:"logLevel"`
 	LogToStderr bool   `json:"logToStderr,omitempty"`
 
+	MetricsPort *int `json:"metricsPort,omitempty"`
+
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.
 	MultusSocketDir string `json:"socketDir"`
