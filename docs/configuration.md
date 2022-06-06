@@ -111,7 +111,7 @@ Optionally, you may have Multus log to a file on the filesystem. This file will 
 For example in your CNI configuration, you may set:
 
 ```
-    "LogFile": "/var/log/multus.log",
+    "logFile": "/var/log/multus.log",
 ```
 
 #### Logging Level
@@ -128,7 +128,7 @@ The available logging level values, in decreasing order of verbosity are:
 You may configure the logging level by using the `LogLevel` option in your CNI configuration. For example:
 
 ```
-    "LogLevel": "debug",
+    "logLevel": "debug",
 ```
 
 #### Logging Options
