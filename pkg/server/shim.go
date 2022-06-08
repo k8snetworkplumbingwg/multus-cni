@@ -72,9 +72,11 @@ func postRequest(args *skel.CmdArgs) (*Response, string, error) {
 	}
 
 	response := &Response{}
-	if err = json.Unmarshal(body, response); err != nil {
-		err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
-		return nil, multusShimConfig.CNIVersion, err
+	if len(body) != 0 {
+		if err = json.Unmarshal(body, response); err != nil {
+			err = fmt.Errorf("failed to unmarshal response '%s': %v", string(body), err)
+			return nil, multusShimConfig.CNIVersion, err
+		}
 	}
 	return response, multusShimConfig.CNIVersion, nil
 }

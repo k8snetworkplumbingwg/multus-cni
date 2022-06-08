@@ -16,9 +16,11 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -67,6 +69,62 @@ var _ = Describe("Configuration Manager", func() {
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config).To(Equal(expectedResult))
+	})
+
+	It("Check overrideCNIVersion is worked", func() {
+		err := overrideCNIVersion(defaultCniConfig, "1.1.1")
+		Expect(err).NotTo(HaveOccurred())
+		raw, err := ioutil.ReadFile(defaultCniConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		var jsonConfig map[string]interface{}
+		err = json.Unmarshal(raw, &jsonConfig)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(jsonConfig["cniVersion"].(string)).To(Equal("1.1.1"))
+	})
+
+	It("Check primaryCNIPlugin can be identified", func() {
+		fileName, err := getPrimaryCNIPluginName(multusConfigDir)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fileName).To(Equal(primaryCNIPluginName))
+	})
+
+	It("Check MonitorPluginConfiguration", func() {
+		config, err := configManager.GenerateConfig()
+		Expect(err).NotTo(HaveOccurred())
+
+		err = configManager.PersistMultusConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+
+		configWatcherDoneChannel := make(chan struct{})
+		go func(stopChannel chan struct{}, doneChannel chan struct{}) {
+			defer func() {
+				stopChannel <- struct{}{}
+			}()
+			err := configManager.MonitorPluginConfiguration(configWatcherDoneChannel, stopChannel)
+			Expect(err).NotTo(HaveOccurred())
+		}(make(chan struct{}), configWatcherDoneChannel)
+
+		updatedCNIConfig := `
+{
+  "cniVersion": "0.4.0",
+  "name": "mycni-name",
+  "type": "mycni2",
+  "ipam": {},
+  "dns": {}
+}
+`
+		// update the CNI config to update the master config
+		Expect(ioutil.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
+
+		// wait for a while to get fsnotify event
+		time.Sleep(100 * time.Millisecond)
+		file, err := ioutil.ReadFile(configManager.multusConfigFilePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(file)).To(Equal(config))
+
+		// stop groutine
+		configWatcherDoneChannel <- struct{}{}
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {

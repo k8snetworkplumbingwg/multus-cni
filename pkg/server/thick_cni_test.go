@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,11 +41,6 @@ import (
 )
 
 const suiteName = "Thick CNI architecture"
-
-func TestMultusThickCNIArchitecture(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, suiteName)
-}
 
 type fakeExec struct{}
 
@@ -132,16 +126,15 @@ var _ = Describe(suiteName, func() {
 				context.TODO(), podName, metav1.DeleteOptions{}))
 		})
 
-		It("ADD works successfully", func() {
+		It("ADD/CHECK/DEL works successfully", func() {
+			Expect(os.Setenv("CNI_COMMAND", "ADD")).NotTo(HaveOccurred())
 			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
-		})
 
-		It("DEL works successfully", func() {
-			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
-		})
-
-		It("CHECK works successfully", func() {
+			Expect(os.Setenv("CNI_COMMAND", "CHECK")).NotTo(HaveOccurred())
 			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+
+			Expect(os.Setenv("CNI_COMMAND", "DEL")).NotTo(HaveOccurred())
+			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 		})
 	})
 
@@ -186,16 +179,16 @@ var _ = Describe(suiteName, func() {
 				context.TODO(), podName, metav1.DeleteOptions{}))
 		})
 
-		It("ADD works successfully", func() {
+		It("ADD/CHECK/DEL works successfully", func() {
+			Expect(os.Setenv("CNI_COMMAND", "ADD")).NotTo(HaveOccurred())
 			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
-		})
 
-		It("DEL works successfully", func() {
-			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
-		})
-
-		It("CHECK works successfully", func() {
+			Expect(os.Setenv("CNI_COMMAND", "CHECK")).NotTo(HaveOccurred())
 			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+
+			Expect(os.Setenv("CNI_COMMAND", "DEL")).NotTo(HaveOccurred())
+			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+
 		})
 	})
 })
@@ -219,9 +212,6 @@ func cniCmdArgs(containerID string, netnsPath string, ifName string, stdinData s
 
 func prepareCNIEnv(netnsPath string, namespaceName string, podName string, podUID string) error {
 	cniArgs := fmt.Sprintf("K8S_POD_NAMESPACE=%s;K8S_POD_NAME=%s;K8S_POD_INFRA_CONTAINER_ID=;K8S_POD_UID=%s", namespaceName, podName, podUID)
-	if err := os.Setenv("CNI_COMMAND", "ADD"); err != nil {
-		return err
-	}
 	if err := os.Setenv("CNI_CONTAINERID", "123456789"); err != nil {
 		return err
 	}
@@ -290,7 +280,7 @@ func referenceConfig(thickPluginSocketDir string) string {
         "defaultnetworkwaitseconds": 3,
         "delegates": [{
             "name": "weave1",
-            "cniVersion": "0.3.1",
+            "cniVersion": "0.4.0",
             "type": "weave-net"
         }]}`
 	return fmt.Sprintf(referenceConfigTemplate, thickPluginSocketDir)
