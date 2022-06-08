@@ -34,14 +34,15 @@ import (
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"github.com/vishvananda/netlink"
-	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const (
@@ -60,7 +61,7 @@ var (
 	pollTimeout  = 45 * time.Second
 )
 
-//PrintVersionString ...
+// PrintVersionString ...
 func PrintVersionString() string {
 	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
 		version, commit, date)
@@ -547,7 +548,7 @@ func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (
 	return pod, nil
 }
 
-//CmdAdd ...
+// CmdAdd ...
 func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdAdd: %v, %v, %v", args, exec, kubeClient)
@@ -736,7 +737,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	return result, nil
 }
 
-//CmdCheck ...
+// CmdCheck ...
 func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdCheck: %v, %v, %v", args, exec, kubeClient)
@@ -762,7 +763,7 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	return nil
 }
 
-//CmdDel ...
+// CmdDel ...
 func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdDel: %v, %v, %v", args, exec, kubeClient)
@@ -847,6 +848,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	} else {
 		defer os.Remove(path)
+		in.Delegates = []*types.DelegateNetConf{}
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
 		}
