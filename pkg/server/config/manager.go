@@ -47,7 +47,7 @@ type Manager struct {
 // configuration to `multusAutoconfigDir`. This constructor will auto-discover
 // the primary CNI for which it will delegate.
 func NewManager(config MultusConf, multusAutoconfigDir string, forceCNIVersion bool) (*Manager, error) {
-	defaultCNIPluginName, err := primaryCNIPluginName(multusAutoconfigDir)
+	defaultCNIPluginName, err := getPrimaryCNIPluginName(multusAutoconfigDir)
 	if err != nil {
 		_ = logging.Errorf("failed to find the primary CNI plugin: %v", err)
 		return nil, err
@@ -218,7 +218,7 @@ func (m Manager) PersistMultusConfig(config string) error {
 	return ioutil.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
-func primaryCNIPluginName(multusAutoconfigDir string) (string, error) {
+func getPrimaryCNIPluginName(multusAutoconfigDir string) (string, error) {
 	masterCniConfigFileName, err := findMasterPlugin(multusAutoconfigDir, 120)
 	if err != nil {
 		return "", fmt.Errorf("failed to find the cluster master CNI plugin: %w", err)

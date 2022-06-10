@@ -15,9 +15,13 @@
 package logging
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"testing"
+
 	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -56,12 +60,16 @@ var _ = Describe("logging operations", func() {
 	It("Check loglevel setter", func() {
 		SetLogLevel("debug")
 		Expect(loggingLevel).To(Equal(DebugLevel))
+		Expect(loggingLevel.String()).To(Equal("debug"))
 		SetLogLevel("Error")
 		Expect(loggingLevel).To(Equal(ErrorLevel))
+		Expect(loggingLevel.String()).To(Equal("error"))
 		SetLogLevel("VERbose")
 		Expect(loggingLevel).To(Equal(VerboseLevel))
+		Expect(loggingLevel.String()).To(Equal("verbose"))
 		SetLogLevel("PANIC")
 		Expect(loggingLevel).To(Equal(PanicLevel))
+		Expect(loggingLevel.String()).To(Equal("panic"))
 	})
 
 	It("Check loglevel setter with invalid level", func() {
@@ -74,6 +82,37 @@ var _ = Describe("logging operations", func() {
 		currentVal := loggingStderr
 		SetLogStderr(!currentVal)
 		Expect(loggingStderr).NotTo(Equal(currentVal))
+	})
+
+	It("Check log function is worked", func() {
+		Debugf("foobar")
+		Verbosef("foobar")
+		Expect(Errorf("foobar")).NotTo(BeNil())
+		Panicf("foobar")
+	})
+
+	It("Check log function is worked with stderr", func() {
+		SetLogStderr(true)
+		Debugf("foobar")
+		Verbosef("foobar")
+		Expect(Errorf("foobar")).NotTo(BeNil())
+		Panicf("foobar")
+	})
+
+	It("Check log function is worked with stderr", func() {
+		tmpDir, err := ioutil.TempDir("", "multus_tmp")
+		SetLogFile(fmt.Sprintf("%s/log.txt", tmpDir))
+		Debugf("foobar")
+		Verbosef("foobar")
+		Expect(Errorf("foobar")).NotTo(BeNil())
+		Panicf("foobar")
+		logger.Filename = ""
+		loggingW = nil
+		err = os.RemoveAll(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+		// Revert the log variable to init
+		loggingW = nil
+		logger = &lumberjack.Logger{}
 	})
 
 	// Tests public getter

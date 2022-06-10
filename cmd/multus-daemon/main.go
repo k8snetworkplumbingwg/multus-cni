@@ -201,7 +201,7 @@ func main() {
 			defer func() {
 				stopChannel <- struct{}{}
 			}()
-			if err := configManager.MonitorPluginConfiguration(stopChannel, configWatcherDoneChannel); err != nil {
+			if err := configManager.MonitorPluginConfiguration(configWatcherDoneChannel, stopChannel); err != nil {
 				_ = logging.Errorf("error watching file: %v", err)
 			}
 		}(make(chan struct{}), configWatcherDoneChannel)
