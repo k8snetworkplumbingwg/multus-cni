@@ -66,7 +66,7 @@ func postRequest(args *skel.CmdArgs) (*Response, string, error) {
 		return nil, multusShimConfig.CNIVersion, err
 	}
 
-	body, err := DoCNI("http://dummy/", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
+	body, err := DoCNI("http://dummy/cni", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
 	if err != nil {
 		return nil, multusShimConfig.CNIVersion, err
 	}

@@ -7,6 +7,8 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
@@ -21,6 +23,11 @@ type Request struct {
 	Config []byte `json:"config,omitempty"`
 }
 
+// Metrics represents server's metrics.
+type Metrics struct {
+	requestCounter *prometheus.CounterVec
+}
+
 // Server represents an HTTP server listening to a unix socket. It will handle
 // the CNI shim requests issued when a pod is added / removed.
 type Server struct {
@@ -30,6 +37,7 @@ type Server struct {
 	kubeclient   *k8sclient.ClientInfo
 	exec         invoke.Exec
 	serverConfig []byte
+	metrics      *Metrics
 }
 
 // Response represents the response (computed in the CNI server) for
