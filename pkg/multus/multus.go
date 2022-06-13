@@ -770,14 +770,14 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return err
 	}
 
-	netnsfound := true
+	skipStatusUpdate := false
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
 		// if NetNs is passed down by the Cloud Orchestration Engine, or if it called multiple times
 		// so don't return an error if the device is already removed.
 		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
 		_, ok := err.(ns.NSPathNotExistErr)
-		netnsfound = false
+		skipStatusUpdate = true
 		if ok {
 			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
@@ -813,6 +813,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	if err != nil {
 		// getPod may be failed but just do print error in its log and continue to delete
 		logging.Errorf("Multus: getPod failed: %v, but continue to delete", err)
+		// skip status update because k8s api seems to be stucked
+		skipStatusUpdate = true
 	}
 
 	// Read the cache to get delegates json for the pod
@@ -874,7 +876,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if in.Kubeconfig != "" {
-		if netnsfound {
+		if !skipStatusUpdate {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
 				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)
 				if err != nil {
@@ -883,7 +885,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				}
 			}
 		} else {
-			logging.Debugf("WARNING: Unset SetNetworkStatus skipped due to netns not found.")
+			logging.Debugf("WARNING: Unset SetNetworkStatus skipped")
 		}
 	}
 
