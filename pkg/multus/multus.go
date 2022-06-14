@@ -34,14 +34,15 @@ import (
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"github.com/vishvananda/netlink"
-	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 const (
@@ -60,7 +61,7 @@ var (
 	pollTimeout  = 45 * time.Second
 )
 
-//PrintVersionString ...
+// PrintVersionString ...
 func PrintVersionString() string {
 	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
 		version, commit, date)
@@ -546,7 +547,7 @@ func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (
 	return pod, nil
 }
 
-//CmdAdd ...
+// CmdAdd ...
 func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdAdd: %v, %v, %v", args, exec, kubeClient)
@@ -735,7 +736,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	return result, nil
 }
 
-//CmdCheck ...
+// CmdCheck ...
 func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdCheck: %v, %v, %v", args, exec, kubeClient)
@@ -761,7 +762,7 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	return nil
 }
 
-//CmdDel ...
+// CmdDel ...
 func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdDel: %v, %v, %v", args, exec, kubeClient)
@@ -769,14 +770,14 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return err
 	}
 
-	netnsfound := true
+	skipStatusUpdate := false
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
 		// if NetNs is passed down by the Cloud Orchestration Engine, or if it called multiple times
 		// so don't return an error if the device is already removed.
 		// https://github.com/kubernetes/kubernetes/issues/43014#issuecomment-287164444
 		_, ok := err.(ns.NSPathNotExistErr)
-		netnsfound = false
+		skipStatusUpdate = true
 		if ok {
 			logging.Debugf("CmdDel: WARNING netns may not exist, netns: %s, err: %s", args.Netns, err)
 		} else {
@@ -812,6 +813,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	if err != nil {
 		// getPod may be failed but just do print error in its log and continue to delete
 		logging.Errorf("Multus: getPod failed: %v, but continue to delete", err)
+		// skip status update because k8s api seems to be stucked
+		skipStatusUpdate = true
 	}
 
 	// Read the cache to get delegates json for the pod
@@ -846,6 +849,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	} else {
 		defer os.Remove(path)
+		in.Delegates = []*types.DelegateNetConf{}
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
 		}
@@ -873,7 +877,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	// unset the network status annotation in apiserver, only in case Multus as kubeconfig
 	if kubeClient != nil {
-		if netnsfound {
+		if !skipStatusUpdate {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAMESPACE), in.SystemNamespaces) {
 				err := k8s.SetNetworkStatus(kubeClient, k8sArgs, nil, in)
 				if err != nil {
@@ -882,7 +886,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 				}
 			}
 		} else {
-			logging.Debugf("WARNING: Unset SetNetworkStatus skipped due to netns not found.")
+			logging.Debugf("WARNING: Unset SetNetworkStatus skipped")
 		}
 	}
 
