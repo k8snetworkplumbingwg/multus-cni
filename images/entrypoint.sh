@@ -15,6 +15,7 @@ CNI_CONF_DIR="/host/etc/cni/net.d"
 CNI_BIN_DIR="/host/opt/cni/bin"
 ADDITIONAL_BIN_DIR=""
 MULTUS_CONF_FILE="/usr/src/multus-cni/images/70-multus.conf"
+MULTUS_CONF_DIR="/etc/cni/multus/net.d"
 MULTUS_AUTOCONF_DIR="/host/etc/cni/net.d"
 MULTUS_BIN_FILE="/usr/src/multus-cni/bin/multus"
 MULTUS_KUBECONFIG_FILE_HOST="/etc/cni/net.d/multus.d/multus.kubeconfig"
@@ -50,6 +51,7 @@ function usage()
     echo -e "\t--cni-conf-dir=$CNI_CONF_DIR"
     echo -e "\t--cni-version=<cniVersion (e.g. 0.3.1)>"
     echo -e "\t--multus-conf-file=$MULTUS_CONF_FILE"
+    echo -e "\t--multus-conf-dir=$MULTUS_CONF_DIR"
     echo -e "\t--multus-bin-file=$MULTUS_BIN_FILE"
     echo -e "\t--skip-multus-binary-copy=$SKIP_BINARY_COPY"
     echo -e "\t--multus-kubeconfig-file-host=$MULTUS_KUBECONFIG_FILE_HOST"
@@ -129,6 +131,9 @@ while [ "$1" != "" ]; do
             ;;
         --multus-conf-file)
             MULTUS_CONF_FILE=$VALUE
+            ;;
+        --multus-conf-dir)
+            MULTUS_CONF_DIR=$VALUE
             ;;
         --multus-kubeconfig-file-host)
             MULTUS_KUBECONFIG_FILE_HOST=$VALUE
@@ -403,6 +408,7 @@ EOF
         {
           $CNI_VERSION_STRING
           "name": "$MASTER_PLUGIN_NET_NAME",
+          "confDir": "$MULTUS_CONF_DIR",
           "type": "multus",
           $NESTED_CAPABILITIES_STRING
           $ISOLATION_STRING
