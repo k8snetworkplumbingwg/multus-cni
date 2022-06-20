@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# multus thin plugin install shell script
+#
+# note: this script is designed for quick-install or just 'tasting multus' in your test environment.
+# hence it does not cover advanced Kubernetes cluster operation (update, uninstall and so on).
+
 # Always exit on errors.
 set -e
 

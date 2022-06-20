@@ -1,4 +1,9 @@
-## Development Information
+## Development/Support Information
+
+## Which Kubernetes version is supported in multus?
+
+Currently multus team supports Kubernetes that Kubernetes community maintains.
+See [Version Skew Policy](https://kubernetes.io/releases/version-skew-policy/) for the details.
 
 ## How to utilize multus-cni code as library?
 
@@ -8,7 +13,6 @@ You can use following command to import our code into your go code.
 ```
 go get gopkg.in/k8snetworkplumbingwg/multus-cni.v3
 ```
-
 
 ## How do I submit an issue?
 

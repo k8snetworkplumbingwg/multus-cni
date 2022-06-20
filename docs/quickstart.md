@@ -50,8 +50,16 @@ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cn
 
 We'll apply a YAML file with `kubectl` from this repo.
 
+For thin-plugin (i.e. standalone implementation) case:
+
 ```
-cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
+cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+```
+
+For [thick-plugin](docks/thick-plugin.md) (i.e. client/server implementation) case:
+
+```
+cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f -
 ```
 
 ### What the Multus daemonset does
