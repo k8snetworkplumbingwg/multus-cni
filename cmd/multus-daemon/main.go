@@ -13,6 +13,8 @@
 // limitations under the License.
 //
 
+// This binary works as a server that receives requests from multus-shim
+// CNI plugin and creates network interface for kubernets pods.
 package main
 
 import (
