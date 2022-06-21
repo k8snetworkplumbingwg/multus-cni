@@ -68,7 +68,7 @@ type fakeExec struct {
 	delIndex        int
 	chkIndex        int
 	expectedDelSkip int
-	plugins map[string]*fakePlugin
+	plugins         map[string]*fakePlugin
 }
 
 func newFakeExec() *fakeExec {
