@@ -13,6 +13,7 @@
 // limitations under the License.
 //
 
+// this generates kubeconfig file for multus based on service account
 package main
 
 import (
