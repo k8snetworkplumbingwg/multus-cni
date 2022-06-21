@@ -15,7 +15,6 @@
 // This is a "Multi-plugin".The delegate concept referred from CNI project
 // It reads other plugin netconf, and then invoke them, e.g.
 // flannel or sriov plugin.
-
 package main
 
 import (
