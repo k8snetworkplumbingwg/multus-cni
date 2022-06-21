@@ -13,6 +13,8 @@
 // limitations under the License.
 //
 
+// this is daemonized entrypoint process. which watches master config
+// and generate multus CNI config
 package main
 
 import (
