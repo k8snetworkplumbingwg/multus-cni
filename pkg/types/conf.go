@@ -80,6 +80,8 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConfList bytes: %v", err)
 			}
+			delegateConf.ResourceName = resourceName
+			delegateConf.DeviceID = deviceID
 		}
 		if net != nil && net.CNIArgs != nil {
 			bytes, err = addCNIArgsInConfList(bytes, net.CNIArgs)
