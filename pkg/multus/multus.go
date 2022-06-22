@@ -452,7 +452,7 @@ func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *type
 	var errorstrings []string
 	for idx := lastIdx; idx >= 0; idx-- {
 		ifName := getIfname(delegates[idx], args.IfName, idx)
-		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, multusNetconf.WholeRuntimeConfig, delegates[idx])
 		// Attempt to delete all but do not error out, instead, collect all errors.
 		if err := delegateDel(exec, pod, delegates[idx], rt, multusNetconf); err != nil {
 			errorstrings = append(errorstrings, err.Error())
@@ -555,6 +555,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if err != nil {
 		return nil, cmdErr(nil, "error loading netconf: %v", err)
 	}
+	logging.Debugf("Whole RuntimeConfig: %+v", n.WholeRuntimeConfig)
 
 	kubeClient, err = k8s.GetK8sClient(n.Kubeconfig, kubeClient)
 	if err != nil {
@@ -608,7 +609,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	var netStatus []nettypes.NetworkStatus
 	for idx, delegate := range n.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
-		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, delegate)
+		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, n.RuntimeConfig, n.WholeRuntimeConfig, delegate)
 		if cniDeviceInfoPath != "" && delegate.ResourceName != "" && delegate.DeviceID != "" {
 			err = nadutils.CopyDeviceInfoForCNIFromDP(cniDeviceInfoPath, delegate.ResourceName, delegate.DeviceID)
 			// Even if the filename is set, file may not be present. Ignore error,
@@ -753,7 +754,7 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 	for idx, delegate := range in.Delegates {
 		ifName := getIfname(delegate, args.IfName, idx)
 
-		rt, _ := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, in.WholeRuntimeConfig, delegate)
 		err = delegateCheck(exec, delegate, rt, in)
 		if err != nil {
 			return err

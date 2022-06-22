@@ -35,14 +35,15 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -170,7 +171,7 @@ func (f *fakeExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData 
 	}
 	plugin := f.plugins[envMap["CNI_IFNAME"]]
 
-	//GinkgoT().Logf("[%s %d] exec plugin %q found %+v\n", cmd, index, pluginPath, plugin)
+	// GinkgoT().Logf("[%s %d] exec plugin %q found %+v\n", cmd, index, pluginPath, plugin)
 	fmt.Printf("[%s %d] exec plugin %q found %+v\n", cmd, index, pluginPath, plugin)
 
 	// strip prevResult from stdinData; tests don't need it
@@ -1534,7 +1535,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		rawnetconflist := []byte(`{"cniVersion":"0.2.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
-		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil, nil)
 
 		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())
@@ -2667,7 +2668,7 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		rawnetconflist := []byte(`{"cniVersion":"0.4.0","name":"weave1","type":"weave-net"}`)
 		k8sargs, err := k8sclient.GetK8sArgs(args)
 		n, err := types.LoadNetConf(args.StdinData)
-		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
+		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil, nil)
 
 		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())

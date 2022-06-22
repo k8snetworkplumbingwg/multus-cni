@@ -16,8 +16,9 @@
 package types
 
 import (
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"net"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -46,7 +47,12 @@ type NetConf struct {
 	LogLevel        string                   `json:"logLevel"`
 	LogToStderr     bool                     `json:"logToStderr,omitempty"`
 	LogOptions      *logging.LogOptions      `json:"logOptions,omitempty"`
-	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	// TODO: merge RuntimeConfig and WholeRuntimeConfig
+	RuntimeConfig *RuntimeConfig `json:"runtimeConfig,omitempty"`
+	// WholeRuntimeConfig Save all RuntimeConfig parameters submitted by the container runtime.
+	// Can supports all capabilities for cluster networks
+	// Not all content will be passed to CNI, it will be passed according to the capabilities rules.
+	WholeRuntimeConfig map[string]interface{} `json:"-"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.

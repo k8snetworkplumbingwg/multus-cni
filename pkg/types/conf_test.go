@@ -27,6 +27,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+
 	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 
 	. "github.com/onsi/ginkgo"
@@ -632,7 +633,7 @@ var _ = Describe("config operations", func() {
 			HostIP:        "anotherSampleHostIP",
 		}
 
-		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", rc, nil)
+		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", rc, nil, nil)
 		fmt.Println("rt.ContainerID: ", rt.ContainerID)
 		Expect(rt.ContainerID).To(Equal("123456789"))
 		Expect(rt.NetNS).To(Equal(args.Netns))
@@ -664,7 +665,7 @@ var _ = Describe("config operations", func() {
 
 		os.Setenv("CNI_ARGS", "K8S_POD_NAME=dummy;K8S_POD_NAMESPACE=namespacedummy;K8S_POD_INFRA_CONTAINER_ID=123456789;K8S_POD_UID=aaaaa;BLAHBLAH=foo=bar")
 		k8sArgs := &K8sArgs{}
-		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", &RuntimeConfig{}, nil)
+		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", &RuntimeConfig{}, nil, nil)
 		fmt.Println("rt.ContainerID: ", rt.ContainerID)
 		Expect(rt.ContainerID).To(Equal("123456789"))
 		Expect(rt.NetNS).To(Equal(args.Netns))

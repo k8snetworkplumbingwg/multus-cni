@@ -27,6 +27,7 @@ import (
 	"github.com/containernetworking/cni/pkg/types/current"
 	"github.com/containernetworking/cni/pkg/version"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 )
 
@@ -192,7 +193,7 @@ func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetCo
 
 // CreateCNIRuntimeConf create CNI RuntimeConf for a delegate. If delegate configuration
 // exists, merge data with the runtime config.
-func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
+func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, rc *RuntimeConfig, wholeRC map[string]interface{}, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
 	logging.Debugf("CreateCNIRuntimeConf: %v, %v, %s, %v %v", args, k8sArgs, ifName, rc, delegate)
 	var cniDeviceInfoFile string
 	var delegateRc *RuntimeConfig
@@ -280,6 +281,11 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 		if delegateRc.CNIDeviceInfoFile != "" {
 			capabilityArgs["CNIDeviceInfoFile"] = delegateRc.CNIDeviceInfoFile
 		}
+		for capKey, capValue := range wholeRC {
+			if _, ok := rt.CapabilityArgs[capKey]; !ok {
+				capabilityArgs[capKey] = capValue
+			}
+		}
 		rt.CapabilityArgs = capabilityArgs
 	}
 	return rt, cniDeviceInfoFile
@@ -297,6 +303,16 @@ func GetGatewayFromResult(result *current.Result) []net.IP {
 	return gateways
 }
 
+func loadWholeRuntimeConfig(bytes []byte) (map[string]interface{}, error) {
+	tinyNetConf := struct {
+		RuntimeConfig map[string]interface{} `json:"runtimeConfig"`
+	}{}
+	if err := json.Unmarshal(bytes, &tinyNetConf); err != nil {
+		return nil, err
+	}
+	return tinyNetConf.RuntimeConfig, nil
+}
+
 // LoadNetConf converts inputs (i.e. stdin) to NetConf
 func LoadNetConf(bytes []byte) (*NetConf, error) {
 	// LogToStderr's default value set to true
@@ -306,6 +322,12 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	if err := json.Unmarshal(bytes, netconf); err != nil {
 		return nil, logging.Errorf("LoadNetConf: failed to load netconf: %v", err)
 	}
+
+	wholeRuntimeConfig, err := loadWholeRuntimeConfig(bytes)
+	if err != nil {
+		return nil, logging.Errorf("LoadWholeRuntimeConfig: failed to load whole RuntimeConfig: %v", err)
+	}
+	netconf.WholeRuntimeConfig = wholeRuntimeConfig
 
 	// Logging
 	logging.SetLogStderr(netconf.LogToStderr)
