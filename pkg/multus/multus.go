@@ -51,9 +51,11 @@ const (
 )
 
 var (
-	version = "master@git"
-	commit  = "unknown commit"
-	date    = "unknown date"
+	version       = "master@git"
+	commit        = "unknown commit"
+	date          = "unknown date"
+	gitTreeState  = ""
+	releaseStatus = ""
 )
 
 var (
@@ -63,8 +65,7 @@ var (
 
 // PrintVersionString ...
 func PrintVersionString() string {
-	return fmt.Sprintf("multus-cni version:%s, commit:%s, date:%s",
-		version, commit, date)
+	return fmt.Sprintf("version:%s(%s%s), commit:%s, date:%s", version, gitTreeState, releaseStatus, commit, date)
 }
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
