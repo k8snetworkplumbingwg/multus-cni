@@ -40,7 +40,7 @@ func main() {
 
 	flag.Parse()
 	if versionOpt == true {
-		fmt.Printf("%s\n", multus.PrintVersionString())
+		fmt.Printf("multus-shim: %s\n", multus.PrintVersionString())
 		return
 	}
 

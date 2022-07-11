@@ -30,6 +30,7 @@ import (
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
@@ -94,10 +95,16 @@ func main() {
 	forceCNIVersion := flag.Bool("force-cni-version", false, "force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
 	readinessIndicator := flag.String(multusReadinessIndicatorFile, "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
+	version := flag.Bool("version", false, "Show version")
 
 	configFilePath := flag.String("config", types.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
 
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("multus-daemon: %s\n", multus.PrintVersionString())
+		os.Exit(4)
+	}
 
 	if err := startMultusDaemon(*configFilePath); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
