@@ -4,20 +4,20 @@ go 1.16
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/containernetworking/cni v0.8.1
-	github.com/containernetworking/plugins v0.9.1
-	github.com/fsnotify/fsnotify v1.4.9
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.1.2-0.20220511184442-64cfb249bdbe
-	github.com/onsi/ginkgo v1.12.1
-	github.com/onsi/gomega v1.10.3
+	github.com/containernetworking/cni v1.1.0
+	github.com/containernetworking/plugins v1.1.1
+	github.com/fsnotify/fsnotify v1.5.1
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.3.0
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
-	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
-	google.golang.org/grpc v1.27.1
+	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	google.golang.org/grpc v1.33.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	k8s.io/api v0.20.10
-	k8s.io/apimachinery v0.20.10
-	k8s.io/client-go v0.20.10
+	k8s.io/api v0.22.8
+	k8s.io/apimachinery v0.22.8
+	k8s.io/client-go v0.22.8
 	k8s.io/klog v1.0.0
 	k8s.io/kubelet v0.0.0
 	k8s.io/kubernetes v1.20.10

@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -31,7 +31,7 @@ type NetConf struct {
 	// support chaining for master interface and IP decisions
 	// occurring prior to running ipvlan plugin
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
-	PrevResult    *current.Result         `json:"-"`
+	PrevResult    *types100.Result        `json:"-"`
 
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`

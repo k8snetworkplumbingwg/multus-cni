@@ -21,8 +21,9 @@ import (
 	"testing"
 
 	"github.com/containernetworking/cni/pkg/skel"
-	"github.com/containernetworking/cni/pkg/types/020"
-	"github.com/containernetworking/cni/pkg/types/current"
+	types020 "github.com/containernetworking/cni/pkg/types/020"
+	types040 "github.com/containernetworking/cni/pkg/types/040"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 
@@ -98,11 +99,11 @@ func test020ResultHasIPv6DefaultRoute(data []byte) bool {
 	return false
 }
 
-func testResultHasIPv4DefaultRoute(data []byte) bool {
-	resultRaw, err := current.NewResult(data)
+func test040ResultHasIPv4DefaultRoute(data []byte) bool {
+	resultRaw, err := types040.NewResult(data)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	result, err := current.GetResult(resultRaw)
+	result, err := types040.GetResult(resultRaw)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	for _, r := range result.Routes {
@@ -113,11 +114,41 @@ func testResultHasIPv4DefaultRoute(data []byte) bool {
 	return false
 }
 
-func testResultHasIPv6DefaultRoute(data []byte) bool {
-	resultRaw, err := current.NewResult(data)
+func test040ResultHasIPv6DefaultRoute(data []byte) bool {
+	resultRaw, err := types040.NewResult(data)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	result, err := current.GetResult(resultRaw)
+	result, err := types040.GetResult(resultRaw)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	for _, r := range result.Routes {
+		if r.Dst.String() == "::/0" {
+			return true
+		}
+	}
+	return false
+}
+
+func test100ResultHasIPv4DefaultRoute(data []byte) bool {
+	resultRaw, err := types100.NewResult(data)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	result, err := types100.GetResult(resultRaw)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	for _, r := range result.Routes {
+		if r.Dst.String() == "0.0.0.0/0" {
+			return true
+		}
+	}
+	return false
+}
+
+func test100ResultHasIPv6DefaultRoute(data []byte) bool {
+	resultRaw, err := types100.NewResult(data)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+
+	result, err := types100.GetResult(resultRaw)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	for _, r := range result.Routes {
@@ -444,8 +475,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := deleteDefaultGWCacheBytes(origResult, true, false)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -458,6 +489,80 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(5))
+		})
+
+		It("verify ipv4 default gateway is removed from CNI 1.0.0 results", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ],
+    "routes": [
+      {
+        "dst": "20.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "0.0.0.0/0",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "30.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "20::0:0:0/56",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "::0/0",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "30::0:0:0/64",
+        "gw": "10::1:1:1"
+      }
+    ]
+  }
+}`)
+			newResult, err := deleteDefaultGWCacheBytes(origResult, true, false)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(5))
 		})
@@ -518,8 +623,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := deleteDefaultGWCacheBytes(origResult, false, true)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -532,6 +637,80 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(5))
+		})
+
+		It("verify ipv6 default gateway is removed from CNI 1.0.0 results", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ],
+    "routes": [
+      {
+        "dst": "20.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "0.0.0.0/0",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "30.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "20::0:0:0/56",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "::0/0",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "30::0:0:0/64",
+        "gw": "10::1:1:1"
+      }
+    ]
+  }
+}`)
+			newResult, err := deleteDefaultGWCacheBytes(origResult, false, true)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(5))
 		})
@@ -818,8 +997,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -832,6 +1011,54 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(1))
+		})
+
+		It("verify ipv4 default gateway is added to CNI 1.0.0 results without routes", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ]
+  }
+}`)
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(1))
 		})
@@ -884,8 +1111,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -898,6 +1125,72 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(5))
+		})
+
+		It("verify ipv4 default gateway is added to CNI 1.0.0 results", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ],
+    "routes": [
+      {
+        "dst": "20.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "30.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "20::0:0:0/56",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "30::0:0:0/64",
+        "gw": "10::1:1:1"
+      }
+    ]
+  }
+}`)
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10.1.1.1")})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(5))
 		})
@@ -932,8 +1225,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -946,6 +1239,54 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(1))
+		})
+
+		It("verify ipv6 default gateway is added to CNI 1.0.0 results without routes", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ]
+  }
+}`)
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(1))
 		})
@@ -1002,8 +1343,8 @@ var _ = Describe("netutil cnicache function testing", func() {
 			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(testResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
-			Expect(testResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test040ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
 
 			// Simplified CNI Cache with 0.3.0/0.3.1/0.4.0 Result
 			type CNICacheResult030_040 struct {
@@ -1016,6 +1357,76 @@ var _ = Describe("netutil cnicache function testing", func() {
 				} `json:"result"`
 			}
 			result := CNICacheResult030_040{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(6))
+		})
+
+		It("verify ipv6 default gateway is added to CNI 1.0.0 results", func() {
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/var/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10.1.1.103/24",
+        "interface": 0,
+        "version": "4"
+      },
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0,
+        "version": "6"
+      }
+    ],
+    "routes": [
+      {
+        "dst": "20.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "30.0.0.0/24",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "0.0.0.0/0",
+        "gw": "10.1.1.1"
+      },
+      {
+        "dst": "20::0:0:0/56",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "30::0:0:0/64",
+        "gw": "10::1:1:1"
+      }
+    ]
+  }
+}`)
+			newResult, err := addDefaultGWCacheBytes(origResult, []net.IP{net.ParseIP("10::1:1:1")})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv4DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeTrue())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
 			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
 			Expect(len(result.Result.Routes)).To(Equal(6))
 		})
