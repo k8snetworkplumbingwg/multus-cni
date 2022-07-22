@@ -83,7 +83,7 @@ function warn()
     log "WARN: {$1}"
 }
 
-if ! type python3 &> /dev/null; then
+if type python3 &> /dev/null; then
 	alias python=python3
 fi
 
