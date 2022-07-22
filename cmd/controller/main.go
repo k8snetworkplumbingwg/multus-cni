@@ -30,12 +30,12 @@ import (
 )
 
 const (
-	multusPluginName     = "multus"
-	multusConfigFileName = "00-multus.conf"
+	multusPluginName = "multus"
 )
 
 const (
 	defaultCniConfigDir                 = "/etc/cni/net.d"
+	defaultCniConfigFilename            = config.MultusDefaultConfigFileName
 	defaultMultusAdditionalBinDir       = ""
 	defaultMultusCNIVersion             = ""
 	defaultMultusConfigFile             = "auto"
@@ -55,6 +55,7 @@ const (
 
 const (
 	cniConfigDirVarName           = "cni-config-dir"
+	cniConfigFileVarName          = "cni-config-file"
 	multusAdditionalBinDirVarName = "additional-bin-dir"
 	multusAutoconfigDirVarName    = "multus-autoconfig-dir"
 	multusCNIVersion              = "cni-version"
@@ -78,6 +79,7 @@ func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	cniConfigDir := flag.String(cniConfigDirVarName, defaultCniConfigDir, "CNI config dir")
+	cniConfigFileName := flag.String(cniConfigFileVarName, defaultCniConfigFilename, "CNI config filename")
 	multusConfigFile := flag.String(multusConfigFileVarName, defaultMultusConfigFile, "The multus configuration file to use. By default, a new configuration is generated.")
 	multusMasterCni := flag.String(multusMasterCNIFileVarName, defaultMultusMasterCNIFile, "The relative name of the configuration file of the cluster primary CNI.")
 	multusAutoconfigDir := flag.String(multusAutoconfigDirVarName, *cniConfigDir, "The directory path for the generated multus configuration.")
@@ -174,6 +176,10 @@ func main() {
 			logOptions := &config.LogOptions{}
 			config.MutateLogOptions(logOptions, logOptionFuncs...)
 			configurationOptions = append(configurationOptions, config.WithLogOptions(logOptions))
+		}
+
+		if *cniConfigFileName != "" {
+			configurationOptions = append(configurationOptions, config.WithMultusCNIConfigFileName(*cniConfigFileName))
 		}
 
 		multusConfig, err := config.NewMultusConfig(multusPluginName, *cniVersion, *multusKubeconfig, configurationOptions...)

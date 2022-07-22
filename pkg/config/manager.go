@@ -27,9 +27,9 @@ import (
 
 // MultusDefaultNetworkName holds the default name of the multus network
 const (
-	multusConfigFileName     = "00-multus.conf"
-	MultusDefaultNetworkName = "multus-cni-network"
-	userRWPermission         = 0600
+	MultusDefaultConfigFileName = "00-multus.conf"
+	MultusDefaultNetworkName    = "multus-cni-network"
+	userRWPermission            = 0600
 )
 
 // Manager monitors the configuration of the primary CNI plugin, and
@@ -47,7 +47,7 @@ type Manager struct {
 // configuration to `multusAutoconfigDir`. This constructor will auto-discover
 // the primary CNI for which it will delegate.
 func NewManager(config MultusConf, multusAutoconfigDir string) (*Manager, error) {
-	defaultCNIPluginName, err := primaryCNIPluginName(multusAutoconfigDir)
+	defaultCNIPluginName, err := primaryCNIPluginName(multusAutoconfigDir, config.CNIConfigFileName)
 	if err != nil {
 		_ = logging.Errorf("failed to find the primary CNI plugin: %v", err)
 		return nil, err
@@ -69,11 +69,15 @@ func newManager(config MultusConf, multusConfigDir string, defaultCNIPluginName 
 		return nil, err
 	}
 
+	cniConfigFileName := config.CNIConfigFileName
+	if cniConfigFileName == "" {
+		cniConfigFileName = MultusDefaultConfigFileName
+	}
 	configManager := &Manager{
 		configWatcher:        watcher,
 		multusConfig:         &config,
 		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
+		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, cniConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
 	}
 
@@ -179,8 +183,8 @@ func (m Manager) PersistMultusConfig(config string) error {
 	return ioutil.WriteFile(m.multusConfigFilePath, []byte(config), userRWPermission)
 }
 
-func primaryCNIPluginName(multusAutoconfigDir string) (string, error) {
-	masterCniConfigFileName, err := findMasterPlugin(multusAutoconfigDir, 120)
+func primaryCNIPluginName(multusAutoconfigDir string, multusCNIConfigFileName string) (string, error) {
+	masterCniConfigFileName, err := findMasterPlugin(multusAutoconfigDir, multusCNIConfigFileName, 120)
 	if err != nil {
 		return "", fmt.Errorf("failed to find the cluster master CNI plugin: %w", err)
 	}

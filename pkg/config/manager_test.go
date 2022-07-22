@@ -106,7 +106,7 @@ var _ = Describe(suiteName, func() {
 			newCNIConfig := "{\"cniVersion\":\"0.4.0\",\"dns\":{},\"ipam\":{},\"name\":\"yoyo-newnet\",\"type\":\"mycni\"}"
 			Expect(ioutil.WriteFile(defaultCniConfig, []byte(newCNIConfig), userRWPermission)).To(Succeed())
 
-			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName)
+			multusCniConfigFile := fmt.Sprintf("%s/%s", multusConfigDir, MultusDefaultConfigFileName)
 			Eventually(func() (string, error) {
 				multusCniData, err := ioutil.ReadFile(multusCniConfigFile)
 				return string(multusCniData), err

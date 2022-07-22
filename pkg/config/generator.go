@@ -55,6 +55,7 @@ type MultusConf struct {
 	RawNonIsolatedNamespaces string          `json:"globalNamespaces,omitempty"`
 	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
 	Type                     string          `json:"type"`
+	CNIConfigFileName        string          `json:"-"`
 }
 
 // LogOptions specifies the configuration of the log
@@ -206,6 +207,14 @@ func WithOverriddenName(networkName string) Option {
 	}
 }
 
+// WithMultusCNIConfigFileName Modify the CNI configuration file name.
+// default: 00-multus.config
+func WithMultusCNIConfigFileName(cfName string) Option {
+	return func(conf *MultusConf) {
+		conf.CNIConfigFileName = cfName
+	}
+}
+
 func withCapabilities(cniData interface{}) Option {
 	var enabledCapabilities []string
 	var pluginsList []interface{}
@@ -304,7 +313,7 @@ func extractCapabilities(capabilitiesInterface interface{}) []string {
 	return enabledCapabilities
 }
 
-func findMasterPlugin(cniConfigDirPath string, remainingTries int) (string, error) {
+func findMasterPlugin(cniConfigDirPath string, CNIConfigFileName string, remainingTries int) (string, error) {
 	if remainingTries == 0 {
 		return "", fmt.Errorf("could not find a plugin configuration in %s", cniConfigDirPath)
 	}
@@ -315,7 +324,7 @@ func findMasterPlugin(cniConfigDirPath string, remainingTries int) (string, erro
 	}
 
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), "00-multus") {
+		if strings.HasPrefix(file.Name(), strings.TrimSuffix(CNIConfigFileName, filepath.Ext(CNIConfigFileName))) {
 			continue
 		}
 		fileExtension := filepath.Ext(file.Name())
@@ -326,7 +335,7 @@ func findMasterPlugin(cniConfigDirPath string, remainingTries int) (string, erro
 
 	if len(cniPluginConfigs) == 0 {
 		time.Sleep(time.Second)
-		return findMasterPlugin(cniConfigDirPath, remainingTries-1)
+		return findMasterPlugin(cniConfigDirPath, CNIConfigFileName, remainingTries-1)
 	}
 	sort.Strings(cniPluginConfigs)
 	return cniPluginConfigs[0], nil
