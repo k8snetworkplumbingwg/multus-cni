@@ -4,14 +4,14 @@ go 1.17
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/containernetworking/cni v1.0.1
+	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.1.0
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.3.0
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.15.0
+	github.com/onsi/gomega v1.17.0
 	github.com/pkg/errors v0.9.1
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
