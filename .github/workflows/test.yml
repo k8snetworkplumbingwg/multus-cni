@@ -16,11 +16,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Run Revive
-      run: |
-        GO111MODULE=off go get github.com/mgechev/revive
-        $(go env GOPATH)/bin/revive -exclude ./vendor/... ./... # this is ouput for user
-        $(go env GOPATH)/bin/revive -exclude ./vendor/... ./...| xargs -0 -r false # this is for github actions
+    - name: Run Revive Action by pulling pre-built image
+      uses: docker://morphy/revive-action:v2
+      with:
+        exclude: "./vendor/..."
 
     - name: Run go fmt
       run: go fmt ./...
