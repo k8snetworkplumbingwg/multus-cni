@@ -26,13 +26,26 @@ The quickstart installation method for Multus requires that you have first insta
 
 Clone this GitHub repository, we'll apply a daemonset which installs Multus using to `kubectl` from this repo. From the root directory of the clone, apply the daemonset YAML file:
 
+For thin-plugin (i.e. standalone implementation) case:
+
 ```
-cat ./deployments/multus-daemonset-thick-plugin.yml | kubectl apply -f -
+cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+```
+
+For [thick-plugin](docks/thick-plugin.md) (i.e. client/server implementation) case:
+
+```
+cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f -
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](docs/quickstart.md)
 
-## Additional installation Options
+## Thin Plugin v.s Thick Plugin
+
+In multus 4.0 release, we introduces new deployment, client/server style plugin deployment. We call it ['thick plugin'](docs/thick-plugin.md), compared to previous usual deployment (we call it 'thin plugin'). Thick pluign consists with two binary, multus-daemon and multus-shim CNI plugin. 'multus-daemon' will be deployed to all nodes as server. Thick plugin supports additional features, such as metrics, which cannot be supported in 'thin plugin' deployment. On the other side, 'thick plugin' consumes more resources than 'thin plugin', hence you need to think about its trade-off and decide the deployment.
+
+
+## Additional Installation Options
 
 - Install via daemonset using the quick-start guide, above.
 - Download binaries from [release page](https://github.com/k8snetworkplumbingwg/multus-cni/releases)
@@ -43,8 +56,10 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 ## Comprehensive Documentation
 
 - [How to use](docs/how-to-use.md)
+- [Quick Start Guide](docs/quickstart.md)
 - [Configuration](docs/configuration.md)
-- [Development](docs/development.md)
+- [Development and Support Information](docs/development.md)
+- [Thick Plugin](docs/thick-plugin.md)
 
 ## Contact Us
 
