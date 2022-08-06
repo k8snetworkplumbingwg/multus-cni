@@ -178,16 +178,6 @@ type ResourceClient interface {
 	GetPodResourceMap(*v1.Pod) (map[string]*ResourceInfo, error)
 }
 
-// ShimNetConf for the SHIM cni config file written in json
-type ShimNetConf struct {
-	types.NetConf
-
-	MultusSocketDir string `json:"socketDir"`
-	LogFile         string `json:"logFile,omitempty"`
-	LogLevel        string `json:"logLevel,omitempty"`
-	LogToStderr     bool   `json:"logToStderr,omitempty"`
-}
-
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
 	ChrootDir   string `json:"chrootDir,omitempty"`

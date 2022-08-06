@@ -82,7 +82,7 @@ The server configuration is encoded in JSON, and allows the following keys:
 
 - `"chrootDir"`: Specify the directory which points to host root from the pod. See 'Chroot configuration' section for the details.
 - `"socketDir"`: Specify the location where the unix domain socket used for
-client/server communication will be located. Defaults to `"/run/multus-cni"`.
+client/server communication will be located. Defaults to `"/run/multus"`.
 
 In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)
 

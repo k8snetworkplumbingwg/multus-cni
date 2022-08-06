@@ -13,31 +13,15 @@
 // limitations under the License.
 //
 
-package server
+package api
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 )
 
 const (
-	serverSocketName                   = "multus.sock"
-	fullReadWriteExecutePermissions    = 0777
-	thickPluginSocketRunDirPermissions = 0700
+	serverSocketName = "multus.sock"
 )
-
-// FilesystemPreRequirements ensures the target `rundir` features the correct
-// permissions.
-func FilesystemPreRequirements(rundir string) error {
-	if err := os.RemoveAll(rundir); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove old pod info socket directory %s: %v", rundir, err)
-	}
-	if err := os.MkdirAll(rundir, thickPluginSocketRunDirPermissions); err != nil {
-		return fmt.Errorf("failed to create pod info socket directory %s: %v", rundir, err)
-	}
-	return nil
-}
 
 // SocketPath returns the path of the multus CNI socket
 func SocketPath(rundir string) string {

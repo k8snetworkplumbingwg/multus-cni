@@ -32,6 +32,7 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 
@@ -251,9 +252,9 @@ func startMultusDaemon(configFilePath string) error {
 		}, 0)
 	}
 
-	l, err := srv.GetListener(srv.SocketPath(daemonConfig.MultusSocketDir))
+	l, err := srv.GetListener(api.SocketPath(daemonConfig.MultusSocketDir))
 	if err != nil {
-		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", srv.SocketPath(daemonConfig.MultusSocketDir), err)
+		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.MultusSocketDir), err)
 	}
 
 	server.SetKeepAlivesEnabled(false)

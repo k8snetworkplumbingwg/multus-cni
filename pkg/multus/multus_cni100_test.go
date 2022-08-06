@@ -191,7 +191,7 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		fExec.addPlugin100(nil, "net1", expectedConf2, expectedResult2, nil)
 
 		_, err := CmdAdd(args, fExec, nil)
-		Expect(err).To(MatchError("[//:weave1]: error adding container to network \"weave1\": delegateAdd: cannot set \"weave-net\" interface name to \"eth0\": validateIfName: no net namespace fsdadfad found: failed to Statfs \"fsdadfad\": no such file or directory"))
+		Expect(err).To(MatchError("[//:weave1]: error adding container to network \"weave1\": DelegateAdd: cannot set \"weave-net\" interface name to \"eth0\": validateIfName: no net namespace fsdadfad found: failed to Statfs \"fsdadfad\": no such file or directory"))
 	})
 
 	It("returns the previous result using CmdCheck", func() {
