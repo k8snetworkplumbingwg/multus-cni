@@ -287,11 +287,12 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	return err
 }
 
-func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
-	logging.Debugf("delegateAdd: %v, %v, %v", exec, delegate, rt)
+// DelegateAdd ...
+func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
+	logging.Debugf("DelegateAdd: %v, %v, %v", exec, delegate, rt)
 
 	if err := validateIfName(rt.NetNS, rt.IfName); err != nil {
-		return nil, logging.Errorf("delegateAdd: cannot set %q interface name to %q: %v", delegate.Conf.Type, rt.IfName, err)
+		return nil, logging.Errorf("DelegateAdd: cannot set %q interface name to %q: %v", delegate.Conf.Type, rt.IfName, err)
 	}
 
 	// Deprecated in ver 3.5.
@@ -300,10 +301,10 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 			// validate Mac address
 			_, err := net.ParseMAC(delegate.MacRequest)
 			if err != nil {
-				return nil, logging.Errorf("delegateAdd: failed to parse mac address %q", delegate.MacRequest)
+				return nil, logging.Errorf("DelegateAdd: failed to parse mac address %q", delegate.MacRequest)
 			}
 
-			logging.Debugf("delegateAdd: set MAC address %q to %q", delegate.MacRequest, rt.IfName)
+			logging.Debugf("DelegateAdd: set MAC address %q to %q", delegate.MacRequest, rt.IfName)
 			rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
 		}
 
@@ -313,15 +314,15 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 				if strings.Contains(ip, "/") {
 					_, _, err := net.ParseCIDR(ip)
 					if err != nil {
-						return nil, logging.Errorf("delegateAdd: failed to parse IP address %q", ip)
+						return nil, logging.Errorf("DelegateAdd: failed to parse IP address %q", ip)
 					}
 				} else if net.ParseIP(ip) == nil {
-					return nil, logging.Errorf("delegateAdd: failed to parse IP address %q", ip)
+					return nil, logging.Errorf("DelegateAdd: failed to parse IP address %q", ip)
 				}
 			}
 
 			ips := strings.Join(delegate.IPRequest, ",")
-			logging.Debugf("delegateAdd: set IP address %q to %q", ips, rt.IfName)
+			logging.Debugf("DelegateAdd: set IP address %q to %q", ips, rt.IfName)
 			rt.Args = append(rt.Args, [2]string{"IP", ips})
 		}
 	}
@@ -360,7 +361,7 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	ips := []string{}
 	res, err := cni100.NewResultFromResult(result)
 	if err != nil {
-		logging.Errorf("delegateAdd: error converting result: %v", err)
+		logging.Errorf("DelegateAdd: error converting result: %v", err)
 		return result, nil
 	}
 	for _, ip := range res.IPs {
@@ -376,13 +377,14 @@ func delegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 		}
 	} else {
 		// for further debug https://github.com/k8snetworkplumbingwg/multus-cni/issues/481
-		logging.Errorf("delegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
+		logging.Errorf("DelegateAdd: pod nil pointer: namespace: %s, name: %s, container id: %s, pod: %v", rt.Args[1][1], rt.Args[2][1], rt.Args[3][1], pod)
 	}
 	return result, nil
 }
 
-func delegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
-	logging.Debugf("delegateCheck: %v, %v, %v", exec, delegateConf, rt)
+// DelegateCheck ...
+func DelegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
+	logging.Debugf("DelegateCheck: %v, %v, %v", exec, delegateConf, rt)
 
 	if logging.GetLoggingLevel() >= logging.VerboseLevel {
 		var cniConfName string
@@ -398,20 +400,21 @@ func delegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *li
 	if delegateConf.ConfListPlugin {
 		err = conflistCheck(rt, delegateConf.Bytes, multusNetconf, exec)
 		if err != nil {
-			return logging.Errorf("delegateCheck: error invoking ConflistCheck - %q: %v", delegateConf.ConfList.Name, err)
+			return logging.Errorf("DelegateCheck: error invoking ConflistCheck - %q: %v", delegateConf.ConfList.Name, err)
 		}
 	} else {
 		err = confCheck(rt, delegateConf.Bytes, multusNetconf, exec)
 		if err != nil {
-			return logging.Errorf("delegateCheck: error invoking DelegateCheck - %q: %v", delegateConf.Conf.Type, err)
+			return logging.Errorf("DelegateCheck: error invoking DelegateCheck - %q: %v", delegateConf.Conf.Type, err)
 		}
 	}
 
 	return err
 }
 
-func delegateDel(exec invoke.Exec, pod *v1.Pod, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
-	logging.Debugf("delegateDel: %v, %v, %v, %v", exec, pod, delegateConf, rt)
+// DelegateDel ...
+func DelegateDel(exec invoke.Exec, pod *v1.Pod, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
+	logging.Debugf("DelegateDel: %v, %v, %v, %v", exec, pod, delegateConf, rt)
 
 	if logging.GetLoggingLevel() >= logging.VerboseLevel {
 		var confName string
@@ -431,12 +434,12 @@ func delegateDel(exec invoke.Exec, pod *v1.Pod, delegateConf *types.DelegateNetC
 	if delegateConf.ConfListPlugin {
 		err = conflistDel(rt, delegateConf.Bytes, multusNetconf, exec)
 		if err != nil {
-			return logging.Errorf("delegateDel: error invoking ConflistDel - %q: %v", delegateConf.ConfList.Name, err)
+			return logging.Errorf("DelegateDel: error invoking ConflistDel - %q: %v", delegateConf.ConfList.Name, err)
 		}
 	} else {
 		err = confDel(rt, delegateConf.Bytes, multusNetconf, exec)
 		if err != nil {
-			return logging.Errorf("delegateDel: error invoking DelegateDel - %q: %v", delegateConf.Conf.Type, err)
+			return logging.Errorf("DelegateDel: error invoking DelegateDel - %q: %v", delegateConf.Conf.Type, err)
 		}
 	}
 
@@ -454,7 +457,7 @@ func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *type
 		ifName := getIfname(delegates[idx], args.IfName, idx)
 		rt, cniDeviceInfoPath := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, netRt, delegates[idx])
 		// Attempt to delete all but do not error out, instead, collect all errors.
-		if err := delegateDel(exec, pod, delegates[idx], rt, multusNetconf); err != nil {
+		if err := DelegateDel(exec, pod, delegates[idx], rt, multusNetconf); err != nil {
 			errorstrings = append(errorstrings, err.Error())
 		}
 		if cniDeviceInfoPath != "" {
@@ -503,7 +506,9 @@ func isCriticalRequestRetriable(err error) bool {
 	return false
 }
 
-func getPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (*v1.Pod, error) {
+// GetPod retrieves Kubernetes Pod object from given namespace/name in k8sArgs (i.e. cni args)
+// GetPod also get pod UID, but it is not used to retrieve, but it is used for double check
+func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (*v1.Pod, error) {
 	if kubeClient == nil {
 		return nil, nil
 	}
@@ -576,7 +581,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	pod, err := getPod(kubeClient, k8sArgs, false)
+	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +628,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		if netName == "" {
 			netName = delegate.ConfList.Name
 		}
-		tmpResult, err = delegateAdd(exec, kubeClient, pod, delegate, rt, n)
+		tmpResult, err = DelegateAdd(exec, kubeClient, pod, delegate, rt, n)
 		if err != nil {
 			// If the add failed, tear down all networks we already added
 			// Ignore errors; DEL must be idempotent anyway
@@ -754,7 +759,7 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 		ifName := getIfname(delegate, args.IfName, idx)
 
 		rt, _ := types.CreateCNIRuntimeConf(args, k8sArgs, ifName, in.RuntimeConfig, delegate)
-		err = delegateCheck(exec, delegate, rt, in)
+		err = DelegateCheck(exec, delegate, rt, in)
 		if err != nil {
 			return err
 		}
@@ -810,10 +815,10 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return cmdErr(nil, "error getting k8s client: %v", err)
 	}
 
-	pod, err := getPod(kubeClient, k8sArgs, true)
+	pod, err := GetPod(kubeClient, k8sArgs, true)
 	if err != nil {
-		// getPod may be failed but just do print error in its log and continue to delete
-		logging.Errorf("Multus: getPod failed: %v, but continue to delete", err)
+		// GetPod may be failed but just do print error in its log and continue to delete
+		logging.Errorf("Multus: GetPod failed: %v, but continue to delete", err)
 		// skip status update because k8s api seems to be stucked
 		skipStatusUpdate = true
 	}

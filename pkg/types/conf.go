@@ -197,16 +197,16 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podUID := string(k8sArgs.K8S_POD_UID)
 	sandboxID := string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)
-	return NewCNIRuntimeConf(args.ContainerID, sandboxID, podName, podNamespace, podUID, args.Netns, ifName, rc, delegate)
+	return newCNIRuntimeConf(args.ContainerID, sandboxID, podName, podNamespace, podUID, args.Netns, ifName, rc, delegate)
 }
 
-// NewCNIRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
-func NewCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, netNs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
+// newCNIRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func newCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, netNs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
 	logging.Debugf("LoadCNIRuntimeConf: %s, %v %v", ifName, rc, delegate)
 
-	delegateRc := DelegateRuntimeConfig(containerID, delegate, rc, ifName)
+	delegateRc := delegateRuntimeConfig(containerID, delegate, rc, ifName)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
-	rt := CreateRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName)
+	rt := createRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName)
 
 	var cniDeviceInfoFile string
 
@@ -270,8 +270,8 @@ func NewCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, ne
 	return rt, cniDeviceInfoFile
 }
 
-// CreateRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
-func CreateRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName string) *libcni.RuntimeConf {
+// createRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func createRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName string) *libcni.RuntimeConf {
 	return &libcni.RuntimeConf{
 		ContainerID: containerID,
 		NetNS:       netNs,
@@ -287,8 +287,8 @@ func CreateRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, pod
 	}
 }
 
-// DelegateRuntimeConfig creates the CNI `RuntimeConf` for the given ADD / DEL request.
-func DelegateRuntimeConfig(containerID string, delegate *DelegateNetConf, rc *RuntimeConfig, ifName string) *RuntimeConfig {
+// delegateRuntimeConfig creates the CNI `RuntimeConf` for the given ADD / DEL request.
+func delegateRuntimeConfig(containerID string, delegate *DelegateNetConf, rc *RuntimeConfig, ifName string) *RuntimeConfig {
 	var delegateRc *RuntimeConfig
 
 	if delegate != nil {
@@ -319,10 +319,25 @@ func GetGatewayFromResult(result *cni100.Result) []net.IP {
 	return gateways
 }
 
+// GetDefaultNetConf returns NetConf with default variables
+func GetDefaultNetConf() *NetConf {
+	// LogToStderr's default value set to true
+	return &NetConf{
+		BinDir:                 defaultBinDir,
+		ConfDir:                defaultConfDir,
+		CNIDir:                 defaultCNIDir,
+		LogToStderr:            true,
+		MultusNamespace:        defaultMultusNamespace,
+		NonIsolatedNamespaces:  []string{defaultNonIsolatedNamespace},
+		ReadinessIndicatorFile: defaultReadinessIndicatorFile,
+		SystemNamespaces:       []string{"kube-system"},
+	}
+
+}
+
 // LoadNetConf converts inputs (i.e. stdin) to NetConf
 func LoadNetConf(bytes []byte) (*NetConf, error) {
-	// LogToStderr's default value set to true
-	netconf := &NetConf{LogToStderr: true}
+	netconf := GetDefaultNetConf()
 
 	logging.Debugf("LoadNetConf: %s", string(bytes))
 	if err := json.Unmarshal(bytes, netconf); err != nil {
@@ -366,34 +381,8 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 		return nil, logging.Errorf("LoadNetConf: at least one delegate/clusterNetwork must be specified")
 	}
 
-	if netconf.CNIDir == "" {
-		netconf.CNIDir = defaultCNIDir
-	}
-
-	if netconf.ConfDir == "" {
-		netconf.ConfDir = defaultConfDir
-	}
-
-	if netconf.BinDir == "" {
-		netconf.BinDir = defaultBinDir
-	}
-
-	if netconf.ReadinessIndicatorFile == "" {
-		netconf.ReadinessIndicatorFile = defaultReadinessIndicatorFile
-	}
-
-	if len(netconf.SystemNamespaces) == 0 {
-		netconf.SystemNamespaces = []string{"kube-system"}
-	}
-
-	if netconf.MultusNamespace == "" {
-		netconf.MultusNamespace = defaultMultusNamespace
-	}
-
 	// setup namespace isolation
-	if netconf.RawNonIsolatedNamespaces == "" {
-		netconf.NonIsolatedNamespaces = []string{defaultNonIsolatedNamespace}
-	} else {
+	if netconf.RawNonIsolatedNamespaces != "" {
 		// Parse the comma separated list
 		nonisolated := strings.Split(netconf.RawNonIsolatedNamespaces, ",")
 		// Cleanup the whitespace

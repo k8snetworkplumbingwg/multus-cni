@@ -37,13 +37,31 @@ import (
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
+const (
+	fullReadWriteExecutePermissions    = 0777
+	thickPluginSocketRunDirPermissions = 0700
+)
+
+// FilesystemPreRequirements ensures the target `rundir` features the correct
+// permissions.
+func FilesystemPreRequirements(rundir string) error {
+	if err := os.RemoveAll(rundir); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove old pod info socket directory %s: %v", rundir, err)
+	}
+	if err := os.MkdirAll(rundir, thickPluginSocketRunDirPermissions); err != nil {
+		return fmt.Errorf("failed to create pod info socket directory %s: %v", rundir, err)
+	}
+	return nil
+}
+
 // HandleCNIRequest is the CNI server handler function; it is invoked whenever
 // a CNI request is processed.
-func HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) ([]byte, error) {
+func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) ([]byte, error) {
 	var result []byte
 	var err error
 
@@ -52,13 +70,45 @@ func HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdAr
 	case "ADD":
 		result, err = cmdAdd(cniCmdArgs, k8sArgs, exec, kubeClient)
 	case "DEL":
-		err = cmdDelete(cniCmdArgs, k8sArgs, exec, kubeClient)
+		err = cmdDel(cniCmdArgs, k8sArgs, exec, kubeClient)
 	case "CHECK":
 		err = cmdCheck(cniCmdArgs, k8sArgs, exec, kubeClient)
 	default:
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
 	logging.Verbosef("%s finished CNI request %+v, result: %q, err: %v", cmd, *cniCmdArgs, string(result), err)
+	if err != nil {
+		// Prefix errors with request info for easier failure debugging
+		return nil, fmt.Errorf("%+v ERRORED: %v", *cniCmdArgs, err)
+	}
+	return result, nil
+}
+
+// HandleDelegateRequest is the CNI server handler function; it is invoked whenever
+// a CNI request is processed as delegate CNI request.
+func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) ([]byte, error) {
+	var result []byte
+	var err error
+	var multusConfByte []byte
+
+	multusConfByte = bytes.Replace(s.serverConfig, []byte(","), []byte("{"), 1)
+	multusConfig := types.GetDefaultNetConf()
+	if err = json.Unmarshal(multusConfByte, multusConfig); err != nil {
+		return nil, err
+	}
+
+	logging.Verbosef("%s starting delegate request %+v", cmd, cniCmdArgs)
+	switch cmd {
+	case "ADD":
+		result, err = cmdDelegateAdd(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig)
+	case "DEL":
+		err = cmdDelegateDel(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig)
+	case "CHECK":
+		err = cmdDelegateCheck(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig)
+	default:
+		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
+	}
+	logging.Verbosef("%s finished Delegate request %+v, result: %q, err: %v", cmd, *cniCmdArgs, string(result), err)
 	if err != nil {
 		// Prefix errors with request info for easier failure debugging
 		return nil, fmt.Errorf("%+v ERRORED: %v", *cniCmdArgs, err)
@@ -112,7 +162,6 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			Handler: router,
 		},
 		rundir:       rundir,
-		requestFunc:  HandleCNIRequest,
 		kubeclient:   kubeClient,
 		exec:         exec,
 		serverConfig: servConfig,
@@ -135,9 +184,25 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			w.WriteHeader(http.StatusNotFound)
 		}))
 
-	router.HandleFunc("/cni", promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": "/cni"}),
+	router.HandleFunc(api.MultusCNIAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusCNIAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			result, err := s.handleCNIRequest(r)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			// Empty response JSON means success with no body
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(result); err != nil {
+				_ = logging.Errorf("Error writing HTTP response: %v", err)
+			}
+		}))).Methods("POST")
+
+	router.HandleFunc(api.MultusDelegateAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusDelegateAPIEndpoint}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			result, err := s.handleDelegateRequest(r)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
 				return
@@ -155,7 +220,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 }
 
 func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
-	var cr Request
+	var cr api.Request
 	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
@@ -173,7 +238,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
 	}
 
-	result, err := s.requestFunc(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient)
+	result, err := s.HandleCNIRequest(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient)
 	if err != nil {
 		// Prefix error with request information for easier debugging
 		return nil, fmt.Errorf("%+v %v", cniCmdArgs, err)
@@ -181,7 +246,34 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	return result, nil
 }
 
-func extractCniData(cniRequest *Request, overrideConf []byte) (string, *skel.CmdArgs, error) {
+func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
+	var cr api.Request
+	b, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(b, &cr); err != nil {
+		return nil, err
+	}
+	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig) // not override config
+	if err != nil {
+		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
+	}
+
+	k8sArgs, err := kubernetesRuntimeArgs(cr.Env, s.kubeclient)
+	if err != nil {
+		return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
+	}
+
+	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient)
+	if err != nil {
+		// Prefix error with request information for easier debugging
+		return nil, fmt.Errorf("%+v %v", cniCmdArgs, err)
+	}
+	return result, nil
+}
+
+func extractCniData(cniRequest *api.Request, overrideConf []byte) (string, *skel.CmdArgs, error) {
 	cmd, ok := cniRequest.Env["CNI_COMMAND"]
 	if !ok {
 		return "", nil, fmt.Errorf("unexpected or missing CNI_COMMAND")
@@ -271,6 +363,7 @@ func gatherCNIArgs(env map[string]string) (map[string]string, error) {
 	}
 	return mapArgs, nil
 }
+
 func podUID(kubeclient *k8s.ClientInfo, cniArgs map[string]string, podNamespace, podName string) (string, error) {
 	// UID may not be passed by all runtimes yet. Will be passed
 	// by CRIO 1.20+ and containerd 1.5+ soon.
@@ -306,7 +399,7 @@ func cmdAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kub
 	return serializeResult(result)
 }
 
-func cmdDelete(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+func cmdDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
 	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podName := string(k8sArgs.K8S_POD_NAME)
 	if namespace == "" || podName == "" {
@@ -335,9 +428,69 @@ func serializeResult(result cnitypes.Result) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate the CNI result: %w", err)
 	}
 
-	responseBytes, err := json.Marshal(&Response{Result: realResult})
+	responseBytes, err := json.Marshal(&api.Response{Result: realResult})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal pod request response: %v", err)
 	}
 	return responseBytes, nil
+}
+
+func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf) ([]byte, error) {
+	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podName := string(k8sArgs.K8S_POD_NAME)
+	if namespace == "" || podName == "" {
+		return nil, fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
+	}
+	pod, err := multus.GetPod(kubeClient, k8sArgs, false)
+	if err != nil {
+		return nil, err
+	}
+
+	delegateCNIConf := &types.DelegateNetConf{}
+	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
+		return nil, err
+	}
+	delegateCNIConf.Bytes = cmdArgs.StdinData
+
+	logging.Debugf("CmdDelegateAdd for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
+	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
+	result, err := multus.DelegateAdd(exec, kubeClient, pod, delegateCNIConf, rt, multusConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error configuring pod [%s/%s] networking: %v", namespace, podName, err)
+	}
+
+	return serializeResult(result)
+}
+
+func cmdDelegateCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf) error {
+	delegateCNIConf := &types.DelegateNetConf{}
+	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
+		return err
+	}
+	delegateCNIConf.Bytes = cmdArgs.StdinData
+	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
+	return multus.DelegateCheck(exec, delegateCNIConf, rt, multusConfig)
+}
+
+// note: this function may send back error to the client. In cni spec, command DEL should NOT send any error
+// because container deletion follows cni DEL command. But in delegateDel case, container is not removed by
+// this delegateDel, hence we decide to send error message to the request sender.
+func cmdDelegateDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf) error {
+	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
+	podName := string(k8sArgs.K8S_POD_NAME)
+	if namespace == "" || podName == "" {
+		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
+	}
+	pod, err := multus.GetPod(kubeClient, k8sArgs, false)
+	if err != nil {
+		return err
+	}
+
+	delegateCNIConf := &types.DelegateNetConf{}
+	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
+		return err
+	}
+	delegateCNIConf.Bytes = cmdArgs.StdinData
+	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
+	return multus.DelegateDel(exec, pod, delegateCNIConf, rt, multusConfig)
 }

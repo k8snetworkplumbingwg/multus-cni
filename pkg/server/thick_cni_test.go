@@ -39,6 +39,7 @@ import (
 
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
 	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 )
 
@@ -131,13 +132,13 @@ var _ = Describe(suiteName, func() {
 
 		It("ADD/CHECK/DEL works successfully", func() {
 			Expect(os.Setenv("CNI_COMMAND", "ADD")).NotTo(HaveOccurred())
-			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 
 			Expect(os.Setenv("CNI_COMMAND", "CHECK")).NotTo(HaveOccurred())
-			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 
 			Expect(os.Setenv("CNI_COMMAND", "DEL")).NotTo(HaveOccurred())
-			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 		})
 	})
 
@@ -185,13 +186,13 @@ var _ = Describe(suiteName, func() {
 
 		It("ADD/CHECK/DEL works successfully", func() {
 			Expect(os.Setenv("CNI_COMMAND", "ADD")).NotTo(HaveOccurred())
-			Expect(CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdAdd(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 
 			Expect(os.Setenv("CNI_COMMAND", "CHECK")).NotTo(HaveOccurred())
-			Expect(CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdCheck(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 
 			Expect(os.Setenv("CNI_COMMAND", "DEL")).NotTo(HaveOccurred())
-			Expect(CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
+			Expect(api.CmdDel(cniCmdArgs(containerID, netns.Path(), ifaceName, referenceConfig(thickPluginRunDir)))).To(Succeed())
 
 		})
 	})
@@ -260,9 +261,9 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo, servConfig []byte)
 		return nil, err
 	}
 
-	l, err := GetListener(SocketPath(runDir))
+	l, err := GetListener(api.SocketPath(runDir))
 	if err != nil {
-		return nil, fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", SocketPath(runDir), err)
+		return nil, fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(runDir), err)
 	}
 
 	cniServer.SetKeepAlivesEnabled(false)
