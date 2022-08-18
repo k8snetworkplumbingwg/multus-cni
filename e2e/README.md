@@ -7,6 +7,7 @@
 $ git clone https://github.com/k8snetworkplumbingwg/multus-cni.git
 $ cd multus-cni/e2e
 $ ./get_tools.sh
+$ ./generate_yamls.sh
 $ ./setup_cluster.sh
 $ ./test-simple-macvlan1.sh
 ```

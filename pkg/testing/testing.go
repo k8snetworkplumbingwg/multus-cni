@@ -129,13 +129,8 @@ func (r *Result) Version() string {
 
 // GetAsVersion returns a Result object given a version
 func (r *Result) GetAsVersion(version string) (types.Result, error) {
-	for _, supportedVersion := range types020.SupportedVersions {
-		if version == supportedVersion {
-			r.CNIVersion = version
-			return r, nil
-		}
-	}
-	return nil, fmt.Errorf("cannot convert version %q to %s", types020.SupportedVersions, version)
+	r.CNIVersion = version
+	return r, nil
 }
 
 // Print prints a Result's information to std out

@@ -57,8 +57,8 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 
 User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
 
-* `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist) or directory for CNI config file
-* `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist) or directory for CNI config file
+* `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist), directory for CNI config file or absolute file path for CNI config file
+* `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist), directory for CNI config file or absolute file path for CNI config file
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
 * `delegates` ([]map,required): number of delegate details in the Multus
@@ -70,6 +70,7 @@ Multus will find network for clusterNetwork/defaultNetworks as following sequenc
 1. CRD object for given network name, in 'kube-system' namespace
 1. CNI json config file in `confDir`. Given name should be without extension, like .conf/.conflist. (e.g. "test" for "test.conf"). The given name for `clusterNetwork` should match the value for `name` key in the config file (e.g. `"name": "test"` in "test.conf" when `"clusterNetwork": "test"`)
 1. Directory for CNI json config file. Multus will find alphabetically first file for the network
+1. File path for CNI json confile file.
 1. Multus failed to find network. Multus raise error message
 
 ## Miscellaneous config

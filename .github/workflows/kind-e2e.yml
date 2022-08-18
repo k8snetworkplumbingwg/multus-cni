@@ -3,6 +3,29 @@ on: [push, pull_request]
 jobs:
   e2e-kind:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - docker-file: images/Dockerfile.thick
+            cni-version: "0.3.1"
+            multus-manifest: multus-daemonset-thick.yml
+          - docker-file: images/Dockerfile
+            cni-version: "0.3.1"
+            multus-manifest: multus-daemonset.yml
+          - docker-file: images/Dockerfile.thick
+            cni-version: "0.4.0"
+            multus-manifest: multus-daemonset-thick.yml
+          - docker-file: images/Dockerfile
+            cni-version: "0.4.0"
+            multus-manifest: multus-daemonset.yml
+          # need to wait kind to support CNI 1.0.0 (now kind 0.11 supports up to 0.4.0)
+#          - docker-file: images/Dockerfile.thick
+#            cni-version: "1.0.0"
+#            multus-manifest: multus-thick-daemonset.yml
+#          - docker-file: images/Dockerfile
+#            cni-version: "1.0.0"
+#            multus-manifest: multus-daemonset.yml
+
     if: >
       (( github.event.pull_request.head.repo.owner.login != github.event.pull_request.base.repo.owner.login ) &&
         github.event_name == 'pull_request' ) || (github.event_name == 'push' && github.event.commits != '[]' )
@@ -10,12 +33,22 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+
+      - name: Setup j2cli
+        run: |
+          pip3 install --user --upgrade j2cli
+          j2 --version
+
       - name: Setup registry
         run: docker run -d --restart=always -p "5000:5000" --name "kind-registry" registry:2
-  
+
       - name: Build latest-amd64
-        run: docker build -t localhost:5000/multus:e2e -f images/Dockerfile.thick .
- 
+        run: docker build -t localhost:5000/multus:e2e -f ${{ matrix.docker-file }} .
+
       - name: Push to local registry
         run: docker push localhost:5000/multus:e2e
 
@@ -23,9 +56,13 @@ jobs:
         working-directory: ./e2e
         run: ./get_tools.sh
 
+      - name: generate yaml files
+        working-directory: ./e2e
+        run: env CNI_VERSION=${{ matrix.cni-version }} ./generate_yamls.sh
+
       - name: Setup cluster
         working-directory: ./e2e
-        run: ./setup_cluster.sh
+        run: MULTUS_MANIFEST=${{ matrix.multus-manifest }} ./setup_cluster.sh
 
       - name: Test simple pod
         working-directory: ./e2e

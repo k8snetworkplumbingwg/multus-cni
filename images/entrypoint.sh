@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# multus thin plugin install shell script
+#
+# note: this script is designed for quick-install or just 'tasting multus' in your test environment.
+# hence it does not cover advanced Kubernetes cluster operation (update, uninstall and so on).
+
 # Always exit on errors.
 set -e
 
@@ -32,6 +37,7 @@ RESTART_CRIO=false
 CRIO_RESTARTED_ONCE=false
 RENAME_SOURCE_CONFIG_FILE=false
 SKIP_BINARY_COPY=false
+FORCE_CNI_VERSION=false # force-cni-version is only for e2e-kind.
 
 # Give help text for parameters.
 function usage()
@@ -117,6 +123,10 @@ while [ "$1" != "" ]; do
             ;;
         --cni-version)
             CNI_VERSION=$VALUE
+            ;;
+	# force-cni-version is only for e2e-kind testing
+	--force-cni-version)
+            FORCE_CNI_VERSION=$VALUE
             ;;
         --cni-bin-dir)
             CNI_BIN_DIR=$VALUE
@@ -218,7 +228,7 @@ MULTUS_KUBECONFIG=$CNI_CONF_DIR/multus.d/multus.kubeconfig
 
 # ------------------------------- Generate a "kube-config"
 # Inspired by: https://tinyurl.com/y7r2knme
-SERVICE_ACCOUNT_PATH=/var/run/secrets/kubernetes.io/serviceaccount
+SERVICE_ACCOUNT_PATH=/run/secrets/kubernetes.io/serviceaccount
 KUBE_CA_FILE=${KUBE_CA_FILE:-$SERVICE_ACCOUNT_PATH/ca.crt}
 SERVICEACCOUNT_TOKEN=$(cat $SERVICE_ACCOUNT_PATH/token)
 SKIP_TLS_VERIFY=${SKIP_TLS_VERIFY:-false}
@@ -287,6 +297,10 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   while [ $found_master == false ]; do
     if [ "$MULTUS_MASTER_CNI_FILE_NAME" != "" ]; then
         MASTER_PLUGIN="$MULTUS_MASTER_CNI_FILE_NAME"
+	if [ ! -f "$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN" ]; then
+		error "Cannot find master cni file $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN"
+		exit 1;
+	fi
     else
         MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     fi
@@ -391,12 +405,16 @@ EOF
       log "Nested capabilities string: $NESTED_CAPABILITIES_STRING"
 
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
-      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
-      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
-      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
-      if [ "$CHECK_CNI_VERSION" != "" ] ; then
-        error "$CHECK_CNI_VERSION"
-        exit 1
+      if [ "$FORCE_CNI_VERSION" == true ]; then
+	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION | sed -e "s/\"cniVersion.*/\"cniVersion\": \"$CNI_VERSION\",/g")"
+      else
+	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
+	      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
+	      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
+	      if [ "$CHECK_CNI_VERSION" != "" ] ; then
+		      error "$CHECK_CNI_VERSION"
+		      exit 1
+	      fi
       fi
 
       CONF=$(cat <<-EOF

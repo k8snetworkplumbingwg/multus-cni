@@ -20,7 +20,7 @@ import (
 	"net"
 
 	"github.com/containernetworking/cni/pkg/types"
-	"github.com/containernetworking/cni/pkg/types/current"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -31,22 +31,25 @@ type NetConf struct {
 	// support chaining for master interface and IP decisions
 	// occurring prior to running ipvlan plugin
 	RawPrevResult *map[string]interface{} `json:"prevResult"`
-	PrevResult    *current.Result         `json:"-"`
+	PrevResult    *cni100.Result          `json:"-"`
 
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
 	BinDir  string `json:"binDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
-	RawDelegates    []map[string]interface{} `json:"delegates"`
-	Delegates       []*DelegateNetConf       `json:"-"`
-	Kubeconfig      string                   `json:"kubeconfig"`
-	ClusterNetwork  string                   `json:"clusterNetwork"`
-	DefaultNetworks []string                 `json:"defaultNetworks"`
-	LogFile         string                   `json:"logFile"`
-	LogLevel        string                   `json:"logLevel"`
-	LogToStderr     bool                     `json:"logToStderr,omitempty"`
-	LogOptions      *logging.LogOptions      `json:"logOptions,omitempty"`
-	RuntimeConfig   *RuntimeConfig           `json:"runtimeConfig,omitempty"`
+	RawDelegates []map[string]interface{} `json:"delegates"`
+	// These parameters are exclusive in one config file:
+	//  - Delegates (directly add delegate CNI config into multus CNI config)
+	//  - ClusterNetwork+DefaultNetworks  (add CNI config through CRD, directory or file)
+	Delegates       []*DelegateNetConf  `json:"-"`
+	ClusterNetwork  string              `json:"clusterNetwork"`
+	DefaultNetworks []string            `json:"defaultNetworks"`
+	Kubeconfig      string              `json:"kubeconfig"`
+	LogFile         string              `json:"logFile"`
+	LogLevel        string              `json:"logLevel"`
+	LogToStderr     bool                `json:"logToStderr,omitempty"`
+	LogOptions      *logging.LogOptions `json:"logOptions,omitempty"`
+	RuntimeConfig   *RuntimeConfig      `json:"runtimeConfig,omitempty"`
 	// Default network readiness options
 	ReadinessIndicatorFile string `json:"readinessindicatorfile"`
 	// Option to isolate the usage of CR's to the namespace in which a pod resides.
@@ -173,4 +176,21 @@ type ResourceInfo struct {
 type ResourceClient interface {
 	// GetPodResourceMap returns an instance of a map of Pod ResourceInfo given a (Pod name, namespace) tuple
 	GetPodResourceMap(*v1.Pod) (map[string]*ResourceInfo, error)
+}
+
+// ControllerNetConf for the controller cni configuration
+type ControllerNetConf struct {
+	ChrootDir   string `json:"chrootDir,omitempty"`
+	ConfDir     string `json:"confDir"`
+	CNIDir      string `json:"cniDir"`
+	BinDir      string `json:"binDir"`
+	LogFile     string `json:"logFile"`
+	LogLevel    string `json:"logLevel"`
+	LogToStderr bool   `json:"logToStderr,omitempty"`
+
+	MetricsPort *int `json:"metricsPort,omitempty"`
+
+	// Option to point to the path of the unix domain socket through which the
+	// multus client / server communicate.
+	MultusSocketDir string `json:"socketDir"`
 }

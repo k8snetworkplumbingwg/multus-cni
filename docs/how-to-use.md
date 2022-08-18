@@ -21,7 +21,11 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 As a [quickstart](quickstart.md), you may apply these YAML files (included in the clone of this repository). Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
-    cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+    cat ./deployments/multus-daemonset.yml | kubectl apply -f -  # thin deployment
+
+or
+
+    cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f - # thick (client/server) deployment
 
 If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
@@ -39,7 +43,7 @@ cat >/etc/cni/net.d/00-multus.conf <<EOF
 {
   "name": "multus-cni-network",
   "type": "multus",
-  "readinessindicatorfile": "/var/run/flannel/subnet.env",
+  "readinessindicatorfile": "/run/flannel/subnet.env",
   "delegates": [
     {
       "NOTE1": "This is example, wrote your CNI config in delegates",

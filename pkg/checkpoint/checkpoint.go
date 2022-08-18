@@ -33,7 +33,7 @@ type PodDevicesEntry struct {
 	PodUID        string
 	ContainerName string
 	ResourceName  string
-	DeviceIDs     []string
+	DeviceIDs     map[int64][]string
 	AllocResp     []byte
 }
 
@@ -97,12 +97,14 @@ func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resource
 	for _, pod := range cp.podEntires {
 		if pod.PodUID == podID {
 			entry, ok := resourceMap[pod.ResourceName]
-			if ok {
-				// already exists; append to it
-				entry.DeviceIDs = append(entry.DeviceIDs, pod.DeviceIDs...)
-			} else {
+			if !ok {
 				// new entry
-				resourceMap[pod.ResourceName] = &types.ResourceInfo{DeviceIDs: pod.DeviceIDs}
+				entry = &types.ResourceInfo{}
+				resourceMap[pod.ResourceName] = entry
+			}
+			for _, v := range pod.DeviceIDs {
+				// already exists; append to it
+				entry.DeviceIDs = append(entry.DeviceIDs, v...)
 			}
 		}
 	}

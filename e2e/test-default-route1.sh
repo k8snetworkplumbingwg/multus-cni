@@ -3,7 +3,7 @@ set -o errexit
 
 export PATH=${PATH}:./bin
 
-kubectl create -f default-route1.yml
+kubectl create -f yamls/default-route1.yml
 kubectl wait --for=condition=ready -l app=default-route1 --timeout=300s pod
 
 echo "check default-route-worker1 interface: net1"
@@ -41,4 +41,4 @@ if [ $ipaddr != "10.244.1.1" ]; then
 fi
 
 echo "cleanup resources"
-kubectl delete -f default-route1.yml
+kubectl delete -f yamls/default-route1.yml
