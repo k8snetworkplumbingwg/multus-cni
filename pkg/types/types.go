@@ -102,7 +102,7 @@ type DelegateNetConf struct {
 	IPRequest             []string        `json:"ipRequest,omitempty"`
 	PortMappingsRequest   []*PortMapEntry `json:"-"`
 	BandwidthRequest      *BandwidthEntry `json:"-"`
-	GatewayRequest        []net.IP        `json:"default-route,omitempty"`
+	GatewayRequest        *[]net.IP       `json:"default-route,omitempty"`
 	IsFilterV4Gateway     bool
 	IsFilterV6Gateway     bool
 	// MasterPlugin is only used internal housekeeping
@@ -153,7 +153,7 @@ type NetworkSelectionElement struct {
 	// CNIArgs contains additional CNI arguments for the network interface
 	CNIArgs *map[string]interface{} `json:"cni-args"`
 	// GatewayRequest contains default route IP address for the pod
-	GatewayRequest []net.IP `json:"default-route,omitempty"`
+	GatewayRequest *[]net.IP `json:"default-route,omitempty"`
 }
 
 // K8sArgs is the valid CNI_ARGS used for Kubernetes

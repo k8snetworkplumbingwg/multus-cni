@@ -649,7 +649,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			// https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ (4.1.2.1.9)
 			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
 			// else we'll update the defaultgateway to the one specified.
-			if delegate.GatewayRequest != nil && delegate.GatewayRequest[0] != nil {
+			if delegate.GatewayRequest != nil && len(*delegate.GatewayRequest) != 0 {
 				deleteV4gateway = true
 				adddefaultgateway = true
 				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
@@ -665,7 +665,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			// https://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ (4.1.2.1.9)
 			// the list can be empty; if it is, we'll assume the CNI's config for the default gateway holds,
 			// else we'll update the defaultgateway to the one specified.
-			if delegate.GatewayRequest != nil && delegate.GatewayRequest[0] != nil {
+			if delegate.GatewayRequest != nil && len(*delegate.GatewayRequest) != 0 {
 				deleteV6gateway = true
 				adddefaultgateway = true
 				logging.Debugf("Detected gateway override on interface %v to %v", ifName, delegate.GatewayRequest)
@@ -686,11 +686,11 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 		// Here we'll set the default gateway which specified in `default-route` network selection
 		if adddefaultgateway {
-			err = netutils.SetDefaultGW(args.Netns, ifName, delegate.GatewayRequest)
+			err = netutils.SetDefaultGW(args.Netns, ifName, *delegate.GatewayRequest)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error setting default gateway: %v", err)
 			}
-			err = netutils.AddDefaultGWCache(n.CNIDir, rt, netName, ifName, delegate.GatewayRequest)
+			err = netutils.AddDefaultGWCache(n.CNIDir, rt, netName, ifName, *delegate.GatewayRequest)
 			if err != nil {
 				return nil, cmdErr(k8sArgs, "error setting default gateway in cache: %v", err)
 			}

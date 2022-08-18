@@ -68,9 +68,9 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 }
 
 // LoadDelegateNetConf converts raw CNI JSON into a DelegateNetConf structure
-func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID string, resourceName string) (*DelegateNetConf, error) {
+func LoadDelegateNetConf(bytes []byte, netElement *NetworkSelectionElement, deviceID string, resourceName string) (*DelegateNetConf, error) {
 	var err error
-	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), net, deviceID)
+	logging.Debugf("LoadDelegateNetConf: %s, %v, %s", string(bytes), netElement, deviceID)
 
 	delegateConf := &DelegateNetConf{}
 	if err := json.Unmarshal(bytes, &delegateConf.Conf); err != nil {
@@ -88,9 +88,11 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf: failed to add deviceID in NetConfList bytes: %v", err)
 			}
+			delegateConf.ResourceName = resourceName
+			delegateConf.DeviceID = deviceID
 		}
-		if net != nil && net.CNIArgs != nil {
-			bytes, err = addCNIArgsInConfList(bytes, net.CNIArgs)
+		if netElement != nil && netElement.CNIArgs != nil {
+			bytes, err = addCNIArgsInConfList(bytes, netElement.CNIArgs)
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add cni-args in NetConfList bytes: %v", err)
 			}
@@ -105,45 +107,51 @@ func LoadDelegateNetConf(bytes []byte, net *NetworkSelectionElement, deviceID st
 			delegateConf.ResourceName = resourceName
 			delegateConf.DeviceID = deviceID
 		}
-		if net != nil && net.CNIArgs != nil {
-			bytes, err = addCNIArgsInConfig(bytes, net.CNIArgs)
+		if netElement != nil && netElement.CNIArgs != nil {
+			bytes, err = addCNIArgsInConfig(bytes, netElement.CNIArgs)
 			if err != nil {
 				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add cni-args in NetConfList bytes: %v", err)
 			}
 		}
 	}
 
-	if net != nil {
-		if net.Name != "" {
+	if netElement != nil {
+		if netElement.Name != "" {
 			// Overwrite CNI config name with net-attach-def name
-			delegateConf.Name = fmt.Sprintf("%s/%s", net.Namespace, net.Name)
+			delegateConf.Name = fmt.Sprintf("%s/%s", netElement.Namespace, netElement.Name)
 		}
-		if net.InterfaceRequest != "" {
-			delegateConf.IfnameRequest = net.InterfaceRequest
+		if netElement.InterfaceRequest != "" {
+			delegateConf.IfnameRequest = netElement.InterfaceRequest
 		}
-		if net.MacRequest != "" {
-			delegateConf.MacRequest = net.MacRequest
+		if netElement.MacRequest != "" {
+			delegateConf.MacRequest = netElement.MacRequest
 		}
-		if net.IPRequest != nil {
-			delegateConf.IPRequest = net.IPRequest
+		if netElement.IPRequest != nil {
+			delegateConf.IPRequest = netElement.IPRequest
 		}
-		if net.BandwidthRequest != nil {
-			delegateConf.BandwidthRequest = net.BandwidthRequest
+		if netElement.BandwidthRequest != nil {
+			delegateConf.BandwidthRequest = netElement.BandwidthRequest
 		}
-		if net.PortMappingsRequest != nil {
-			delegateConf.PortMappingsRequest = net.PortMappingsRequest
+		if netElement.PortMappingsRequest != nil {
+			delegateConf.PortMappingsRequest = netElement.PortMappingsRequest
 		}
-		if net.GatewayRequest != nil {
-			delegateConf.GatewayRequest = append(delegateConf.GatewayRequest, net.GatewayRequest...)
+		if netElement.GatewayRequest != nil {
+			var list []net.IP
+			if delegateConf.GatewayRequest != nil {
+				list = append(*delegateConf.GatewayRequest, *netElement.GatewayRequest...)
+			} else {
+				list = *netElement.GatewayRequest
+			}
+			delegateConf.GatewayRequest = &list
 		}
-		if net.InfinibandGUIDRequest != "" {
-			delegateConf.InfinibandGUIDRequest = net.InfinibandGUIDRequest
+		if netElement.InfinibandGUIDRequest != "" {
+			delegateConf.InfinibandGUIDRequest = netElement.InfinibandGUIDRequest
 		}
-		if net.DeviceID != "" {
+		if netElement.DeviceID != "" {
 			if deviceID != "" {
 				logging.Debugf("Warning: Both RuntimeConfig and ResourceMap provide deviceID. Ignoring RuntimeConfig")
 			} else {
-				delegateConf.DeviceID = net.DeviceID
+				delegateConf.DeviceID = netElement.DeviceID
 			}
 		}
 	}
@@ -603,11 +611,13 @@ func CheckGatewayConfig(delegates []*DelegateNetConf) error {
 
 	// Check the gateway
 	for _, delegate := range delegates {
-		for _, gw := range delegate.GatewayRequest {
-			if gw.To4() != nil {
-				v4Gateways++
-			} else {
-				v6Gateways++
+		if delegate.GatewayRequest != nil {
+			for _, gw := range *delegate.GatewayRequest {
+				if gw.To4() != nil {
+					v4Gateways++
+				} else {
+					v6Gateways++
+				}
 			}
 		}
 	}
@@ -623,7 +633,7 @@ func CheckGatewayConfig(delegates []*DelegateNetConf) error {
 			delegates[i].IsFilterV4Gateway = true
 			delegates[i].IsFilterV6Gateway = true
 		} else {
-			for _, gw := range delegate.GatewayRequest {
+			for _, gw := range *delegate.GatewayRequest {
 				if gw.To4() != nil {
 					delegates[i].IsFilterV6Gateway = true
 				} else {
