@@ -9,8 +9,10 @@ require (
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.0.0-20211209124913-491a49abca63
+	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/grpc v1.27.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.21.1
@@ -18,7 +20,7 @@ require (
 	k8s.io/client-go v0.21.1
 	k8s.io/klog v1.0.0
 	k8s.io/kubelet v0.0.0
-	k8s.io/kubernetes v1.21.1
+	k8s.io/kubernetes v1.21.5
 )
 
 replace (
@@ -43,7 +45,6 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.21.1
 	k8s.io/kubectl => k8s.io/kubectl v0.21.1
 	k8s.io/kubelet => k8s.io/kubelet v0.21.1
-	k8s.io/kubernetes => k8s.io/kubernetes v1.21.1
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.21.1
 	k8s.io/metrics => k8s.io/metrics v0.21.1
 	k8s.io/mount-utils => k8s.io/mount-utils v0.21.1
