@@ -47,7 +47,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:thick-amd64
+            ghcr.io/${{ github.repository }}:stable-thick-amd64
             ${{ steps.docker_meta.outputs.tags }}-thick-amd64
           file: images/Dockerfile.thick
 
@@ -258,6 +258,21 @@ jobs:
       - name: Create manifest for multi-arch images
         if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
+          # <tag>-thick
+          # get artifacts from previous steps
+          docker pull ${{ steps.docker_meta.outputs.tags }}-thick-amd64
+          docker manifest create ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64
+          docker manifest annotate ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64 --arch amd64
+          docker manifest push ${{ steps.docker_meta.outputs.tags }}-thick
+
+          # stable-thick
+          # get artifacts from previous steps
+          docker pull ${{ env.REPOSITORY }}:stable-thick-amd64
+          docker manifest create ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64 --arch amd64
+          docker manifest push ${{ env.REPOSITORY }}:stable-thick
+
+          # <tag>
           # get artifacts from previous steps
           docker pull ${{ steps.docker_meta.outputs.tags }}-amd64
           docker pull ${{ steps.docker_meta.outputs.tags }}-arm64
@@ -271,6 +286,9 @@ jobs:
           docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-ppc64le --arch ppc64le
           docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-s390x --arch s390x
           docker manifest push ${{ steps.docker_meta.outputs.tags }}
+
+          # stable
+          # get artifacts from previous steps
           docker pull ${{ env.REPOSITORY }}:stable-amd64
           docker pull ${{ env.REPOSITORY }}:stable-arm64
           docker pull ${{ env.REPOSITORY }}:stable-arm32

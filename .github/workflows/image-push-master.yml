@@ -40,7 +40,8 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:thick-amd64
+            ghcr.io/${{ github.repository }}:latest-thick-amd64
+            ghcr.io/${{ github.repository }}:snapshot-thick-amd64
           file: images/Dockerfile.thick
 
   push-arm64:
@@ -208,22 +209,27 @@ jobs:
       - name: Create manifest for multi-arch images
         if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
+          # snapshot-thick
           # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:thick ${{ env.REPOSITORY }}:thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:thick
+          docker pull ${{ env.REPOSITORY }}:snapshot-thick-amd64
+          docker manifest create ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64 --arch amd64
+          docker manifest push ${{ env.REPOSITORY }}:snapshot-thick
 
+          # latest-thick
+          # get artifacts from previous steps
+          docker pull ${{ env.REPOSITORY }}:latest-thick-amd64
+          docker manifest create ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64
+          docker manifest annotate ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64 --arch amd64
+          docker manifest push ${{ env.REPOSITORY }}:latest-thick
+
+          # snapshot
+          # get artifacts from previous steps
           docker pull ${{ env.REPOSITORY }}:snapshot-amd64
           docker pull ${{ env.REPOSITORY }}:snapshot-arm64
           docker pull ${{ env.REPOSITORY }}:snapshot-arm32
           docker pull ${{ env.REPOSITORY }}:snapshot-ppc64le
           docker pull ${{ env.REPOSITORY }}:snapshot-s390x
-          docker pull ${{ env.REPOSITORY }}:latest-amd64
-          docker pull ${{ env.REPOSITORY }}:latest-arm64
-          docker pull ${{ env.REPOSITORY }}:latest-arm32
-          docker pull ${{ env.REPOSITORY }}:latest-ppc64le
-          docker pull ${{ env.REPOSITORY }}:latest-s390x
           docker manifest create ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 ${{ env.REPOSITORY }}:snapshot-arm64 ${{ env.REPOSITORY }}:snapshot-arm32 ${{ env.REPOSITORY }}:snapshot-ppc64le ${{ env.REPOSITORY }}:snapshot-s390x
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 --arch amd64
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm64 --arch arm64
@@ -231,6 +237,15 @@ jobs:
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-ppc64le --arch ppc64le
           docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-s390x --arch s390x
           docker manifest push ${{ env.REPOSITORY }}:snapshot
+
+          # latest
+          # get artifacts from previous steps
+          docker pull ${{ env.REPOSITORY }}:latest-amd64
+          docker pull ${{ env.REPOSITORY }}:latest-arm64
+          docker pull ${{ env.REPOSITORY }}:latest-arm32
+          docker pull ${{ env.REPOSITORY }}:latest-ppc64le
+          docker pull ${{ env.REPOSITORY }}:latest-s390x
+
           docker manifest create ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 ${{ env.REPOSITORY }}:latest-arm64 ${{ env.REPOSITORY }}:latest-arm32 ${{ env.REPOSITORY }}:latest-ppc64le ${{ env.REPOSITORY }}:latest-s390x
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 --arch amd64
           docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm64 --arch arm64
