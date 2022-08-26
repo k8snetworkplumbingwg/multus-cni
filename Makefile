@@ -1,14 +1,17 @@
 
 IMAGE_BUILD_CMD := docker build
 IMAGE_PUSH_CMD := docker push
-VERSION ?= v3.7.2
-BUILD_NUMBER ?= 1
 
-IMAGE_REGISTRY := docker.io/platform9
-IMAGE_NAME := multus
-IMAGE_TAG_NAME := $(VERSION)-pmk-$(BUILD_NUMBER)
-IMAGE_REPO := $(IMAGE_REGISTRY)/$(IMAGE_NAME)
-IMAGE_TAG := $(IMAGE_REPO):$(IMAGE_TAG_NAME)
+
+UPSTREAM_VERSION=$(shell git describe --tags HEAD)
+
+registry_url ?= 514845858982.dkr.ecr.us-west-1.amazonaws.com
+#registry_url ?= docker.io
+
+image_name = ${registry_url}/platform9/multus
+image_tag = $(UPSTREAM_VERSION)-pmk-$(TEAMCITY_BUILD_ID)
+
+TAG := $(image_name):$(image_tag)
 
 SRCROOT = $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/)
 BUILD_DIR :=$(SRCROOT)/bin
@@ -17,9 +20,14 @@ $(BUILD_DIR):
 	mkdir -p $@
 
 build: $(BUILD_DIR)
-	$(IMAGE_BUILD_CMD) --build-arg VERSION=$(VERSION) \
-		-t $(IMAGE_TAG) -f deployments/Dockerfile .
-	echo ${IMAGE_TAG} > $(BUILD_DIR)/container-tag
+	$(IMAGE_BUILD_CMD) --build-arg VERSION=$(UPSTREAM_VERSION) \
+		-t $(TAG) -f deployments/Dockerfile .
+	echo ${TAG} > $(BUILD_DIR)/container-tag
 
 push: build
-	$(IMAGE_PUSH_CMD) $(IMAGE_TAG)
+	$(IMAGE_PUSH_CMD) $(TAG)
+	&& docker rmi $(TAG)
+	(docker push $(TAG)  || \
+		(aws ecr get-login --region=us-west-1 --no-include-email | sh && \
+		docker push $(TAG))) && \
+		docker rmi $(TAG)
