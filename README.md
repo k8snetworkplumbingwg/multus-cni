@@ -42,7 +42,7 @@ This will configure your systems to be ready to use Multus CNI, but, to get star
 
 ## Thin Plugin v.s Thick Plugin
 
-In multus 4.0 release, we introduces new deployment, client/server style plugin deployment. We call it ['thick plugin'](docs/thick-plugin.md), compared to previous usual deployment (we call it 'thin plugin'). Thick pluign consists with two binary, multus-daemon and multus-shim CNI plugin. 'multus-daemon' will be deployed to all nodes as server. Thick plugin supports additional features, such as metrics, which cannot be supported in 'thin plugin' deployment. On the other side, 'thick plugin' consumes more resources than 'thin plugin', hence you need to think about its trade-off and decide the deployment.
+With the multus 4.0 release, we introduce a new client/server style plugin deployment. This new deployment is called ['thick plugin'](docs/thick-plugin.md), in contrast to the previous deployment, which is now called 'thin plugin'. The new thick plugin consists of two binaries, multus-daemon and multus-shim CNI plugin. The 'multus-daemon' will be deployed to all nodes as local agent and supports additional features, such as metrics, which were not available with the 'thin plugin' deployment before. Due to those additional features, the 'thick plugin' comes with the trade-off of consuming more resources than the 'thin plugin'.
 
 
 ## Additional Installation Options
