@@ -11,7 +11,7 @@ RUN  cd /usr/src/multus-cni && \
      ./hack/build-go.sh
 
 # build ppc container
-FROM ppc64le/centos:latest
+FROM ppc64le/python:slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE

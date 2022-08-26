@@ -7,7 +7,7 @@ ADD . /usr/src/multus-cni
 RUN  cd /usr/src/multus-cni && \
      ./hack/build-go.sh
 
-FROM centos:centos7
+FROM python:slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
