@@ -11,7 +11,7 @@ RUN  cd /usr/src/multus-cni && \
      ./hack/build-go.sh
 
 # build arm container
-FROM arm32v7/centos:7
+FROM arm32v7/python:slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE

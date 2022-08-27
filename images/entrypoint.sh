@@ -83,10 +83,6 @@ function warn()
     log "WARN: {$1}"
 }
 
-if type python3 &> /dev/null; then
-	alias python=python3
-fi
-
 function checkCniVersion {
       cniversion_python_tmpfile=$(mktemp)
       cat << EOF > $cniversion_python_tmpfile
@@ -103,7 +99,7 @@ if version(v_top_level) >= v_040 and version(v_nested) < v_040:
     msg = "Multus cni version is %s while master plugin cni version is %s"
     print(msg % (v_top_level, v_nested))
 EOF
-      python $cniversion_python_tmpfile $1 $2
+      python3 $cniversion_python_tmpfile $1 $2
 }
 
 # Parse parameters given as arguments to this script.
@@ -364,7 +360,7 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
 
       if [ "$OVERRIDE_NETWORK_NAME" == "true" ]; then
         MASTER_PLUGIN_NET_NAME="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
-            python -c 'import json,sys;print(json.load(sys.stdin)["name"])')"
+            python3 -c 'import json,sys;print(json.load(sys.stdin)["name"])')"
       else
         MASTER_PLUGIN_NET_NAME="multus-cni-network"
       fi
@@ -386,7 +382,7 @@ else:
 EOF
 
       NESTED_CAPABILITIES_STRING="$(cat $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN | \
-            python $capabilities_python_filter_tmpfile)"
+            python3 $capabilities_python_filter_tmpfile)"
       rm $capabilities_python_filter_tmpfile
       log "Nested capabilities string: $NESTED_CAPABILITIES_STRING"
 
