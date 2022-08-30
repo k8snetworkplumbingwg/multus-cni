@@ -628,16 +628,14 @@ func CheckGatewayConfig(delegates []*DelegateNetConf) error {
 
 	// set filter flag for each delegate
 	for i, delegate := range delegates {
-		// no GatewayRequest
-		if delegate.GatewayRequest == nil {
-			delegates[i].IsFilterV4Gateway = true
-			delegates[i].IsFilterV6Gateway = true
-		} else {
+		delegates[i].IsFilterV4Gateway = true
+		delegates[i].IsFilterV6Gateway = true
+		if delegate.GatewayRequest != nil {
 			for _, gw := range *delegate.GatewayRequest {
 				if gw.To4() != nil {
-					delegates[i].IsFilterV6Gateway = true
+					delegates[i].IsFilterV4Gateway = false
 				} else {
-					delegates[i].IsFilterV4Gateway = true
+					delegates[i].IsFilterV6Gateway = false
 				}
 			}
 		}

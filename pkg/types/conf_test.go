@@ -928,7 +928,12 @@ var _ = Describe("config operations", func() {
 
 		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
 		Expect(err).NotTo(HaveOccurred())
+
+		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
+
 		Expect(netconf.GatewayRequest).To(BeNil())
+		Expect(netconf.IsFilterV4Gateway).To(BeTrue())
+		Expect(netconf.IsFilterV6Gateway).To(BeTrue())
 	})
 
 	It("test LoadDelegateNetConf keeps empty GatewayRequest", func() {
@@ -950,8 +955,13 @@ var _ = Describe("config operations", func() {
 
 		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
 		Expect(err).NotTo(HaveOccurred())
+
+		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
+
 		Expect(netconf.GatewayRequest).NotTo(BeNil())
-		Expect(len(*netconf.GatewayRequest)).To(BeEquivalentTo(0))
+		Expect(len(*netconf.GatewayRequest)).To(Equal(0))
+		Expect(netconf.IsFilterV4Gateway).To(BeTrue())
+		Expect(netconf.IsFilterV6Gateway).To(BeTrue())
 	})
 
 	It("test LoadDelegateNetConf keeps GatewayRequest", func() {
@@ -973,8 +983,41 @@ var _ = Describe("config operations", func() {
 
 		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
 		Expect(err).NotTo(HaveOccurred())
+
+		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
+
 		Expect(netconf.GatewayRequest).NotTo(BeNil())
-		Expect(len(*netconf.GatewayRequest)).To(BeEquivalentTo(1))
+		Expect(len(*netconf.GatewayRequest)).To(Equal(1))
+		Expect(netconf.IsFilterV4Gateway).To(BeFalse())
+		Expect(netconf.IsFilterV6Gateway).To(BeTrue())
+	})
+
+	It("test LoadDelegateNetConf keeps dual GatewayRequest", func() {
+		conf := `{
+			"name": "node-cni-network",
+			"type": "multus",
+			"kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+			"delegates": [{
+				"name": "weave-list",
+				"plugins": [ {"type" :"weave"} ]
+			}]
+		}`
+
+		nsJSON := `{ "name": "foobar", "default-route": [ "10.1.1.1", "fc00::1" ] }`
+		ns := &NetworkSelectionElement{}
+
+		err := json.Unmarshal([]byte(nsJSON), ns)
+		Expect(err).NotTo(HaveOccurred())
+
+		netconf, err := LoadDelegateNetConf([]byte(conf), ns, "", "")
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
+
+		Expect(netconf.GatewayRequest).NotTo(BeNil())
+		Expect(len(*netconf.GatewayRequest)).To(Equal(2))
+		Expect(netconf.IsFilterV4Gateway).To(BeFalse())
+		Expect(netconf.IsFilterV6Gateway).To(BeFalse())
 	})
 
 })
