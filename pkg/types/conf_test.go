@@ -959,7 +959,7 @@ var _ = Describe("config operations", func() {
 		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
 
 		Expect(netconf.GatewayRequest).NotTo(BeNil())
-		Expect(len(*netconf.GatewayRequest)).To(Equal(0))
+		Expect(*netconf.GatewayRequest).To(BeEmpty())
 		Expect(netconf.IsFilterV4Gateway).To(BeTrue())
 		Expect(netconf.IsFilterV6Gateway).To(BeTrue())
 	})
