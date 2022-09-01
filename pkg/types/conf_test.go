@@ -78,10 +78,10 @@ var _ = Describe("config operations", func() {
 }`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(netConf.Delegates)).To(Equal(1))
+		Expect(netConf.Delegates).To(HaveLen(1))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
-		Expect(len(netConf.RuntimeConfig.PortMaps)).To(Equal(1))
+		Expect(netConf.RuntimeConfig.PortMaps).To(HaveLen(1))
 	})
 
 	It("fails to load invalid multus configuration (bad json)", func() {
@@ -176,7 +176,7 @@ var _ = Describe("config operations", func() {
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(netConf.NamespaceIsolation).To(Equal(true))
-		Expect(len(netConf.NonIsolatedNamespaces)).To(Equal(1))
+		Expect(netConf.NonIsolatedNamespaces).To(HaveLen(1))
 		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("default"))
 	})
 
@@ -196,7 +196,7 @@ var _ = Describe("config operations", func() {
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
 		Expect(netConf.NamespaceIsolation).To(Equal(true))
-		Expect(len(netConf.NonIsolatedNamespaces)).To(Equal(3))
+		Expect(netConf.NonIsolatedNamespaces).To(HaveLen(3))
 		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("foo"))
 		Expect(netConf.NonIsolatedNamespaces[1]).To(Equal("bar"))
 		Expect(netConf.NonIsolatedNamespaces[2]).To(Equal("default"))
@@ -241,7 +241,7 @@ var _ = Describe("config operations", func() {
 }`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(netConf.Delegates)).To(Equal(2))
+		Expect(netConf.Delegates).To(HaveLen(2))
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
 		Expect(netConf.Delegates[1].Conf.Type).To(Equal("foobar"))
@@ -865,10 +865,10 @@ var _ = Describe("config operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		runtimeConf := mergeCNIRuntimeConfig(&origRuntimeConfig, delegate)
 		Expect(runtimeConf.PortMaps).NotTo(BeNil())
-		Expect(len(runtimeConf.PortMaps)).To(BeEquivalentTo(1))
+		Expect(runtimeConf.PortMaps).To(HaveLen(1))
 		Expect(runtimeConf.PortMaps[0]).To(Equal(portMapEntry1))
 		Expect(runtimeConf.Bandwidth).To(Equal(bandwidthEntry1))
-		Expect(len(runtimeConf.IPs)).To(BeEquivalentTo(1))
+		Expect(runtimeConf.IPs).To(HaveLen(1))
 		Expect(runtimeConf.Mac).To(Equal("c2:11:22:33:44:66"))
 		Expect(runtimeConf.InfinibandGUID).To(Equal("24:8a:07:03:00:8d:ae:2e"))
 		// The original RuntimeConfig must have not been overwritten
@@ -888,7 +888,7 @@ var _ = Describe("config operations", func() {
 
 		n, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(n.Delegates)).To(BeEquivalentTo(1))
+		Expect(n.Delegates).To(HaveLen(1))
 		Expect(n.Delegates[0].Name).To(Equal("weave"))
 	})
 
@@ -905,7 +905,7 @@ var _ = Describe("config operations", func() {
 
 		n, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(n.Delegates)).To(BeEquivalentTo(1))
+		Expect(n.Delegates).To(HaveLen(1))
 		Expect(n.Delegates[0].Name).To(Equal("weave-list"))
 	})
 
@@ -987,7 +987,7 @@ var _ = Describe("config operations", func() {
 		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
 
 		Expect(netconf.GatewayRequest).NotTo(BeNil())
-		Expect(len(*netconf.GatewayRequest)).To(Equal(1))
+		Expect(*netconf.GatewayRequest).To(HaveLen(1))
 		Expect(netconf.IsFilterV4Gateway).To(BeFalse())
 		Expect(netconf.IsFilterV6Gateway).To(BeTrue())
 	})
@@ -1015,7 +1015,7 @@ var _ = Describe("config operations", func() {
 		Expect(CheckGatewayConfig([]*DelegateNetConf{netconf})).To(Succeed())
 
 		Expect(netconf.GatewayRequest).NotTo(BeNil())
-		Expect(len(*netconf.GatewayRequest)).To(Equal(2))
+		Expect(*netconf.GatewayRequest).To(HaveLen(2))
 		Expect(netconf.IsFilterV4Gateway).To(BeFalse())
 		Expect(netconf.IsFilterV6Gateway).To(BeFalse())
 	})
