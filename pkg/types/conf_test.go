@@ -158,7 +158,7 @@ var _ = Describe("config operations", func() {
 		Expect(*netConf.LogOptions.MaxAge).To(Equal(5))
 		Expect(*netConf.LogOptions.MaxBackups).To(Equal(5))
 		Expect(*netConf.LogOptions.MaxSize).To(Equal(100))
-		Expect(*netConf.LogOptions.Compress).To(Equal(true))
+		Expect(*netConf.LogOptions.Compress).To(BeTrue())
 	})
 
 	It("properly sets namespace isolation using the default namespace", func() {
@@ -175,7 +175,7 @@ var _ = Describe("config operations", func() {
 	}`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(netConf.NamespaceIsolation).To(Equal(true))
+		Expect(netConf.NamespaceIsolation).To(BeTrue())
 		Expect(netConf.NonIsolatedNamespaces).To(HaveLen(1))
 		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("default"))
 	})
@@ -195,7 +195,7 @@ var _ = Describe("config operations", func() {
 	}`
 		netConf, err := LoadNetConf([]byte(conf))
 		Expect(err).NotTo(HaveOccurred())
-		Expect(netConf.NamespaceIsolation).To(Equal(true))
+		Expect(netConf.NamespaceIsolation).To(BeTrue())
 		Expect(netConf.NonIsolatedNamespaces).To(HaveLen(3))
 		Expect(netConf.NonIsolatedNamespaces[0]).To(Equal("foo"))
 		Expect(netConf.NonIsolatedNamespaces[1]).To(Equal("bar"))
@@ -331,9 +331,9 @@ var _ = Describe("config operations", func() {
 
 	It("check CheckSystemNamespaces() works fine", func() {
 		b1 := CheckSystemNamespaces("foobar", []string{"barfoo", "bafoo", "foobar"})
-		Expect(b1).To(Equal(true))
+		Expect(b1).To(BeTrue())
 		b2 := CheckSystemNamespaces("foobar1", []string{"barfoo", "bafoo", "foobar"})
-		Expect(b2).To(Equal(false))
+		Expect(b2).To(BeFalse())
 	})
 
 	It("assigns deviceID in delegated conf", func() {
