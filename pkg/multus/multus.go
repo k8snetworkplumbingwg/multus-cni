@@ -93,7 +93,7 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, string, error) 
 }
 
 func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
-	logging.Debugf("getIfname: %v, %s, %d", delegate, argif, idx)
+	logging.Debugf("getIfname: %v, %s, %d", *delegate, argif, idx)
 	if delegate.IfnameRequest != "" {
 		return delegate.IfnameRequest
 	}
@@ -289,7 +289,7 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 
 // DelegateAdd ...
 func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, delegate *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) (cnitypes.Result, error) {
-	logging.Debugf("DelegateAdd: %v, %v, %v", exec, delegate, rt)
+	logging.Debugf("DelegateAdd: %v, %v, %v", exec, *delegate, *rt)
 
 	if err := validateIfName(rt.NetNS, rt.IfName); err != nil {
 		return nil, logging.Errorf("DelegateAdd: cannot set %q interface name to %q: %v", delegate.Conf.Type, rt.IfName, err)

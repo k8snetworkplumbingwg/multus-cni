@@ -163,7 +163,7 @@ func LoadDelegateNetConf(bytes []byte, netElement *NetworkSelectionElement, devi
 
 // mergeCNIRuntimeConfig creates CNI runtimeconfig from delegate
 func mergeCNIRuntimeConfig(runtimeConfig *RuntimeConfig, delegate *DelegateNetConf) *RuntimeConfig {
-	logging.Debugf("mergeCNIRuntimeConfig: %v %v", runtimeConfig, delegate)
+	logging.Debugf("mergeCNIRuntimeConfig: %v %v", *runtimeConfig, *delegate)
 	var mergedRuntimeConfig RuntimeConfig
 
 	if runtimeConfig == nil {
