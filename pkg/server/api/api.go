@@ -69,7 +69,7 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 
 // GetAPIEndpoint returns endpoint URL for multus-daemon
 func GetAPIEndpoint(endpoint string) string {
-	return fmt.Sprintf("http://dummy/%s", endpoint)
+	return fmt.Sprintf("http://dummy%s", endpoint)
 }
 
 // CreateDelegateRequest creates Request for delegate API request
