@@ -446,11 +446,10 @@ func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.E
 		return nil, err
 	}
 
-	delegateCNIConf := &types.DelegateNetConf{}
-	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
+	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, nil, "", "")
+	if err != nil {
 		return nil, err
 	}
-	delegateCNIConf.Bytes = cmdArgs.StdinData
 
 	logging.Debugf("CmdDelegateAdd for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
 	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
@@ -486,11 +485,10 @@ func cmdDelegateDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.E
 		return err
 	}
 
-	delegateCNIConf := &types.DelegateNetConf{}
-	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
+	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, nil, "", "")
+	if err != nil {
 		return err
 	}
-	delegateCNIConf.Bytes = cmdArgs.StdinData
 	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
 	return multus.DelegateDel(exec, pod, delegateCNIConf, rt, multusConfig)
 }
