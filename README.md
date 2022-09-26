@@ -32,7 +32,7 @@ For thin-plugin (i.e. standalone implementation) case:
 cat ./deployments/multus-daemonset.yml | kubectl apply -f -
 ```
 
-For [thick-plugin](docks/thick-plugin.md) (i.e. client/server implementation) case:
+For [thick-plugin](docs/thick-plugin.md) (i.e. client/server implementation) case:
 
 ```
 cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f -
