@@ -825,6 +825,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
+	removeCacheConf := false
 	if err != nil {
 		// Fetch delegates again if cache is not exist and pod info can be read
 		if os.IsNotExist(err) && pod != nil {
@@ -854,7 +855,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			return nil
 		}
 	} else {
-		defer os.Remove(path)
+		removeCacheConf = true
 		in.Delegates = []*types.DelegateNetConf{}
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
@@ -896,5 +897,22 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
-	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+	e := delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+
+	// delegate plugin delete success, delete cache file
+	// others
+	// 1.  sandBox container stop times, but delegated plugin failed (cache file has been deleted)
+	// 2.  container gc manager clean up forever even though POD has been fully deleted from ETCD
+	// this case POD not find && cache file not find; never clean up
+	if removeCacheConf {
+		if in.AllowTryDeleteOnErr {
+			if e == nil {
+				_ = os.Remove(path)
+			}
+		} else {
+			_ = os.Remove(path) // lgtm[go/path-injection]
+		}
+	}
+
+	return e
 }

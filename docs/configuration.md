@@ -37,7 +37,8 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
     }, {
         "type": "macvlan",
         ... (snip)
-    }]
+    }],
+    allowTryDeleteOnErr: false
 }
 ```
 
@@ -62,6 +63,7 @@ User should chose following parameters combination (`clusterNetwork`+`defaultNet
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
 * `delegates` ([]map,required): number of delegate details in the Multus
+* `allowTryDeleteOnErr` (bool, optional): Enable or disable delegate DEL message to next when some missing error. Defaults to false.
 
 ### Network selection flow of clusterNetwork/defaultNetworks
 

@@ -41,7 +41,10 @@ type NetConf struct {
 	// These parameters are exclusive in one config file:
 	//  - Delegates (directly add delegate CNI config into multus CNI config)
 	//  - ClusterNetwork+DefaultNetworks  (add CNI config through CRD, directory or file)
-	Delegates       []*DelegateNetConf  `json:"-"`
+	Delegates []*DelegateNetConf `json:"-"`
+	// Allow delegate DEL message to next when some missing error
+	AllowTryDeleteOnErr bool `json:"allowTryDeleteOnErr"`
+
 	ClusterNetwork  string              `json:"clusterNetwork"`
 	DefaultNetworks []string            `json:"defaultNetworks"`
 	Kubeconfig      string              `json:"kubeconfig"`
