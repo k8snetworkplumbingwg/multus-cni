@@ -61,6 +61,9 @@ type NetConf struct {
 	SystemNamespaces []string `json:"systemNamespaces"`
 	// Option to set the namespace that multus-cni uses (clusterNetwork/defaultNetworks)
 	MultusNamespace string `json:"multusNamespace"`
+
+	// Retry delegate DEL message to next when some error
+	RetryDeleteOnError bool `json:"retryDeleteOnError"`
 }
 
 // RuntimeConfig specifies CNI RuntimeConfig
