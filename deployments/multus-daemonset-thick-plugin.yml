@@ -122,7 +122,7 @@ spec:
       serviceAccountName: multus
       containers:
         - name: kube-multus
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
           command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
           args:
             - "-cni-version=0.3.1"
@@ -146,7 +146,7 @@ spec:
               mountPath: /host/opt/cni/bin
       initContainers:
         - name: install-multus-binary
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
           command:
             - "cp"
             - "/usr/src/multus-cni/bin/multus"
@@ -162,7 +162,7 @@ spec:
               mountPath: /host/opt/cni/bin
               mountPropagation: Bidirectional
         - name: generate-kubeconfig
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:thick
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:v3.9.2-thick-amd64
           command:
             - "/usr/src/multus-cni/bin/generate-kubeconfig"
           args:

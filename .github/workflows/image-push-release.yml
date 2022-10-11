@@ -47,7 +47,7 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:thick-amd64
+            ghcr.io/${{ github.repository }}:stable-thick-amd64
             ${{ steps.docker_meta.outputs.tags }}-thick-amd64
           file: images/Dockerfile.thick
 
