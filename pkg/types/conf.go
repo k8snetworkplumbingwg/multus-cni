@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/containernetworking/cni/libcni"
@@ -205,13 +204,15 @@ func CreateCNIRuntimeConf(args *skel.CmdArgs, k8sArgs *K8sArgs, ifName string, r
 	podNamespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podUID := string(k8sArgs.K8S_POD_UID)
 	sandboxID := string(k8sArgs.K8S_POD_INFRA_CONTAINER_ID)
-	return newCNIRuntimeConf(args.ContainerID, sandboxID, podName, podNamespace, podUID, args.Netns, ifName, rc, delegate)
+	return newCNIRuntimeConf(args, sandboxID, podName, podNamespace, podUID, ifName, rc, delegate)
 }
 
 // newCNIRuntimeConf creates the CNI `RuntimeConf` for the given ADD / DEL request.
-func newCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, netNs, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
+func newCNIRuntimeConf(args *skel.CmdArgs, sandboxID, podName, podNamespace, podUID, ifName string, rc *RuntimeConfig, delegate *DelegateNetConf) (*libcni.RuntimeConf, string) {
 	logging.Debugf("LoadCNIRuntimeConf: %s, %v %v", ifName, rc, delegate)
 
+	containerID := args.ContainerID
+	netNs := args.Netns
 	delegateRc := delegateRuntimeConfig(containerID, delegate, rc, ifName)
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go#buildCNIRuntimeConf
 	rt := createRuntimeConf(netNs, podNamespace, podName, containerID, sandboxID, podUID, ifName)
@@ -219,7 +220,7 @@ func newCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, ne
 	var cniDeviceInfoFile string
 
 	// Populate rt.Args with CNI_ARGS if the rt.Args value is not set
-	cniArgs := os.Getenv("CNI_ARGS")
+	cniArgs := args.Args
 	if cniArgs != "" {
 		logging.Debugf("ARGS: %s", cniArgs)
 		for _, arg := range strings.Split(cniArgs, ";") {

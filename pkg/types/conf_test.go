@@ -640,11 +640,12 @@ var _ = Describe("config operations", func() {
 		Expect(rt.CapabilityArgs["portMappings"]).To(Equal(rc.PortMaps))
 	})
 
-	It("creates a valid CNI runtime config with K8s args passed via CNI_ARGS environment variable", func() {
+	It("creates a valid CNI runtime config with K8s args passed via CNI_ARGS", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
 			Netns:       testNS.Path(),
 			IfName:      "eth0",
+			Args:        "K8S_POD_NAME=dummy;K8S_POD_NAMESPACE=namespacedummy;K8S_POD_INFRA_CONTAINER_ID=123456789;K8S_POD_UID=aaaaa;BLAHBLAH=foo=bar",
 			StdinData: []byte(`{
     "name": "node-cni-network",
     "type": "multus",
@@ -662,7 +663,6 @@ var _ = Describe("config operations", func() {
 }`),
 		}
 
-		os.Setenv("CNI_ARGS", "K8S_POD_NAME=dummy;K8S_POD_NAMESPACE=namespacedummy;K8S_POD_INFRA_CONTAINER_ID=123456789;K8S_POD_UID=aaaaa;BLAHBLAH=foo=bar")
 		k8sArgs := &K8sArgs{}
 		rt, _ := CreateCNIRuntimeConf(args, k8sArgs, "", &RuntimeConfig{}, nil)
 		fmt.Println("rt.ContainerID: ", rt.ContainerID)
