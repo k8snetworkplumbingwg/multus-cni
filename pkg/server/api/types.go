@@ -24,6 +24,20 @@ type Request struct {
 	Env map[string]string `json:"env,omitempty"`
 	// CNI configuration passed via stdin to the CNI plugin
 	Config []byte `json:"config,omitempty"`
+	// Annotation for Delegate request
+	InterfaceAttributes *DelegateInterfaceAttributes `json:"interfaceAttributes,omitempty"`
+}
+
+// DelegateInterfaceAttributes annotates delegate request for additional config
+type DelegateInterfaceAttributes struct {
+	// IPRequest contains an optional requested IP address for this network
+	// attachment
+	IPRequest []string `json:"ips,omitempty"`
+	// MacRequest contains an optional requested MAC address for this
+	// network attachment
+	MacRequest string `json:"mac,omitempty"`
+	// CNIArgs contains additional CNI arguments for the network interface
+	CNIArgs *map[string]interface{} `json:"cni-args"`
 }
 
 // Response represents the response (computed in the CNI server) for

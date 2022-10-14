@@ -86,7 +86,7 @@ func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs
 
 // HandleDelegateRequest is the CNI server handler function; it is invoked whenever
 // a CNI request is processed as delegate CNI request.
-func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) ([]byte, error) {
+func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, interfaceAttributes *api.DelegateInterfaceAttributes) ([]byte, error) {
 	var result []byte
 	var err error
 	var multusConfByte []byte
@@ -100,7 +100,7 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 	logging.Verbosef("%s starting delegate request %+v", cmd, cniCmdArgs)
 	switch cmd {
 	case "ADD":
-		result, err = cmdDelegateAdd(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig)
+		result, err = cmdDelegateAdd(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig, interfaceAttributes)
 	case "DEL":
 		err = cmdDelegateDel(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig)
 	case "CHECK":
@@ -265,7 +265,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
 	}
 
-	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient)
+	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient, cr.InterfaceAttributes)
 	if err != nil {
 		// Prefix error with request information for easier debugging
 		return nil, fmt.Errorf("%+v %v", cniCmdArgs, err)
@@ -435,7 +435,7 @@ func serializeResult(result cnitypes.Result) ([]byte, error) {
 	return responseBytes, nil
 }
 
-func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf) ([]byte, error) {
+func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf, interfaceAttributes *api.DelegateInterfaceAttributes) ([]byte, error) {
 	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podName := string(k8sArgs.K8S_POD_NAME)
 	if namespace == "" || podName == "" {
@@ -446,7 +446,22 @@ func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.E
 		return nil, err
 	}
 
-	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, nil, "", "")
+	// copy deleate annotation into network selection element
+	var selectionElement *types.NetworkSelectionElement
+	if interfaceAttributes != nil {
+		selectionElement = &types.NetworkSelectionElement{}
+		if interfaceAttributes.MacRequest != "" {
+			selectionElement.MacRequest = interfaceAttributes.MacRequest
+		}
+		if interfaceAttributes.IPRequest != nil {
+			selectionElement.IPRequest = interfaceAttributes.IPRequest
+		}
+		if interfaceAttributes.CNIArgs != nil {
+			selectionElement.CNIArgs = interfaceAttributes.CNIArgs
+		}
+	}
+
+	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, selectionElement, "", "")
 	if err != nil {
 		return nil, err
 	}

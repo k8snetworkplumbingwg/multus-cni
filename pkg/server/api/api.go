@@ -73,7 +73,7 @@ func GetAPIEndpoint(endpoint string) string {
 }
 
 // CreateDelegateRequest creates Request for delegate API request
-func CreateDelegateRequest(cniCommand, cniContainerID, cniNetNS, cniIFName, podNamespace, podName, podUID string, cniConfig []byte) *Request {
+func CreateDelegateRequest(cniCommand, cniContainerID, cniNetNS, cniIFName, podNamespace, podName, podUID string, cniConfig []byte, interfaceAttributes *DelegateInterfaceAttributes) *Request {
 	return &Request{
 		Env: map[string]string{
 			"CNI_COMMAND":     strings.ToUpper(cniCommand),
@@ -82,6 +82,7 @@ func CreateDelegateRequest(cniCommand, cniContainerID, cniNetNS, cniIFName, podN
 			"CNI_IFNAME":      cniIFName,
 			"CNI_ARGS":        fmt.Sprintf("K8S_POD_NAMESPACE=%s;K8S_POD_NAME=%s;K8S_POD_UID=%s", podNamespace, podName, podUID),
 		},
-		Config: cniConfig,
+		Config:              cniConfig,
+		InterfaceAttributes: interfaceAttributes,
 	}
 }
