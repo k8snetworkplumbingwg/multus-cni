@@ -586,7 +586,7 @@ k8s.io/klog/v2/internal/severity
 # k8s.io/kube-openapi v0.0.0-20220413171646-5e7f5fdc6da6 => k8s.io/kube-openapi v0.0.0-20211109043538-20434351676c
 ## explicit; go 1.12
 k8s.io/kube-openapi/pkg/util/proto
-# k8s.io/kubelet v0.0.0 => k8s.io/kubelet v0.22.8
+# k8s.io/kubelet v0.22.8 => k8s.io/kubelet v0.22.8
 ## explicit; go 1.16
 k8s.io/kubelet/pkg/apis/podresources/v1
 # k8s.io/utils v0.0.0-20211116205334-6203023598ed
