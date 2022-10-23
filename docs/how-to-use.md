@@ -264,6 +264,7 @@ cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
       ]
   }
 }
+EOF
 ```
 
 ### Run pod with network annotation
