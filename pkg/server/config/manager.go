@@ -166,7 +166,7 @@ func (m Manager) GenerateConfig() (string, error) {
 // MonitorPluginConfiguration monitors the configuration file pointed
 // to by the primaryCNIPluginName attribute, and re-generates the multus
 // configuration whenever the primary CNI config is updated.
-func (m Manager) MonitorPluginConfiguration(shutDown chan struct{}, done chan struct{}) error {
+func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<- struct{}) error {
 	logging.Verbosef("started to watch file %s", m.primaryCNIConfigPath)
 
 	for {
@@ -206,7 +206,7 @@ func (m Manager) MonitorPluginConfiguration(shutDown chan struct{}, done chan st
 		case <-shutDown:
 			logging.Verbosef("Stopped monitoring, closing channel ...")
 			_ = m.configWatcher.Close()
-			done <- struct{}{}
+			close(done)
 			return nil
 		}
 	}
