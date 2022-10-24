@@ -98,9 +98,6 @@ var _ = Describe("Configuration Manager", func() {
 
 		configWatcherDoneChannel := make(chan struct{})
 		go func(stopChannel chan struct{}, doneChannel chan struct{}) {
-			defer func() {
-				stopChannel <- struct{}{}
-			}()
 			err := configManager.MonitorPluginConfiguration(configWatcherDoneChannel, stopChannel)
 			Expect(err).NotTo(HaveOccurred())
 		}(make(chan struct{}), configWatcherDoneChannel)
