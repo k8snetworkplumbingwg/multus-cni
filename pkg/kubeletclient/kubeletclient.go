@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	kubeletSocket              = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
+	defaultkubeletSocket              = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
 	kubeletConnectionTimeout   = 10 * time.Second
 	defaultKubeletSocketFile   = "kubelet.sock"
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
@@ -40,7 +40,7 @@ func LocalEndpoint(path, file string) (string, error) {
 // GetResourceClient returns an instance of ResourceClient interface initialized with Pod resource information
 func GetResourceClient(kubeletSocket string) (types.ResourceClient, error) {
 	if kubeletSocket == "" {
-		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, kubeletSocket)
+		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, defaultkubeletSocket)
 	}
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
