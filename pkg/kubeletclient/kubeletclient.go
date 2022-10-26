@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/checkpoint"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
@@ -61,7 +62,7 @@ func getKubeletResourceClient(kubeletSocket string, timeout time.Duration) (podr
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, kubeletSocket, grpc.WithInsecure(),
+	conn, err := grpc.DialContext(ctx, kubeletSocket, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dial),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaultPodResourcesMaxSize)))
 	if err != nil {
