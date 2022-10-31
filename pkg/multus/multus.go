@@ -825,6 +825,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
+	removeCacheConf := false
 	if err != nil {
 		// Fetch delegates again if cache is not exist and pod info can be read
 		if os.IsNotExist(err) && pod != nil {
@@ -854,7 +855,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			return nil
 		}
 	} else {
-		defer os.Remove(path)
+		removeCacheConf = true
 		in.Delegates = []*types.DelegateNetConf{}
 		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
 			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
@@ -896,5 +897,26 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		}
 	}
 
-	return delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+	e := delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
+
+	// Enable Option only delegate plugin delete success to delete cache file
+	// CNI Runtime maybe return an error to block sandbox cleanup a while initiative,
+	// like starting, prepare something, it will be OK when retry later
+	// put "delete cache file" off later ensure have enough info delegate DEL message when Pod has been fully
+	// deleted from ETCD before sandbox cleanup success..
+	if in.RetryDeleteOnError {
+		if removeCacheConf {
+			// Kubelet though this error as has been cleanup success and never retry, clean cache also
+			// Block sandbox cleanup error message can not contain "no such file or directory", CNI Runtime maybe should adaptor it !
+			if e == nil || strings.Contains(e.Error(), "no such file or directory") {
+				_ = os.Remove(path) // lgtm[go/path-injection]
+			}
+		}
+	} else {
+		if removeCacheConf {
+			_ = os.Remove(path) // lgtm[go/path-injection]
+		}
+	}
+
+	return e
 }
