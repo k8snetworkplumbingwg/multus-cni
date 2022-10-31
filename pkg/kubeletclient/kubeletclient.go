@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultkubeletSocket              = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
+	defaultKubeletSocket       = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
 	kubeletConnectionTimeout   = 10 * time.Second
 	defaultKubeletSocketFile   = "kubelet.sock"
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
@@ -38,10 +38,21 @@ func LocalEndpoint(path, file string) (string, error) {
 	return filepath.Join(u.String(), file+".sock"), nil
 }
 
+func removeUnixProtocol(endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != unixProtocol {
+		return "", fmt.Errorf("only support unix socket endpoint")
+	}
+	return u.Path, nil
+}
+
 // GetResourceClient returns an instance of ResourceClient interface initialized with Pod resource information
 func GetResourceClient(kubeletSocket string) (types.ResourceClient, error) {
 	if kubeletSocket == "" {
-		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, defaultkubeletSocket)
+		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, defaultKubeletSocket)
 	}
 	// If Kubelet resource API endpoint exist use that by default
 	// Or else fallback with checkpoint file
@@ -59,10 +70,14 @@ func dial(ctx context.Context, addr string) (net.Conn, error) {
 }
 
 func getKubeletResourceClient(kubeletSocket string, timeout time.Duration) (podresourcesapi.PodResourcesListerClient, *grpc.ClientConn, error) {
+	addr, err := removeUnixProtocol(kubeletSocket)
+	if err != nil {
+		return nil, nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	conn, err := grpc.DialContext(ctx, kubeletSocket, grpc.WithTransportCredentials(insecure.NewCredentials()),
+	conn, err := grpc.DialContext(ctx, addr, grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dial),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(defaultPodResourcesMaxSize)))
 	if err != nil {
@@ -74,7 +89,7 @@ func getKubeletResourceClient(kubeletSocket string, timeout time.Duration) (podr
 func getKubeletClient(kubeletSocket string) (types.ResourceClient, error) {
 	newClient := &kubeletClient{}
 	if kubeletSocket == "" {
-		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, kubeletSocket)
+		kubeletSocket, _ = LocalEndpoint(defaultPodResourcesPath, defaultKubeletSocket)
 	}
 
 	client, conn, err := getKubeletResourceClient(kubeletSocket, 10*time.Second)
