@@ -121,7 +121,7 @@ func setUp() error {
 
 	socketDir = testingPodResourcesPath
 	socketName = filepath.Join(socketDir, "kubelet.sock")
-	testKubeletSocket = socketName
+	testKubeletSocket, _ = LocalEndpoint(socketDir, "kubelet")
 
 	fakeServer = &fakeResourceServer{server: grpc.NewServer()}
 	podresourcesapi.RegisterPodResourcesListerServer(fakeServer.server, fakeServer)
@@ -160,11 +160,17 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 		})
 
 		It("should fail with missing file", func() {
-			_, err := GetResourceClient("sampleSocketString")
+			_, err := GetResourceClient("unix:/sampleSocketString")
 			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error reading file"))
+		})
+
+		It("should fail with invalid protocol", func() {
+			_, err := GetResourceClient("tcp:" + socketName)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("only support unix socket endpoint"))
 		})
 	})
-
 	Context("GetPodResourceMap() with valid pod name and namespace", func() {
 		It("should return no error", func() {
 			podUID := k8sTypes.UID("970a395d-bb3b-11e8-89df-408d5c537d23")
