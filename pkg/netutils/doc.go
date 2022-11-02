@@ -1,4 +1,4 @@
-// Copyright (c) 2021 Multus Authors
+// Copyright (c) 2022 Multus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,4 +13,5 @@
 // limitations under the License.
 
 // Package netutils is the package that contains network related utilities.
+
 package netutils
