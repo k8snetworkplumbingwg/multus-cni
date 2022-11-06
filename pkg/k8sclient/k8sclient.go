@@ -190,7 +190,7 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		return nil, logging.Errorf("parsePodNetworkAnnotation: pod annotation does not have \"network\" as key")
 	}
 
-	if strings.IndexAny(podNetworks, "[{\"") >= 0 {
+	if strings.ContainsAny(podNetworks, "[{\"") {
 		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
 			return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
 		}
