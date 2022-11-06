@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -55,7 +54,7 @@ func NewFakeNetAttachDefFile(namespace, name, filePath, fileData string) *netv1.
 			Namespace: namespace,
 		},
 	}
-	err := ioutil.WriteFile(filePath, []byte(fileData), 0600)
+	err := os.WriteFile(filePath, []byte(fileData), 0600)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	return netAttach
 }

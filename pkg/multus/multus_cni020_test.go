@@ -17,7 +17,6 @@ package multus
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 
@@ -51,7 +50,7 @@ var _ = Describe("multus operations", func() {
 	It("delete delegates given good filepath", func() {
 		os.MkdirAll("/opt/cni/bin", 0755)
 		d1 := []byte("blah")
-		ioutil.WriteFile("/opt/cni/bin/123456789", d1, 0644)
+		os.WriteFile("/opt/cni/bin/123456789", d1, 0644)
 
 		err := deleteDelegates("123456789", "/opt/cni/bin")
 		Expect(err).NotTo(HaveOccurred())
@@ -71,7 +70,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		os.Setenv("CNI_NETNS", testNS.Path())
 		os.Setenv("CNI_PATH", "/some/path")
 
-		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
 		Expect(err).NotTo(HaveOccurred())
 
 		// Touch the default network file.

@@ -22,7 +22,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"io/ioutil"
 	"testing"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
@@ -40,7 +39,7 @@ type fakeCheckpoint struct {
 }
 
 func (fc *fakeCheckpoint) WriteToFile(inBytes []byte) error {
-	return ioutil.WriteFile(fc.fileName, inBytes, 0600)
+	return os.WriteFile(fc.fileName, inBytes, 0600)
 }
 
 func (fc *fakeCheckpoint) DeleteFile() error {
