@@ -458,7 +458,13 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 		daemonNetConf.BinDir = defaultBinDir
 	}
 
-	if daemonNetConf.MultusSocketDir == "" {
+	if daemonNetConf.MultusSocketDir == "" ||
+		daemonNetConf.MultusSocketDir == "/" ||
+		daemonNetConf.MultusSocketDir == "/run" ||
+		daemonNetConf.MultusSocketDir == "/host" ||
+		daemonNetConf.MultusSocketDir == "/tmp" ||
+		daemonNetConf.MultusSocketDir == "/var/lib" ||
+		daemonNetConf.MultusSocketDir == "/etc" {
 		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}
 
