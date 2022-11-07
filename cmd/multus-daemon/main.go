@@ -70,12 +70,12 @@ func main() {
 	logToStdErr := flag.Bool("multus-log-to-stderr", false, "If the multus logs are also to be echoed to stderr.")
 	logLevel := flag.String("multus-log-level", "", "One of: debug/verbose/error/panic. Used only with --multus-conf-file=auto.")
 	logFile := flag.String("multus-log-file", "", "Path where to multus will log. Used only with --multus-conf-file=auto.")
-	logMaxSize := flag.Int("multus-log-max-size", defaultMultusLogMaxSize, "the maximum size in megabytes of the log file before it gets rotated")
-	logMaxAge := flag.Int("multus-log-max-age", defaultMultusLogMaxAge, "the maximum number of days to retain old log files in their filename")
-	logMaxBackups := flag.Int("multus-log-max-backups", defaultMultusLogMaxBackups, "the maximum number of old log files to retain")
-	logCompress := flag.Bool("multus-log-compress", defaultMultusLogCompress, "compress determines if the rotated log files should be compressed using gzip")
+	logMaxSize := flag.Int("multus-log-max-size", defaultMultusLogMaxSize, "The maximum size in megabytes of the log file before it gets rotated")
+	logMaxAge := flag.Int("multus-log-max-age", defaultMultusLogMaxAge, "The maximum number of days to retain old log files in their filename")
+	logMaxBackups := flag.Int("multus-log-max-backups", defaultMultusLogMaxBackups, "The maximum number of old log files to retain")
+	logCompress := flag.Bool("multus-log-compress", defaultMultusLogCompress, "Compress determines if the rotated log files should be compressed using gzip")
 	cniVersion := flag.String("cni-version", "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
-	forceCNIVersion := flag.Bool("force-cni-version", false, "force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
+	forceCNIVersion := flag.Bool("force-cni-version", false, "Force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
 	readinessIndicator := flag.String("readiness-indicator-file", "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
 	version := flag.Bool("version", false, "Show version")
