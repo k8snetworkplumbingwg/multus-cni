@@ -89,7 +89,10 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 
 func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
 	if forceCNIVersion {
-		overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+		err := overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	watcher, err := newWatcher(multusConfigDir)
