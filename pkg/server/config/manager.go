@@ -17,7 +17,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -64,7 +64,7 @@ func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigD
 
 // overrideCNIVersion overrides cniVersion in cniConfigFile, it should be used only in kind case
 func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
-	masterCNIConfigData, err := ioutil.ReadFile(cniConfigFile)
+	masterCNIConfigData, err := os.ReadFile(cniConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read cni config %s: %v", cniConfigFile, err)
 	}
@@ -80,7 +80,7 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 		return fmt.Errorf("couldn't update cluster network config: %v", err)
 	}
 
-	err = ioutil.WriteFile(cniConfigFile, configBytes, 0644)
+	err = os.WriteFile(cniConfigFile, configBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("couldn't update cluster network config: %v", err)
 	}
@@ -214,7 +214,7 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
 func (m Manager) PersistMultusConfig(config string) error {
-	return ioutil.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
+	return os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
 func getPrimaryCNIPluginName(multusAutoconfigDir string) (string, error) {
@@ -254,7 +254,7 @@ func shouldRegenerateConfig(event fsnotify.Event) bool {
 }
 
 func primaryCNIData(masterCNIPluginPath string) (interface{}, error) {
-	masterCNIConfigData, err := ioutil.ReadFile(masterCNIPluginPath)
+	masterCNIConfigData, err := os.ReadFile(masterCNIPluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read the cluster primary CNI config %s: %w", masterCNIPluginPath, err)
 	}

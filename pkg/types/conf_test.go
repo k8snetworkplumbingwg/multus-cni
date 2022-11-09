@@ -18,7 +18,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -49,7 +48,7 @@ var _ = Describe("config operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		os.Setenv("CNI_PATH", "/some/path")
 
-		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
 		Expect(err).NotTo(HaveOccurred())
 	})
 

@@ -17,7 +17,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -45,12 +44,12 @@ var _ = Describe("Configuration Manager", func() {
 
 	BeforeEach(func() {
 		var err error
-		multusConfigDir, err = ioutil.TempDir("", "multus-config")
+		multusConfigDir, err = os.MkdirTemp("", "multus-config")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(os.MkdirAll(multusConfigDir, 0755)).To(Succeed())
 
 		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
-		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
+		Expect(os.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
 
 		multusConf, _ := NewMultusConfig(
 			primaryCNIName,
@@ -73,7 +72,7 @@ var _ = Describe("Configuration Manager", func() {
 	It("Check overrideCNIVersion is worked", func() {
 		err := overrideCNIVersion(defaultCniConfig, "1.1.1")
 		Expect(err).NotTo(HaveOccurred())
-		raw, err := ioutil.ReadFile(defaultCniConfig)
+		raw, err := os.ReadFile(defaultCniConfig)
 		Expect(err).NotTo(HaveOccurred())
 
 		var jsonConfig map[string]interface{}
@@ -111,11 +110,11 @@ var _ = Describe("Configuration Manager", func() {
 }
 `
 		// update the CNI config to update the master config
-		Expect(ioutil.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
+		Expect(os.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
 
 		// wait for a while to get fsnotify event
 		time.Sleep(100 * time.Millisecond)
-		file, err := ioutil.ReadFile(configManager.multusConfigFilePath)
+		file, err := os.ReadFile(configManager.multusConfigFilePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(file)).To(Equal(config))
 
@@ -156,12 +155,12 @@ var _ = Describe("Configuration Manager with mismatched cniVersion", func() {
 
 	It("test cni version incompatibility", func() {
 		var err error
-		multusConfigDir, err = ioutil.TempDir("", "multus-config")
+		multusConfigDir, err = os.MkdirTemp("", "multus-config")
 		Expect(err).ToNot(HaveOccurred())
 		Expect(os.MkdirAll(multusConfigDir, 0755)).To(Succeed())
 
 		defaultCniConfig = fmt.Sprintf("%s/%s", multusConfigDir, primaryCNIPluginName)
-		Expect(ioutil.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
+		Expect(os.WriteFile(defaultCniConfig, []byte(primaryCNIPluginTemplate), UserRWPermission)).To(Succeed())
 
 		multusConf, _ := NewMultusConfig(
 			primaryCNIName,

@@ -17,7 +17,6 @@ package logging
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -101,7 +100,7 @@ var _ = Describe("logging operations", func() {
 	})
 
 	It("Check log function is worked with stderr", func() {
-		tmpDir, err := ioutil.TempDir("", "multus_tmp")
+		tmpDir, err := os.MkdirTemp("", "multus_tmp")
 		SetLogFile(fmt.Sprintf("%s/log.txt", tmpDir))
 		Debugf("foobar")
 		Verbosef("foobar")

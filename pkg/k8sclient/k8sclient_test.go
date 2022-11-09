@@ -17,7 +17,6 @@ package k8sclient
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -60,7 +59,7 @@ var _ = Describe("k8sclient operations", func() {
 	const fakePodName string = "testPod"
 
 	BeforeEach(func() {
-		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
 		Expect(err).NotTo(HaveOccurred())
 		genericConf = `{
 			"name":"node-cni-network",
@@ -546,7 +545,7 @@ var _ = Describe("k8sclient operations", func() {
 
 	It("retrieves cluster network from cni config path", func() {
 		net1Name := filepath.Join(tmpDir, "10-net1.conf")
-		ioutil.WriteFile(net1Name, []byte(`{
+		os.WriteFile(net1Name, []byte(`{
 				"name": "net1",
 				"type": "mynet",
 				"cniVersion": "0.3.1"
@@ -765,7 +764,7 @@ var _ = Describe("k8sclient operations", func() {
 	})
 
 	It("uses cached delegates when an error in loading from pod annotation occurs", func() {
-		dir, err := ioutil.TempDir("", "multus-test")
+		dir, err := os.MkdirTemp("", "multus-test")
 		Expect(err).NotTo(HaveOccurred())
 		defer os.RemoveAll(dir) // clean up
 

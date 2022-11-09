@@ -18,8 +18,8 @@ package netutils
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 
 	"github.com/containernetworking/cni/libcni"
@@ -95,7 +95,7 @@ func SetDefaultGW(netnsPath string, ifName string, gateways []net.IP) error {
 func DeleteDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, ipv4, ipv6 bool) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
 
-	cache, err := ioutil.ReadFile(cacheFile)
+	cache, err := os.ReadFile(cacheFile)
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func DeleteDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName strin
 	}
 
 	logging.Debugf("DeleteDefaultGWCache: update cache to delete GW: %s", string(newCache))
-	return ioutil.WriteFile(cacheFile, newCache, 0600)
+	return os.WriteFile(cacheFile, newCache, 0600)
 }
 
 func deleteDefaultGWCacheBytes(cacheFile []byte, ipv4, ipv6 bool) ([]byte, error) {
@@ -267,7 +267,7 @@ func deleteDefaultGWResult020(result map[string]interface{}, ipv4, ipv6 bool) (m
 func AddDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, gw []net.IP) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
 
-	cache, err := ioutil.ReadFile(cacheFile)
+	cache, err := os.ReadFile(cacheFile)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func AddDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, 
 	}
 
 	logging.Debugf("AddDefaultGWCache: update cache to add GW: %s", string(newCache))
-	return ioutil.WriteFile(cacheFile, newCache, 0600)
+	return os.WriteFile(cacheFile, newCache, 0600)
 }
 
 func addDefaultGWCacheBytes(cacheFile []byte, gw []net.IP) ([]byte, error) {

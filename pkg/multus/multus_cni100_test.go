@@ -16,7 +16,6 @@ package multus
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 
@@ -47,7 +46,7 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		os.Setenv("CNI_NETNS", testNS.Path())
 		os.Setenv("CNI_PATH", "/some/path")
 
-		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
 		Expect(err).NotTo(HaveOccurred())
 
 		// Touch the default network file.
