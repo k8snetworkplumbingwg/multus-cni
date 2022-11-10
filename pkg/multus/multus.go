@@ -361,8 +361,7 @@ func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	ips := []string{}
 	res, err := cni100.NewResultFromResult(result)
 	if err != nil {
-		logging.Errorf("DelegateAdd: error converting result: %v", err)
-		return result, nil
+		return result, logging.Errorf("DelegateAdd: error converting result: %v", err)
 	}
 	for _, ip := range res.IPs {
 		ips = append(ips, ip.Address.String())
@@ -825,8 +824,25 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
-	removeCacheConf := false
-	if err != nil {
+	useCacheConf := false
+	if err == nil {
+		in.Delegates = []*types.DelegateNetConf{}
+		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
+			logging.Errorf("Multus: failed to load netconf: %v", err)
+		} else {
+			useCacheConf = true
+			// check plugins field and enable ConfListPlugin if there is
+			for _, v := range in.Delegates {
+				if len(v.ConfList.Plugins) != 0 {
+					v.ConfListPlugin = true
+				}
+			}
+			// First delegate is always the master plugin
+			in.Delegates[0].MasterPlugin = true
+		}
+	}
+
+	if !useCacheConf {
 		// Fetch delegates again if cache is not exist and pod info can be read
 		if os.IsNotExist(err) && pod != nil {
 			if in.ClusterNetwork != "" {
@@ -851,23 +867,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		} else {
 			// The options to continue with a delete have been exhausted (cachefile + API query didn't work)
 			// We cannot exit with an error as this may cause a sandbox to never get deleted.
-			logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
-			return nil
+			return logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
 		}
-	} else {
-		removeCacheConf = true
-		in.Delegates = []*types.DelegateNetConf{}
-		if err := json.Unmarshal(netconfBytes, &in.Delegates); err != nil {
-			return cmdErr(k8sArgs, "failed to load netconf: %v", err)
-		}
-		// check plugins field and enable ConfListPlugin if there is
-		for _, v := range in.Delegates {
-			if len(v.ConfList.Plugins) != 0 {
-				v.ConfListPlugin = true
-			}
-		}
-		// First delegate is always the master plugin
-		in.Delegates[0].MasterPlugin = true
 	}
 
 	// set CNIVersion in delegate CNI config if there is no CNIVersion and multus conf have CNIVersion.
@@ -905,7 +906,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	// put "delete cache file" off later ensure have enough info delegate DEL message when Pod has been fully
 	// deleted from ETCD before sandbox cleanup success..
 	if in.RetryDeleteOnError {
-		if removeCacheConf {
+		if useCacheConf {
 			// Kubelet though this error as has been cleanup success and never retry, clean cache also
 			// Block sandbox cleanup error message can not contain "no such file or directory", CNI Runtime maybe should adaptor it !
 			if e == nil || strings.Contains(e.Error(), "no such file or directory") {
@@ -913,7 +914,8 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			}
 		}
 	} else {
-		if removeCacheConf {
+		if useCacheConf {
+			// remove used cache file
 			_ = os.Remove(path) // lgtm[go/path-injection]
 		}
 	}
