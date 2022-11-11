@@ -17,7 +17,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -64,7 +63,7 @@ var _ = Describe("Configuration Generator", func() {
 	var err error
 
 	BeforeEach(func() {
-		tmpDir, err = ioutil.TempDir("", "multus_tmp")
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
 		Expect(err).NotTo(HaveOccurred())
 	})
 

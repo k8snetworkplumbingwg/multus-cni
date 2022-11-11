@@ -17,7 +17,7 @@ package checkpoint
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
@@ -72,7 +72,7 @@ func getCheckpoint(filePath string) (types.ResourceClient, error) {
 func (cp *checkpoint) getPodEntries() error {
 
 	cpd := &checkpointFileData{}
-	rawBytes, err := ioutil.ReadFile(cp.fileName)
+	rawBytes, err := os.ReadFile(cp.fileName)
 	if err != nil {
 		return logging.Errorf("getPodEntries: error reading file %s\n%v\n", checkPointfile, err)
 	}

@@ -18,7 +18,6 @@ package kubeletclient
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -47,7 +46,7 @@ type fakeResourceServer struct {
 	server *grpc.Server
 }
 
-//TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
+// TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
 func (m *fakeResourceServer) GetAllocatableResources(ctx context.Context, req *podresourcesapi.AllocatableResourcesRequest) (*podresourcesapi.AllocatableResourcesResponse, error) {
 	return &podresourcesapi.AllocatableResourcesResponse{}, nil
 }
@@ -102,7 +101,7 @@ func CreateListener(addr string) (net.Listener, error) {
 	}
 
 	// Create the socket on a tempfile and move it to the destination socket to handle improper cleanup
-	file, err := ioutil.TempFile(filepath.Dir(addr), "")
+	file, err := os.MkdirTemp(filepath.Dir(addr), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file: %v", err)
 	}
@@ -124,7 +123,7 @@ func CreateListener(addr string) (net.Listener, error) {
 }
 
 func setUp() error {
-	tempSocketDir, err := ioutil.TempDir("", "kubelet-resource-client")
+	tempSocketDir, err := os.MkdirTemp("", "kubelet-resource-client")
 	if err != nil {
 		return err
 	}

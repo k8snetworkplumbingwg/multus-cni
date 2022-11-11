@@ -18,7 +18,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -428,7 +427,7 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 // LoadDaemonNetConf loads the configuration for the multus daemon
 func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
-	config, err := ioutil.ReadFile(configPath)
+	config, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read the config file's contents: %w", err)
 	}

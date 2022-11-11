@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -331,7 +331,7 @@ func findMasterPlugin(cniConfigDirPath string, remainingTries int) (string, erro
 		return "", fmt.Errorf("could not find a plugin configuration in %s", cniConfigDirPath)
 	}
 	var cniPluginConfigs []string
-	files, err := ioutil.ReadDir(cniConfigDirPath)
+	files, err := os.ReadDir(cniConfigDirPath)
 	if err != nil {
 		return "", fmt.Errorf("error when listing the CNI plugin configurations: %w", err)
 	}

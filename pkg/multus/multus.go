@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -77,7 +76,7 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 
 	path := filepath.Join(dataDir, containerID)
 
-	err := ioutil.WriteFile(path, netconf, 0600)
+	err := os.WriteFile(path, netconf, 0600)
 	if err != nil {
 		return logging.Errorf("saveScratchNetConf: failed to write container data in the path(%q): %v", path, err)
 	}
@@ -89,7 +88,7 @@ func consumeScratchNetConf(containerID, dataDir string) ([]byte, string, error) 
 	logging.Debugf("consumeScratchNetConf: %s, %s", containerID, dataDir)
 	path := filepath.Join(dataDir, containerID)
 
-	b, err := ioutil.ReadFile(path)
+	b, err := os.ReadFile(path)
 	return b, path, err
 }
 

@@ -17,7 +17,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	. "github.com/onsi/ginkgo"
@@ -68,7 +67,7 @@ var _ = Describe(suiteName, func() {
 
 	BeforeEach(func() {
 		var err error
-		thickPluginRunDir, err = ioutil.TempDir("", thickCNISocketDirPath)
+		thickPluginRunDir, err = os.MkdirTemp("", thickCNISocketDirPath)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
