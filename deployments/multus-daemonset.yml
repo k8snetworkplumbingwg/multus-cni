@@ -121,7 +121,8 @@ data:
       "name": "multus-cni-network",
       "type": "multus",
       "capabilities": {
-        "portMappings": true
+        "portMappings": true,
+        "bandwidth": true
       },
       "delegates": [
         {
