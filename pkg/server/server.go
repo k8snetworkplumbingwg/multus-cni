@@ -220,7 +220,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	var cr api.Request
-	b, err := os.R(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}

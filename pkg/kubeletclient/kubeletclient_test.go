@@ -101,7 +101,8 @@ func CreateListener(addr string) (net.Listener, error) {
 	}
 
 	// Create the socket on a tempfile and move it to the destination socket to handle improper cleanup
-	file, err := os.MkdirTemp(filepath.Dir(addr), "")
+
+	file, err := os.CreateTemp(filepath.Dir(addr), "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary file: %v", err)
 	}

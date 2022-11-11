@@ -44,8 +44,7 @@ type ShimNetConf struct {
 func CmdAdd(args *skel.CmdArgs) error {
 	response, cniVersion, err := postRequest(args)
 	if err != nil {
-		logging.Errorf("CmdAdd (shim): %v", err)
-		return err
+		return logging.Errorf("CmdAdd (shim): %v", err)
 	}
 
 	logging.Verbosef("CmdAdd (shim): %v", *response.Result)
@@ -56,8 +55,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 func CmdCheck(args *skel.CmdArgs) error {
 	_, _, err := postRequest(args)
 	if err != nil {
-		logging.Errorf("CmdCheck (shim): %v", err)
-		return err
+		return logging.Errorf("CmdCheck (shim): %v", err)
 	}
 
 	return err
@@ -67,10 +65,8 @@ func CmdCheck(args *skel.CmdArgs) error {
 func CmdDel(args *skel.CmdArgs) error {
 	_, _, err := postRequest(args)
 	if err != nil {
-		logging.Errorf("CmdDel (shim): %v", err)
-		return nil
+		return logging.Errorf("CmdDel (shim): %v", err)
 	}
-
 	return nil
 }
 

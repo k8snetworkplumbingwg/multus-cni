@@ -89,7 +89,10 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 
 func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
 	if forceCNIVersion {
-		overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+		err := overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	watcher, err := newWatcher(multusConfigDir)
@@ -249,8 +252,7 @@ func newWatcher(cniConfigDir string) (*fsnotify.Watcher, error) {
 }
 
 func shouldRegenerateConfig(event fsnotify.Event) bool {
-	return event.Op&fsnotify.Write == fsnotify.Write ||
-		event.Op&fsnotify.Create == fsnotify.Create
+	return event.Has(fsnotify.Write) || event.Has(fsnotify.Create)
 }
 
 func primaryCNIData(masterCNIPluginPath string) (interface{}, error) {
