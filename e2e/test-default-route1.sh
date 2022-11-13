@@ -6,8 +6,14 @@ export PATH=${PATH}:./bin
 kubectl create -f yamls/default-route1.yml
 kubectl wait --for=condition=ready -l app=default-route1 --timeout=300s pod
 
-echo "check default-route-worker1 interface: net1"
-kubectl exec default-route-worker1 -- ip a show dev net1
+echo "check default-route-worker1  interface: net1"
+net=$(kubectl exec default-route-worker1 -- ip a show dev net1)
+if [ $? -eq 0 ];then
+	echo "default-route-worker1 pod has net1 card"
+else
+	echo "default-route-worker1 pod has no net1 card"
+	exit 1
+fi
 
 echo "check default-route-worker1 interface address: net1"
 ipaddr=$(kubectl exec default-route-worker1 -- ip -j a show  | jq -r \
@@ -24,7 +30,13 @@ if [ $ipaddr != "10.1.1.254" ]; then
 fi
 
 echo "check default-route-worker2 interface: net1"
-kubectl exec default-route-worker2 -- ip a show dev net1
+net2=$(kubectl exec default-route-worker2 -- ip a show dev net1)
+if [ $? -eq 0  ];then
+	echo "default-route-worker2 pod has net1 card"
+else
+	echo "default-route-worker2 pod has no net1 card"
+	exit 1
+fi
 
 echo "check default-route-worker2 interface address: net1"
 ipaddr=$(kubectl exec default-route-worker2 -- ip -j a show  | jq -r \
