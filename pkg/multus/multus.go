@@ -361,8 +361,7 @@ func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	ips := []string{}
 	res, err := cni100.NewResultFromResult(result)
 	if err != nil {
-		logging.Errorf("DelegateAdd: error converting result: %v", err)
-		return result, nil
+		return result, logging.Errorf("DelegateAdd: error converting result: %v", err)
 	}
 	for _, ip := range res.IPs {
 		ips = append(ips, ip.Address.String())
@@ -868,8 +867,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		} else {
 			// The options to continue with a delete have been exhausted (cachefile + API query didn't work)
 			// We cannot exit with an error as this may cause a sandbox to never get deleted.
-			logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
-			return nil
+			return logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
 		}
 	}
 
