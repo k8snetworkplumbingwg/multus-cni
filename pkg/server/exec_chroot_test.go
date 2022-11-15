@@ -54,4 +54,14 @@ var _ = Describe("exec_chroot", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("Call invalid ChrootExec.FindInPath with dummy", func() {
+		chrootExec := &ChrootExec{
+			Stderr:    os.Stderr,
+			chrootDir: "/tmp",
+		}
+
+		_, err := chrootExec.FindInPath("true", []string{"/usr"})
+		Expect(err).To(HaveOccurred())
+	})
+
 })
