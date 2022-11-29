@@ -30,6 +30,9 @@ const (
 	// MultusDelegateAPIEndpoint is an endpoint for multus delegate request (for hotplug)
 	MultusDelegateAPIEndpoint = "/delegate"
 	defaultMultusRunDir       = "/run/multus/"
+
+	// MultusHealthAPIEndpoint is an endpoint API clients can query to know if they can communicate w/ multus server
+	MultusHealthAPIEndpoint = "/healthz"
 )
 
 // DoCNI sends a CNI request to the CNI server via JSON + HTTP over a root-owned unix socket,
