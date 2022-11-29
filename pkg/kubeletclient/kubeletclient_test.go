@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,7 +86,7 @@ func TestKubeletclient(t *testing.T) {
 	RunSpecs(t, "Kubeletclient Suite")
 }
 
-var testKubeletSocket string
+var testKubeletSocket *url.URL
 
 // CreateListener creates a listener on the specified endpoint.
 // based from k8s.io/kubernetes/pkg/kubelet/util
@@ -135,7 +136,7 @@ func setUp() error {
 
 	socketDir = testingPodResourcesPath
 	socketName = filepath.Join(socketDir, "kubelet.sock")
-	testKubeletSocket, _ = LocalEndpoint(socketDir, "kubelet")
+	testKubeletSocket = localEndpoint(filepath.Join(socketDir, "kubelet"))
 
 	fakeServer = &fakeResourceServer{server: grpc.NewServer()}
 	podresourcesapi.RegisterPodResourcesListerServer(fakeServer.server, fakeServer)
@@ -169,7 +170,7 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 
 	Context("GetResourceClient()", func() {
 		It("should return no error", func() {
-			_, err := GetResourceClient(testKubeletSocket)
+			_, err := GetResourceClient(testKubeletSocket.Path)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -177,12 +178,6 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			_, err := GetResourceClient("unix:/sampleSocketString")
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error reading file"))
-		})
-
-		It("should fail with invalid protocol", func() {
-			_, err := GetResourceClient("tcp:" + socketName)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("only support unix socket endpoint"))
 		})
 	})
 	Context("GetPodResourceMap() with valid pod name and namespace", func() {
@@ -215,7 +210,9 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 		})
 
 		It("should return an error with garbage socket value", func() {
-			_, err := getKubeletClient("/badfilepath!?//")
+			u, err := url.Parse("/badfilepath!?//")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = getKubeletClient(u)
 			Expect(err).To(HaveOccurred())
 		})
 	})
