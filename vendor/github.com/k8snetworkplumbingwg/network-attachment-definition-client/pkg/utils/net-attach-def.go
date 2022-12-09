@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 
@@ -72,7 +73,7 @@ func SetNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, statuses []v
 	return nil
 }
 
-func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkstatus string) (error) {
+func setPodNetworkStatus(client kubernetes.Interface, pod *corev1.Pod, networkstatus string) error {
 	if len(pod.Annotations) == 0 {
 		pod.Annotations = make(map[string]string)
 	}
@@ -145,6 +146,12 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 		netStatus.IPs = append(netStatus.IPs, ipconfig.Address.IP.String())
 	}
 
+	for _, route := range result.Routes {
+		if isDefaultRoute(route) {
+			netStatus.Gateway = append(netStatus.Gateway, route.GW.String())
+		}
+	}
+
 	v1dns := convertDNS(result.DNS)
 	netStatus.DNS = *v1dns
 
@@ -153,6 +160,12 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 	}
 
 	return netStatus, nil
+}
+
+func isDefaultRoute(route *cnitypes.Route) bool {
+	return route.Dst.IP == nil && route.Dst.Mask == nil ||
+		route.Dst.IP.Equal(net.IPv4zero) ||
+		route.Dst.IP.Equal(net.IPv6zero)
 }
 
 // ParsePodNetworkAnnotation parses Pod annotation for net-attach-def and get NetworkSelectionElement
