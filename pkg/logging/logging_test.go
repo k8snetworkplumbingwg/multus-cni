@@ -23,7 +23,7 @@ import (
 	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
