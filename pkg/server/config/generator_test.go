@@ -262,6 +262,44 @@ var _ = Describe("Configuration Generator", func() {
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
+	It("generates a multus config with CNI configuration directory", func() {
+		cniConfigDir := "/host/etc/cni/net.d"
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithCniConfigDir(cniConfigDir))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"cniConfigDir":"/host/etc/cni/net.d",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
+	It("generates a multus config with a custom socket directory", func() {
+		socketDir := "/var/run/multus/multussock/"
+		multusConfig, err := newMultusConfigWithDelegates(
+			primaryCNIName,
+			cniVersion,
+			primaryCNIFile,
+			WithSocketDir(socketDir))
+		Expect(err).NotTo(HaveOccurred())
+		expectedResult := fmt.Sprintf(`
+			{
+				"cniVersion":"0.4.0",
+				"clusterNetwork":"%s",
+				"name":"multus-cni-network",
+				"socketDir":"/var/run/multus/multussock/",
+				"type":"myCNI"
+			}`, primaryCNIFile)
+		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
+	})
+
 	It("multus config with global namespace", func() {
 		const globalNamespace = "come-along-ns"
 		multusConfig, err := newMultusConfigWithDelegates(

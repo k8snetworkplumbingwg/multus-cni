@@ -56,6 +56,7 @@ const (
 	defaultMultusMasterCNIFile          = ""
 	defaultMultusNamespaceIsolation     = false
 	defaultMultusReadinessIndicatorFile = ""
+	defaultSocketDir                    = "/run/multus/"
 )
 
 func main() {
@@ -75,6 +76,7 @@ func main() {
 	logMaxBackups := flag.Int("multus-log-max-backups", defaultMultusLogMaxBackups, "The maximum number of old log files to retain")
 	logCompress := flag.Bool("multus-log-compress", defaultMultusLogCompress, "Compress determines if the rotated log files should be compressed using gzip")
 	cniVersion := flag.String("cni-version", "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
+	socketDir := flag.String("socket-dir", defaultSocketDir, "Specifies the directory where the socket file resides.")
 	forceCNIVersion := flag.Bool("force-cni-version", false, "Force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
 	readinessIndicator := flag.String("readiness-indicator-file", "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
 	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
@@ -135,6 +137,12 @@ func main() {
 			configurationOptions = append(
 				configurationOptions, config.WithReadinessFileIndicator(*readinessIndicator))
 		}
+
+		configurationOptions = append(
+			configurationOptions, config.WithCniConfigDir(*cniConfigDir))
+
+		configurationOptions = append(
+			configurationOptions, config.WithSocketDir(*socketDir))
 
 		// logOptions
 
