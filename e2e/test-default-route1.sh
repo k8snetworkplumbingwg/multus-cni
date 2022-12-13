@@ -8,6 +8,9 @@ kubectl wait --for=condition=ready -l app=default-route1 --timeout=300s pod
 
 echo "check default-route-worker1 interface: net1"
 kubectl exec default-route-worker1 -- ip a show dev net1
+if [ $? -ne 0 ];then
+       exit 1
+fi
 
 echo "check default-route-worker1 interface address: net1"
 ipaddr=$(kubectl exec default-route-worker1 -- ip -j a show  | jq -r \
@@ -25,6 +28,9 @@ fi
 
 echo "check default-route-worker2 interface: net1"
 kubectl exec default-route-worker2 -- ip a show dev net1
+if [ $? -ne 0 ];then
+       exit 1
+fi
 
 echo "check default-route-worker2 interface address: net1"
 ipaddr=$(kubectl exec default-route-worker2 -- ip -j a show  | jq -r \
