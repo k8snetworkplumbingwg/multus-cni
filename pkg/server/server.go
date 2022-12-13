@@ -29,7 +29,6 @@ import (
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 
-	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -155,7 +154,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		servConfig = bytes.Replace(servConfig, []byte("{"), []byte(","), 1)
 	}
 
-	router := mux.NewRouter()
+	router := http.NewServeMux()
 	s := &Server{
 		Server: http.Server{
 			Handler: router,
@@ -177,14 +176,14 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	// register metrics
 	prometheus.MustRegister(s.metrics.requestCounter)
 
-	router.NotFoundHandler = promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": "NotFound"}),
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_ = logging.Errorf("http not found: %v", r)
-			w.WriteHeader(http.StatusNotFound)
-		}))
-
+	// handle for '/cni'
 	router.HandleFunc(api.MultusCNIAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusCNIAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				return
+			}
+
 			result, err := s.handleCNIRequest(r)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
@@ -197,10 +196,16 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			if _, err := w.Write(result); err != nil {
 				_ = logging.Errorf("Error writing HTTP response: %v", err)
 			}
-		}))).Methods("POST")
+		})))
 
+	// handle for '/delegate'
 	router.HandleFunc(api.MultusDelegateAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusDelegateAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				return
+			}
+
 			result, err := s.handleDelegateRequest(r)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
@@ -213,13 +218,26 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			if _, err := w.Write(result); err != nil {
 				_ = logging.Errorf("Error writing HTTP response: %v", err)
 			}
-		}))).Methods("POST")
+		})))
 
+	// handle for '/healthz'
 	router.HandleFunc(api.MultusHealthAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				return
+			}
+
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
-		}))).Methods("GET")
+		})))
+
+	// this handle for the rest of above
+	router.HandleFunc("/", promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": "NotFound"}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = logging.Errorf("http not found: %v", r)
+			w.WriteHeader(http.StatusNotFound)
+		})))
 
 	return s, nil
 }
