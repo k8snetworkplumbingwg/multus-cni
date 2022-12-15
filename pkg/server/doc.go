@@ -13,5 +13,4 @@
 // limitations under the License.
 
 // Package server is the package that contains thick pluigin's server libraries.
-
 package server

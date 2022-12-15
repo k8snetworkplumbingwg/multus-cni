@@ -14,5 +14,4 @@
 
 // Package multus is the package that contains main multus function, which
 // manipulates CNI request for delegate plugins.
-
 package multus

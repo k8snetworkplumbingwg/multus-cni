@@ -13,5 +13,4 @@
 // limitations under the License.
 
 // Package types contains common types in the multus.
-
 package types

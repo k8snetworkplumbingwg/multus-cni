@@ -14,5 +14,4 @@
 
 // Package checkpoint is the package that contains the libraries that manipulates kubelet's
 // checkpoint API
-
 package checkpoint
