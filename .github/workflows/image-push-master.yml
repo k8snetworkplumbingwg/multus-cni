@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -24,7 +24,7 @@ jobs:
 
       - name: Push container image
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -35,7 +35,7 @@ jobs:
 
       - name: Push container image for daemon based deployment
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -49,14 +49,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -64,7 +64,7 @@ jobs:
 
       - name: Push container image
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -78,14 +78,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -93,7 +93,7 @@ jobs:
 
       - name: Push container image
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -107,14 +107,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -122,7 +122,7 @@ jobs:
 
       - name: Push container image
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -136,14 +136,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -151,7 +151,7 @@ jobs:
 
       - name: Push container image
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
@@ -160,34 +160,35 @@ jobs:
             ghcr.io/${{ github.repository }}:snapshot-s390x
           file: images/Dockerfile.s390x
 
-  push-origin:
-    name: Image push/origin
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest-origin
-            ghcr.io/${{ github.repository }}:snapshot-origin
-          file: images/Dockerfile.openshift
+# TODO: need to fix this action
+#  push-origin:
+#    name: Image push/origin
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Check out code into the Go module directory
+#        uses: actions/checkout@v3
+#
+#      - name: Set up Docker Buildx
+#        uses: docker/setup-buildx-action@v2
+#
+#      - name: Login to GitHub Container Registry
+#        if: github.repository_owner == 'k8snetworkplumbingwg'
+#        uses: docker/login-action@v2
+#        with:
+#          registry: ghcr.io
+#          username: ${{ github.repository_owner }}
+#          password: ${{ secrets.GITHUB_TOKEN }}
+#
+#      - name: Push container image
+#        if: github.repository_owner == 'k8snetworkplumbingwg'
+#        uses: docker/build-push-action@v3
+#        with:
+#          context: .
+#          push: true
+#          tags: |
+#            ghcr.io/${{ github.repository }}:latest-origin
+#            ghcr.io/${{ github.repository }}:snapshot-origin
+#          file: images/Dockerfile.openshift
 
   push-manifest:
     needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
@@ -196,11 +197,11 @@ jobs:
       REPOSITORY: ghcr.io/${{ github.repository }}
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
         if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
