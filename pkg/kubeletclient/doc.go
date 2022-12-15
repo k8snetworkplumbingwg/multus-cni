@@ -14,5 +14,4 @@
 
 // Package kubeletclient is the package that contains the kubelet's libraries that
 // controls podresource API in kubelet
-
 package kubeletclient

@@ -13,5 +13,4 @@
 // limitations under the License.
 
 // Package netutils is the package that contains network related utilities.
-
 package netutils

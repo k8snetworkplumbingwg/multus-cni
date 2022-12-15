@@ -13,5 +13,4 @@
 // limitations under the License.
 
 // Package logging is the package that contains logging library.
-
 package logging

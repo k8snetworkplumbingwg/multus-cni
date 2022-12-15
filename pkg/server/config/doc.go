@@ -14,5 +14,4 @@
 
 // Package config is the package that contains the libraries that operates
 // CNI config files
-
 package config
