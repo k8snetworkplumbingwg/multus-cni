@@ -42,8 +42,8 @@ type Manager struct {
 	primaryCNIConfigPath string
 }
 
-// NewManager returns a config manager object, configured to persist the
-// configuration to `multusAutoconfigDir`. This constructor will auto-discover
+// NewManager returns a config manager object, configured to read the
+// primary CNI configuration in `multusAutoconfigDir`. This constructor will auto-discover
 // the primary CNI for which it will delegate.
 func NewManager(config MultusConf, multusAutoconfigDir string, forceCNIVersion bool) (*Manager, error) {
 	defaultCNIPluginName, err := getPrimaryCNIPluginName(multusAutoconfigDir)
@@ -108,7 +108,7 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 		configWatcher:        watcher,
 		multusConfig:         &config,
 		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
+		multusConfigFilePath: cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
 	}
 
@@ -217,6 +217,7 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
 func (m Manager) PersistMultusConfig(config string) error {
+	logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
 	return os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 

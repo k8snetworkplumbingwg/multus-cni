@@ -54,6 +54,8 @@ type MultusConf struct {
 	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
 	Type                     string          `json:"type"`
 	CniDir                   string          `json:"cniDir,omitempty"`
+	CniConfigDir             string          `json:"cniConfigDir,omitempty"`
+	SocketDir                string          `json:"socketDir,omitempty"`
 }
 
 // LogOptions specifies the configuration of the log
@@ -218,6 +220,23 @@ func WithOverriddenName(networkName string) Option {
 func WithCniDir(cniDir string) Option {
 	return func(conf *MultusConf) error {
 		conf.CniDir = cniDir
+		return nil
+	}
+}
+
+// WithCniConfigDir mutates the inner state to set the
+// multus CNI configuration directory
+func WithCniConfigDir(confDir string) Option {
+	return func(conf *MultusConf) error {
+		conf.CniConfigDir = confDir
+		return nil
+	}
+}
+
+// WithSocketDir mutates the socket directory
+func WithSocketDir(sockDir string) Option {
+	return func(conf *MultusConf) error {
+		conf.SocketDir = sockDir
 		return nil
 	}
 }
