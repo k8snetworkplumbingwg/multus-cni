@@ -62,12 +62,21 @@ const (
 func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
+	//XXX: one section (multus CNI config)
 	cniConfigDir := flag.String("cni-config-dir", defaultCniConfigDir, "CNI config dir")
 	multusConfigFile := flag.String("multus-conf-file", "auto", "The multus configuration file to use. By default, a new configuration is generated.")
+	cniVersion := flag.String("cni-version", "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
 	multusMasterCni := flag.String("multus-master-cni-file", "", "The relative name of the configuration file of the cluster primary CNI.")
 	multusAutoconfigDir := flag.String("multus-autoconfig-dir", *cniConfigDir, "The directory path for the generated multus configuration.")
+	forceCNIVersion := flag.Bool("force-cni-version", false, "Force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
+	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
+	socketDir := flag.String("socket-dir", defaultSocketDir, "Specifies the directory where the socket file resides.")
+
+	// namespaces
 	namespaceIsolation := flag.Bool("namespace-isolation", false, "If the network resources are only available within their defined namespaces.")
 	globalNamespaces := flag.String("global-namespaces", "", "Comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled.")
+
+	// logging
 	logToStdErr := flag.Bool("multus-log-to-stderr", false, "If the multus logs are also to be echoed to stderr.")
 	logLevel := flag.String("multus-log-level", "", "One of: debug/verbose/error/panic. Used only with --multus-conf-file=auto.")
 	logFile := flag.String("multus-log-file", "", "Path where to multus will log. Used only with --multus-conf-file=auto.")
@@ -75,11 +84,11 @@ func main() {
 	logMaxAge := flag.Int("multus-log-max-age", defaultMultusLogMaxAge, "The maximum number of days to retain old log files in their filename")
 	logMaxBackups := flag.Int("multus-log-max-backups", defaultMultusLogMaxBackups, "The maximum number of old log files to retain")
 	logCompress := flag.Bool("multus-log-compress", defaultMultusLogCompress, "Compress determines if the rotated log files should be compressed using gzip")
-	cniVersion := flag.String("cni-version", "", "Allows you to specify CNI spec version. Used only with --multus-conf-file=auto.")
-	socketDir := flag.String("socket-dir", defaultSocketDir, "Specifies the directory where the socket file resides.")
-	forceCNIVersion := flag.Bool("force-cni-version", false, "Force to use given CNI version. only for kind-e2e testing") // this is only for kind-e2e
+
 	readinessIndicator := flag.String("readiness-indicator-file", "", "Which file should be used as the readiness indicator. Used only with --multus-conf-file=auto.")
-	overrideNetworkName := flag.Bool("override-network-name", false, "Used when we need overrides the name of the multus configuration with the name of the delegated primary CNI")
+	//----
+
+	// keep in command line option
 	version := flag.Bool("version", false, "Show version")
 
 	configFilePath := flag.String("config", types.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
