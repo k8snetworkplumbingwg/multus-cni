@@ -89,6 +89,7 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 	var err error
 	var multusConfByte []byte
 
+	// !bang need to not have both of these?
 	multusConfByte = bytes.Replace(s.serverConfig, []byte(","), []byte("{"), 1)
 	multusConfig := types.GetDefaultNetConf()
 	if err = json.Unmarshal(multusConfByte, multusConfig); err != nil {
@@ -151,6 +152,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	// preprocess server config to be used to override multus CNI config
 	// see extractCniData() for the detail
 	if servConfig != nil {
+		// !bang need to not have both of these?
 		servConfig = bytes.Replace(servConfig, []byte("{"), []byte(","), 1)
 	}
 

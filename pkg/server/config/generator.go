@@ -56,6 +56,15 @@ type MultusConf struct {
 	CniDir                   string          `json:"cniDir,omitempty"`
 	CniConfigDir             string          `json:"cniConfigDir,omitempty"`
 	SocketDir                string          `json:"socketDir,omitempty"`
+	MultusConfigFile         string          `json:"multusConfigFile,omitempty"`
+	LogMaxAge                int             `json:"logMaxAge,omitempty"`
+	LogMaxSize               int             `json:"logMaxSize,omitempty"`
+	LogMaxBackups            int             `json:"logMaxBackups,omitempty"`
+	LogCompress              bool            `json:"logCompress,omitempty"`
+	MultusMasterCni          string          `json:"multusMasterCNI,omitempty"`
+	MultusAutoconfigDir      string          `json:"multusAutoconfigDir,omitempty"`
+	ForceCNIVersion          bool            `json:"forceCNIVersion,omitempty"`
+	OverrideNetworkName      bool            `json:"overrideNetworkName,omitempty"`
 }
 
 // LogOptions specifies the configuration of the log
@@ -78,6 +87,28 @@ func NewMultusConfig(pluginName string, cniVersion string, configurationOptions 
 
 	err := multusConfig.Mutate(configurationOptions...)
 	return multusConfig, err
+}
+
+func ParseMultusConfig(configPath string) (*MultusConf, error) {
+	config, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("ParseMultusConfig failed to read the config file's contents: %w", err)
+	}
+
+	multusconf := &MultusConf{
+		/*
+			Name:         MultusDefaultNetworkName,
+			CNIVersion:   cniVersion,
+			Type:         pluginName,
+			Capabilities: map[string]bool{},
+		*/
+	}
+
+	if err := json.Unmarshal(config, multusconf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+	}
+
+	return multusconf, nil
 }
 
 // CheckVersionCompatibility checks compatibilty of the

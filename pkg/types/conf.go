@@ -39,13 +39,6 @@ const (
 	defaultNonIsolatedNamespace   = "default"
 )
 
-// const block for multus-daemon configs
-const (
-	// DefaultMultusDaemonConfigFile is the default path of the config file
-	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
-	defaultMultusRunDir           = "/run/multus/"
-)
-
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
 	logging.Debugf("LoadDelegateNetConfList: %s, %v", string(bytes), delegateConf)
@@ -425,14 +418,24 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	return netconf, nil
 }
 
+const (
+	// const block for multus-daemon configs
+	// DefaultMultusDaemonConfigFile is the Default path of the config file
+	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	DefaultMultusRunDir           = "/run/multus/"
+)
+
 // LoadDaemonNetConf loads the configuration for the multus daemon
+// !bang here's where we need to also manipulate the netconf itself?
 func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 	config, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read the config file's contents: %w", err)
 	}
 
-	daemonNetConf := &ControllerNetConf{}
+	daemonNetConf := &ControllerNetConf{
+		MultusSocketDir: DefaultMultusRunDir,
+	}
 	if err := json.Unmarshal(config, daemonNetConf); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
 	}
@@ -443,10 +446,6 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 	}
 	if daemonNetConf.LogLevel != "" {
 		logging.SetLogLevel(daemonNetConf.LogLevel)
-	}
-
-	if daemonNetConf.MultusSocketDir == "" {
-		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}
 
 	return daemonNetConf, config, nil
