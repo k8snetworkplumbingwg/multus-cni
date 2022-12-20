@@ -39,13 +39,6 @@ const (
 	defaultNonIsolatedNamespace   = "default"
 )
 
-// const block for multus-daemon configs
-const (
-	// DefaultMultusDaemonConfigFile is the default path of the config file
-	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
-	defaultMultusRunDir           = "/run/multus/"
-)
-
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
 	logging.Debugf("LoadDelegateNetConfList: %s, %v", string(bytes), delegateConf)
@@ -425,16 +418,20 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	return netconf, nil
 }
 
-// LoadDaemonNetConf loads the configuration for the multus daemon
-func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
-	config, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read the config file's contents: %w", err)
-	}
+const (
+	// const block for multus-daemon configs
+	// DefaultMultusDaemonConfigFile is the Default path of the config file
+	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	DefaultMultusRunDir           = "/run/multus/"
+)
 
-	daemonNetConf := &ControllerNetConf{}
+// LoadDaemonNetConf loads the configuration for the multus daemon
+func LoadDaemonNetConf(config []byte) (*ControllerNetConf, error) {
+	daemonNetConf := &ControllerNetConf{
+		DaemonSocketDir: DefaultMultusRunDir,
+	}
 	if err := json.Unmarshal(config, daemonNetConf); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
 	}
 
 	logging.SetLogStderr(daemonNetConf.LogToStderr)
@@ -444,12 +441,9 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 	if daemonNetConf.LogLevel != "" {
 		logging.SetLogLevel(daemonNetConf.LogLevel)
 	}
+	daemonNetConf.ConfigFileContents = config
 
-	if daemonNetConf.MultusSocketDir == "" {
-		daemonNetConf.MultusSocketDir = defaultMultusRunDir
-	}
-
-	return daemonNetConf, config, nil
+	return daemonNetConf, nil
 }
 
 // AddDelegates appends the new delegates to the delegates list
