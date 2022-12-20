@@ -445,18 +445,6 @@ func LoadDaemonNetConf(configPath string) (*ControllerNetConf, []byte, error) {
 		logging.SetLogLevel(daemonNetConf.LogLevel)
 	}
 
-	if daemonNetConf.CNIDir == "" {
-		daemonNetConf.CNIDir = defaultCNIDir
-	}
-
-	if daemonNetConf.ConfDir == "" {
-		daemonNetConf.ConfDir = defaultConfDir
-	}
-
-	if daemonNetConf.BinDir == "" {
-		daemonNetConf.BinDir = defaultBinDir
-	}
-
 	if daemonNetConf.MultusSocketDir == "" {
 		daemonNetConf.MultusSocketDir = defaultMultusRunDir
 	}

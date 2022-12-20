@@ -50,17 +50,3 @@ type ShimNetConf struct {
 	LogLevel        string `json:"logLevel,omitempty"`
 	LogToStderr     bool   `json:"logToStderr,omitempty"`
 }
-
-// ControllerNetConf for the controller cni configuration
-type ControllerNetConf struct {
-	ConfDir     string `json:"confDir"`
-	CNIDir      string `json:"cniDir"`
-	BinDir      string `json:"binDir"`
-	LogFile     string `json:"logFile"`
-	LogLevel    string `json:"logLevel"`
-	LogToStderr bool   `json:"logToStderr,omitempty"`
-
-	// Option to point to the path of the unix domain socket through which the
-	// multus client / server communicate.
-	MultusSocketDir string `json:"socketDir"`
-}

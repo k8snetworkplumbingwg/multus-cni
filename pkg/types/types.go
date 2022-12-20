@@ -184,9 +184,6 @@ type ResourceClient interface {
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
 	ChrootDir   string `json:"chrootDir,omitempty"`
-	ConfDir     string `json:"confDir"`
-	CNIDir      string `json:"cniDir"`
-	BinDir      string `json:"binDir"`
 	LogFile     string `json:"logFile"`
 	LogLevel    string `json:"logLevel"`
 	LogToStderr bool   `json:"logToStderr,omitempty"`
