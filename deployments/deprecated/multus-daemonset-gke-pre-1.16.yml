@@ -108,7 +108,7 @@ data:
       "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
     }
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-amd64
@@ -169,7 +169,7 @@ spec:
               - key: cni-conf.json
                 path: 70-multus.conf
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: kube-multus-ds-ppc64le
