@@ -449,7 +449,7 @@ EOF
         # Restart CRIO only once.
         if [ "$CRIO_RESTARTED_ONCE" == false ]; then
           log "Restarting crio"
-          systemctl restart crio
+          systemctl restart crio || service crio restart
           CRIO_RESTARTED_ONCE=true
         fi
       fi
