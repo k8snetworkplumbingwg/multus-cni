@@ -211,20 +211,6 @@ jobs:
       - name: Create manifest for multi-arch images
         if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
-          # snapshot-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:snapshot-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:snapshot-thick
-
-          # latest-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:latest-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:latest-thick
-
           # snapshot
           # get artifacts from previous steps
           docker pull ${{ env.REPOSITORY }}:snapshot-amd64

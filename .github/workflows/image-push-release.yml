@@ -260,20 +260,6 @@ jobs:
       - name: Create manifest for multi-arch images
         if: github.repository_owner == 'k8snetworkplumbingwg'
         run: |
-          # <tag>-thick
-          # get artifacts from previous steps
-          docker pull ${{ steps.docker_meta.outputs.tags }}-thick-amd64
-          docker manifest create ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64 --arch amd64
-          docker manifest push ${{ steps.docker_meta.outputs.tags }}-thick
-
-          # stable-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:stable-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:stable-thick
-
           # <tag>
           # get artifacts from previous steps
           docker pull ${{ steps.docker_meta.outputs.tags }}-amd64
