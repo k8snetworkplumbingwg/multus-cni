@@ -1,11 +1,21 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM golang:1.18 as build
+FROM --platform=$BUILDPLATFORM  golang:1.18 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
 
-RUN  cd /usr/src/multus-cni && \
-     ./hack/build-go.sh
+ENV GOOS "linux"
+
+ARG TARGETPLATFORM
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    export GOARCH=amd64 ; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    export GOARCH=arm64 ; \
+    elif [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
+    export GOARCH=arm ; \
+    fi \
+    && cd /usr/src/multus-cni \
+    && ./hack/build-go.sh
 
 FROM debian:stable-slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
