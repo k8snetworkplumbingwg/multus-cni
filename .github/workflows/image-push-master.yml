@@ -40,9 +40,10 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest-thick-amd64
-            ghcr.io/${{ github.repository }}:snapshot-thick-amd64
+            ghcr.io/${{ github.repository }}:latest-thick
+            ghcr.io/${{ github.repository }}:snapshot-thick
           file: images/Dockerfile.thick
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
 
   push-arm64:
     name: Image push/arm64
