@@ -186,7 +186,6 @@ spec:
         - "--cni-version=0.3.1"
         - "--cni-bin-dir=/host/usr/libexec/cni"
         - "--multus-conf-file=auto"
-        - "--restart-crio=true"
         resources:
           requests:
             cpu: "100m"
