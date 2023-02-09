@@ -54,7 +54,7 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 		return logging.Errorf("LoadDelegateNetConfList: error unmarshalling delegate conflist: %v", err)
 	}
 
-	if delegateConf.ConfList.Plugins == nil {
+	if delegateConf.ConfList.Plugins == nil || len(delegateConf.ConfList.Plugins) == 0 {
 		return logging.Errorf("LoadDelegateNetConfList: delegate must have the 'type' or 'plugin' field")
 	}
 
