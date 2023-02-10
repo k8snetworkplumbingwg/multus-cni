@@ -86,7 +86,7 @@ func (cp *checkpoint) getPodEntries() error {
 	return nil
 }
 
-// GetComputeDeviceMap returns an instance of a map of ResourceInfo
+// GetPodResourceMap returns an instance of a map of ResourceInfo
 func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.ResourceInfo, error) {
 	podID := string(pod.UID)
 	resourceMap := make(map[string]*types.ResourceInfo)
