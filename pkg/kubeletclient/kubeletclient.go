@@ -131,7 +131,7 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 	ns := pod.Namespace
 
 	if name == "" || ns == "" {
-		return nil, logging.Errorf("GetPodResourcesMap: Pod name or namespace cannot be empty")
+		return nil, logging.Errorf("GetPodResourceMap: Pod name or namespace cannot be empty")
 	}
 
 	for _, pr := range rc.resources {
