@@ -39,7 +39,7 @@ func main() {
 	flag.BoolVar(&versionOpt, "v", false, "Show application version")
 
 	flag.Parse()
-	if versionOpt == true {
+	if versionOpt {
 		fmt.Printf("multus-shim: %s\n", multus.PrintVersionString())
 		return
 	}

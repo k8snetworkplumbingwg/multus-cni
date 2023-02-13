@@ -372,7 +372,7 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 			}
 		}
 
-		if isGatewayConfigured == true {
+		if isGatewayConfigured {
 			err = types.CheckGatewayConfig(conf.Delegates)
 			if err != nil {
 				return 0, nil, err
@@ -680,7 +680,7 @@ const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 // IsStaticPod returns true if the pod is static pod.
 func IsStaticPod(pod *v1.Pod) bool {
 	if pod.Annotations != nil {
-		if source, ok := pod.Annotations[ConfigSourceAnnotationKey]; ok == true {
+		if source, ok := pod.Annotations[ConfigSourceAnnotationKey]; ok {
 			return source != "api"
 		}
 	}
