@@ -16,7 +16,7 @@ go get gopkg.in/k8snetworkplumbingwg/multus-cni.v3
 
 ## How do I submit an issue?
 
-Use GitHub as normally, you'll be presented with an option to submit a issue or enhancement request.
+Use GitHub as normally, you'll be presented with an option to submit an issue or enhancement request.
 
 Issues are considered stale after 90 days. After which, the maintainers reserve the right to close an issue.
 
@@ -53,4 +53,4 @@ The following are the best practices for multus logging:
 
 ## Multus release schedule
 
-On the first maintainer's meeting, twice yearly, after January 1st and July 1st, if a new version has not been tagged, a new version will tagged.
+On the first maintainer's meeting, twice yearly, after January 1st and July 1st, if a new version has not been tagged, a new version will tag.

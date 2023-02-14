@@ -13,7 +13,7 @@ Generally we recommend two options: Manually place a Multus binary in your `/opt
 
 *Copy Multus Binary into place*
 
-You may acquire the Multus binary via compilation (see the [developer guide](development.md)) or download the a binary from the [GitHub releases](https://github.com/k8snetworkplumbingwg/multus-cni/releases) page. Copy multus binary into CNI binary directory, usually `/opt/cni/bin`. Perform this on all nodes in your cluster (master and nodes).
+You may acquire the Multus binary via compilation (see the [developer guide](development.md)) or download the binary from the [GitHub releases](https://github.com/k8snetworkplumbingwg/multus-cni/releases) page. Copy multus binary into CNI binary directory, usually `/opt/cni/bin`. Perform this on all nodes in your cluster (master and nodes).
 
     cp multus /opt/cni/bin
 
@@ -483,7 +483,7 @@ You can achieve this by using the JSON formatted annotation and specifying a `de
 
 *NOTE*: It's important that you consider that this may impact some functionality of getting traffic to route over the cluster-wide default network.
 
-For example, we have a this configuration for macvlan:
+For example, we have a configuration for macvlan:
 
 ```
 cat <<EOF | kubectl create -f -

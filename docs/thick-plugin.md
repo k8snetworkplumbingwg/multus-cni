@@ -34,7 +34,7 @@ described above:
 
 ### Configure Deployment
 
-If your delegate CNI plugin requires some files which is in container host, please update
+If your delegate CNI plugin requires some files which is in container host, please
 update `deployments/multus-daemonset-thick.yml` to add directory into multus-daemon pod.
 For example, flannel requires `/run/flannel/subnet.env`, so you need to mount this directory
 into the multus-daemon pod.
