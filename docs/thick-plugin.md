@@ -63,7 +63,6 @@ its thin counterpart allows - with the following exceptions:
 - `cniDir`
 - `multus-kubeconfig-file-host`
 - `rename-conf-file`
-- `restart-crio`
 - `skip-multus-binary-copy`
 
 It is important to refer that these are command line parameters to the golang

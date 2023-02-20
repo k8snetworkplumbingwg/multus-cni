@@ -619,10 +619,6 @@ In some cases, the original CNI configuration that the Multus configuration was 
 
     --cleanup-config-on-exit=true
 
-When using CRIO, you may need to restart CRIO to get the Multus configuration file to take -- this is rarely necessary.
-
-    --restart-crio=false
-
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 
     --rename-conf-file=true

@@ -33,8 +33,6 @@ MULTUS_LOG_FILE=""
 MULTUS_READINESS_INDICATOR_FILE=""
 OVERRIDE_NETWORK_NAME=false
 MULTUS_CLEANUP_CONFIG_ON_EXIT=false
-RESTART_CRIO=false
-CRIO_RESTARTED_ONCE=false
 RENAME_SOURCE_CONFIG_FILE=false
 SKIP_BINARY_COPY=false
 FORCE_CNI_VERSION=false # force-cni-version is only for e2e-kind.
@@ -71,7 +69,6 @@ function usage()
     echo -e "\t--rename-conf-file=false (used only with --multus-conf-file=auto)"
     echo -e "\t--readiness-indicator-file=$MULTUS_READINESS_INDICATOR_FILE (used only with --multus-conf-file=auto)"
     echo -e "\t--additional-bin-dir=$ADDITIONAL_BIN_DIR (adds binDir option to configuration, used only with --multus-conf-file=auto)"
-    echo -e "\t--restart-crio=false (restarts CRIO after config file is generated)"
 }
 
 function log()
@@ -165,9 +162,6 @@ while [ "$1" != "" ]; do
             ;;
         --cleanup-config-on-exit)
             MULTUS_CLEANUP_CONFIG_ON_EXIT=$VALUE
-            ;;
-        --restart-crio)
-            RESTART_CRIO=$VALUE
             ;;
         --rename-conf-file)
             RENAME_SOURCE_CONFIG_FILE=$VALUE
@@ -443,15 +437,6 @@ EOF
       if [ "$RENAME_SOURCE_CONFIG_FILE" == true ]; then
         mv ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN} ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old
         log "Original master file moved to ${MULTUS_AUTOCONF_DIR}/${MASTER_PLUGIN}.old"
-      fi
-
-      if [ "$RESTART_CRIO" == true ]; then
-        # Restart CRIO only once.
-        if [ "$CRIO_RESTARTED_ONCE" == false ]; then
-          log "Restarting crio"
-          systemctl restart crio
-          CRIO_RESTARTED_ONCE=true
-        fi
       fi
     fi
   done
