@@ -87,8 +87,8 @@ function warn()
 }
 
 function checkCniVersion {
-      cniversion_python_tmpfile=$(mktemp)
-      cat << EOF > $cniversion_python_tmpfile
+  cniversion_python_tmpfile=$(mktemp)
+  cat << EOF > $cniversion_python_tmpfile
 import json, sys
 
 def version(v):
@@ -102,7 +102,7 @@ if version(v_top_level) >= v_040 and version(v_nested) < v_040:
     msg = "Multus cni version is %s while master plugin cni version is %s"
     print(msg % (v_top_level, v_nested))
 EOF
-      python3 $cniversion_python_tmpfile $1 $2
+  python3 $cniversion_python_tmpfile $1 $2
 }
 
 # Parse parameters given as arguments to this script.
@@ -117,8 +117,8 @@ while [ "$1" != "" ]; do
         --cni-version)
             CNI_VERSION=$VALUE
             ;;
-	# force-cni-version is only for e2e-kind testing
-	--force-cni-version)
+        # force-cni-version is only for e2e-kind testing
+        --force-cni-version)
             FORCE_CNI_VERSION=$VALUE
             ;;
         --cni-bin-dir)
@@ -287,10 +287,10 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
   while [ $found_master == false ]; do
     if [ "$MULTUS_MASTER_CNI_FILE_NAME" != "" ]; then
         MASTER_PLUGIN="$MULTUS_MASTER_CNI_FILE_NAME"
-	if [ ! -f "$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN" ]; then
-		error "Cannot find master cni file $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN"
-		exit 1;
-	fi
+    if [ ! -f "$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN" ]; then
+        error "Cannot find master cni file $MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN"
+        exit 1;
+    fi
     else
         MASTER_PLUGIN="$(ls $MULTUS_AUTOCONF_DIR | grep -E '\.conf(list)?$' | grep -Ev '00-multus\.conf' | head -1)"
     fi
@@ -396,15 +396,15 @@ EOF
 
       MASTER_PLUGIN_LOCATION=$MULTUS_AUTOCONF_DIR/$MASTER_PLUGIN
       if [ "$FORCE_CNI_VERSION" == true ]; then
-	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION | sed -e "s/\"cniVersion.*/\"cniVersion\": \"$CNI_VERSION\",/g")"
+        MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION | sed -e "s/\"cniVersion.*/\"cniVersion\": \"$CNI_VERSION\",/g")"
       else
-	      MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
-	      log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
-	      CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
-	      if [ "$CHECK_CNI_VERSION" != "" ] ; then
-		      error "$CHECK_CNI_VERSION"
-		      exit 1
-	      fi
+        MASTER_PLUGIN_JSON="$(cat $MASTER_PLUGIN_LOCATION)"
+        log "Using $MASTER_PLUGIN_LOCATION as a source to generate the Multus configuration"
+        CHECK_CNI_VERSION=$(checkCniVersion $MASTER_PLUGIN_LOCATION $CNI_VERSION)
+        if [ "$CHECK_CNI_VERSION" != "" ] ; then
+          error "$CHECK_CNI_VERSION"
+          exit 1
+        fi
       fi
 
       CONF=$(cat <<-EOF
@@ -471,8 +471,8 @@ if [ "$MULTUS_CLEANUP_CONFIG_ON_EXIT" == true ]; then
 else
   log "Entering sleep (success)..."
   if tty -s; then
-	  read
+    read
   else
-	  sleep infinity
+    sleep infinity
   fi
 fi
