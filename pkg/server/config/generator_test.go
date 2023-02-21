@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"testing"
 
 	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
 
@@ -31,23 +30,6 @@ const (
 	cniVersion     = "0.4.0"
 )
 
-type testCase struct {
-	t                        *testing.T
-	configGenerationFunction func() (string, error)
-}
-
-var primaryCNIConfig = map[string]interface{}{
-	"cniVersion":         "1.0.0",
-	"name":               "ovn-kubernetes",
-	"type":               "ovn-k8s-cni-overlay",
-	"ipam":               "{}",
-	"dns":                "{}",
-	"logFile":            "/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log",
-	"logLevel":           "5",
-	"logfile-maxsize":    100,
-	"logfile-maxbackups": 5,
-	"logfile-maxage":     5,
-}
 var primaryCNIFile = "/etc/cni/net.d/10-flannel.conf"
 
 func newMultusConfigWithDelegates(pluginName string, cniVersion string, primaryCNIFile string, configOptions ...Option) (*MultusConf, error) {
