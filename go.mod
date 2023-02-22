@@ -11,8 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c
-	golang.org/x/text v0.3.8 // indirect
+	golang.org/x/net v0.1.1-0.20221104162952-702349b0e862
 	google.golang.org/grpc v1.27.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.21.1
