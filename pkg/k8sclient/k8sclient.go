@@ -551,6 +551,9 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 			return delegate, resourceMap, nil
 		}
 	} else {
+		if ! types.PathIsLocalOrAbsolute(netname) {
+			return nil, resourceMap, logging.Errorf("path: %q is invalid", netname)
+		}
 		fInfo, err := os.Stat(netname)
 		if err != nil {
 			return nil, resourceMap, err

@@ -70,11 +70,17 @@ func PrintVersionString() string {
 
 func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 	logging.Debugf("saveScratchNetConf: %s, %s, %s", containerID, dataDir, string(netconf))
+	if ! types.PathIsLocalOrAbsolute(dataDir) {
+		return logging.Errorf("path %q is invalid", dataDir)
+	}
 	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		return logging.Errorf("saveScratchNetConf: failed to create the multus data directory(%q): %v", dataDir, err)
 	}
 
 	path := filepath.Join(dataDir, containerID)
+	if ! types.PathIsLocalOrAbsolute(path) {
+		return logging.Errorf("path %q is invalid", path)
+	}
 
 	err := os.WriteFile(path, netconf, 0600)
 	if err != nil {
@@ -87,6 +93,10 @@ func saveScratchNetConf(containerID, dataDir string, netconf []byte) error {
 func consumeScratchNetConf(containerID, dataDir string) ([]byte, string, error) {
 	logging.Debugf("consumeScratchNetConf: %s, %s", containerID, dataDir)
 	path := filepath.Join(dataDir, containerID)
+
+	if ! types.PathIsLocalOrAbsolute(path) {
+		return nil, path, logging.Errorf("path %q is invalid", path)
+	}
 
 	b, err := os.ReadFile(path)
 	return b, path, err
@@ -572,6 +582,10 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	}
 
 	if n.ReadinessIndicatorFile != "" {
+		if ! types.PathIsLocalOrAbsolute(n.ReadinessIndicatorFile) {
+			return nil, cmdErr(k8sArgs, "Path %q is invalid path", n.ReadinessIndicatorFile)
+		}
+
 		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
 			_, err := os.Stat(n.ReadinessIndicatorFile)
 			return err == nil, nil
@@ -801,6 +815,10 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	if in.ReadinessIndicatorFile != "" {
+		if ! types.PathIsLocalOrAbsolute(in.ReadinessIndicatorFile) {
+			return cmdErr(k8sArgs, "Path %q is invalid path", in.ReadinessIndicatorFile)
+		}
+
 		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
 			_, err := os.Stat(in.ReadinessIndicatorFile)
 			return err == nil, nil
@@ -902,6 +920,11 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	e := delPlugins(exec, pod, args, k8sArgs, in.Delegates, len(in.Delegates)-1, in.RuntimeConfig, in)
 
+	if ! types.PathIsLocalOrAbsolute(path) && useCacheConf {
+		logging.Errorf("Path: %s is invalid, skip to delete", path)
+		return e
+	}
+
 	// Enable Option only delegate plugin delete success to delete cache file
 	// CNI Runtime maybe return an error to block sandbox cleanup a while initiative,
 	// like starting, prepare something, it will be OK when retry later
@@ -912,13 +935,13 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			// Kubelet though this error as has been cleanup success and never retry, clean cache also
 			// Block sandbox cleanup error message can not contain "no such file or directory", CNI Runtime maybe should adaptor it !
 			if e == nil || strings.Contains(e.Error(), "no such file or directory") {
-				_ = os.Remove(path) // lgtm[go/path-injection]
+				_ = os.Remove(path)
 			}
 		}
 	} else {
 		if useCacheConf {
 			// remove used cache file
-			_ = os.Remove(path) // lgtm[go/path-injection]
+			_ = os.Remove(path)
 		}
 	}
 

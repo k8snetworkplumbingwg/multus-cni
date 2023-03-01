@@ -26,6 +26,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 // DeleteDefaultGW removes the default gateway from marked interfaces.
@@ -94,6 +95,9 @@ func SetDefaultGW(netnsPath string, ifName string, gateways []net.IP) error {
 // DeleteDefaultGWCache updates libcni cache to remove default gateway routes in result
 func DeleteDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, ipv4, ipv6 bool) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
+	if ! types.PathIsLocalOrAbsolute(cacheFile) {
+		return fmt.Errorf("path: %s is invalid", cacheFile)
+	}
 
 	cache, err := os.ReadFile(cacheFile)
 	if err != nil {
@@ -266,6 +270,9 @@ func deleteDefaultGWResult020(result map[string]interface{}, ipv4, ipv6 bool) (m
 // AddDefaultGWCache updates libcni cache to add default gateway result
 func AddDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, gw []net.IP) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
+	if ! types.PathIsLocalOrAbsolute(cacheFile) {
+		return fmt.Errorf("path: %s is invalid", cacheFile)
+	}
 
 	cache, err := os.ReadFile(cacheFile)
 	if err != nil {

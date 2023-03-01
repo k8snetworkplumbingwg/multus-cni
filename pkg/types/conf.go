@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/containernetworking/cni/libcni"
@@ -650,4 +651,31 @@ func CheckSystemNamespaces(namespace string, systemNamespaces []string) bool {
 		}
 	}
 	return false
+}
+
+// PathIsLocal checks the path is in the same directory or under the directory.
+// This code comes from golang1.20 path implementation
+func PathIsLocalOrAbsolute(path string) bool {
+	if strings.HasPrefix(path, "/") {
+		return true
+	}
+	if filepath.IsAbs(path) || path == "" {
+		return false
+	}
+	hasDots := false
+	for p := path; p != ""; {
+		var part string
+		part, p, _ = strings.Cut(p, "/")
+		if part == "." || part == ".." {
+			hasDots = true
+			break
+		}
+	}
+	if hasDots {
+		path = filepath.Clean(path)
+	}
+	if path == ".." || strings.HasPrefix(path, "../") {
+		return false
+	}
+	return true
 }
