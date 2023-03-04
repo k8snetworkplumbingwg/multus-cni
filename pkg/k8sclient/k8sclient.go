@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -536,9 +537,18 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 			Name:      netname,
 			Namespace: namespace,
 		}
-		delegate, resourceMap, err := getKubernetesDelegate(client, net, confdir, pod, resourceMap)
+
+		// check NAD exists first
+		_, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
 		if err == nil {
-			return delegate, resourceMap, nil
+			delegate, resourceMap, err := getKubernetesDelegate(client, net, confdir, pod, resourceMap)
+			if err == nil {
+				return delegate, resourceMap, nil
+			}
+		} else if apierrors.IsNotFound(err) {
+			logging.Verbosef("network-attachment-definition (%s) in namespace (%s) does not exist: %v", netname, namespace, err)
+		} else {
+			logging.Errorf("error getting network-attachment-definition (%s) in namespace (%s): %v", netname, namespace, err)
 		}
 
 		// option2) search CNI json config file, which has <netname> as CNI name, from confDir
