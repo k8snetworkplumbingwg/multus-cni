@@ -12,7 +12,8 @@ require (
 	github.com/onsi/gomega v1.10.3
 	github.com/pkg/errors v0.9.1
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.6.0
+	golang.org/x/text v0.8.0 // indirect
 	google.golang.org/grpc v1.27.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.20.10

@@ -135,9 +135,9 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 github.com/vishvananda/netns
-# golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
+# golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+# golang.org/x/net v0.6.0
 ## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -153,11 +153,15 @@ golang.org/x/net/trace
 # golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20201119102817-f84b799fce68
+# golang.org/x/sys v0.5.0
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.4
+# golang.org/x/term v0.5.0
+golang.org/x/term
+# golang.org/x/text v0.8.0
+## explicit
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
