@@ -13,7 +13,7 @@ Two things we'll refer to a number of times through this document are:
 
 ## Prerequisites
 
-Our installation method requires that you first have installed Kubernetes and have configured a default network -- that is, a CNI plugin that's used for your pod-to-pod connectivity. 
+Our installation method requires that you first have installed Kubernetes and have configured a default network -- that is, a CNI plugin that's used for your pod-to-pod connectivity.
 
 We support Kubernetes versions that Kubernetes community supports. Please see [Supported versions](https://kubernetes.io/releases/version-skew-policy/#supported-versions) in Kubernetes document.
 
@@ -42,7 +42,7 @@ master-2              Ready    master          1h     v1.17.1
 
 Our recommended quickstart method to deploy Multus is to deploy using a Daemonset (a method of running pods on each nodes in your cluster), this spins up pods which install a Multus binary and configure Multus for usage.
 
-Firstly, clone this GitHub repository. 
+Firstly, clone this GitHub repository.
 
 ```
 git clone https://github.com/k8snetworkplumbingwg/multus-cni.git && cd multus-cni
@@ -102,9 +102,9 @@ CNI configurations are JSON, and we have a structure here that has a few things 
 2. `type`: This tells CNI which binary to call on disk. Each CNI plugin is a binary that's called. Typically, these binaries are stored in `/opt/cni/bin` on each node, and CNI executes this binary. In this case we've specified the `loopback` binary (which create a loopback-type network interface). If this is your first time installing Multus, you might want to verify that the plugins that are in the "type" field are actually on disk in the `/opt/cni/bin` directory.
 3. `additional`: This field is put here as an example, each CNI plugin can specify whatever configuration parameters they'd like in JSON. These are specific to the binary you're calling in the `type` field.
 
-For an even further example -- take a look at the [bridge CNI plugin README](https://github.com/containernetworking/plugins/tree/master/plugins/main/bridge) which shows additional details.
+For an even further example -- take a look at the [bridge CNI plugin README](https://github.com/containernetworking/plugins/tree/main/plugins/main/bridge) which shows additional details.
 
-If you'd like more information about CNI configuration, you can read [the entire CNI specification](https://github.com/containernetworking/cni/blob/master/SPEC.md). It might also be useful to look at the [CNI reference plugins](https://github.com/containernetworking/plugins) and see how they're configured.
+If you'd like more information about CNI configuration, you can read [the entire CNI specification](https://github.com/containernetworking/cni/blob/main/SPEC.md). It might also be useful to look at the [CNI reference plugins](https://github.com/containernetworking/plugins) and see how they're configured.
 
 You do not need to reload or refresh the Kubelets when CNI configurations change. These are read on each creation & deletion of pods. So if you change a configuration, it'll apply the next time a pod is created. Existing pods may need to be restarted if they need the new configuration.
 
@@ -112,7 +112,7 @@ You do not need to reload or refresh the Kubelets when CNI configurations change
 
 So, we want to create an additional interface. Let's create a macvlan interface for pods to use. We'll create a custom resource that defines the CNI configuration for interfaces.
 
-Note in the following command that there's a `kind: NetworkAttachmentDefinition`. This is our fancy name for our configuration -- it's a custom extension of Kubernetes that defines how we attach networks to our pods. 
+Note in the following command that there's a `kind: NetworkAttachmentDefinition`. This is our fancy name for our configuration -- it's a custom extension of Kubernetes that defines how we attach networks to our pods.
 
 Secondarily, note the `config` field. You'll see that this is a CNI configuration just like we explained earlier.
 
@@ -241,6 +241,6 @@ spec:
 EOF
 ```
 
-Note that the annotation now reads `k8s.v1.cni.cncf.io/networks: macvlan-conf,macvlan-conf`. Where we have the same configuration used twice, separated by a comma. 
+Note that the annotation now reads `k8s.v1.cni.cncf.io/networks: macvlan-conf,macvlan-conf`. Where we have the same configuration used twice, separated by a comma.
 
 If you were to create another custom resource with the name `foo` you could use that such as: `k8s.v1.cni.cncf.io/networks: foo,macvlan-conf`, and use any number of attachments.
