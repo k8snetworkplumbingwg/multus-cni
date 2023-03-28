@@ -145,7 +145,7 @@ spec:
       containers:
       - name: kube-multus
         image: localhost:5000/multus:e2e
-        command: ["/entrypoint.sh"]
+        command: ["/thin_entrypoint"]
         args:
         - "--multus-conf-file=auto"
         - "--force-cni-version=true"
@@ -169,10 +169,10 @@ spec:
       initContainers:
       - name: install-multus-binary
         image: localhost:5000/multus:e2e
-        command:
-          - "cp"
-          - "/usr/src/multus-cni/bin/multus"
-          - "/host/opt/cni/bin/multus"
+        command: ["/install_multus"]
+        args:
+          - "--type"
+          - "thin"
         resources:
           requests:
             cpu: "10m"
