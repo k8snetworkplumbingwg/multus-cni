@@ -143,7 +143,7 @@ func NewCNIServer(daemonConfig *types.ControllerNetConf, serverConfig []byte) (*
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 
-	return newCNIServer(daemonConfig.MultusSocketDir, kubeClient, exec, serverConfig)
+	return newCNIServer(daemonConfig.DaemonSocketDir, kubeClient, exec, serverConfig)
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte) (*Server, error) {

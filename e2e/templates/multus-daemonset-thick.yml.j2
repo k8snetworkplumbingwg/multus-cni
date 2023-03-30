@@ -90,7 +90,12 @@ data:
         "logFile": "/tmp/multus.log",
         "binDir": "/host/opt/cni/bin",
         "cniDir": "/var/lib/cni/multus",
-        "socketDir": "/host/run/multus"
+        "daemonSocketDir": "/host/run/multus",
+        "cniVersion": "{{ CNI_VERSION }}",
+        "cniConfigDir": "/host/etc/cni/net.d",
+        "multusConfigFile": "auto",
+        "forceCNIVersion": true,
+        "multusAutoconfigDir": "/host/etc/cni/net.d"
     }
 ---
 apiVersion: apps/v1
@@ -128,12 +133,6 @@ spec:
         image: localhost:5000/multus:e2e
         imagePullPolicy: Always
         command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
-        args:
-        - "-cni-version={{ CNI_VERSION }}"
-        - "-cni-config-dir=/host/etc/cni/net.d"
-        - "-force-cni-version=true"
-        - "-multus-conf-file=auto"
-        - "-multus-autoconfig-dir=/host/etc/cni/net.d"
         resources:
           requests:
             cpu: "100m"

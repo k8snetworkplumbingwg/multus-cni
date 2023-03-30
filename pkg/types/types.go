@@ -16,8 +16,9 @@
 package types
 
 import (
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 	"net"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 
 	"github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
@@ -184,9 +185,6 @@ type ResourceClient interface {
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
 	ChrootDir   string `json:"chrootDir,omitempty"`
-	ConfDir     string `json:"confDir"`
-	CNIDir      string `json:"cniDir"`
-	BinDir      string `json:"binDir"`
 	LogFile     string `json:"logFile"`
 	LogLevel    string `json:"logLevel"`
 	LogToStderr bool   `json:"logToStderr,omitempty"`
@@ -195,5 +193,12 @@ type ControllerNetConf struct {
 
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.
-	MultusSocketDir string `json:"socketDir"`
+	DaemonSocketDir string `json:"daemonSocketDir"`
+
+	// Option to point to the path of the unix domain socket through which the
+	// multus client / server communicate.
+	// This attribute is only relevant for the client / shim.
+	ShimSocketDir string `json:"shimSocketDir"`
+
+	ConfigFileContents []byte `json:"-"`
 }
