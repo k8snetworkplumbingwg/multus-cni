@@ -59,3 +59,7 @@ echo "Building multus-daemon"
 go build -o "${DEST_DIR}"/multus-daemon -ldflags "${LDFLAGS}" ./cmd/multus-daemon
 echo "Building multus-shim"
 go build -o "${DEST_DIR}"/multus-shim -ldflags "${LDFLAGS}" ./cmd/multus-shim
+echo "Building install_multus"
+go build -o "${DEST_DIR}"/install_multus -ldflags "${LDFLAGS}" ./cmd/install_multus
+echo "Building thin_entrypoint"
+go build -o "${DEST_DIR}"/thin_entrypoint -ldflags "${LDFLAGS}" ./cmd/thin_entrypoint
