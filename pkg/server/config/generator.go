@@ -89,6 +89,7 @@ func NewMultusConfig(pluginName string, cniVersion string, configurationOptions 
 	return multusConfig, err
 }
 
+// ParseMultusConfig parses multus config from configPath and create MultusConf.
 func ParseMultusConfig(configPath string) (*MultusConf, error) {
 	config, err := os.ReadFile(configPath)
 	if err != nil {

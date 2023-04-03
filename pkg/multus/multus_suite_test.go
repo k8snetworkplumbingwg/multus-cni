@@ -146,7 +146,7 @@ func ParseEnvironment(environ []string) map[string]string {
 	return m
 }
 
-func (f *fakeExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
+func (f *fakeExec) ExecPlugin(_ context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
 	envMap := ParseEnvironment(environ)
 	cmd := envMap["CNI_COMMAND"]
 	var index int
