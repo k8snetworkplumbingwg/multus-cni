@@ -193,7 +193,7 @@ type ControllerNetConf struct {
 
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.
-	DaemonSocketDir string `json:"daemonSocketDir"`
+	SocketDir string `json:"socketDir"`
 
 	ConfigFileContents []byte `json:"-"`
 }

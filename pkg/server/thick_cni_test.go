@@ -285,7 +285,7 @@ func referenceConfig(thickPluginSocketDir string) string {
 	"cniVersion": "0.4.0",
         "name": "node-cni-network",
         "type": "multus",
-        "shimSocketDir": "%s",
+        "daemonSocketDir": "%s",
         "defaultnetworkfile": "/tmp/foo.multus.conf",
         "defaultnetworkwaitseconds": 3,
         "delegates": [{

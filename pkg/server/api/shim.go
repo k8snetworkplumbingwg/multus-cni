@@ -34,7 +34,7 @@ type ShimNetConf struct {
 	// types.NetConf
 
 	CNIVersion      string `json:"cniVersion,omitempty"`
-	MultusSocketDir string `json:"shimSocketDir"`
+	MultusSocketDir string `json:"daemonSocketDir"`
 	LogFile         string `json:"logFile,omitempty"`
 	LogLevel        string `json:"logLevel,omitempty"`
 	LogToStderr     bool   `json:"logToStderr,omitempty"`
