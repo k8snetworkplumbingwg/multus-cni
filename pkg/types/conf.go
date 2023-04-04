@@ -428,7 +428,7 @@ const (
 // LoadDaemonNetConf loads the configuration for the multus daemon
 func LoadDaemonNetConf(config []byte) (*ControllerNetConf, error) {
 	daemonNetConf := &ControllerNetConf{
-		DaemonSocketDir: DefaultMultusRunDir,
+		SocketDir: DefaultMultusRunDir,
 	}
 	if err := json.Unmarshal(config, daemonNetConf); err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
