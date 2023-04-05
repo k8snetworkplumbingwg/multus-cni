@@ -183,7 +183,6 @@ spec:
         command: ["/thin_entrypoint"]
         args:
         - "--multus-conf-file=auto"
-        - "--cni-version=0.3.1"
         - "--multus-autoconfig-dir=/host/etc/cni/net.d"
         - "--cni-conf-dir=/host/etc/cni/net.d"
         resources:
