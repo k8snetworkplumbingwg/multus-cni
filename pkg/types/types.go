@@ -193,12 +193,7 @@ type ControllerNetConf struct {
 
 	// Option to point to the path of the unix domain socket through which the
 	// multus client / server communicate.
-	DaemonSocketDir string `json:"daemonSocketDir"`
-
-	// Option to point to the path of the unix domain socket through which the
-	// multus client / server communicate.
-	// This attribute is only relevant for the client / shim.
-	ShimSocketDir string `json:"shimSocketDir"`
+	SocketDir string `json:"socketDir"`
 
 	ConfigFileContents []byte `json:"-"`
 }

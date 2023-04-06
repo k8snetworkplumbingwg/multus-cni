@@ -133,7 +133,7 @@ func main() {
 		configurationOptions = append(
 			configurationOptions,
 			config.WithCniConfigDir(multusConf.CniConfigDir),
-			config.WithSocketDir(daemonConf.DaemonSocketDir))
+			config.WithSocketDir(daemonConf.SocketDir))
 
 		var logOptionFuncs []config.LogOptionFunc
 		if multusConf.LogMaxAge != defaultMultusLogMaxAge {
@@ -226,7 +226,7 @@ func startMultusDaemon(daemonConfig *types.ControllerNetConf, stopCh chan struct
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
 
-	if err := srv.FilesystemPreRequirements(daemonConfig.DaemonSocketDir); err != nil {
+	if err := srv.FilesystemPreRequirements(daemonConfig.SocketDir); err != nil {
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
@@ -243,9 +243,9 @@ func startMultusDaemon(daemonConfig *types.ControllerNetConf, stopCh chan struct
 		}, 0, stopCh)
 	}
 
-	l, err := srv.GetListener(api.SocketPath(daemonConfig.DaemonSocketDir))
+	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
 	if err != nil {
-		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.DaemonSocketDir), err)
+		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
 	}
 
 	server.SetKeepAlivesEnabled(false)

@@ -53,37 +53,58 @@ kubectl apply -f deployments/multus-daemonset-thick.yml
 
 ### Command line parameters
 
-Multus thick plugin variant accepts the same
-[entrypoint arguments](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/how-to-use.md#entrypoint-script-parameters)
-its thin counterpart allows - with the following exceptions:
-
-- `additional-bin-dir`
-- `binDir`
-- `cleanup-config-on-exit`
-- `cniDir`
-- `multus-kubeconfig-file-host`
-- `rename-conf-file`
-- `skip-multus-binary-copy`
-
-It is important to refer that these are command line parameters to the golang
-binary; as such, they should be passed using a single dash ("-") e.g.
-`-additional-bin-dir=/opt/multus/bin`, `-multus-log-level=debug`, etc.
-
-Furthermore, it also accepts a new command line parameter, where the user
-specifies the path to the server configuration:
+The available command line parameters are:
 
 - `config`: Defaults to `"/etc/cni/net.d/multus.d/daemon-config.json"`
-- `metricsPort`: Metrics port (of multus' metric exporter), default is disable
+- `version`: Prints the daemon config version and exits
 
-### Server configuration
+### Server / Daemon configuration
 
 The server configuration is encoded in JSON, and allows the following keys:
 
 - `"chrootDir"`: Specify the directory which points to host root from the pod. See 'Chroot configuration' section for the details.
-- `"socketDir"`: Specify the location where the unix domain socket used for
-client/server communication will be located. Defaults to `"/run/multus"`.
+- `"socketDir"`: Specify the location where the unix domain socket used
+for client/server communication will be located. This is the location where the
+**Daemon** will read the configuration from. Defaults to `"/run/multus"`.
+- `"metricsPort"`: Metrics port (of multus' metric exporter); by default, no port
+is provided.
+- `"logFile"`: the path to where the daemon logs will be persisted.
+- `"logLevel"`: the logging level for the multus daemon logs.
+- `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
+as well. By default, it is disabled.
 
 In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)
+
+Below you can see an example of the daemon configuration:
+```json
+{
+        "chrootDir": "/hostroot",
+        "confDir": "/host/etc/cni/net.d",
+        "logToStderr": true,
+        "logLevel": "verbose",
+        "logFile": "/tmp/multus.log",
+        "binDir": "/opt/cni/bin",
+        "cniDir": "/var/lib/cni/multus",
+        "socketDir": "/host/run/multus/",
+        "cniVersion": "0.3.1",
+        "cniConfigDir": "/host/etc/cni/net.d",
+        "multusConfigFile": "auto",
+        "multusAutoconfigDir": "/host/etc/cni/net.d"
+    }
+```
+
+### Client / Shim configuration
+
+The multus shim configuration is encoded in JSON, and essentially is just a
+regular CNI configuration, usually available in `/etc/cni/net.d/00-multus.conf`.
+
+It allows the following keys:
+
+- `"cniVersion"`: the CNI version for the Multus CNI plugin.
+- `"logFile"`:  the path to where the daemon logs will be persisted.
+- `"logLevel"`: the logging level for the multus daemon logs.
+- `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
+  as well. By default, it is disabled.
 
 #### Chroot configuration
 
