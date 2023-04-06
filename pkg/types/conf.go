@@ -420,8 +420,10 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 
 const (
 	// const block for multus-daemon configs
+
 	// DefaultMultusDaemonConfigFile is the Default path of the config file
 	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	// DefaultMultusRunDir specifies default RunDir for multus
 	DefaultMultusRunDir           = "/run/multus/"
 )
 

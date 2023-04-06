@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 )
 
 // Metrics represents server's metrics.
@@ -39,14 +38,4 @@ type Server struct {
 	exec         invoke.Exec
 	serverConfig []byte
 	metrics      *Metrics
-}
-
-// ShimNetConf for the shim cni config file written in json
-type ShimNetConf struct {
-	types.NetConf
-
-	MultusSocketDir string `json:"socketDir"`
-	LogFile         string `json:"logFile,omitempty"`
-	LogLevel        string `json:"logLevel,omitempty"`
-	LogToStderr     bool   `json:"logToStderr,omitempty"`
 }

@@ -499,7 +499,7 @@ func cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.E
 	return serializeResult(result)
 }
 
-func cmdDelegateCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, multusConfig *types.NetConf) error {
+func cmdDelegateCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.Exec, _ *k8s.ClientInfo, multusConfig *types.NetConf) error {
 	delegateCNIConf := &types.DelegateNetConf{}
 	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {
 		return err

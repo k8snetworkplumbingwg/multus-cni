@@ -107,7 +107,7 @@ func getIfname(delegate *types.DelegateNetConf, argif string, idx int) string {
 	return fmt.Sprintf("net%d", idx)
 }
 
-func getDelegateDeviceInfo(delegate *types.DelegateNetConf, runtimeConf *libcni.RuntimeConf) (*nettypes.DeviceInfo, error) {
+func getDelegateDeviceInfo(_ *types.DelegateNetConf, runtimeConf *libcni.RuntimeConf) (*nettypes.DeviceInfo, error) {
 	// If the DPDeviceInfoFile was created, it was copied to the CNIDeviceInfoFile.
 	// If the DPDeviceInfoFile was not created, CNI might have created it. So
 	// either way, load CNIDeviceInfoFile.

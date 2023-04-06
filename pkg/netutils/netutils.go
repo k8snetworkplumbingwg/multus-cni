@@ -92,7 +92,7 @@ func SetDefaultGW(netnsPath string, ifName string, gateways []net.IP) error {
 }
 
 // DeleteDefaultGWCache updates libcni cache to remove default gateway routes in result
-func DeleteDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, ipv4, ipv6 bool) error {
+func DeleteDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, _ string, ipv4, ipv6 bool) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
 
 	cache, err := os.ReadFile(cacheFile)
@@ -264,7 +264,7 @@ func deleteDefaultGWResult020(result map[string]interface{}, ipv4, ipv6 bool) (m
 }
 
 // AddDefaultGWCache updates libcni cache to add default gateway result
-func AddDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, ifName string, gw []net.IP) error {
+func AddDefaultGWCache(cacheDir string, rt *libcni.RuntimeConf, netName string, _ string, gw []net.IP) error {
 	cacheFile := filepath.Join(cacheDir, "results", fmt.Sprintf("%s-%s-%s", netName, rt.ContainerID, rt.IfName))
 
 	cache, err := os.ReadFile(cacheFile)
