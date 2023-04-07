@@ -20,8 +20,6 @@ import (
 	"os"
 	"testing"
 
-	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -50,14 +48,6 @@ var primaryCNIConfig = map[string]interface{}{
 }
 var primaryCNIFile = "/etc/cni/net.d/10-flannel.conf"
 
-func newMultusConfigWithDelegates(pluginName string, cniVersion string, primaryCNIFile string, configOptions ...Option) (*MultusConf, error) {
-	multusConfig, err := NewMultusConfig(pluginName, cniVersion, configOptions...)
-	if err != nil {
-		return multusConfig, err
-	}
-	return multusConfig, multusConfig.Mutate(withClusterNetwork(primaryCNIFile))
-}
-
 var _ = Describe("Configuration Generator", func() {
 	var tmpDir string
 	var err error
@@ -73,280 +63,38 @@ var _ = Describe("Configuration Generator", func() {
 	})
 
 	It("basic multus config", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile)
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 
-	It("multus config with namespaceisolation", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithNamespaceIsolation())
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
 		expectedResult := fmt.Sprintf(`
 			{
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"namespaceIsolation":true,
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with readinessindicator", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithReadinessFileIndicator("/a/b/u/it-lives"))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"readinessindicatorfile":"/a/b/u/it-lives",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging configuration", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogLevel("notice"),
-			WithLogToStdErr(),
-			WithLogFile("/u/y/w/log.1"))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"logFile":"/u/y/w/log.1",
-				"logLevel":"notice",
-				"logToStderr":true, 
-				"name":"multus-cni-network",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging options configuration", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogOptions(&LogOptions{
-				MaxAge:     testutils.Int(5),
-				MaxSize:    testutils.Int(100),
-				MaxBackups: testutils.Int(5),
-				Compress:   testutils.Bool(true),
-			}))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"logOptions": {
-					"maxAge": 5,
-					"maxSize": 100,
-					"maxBackups": 5,
-					"compress": true
-				},
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging options with max age", func() {
-		logOption := &LogOptions{}
-		MutateLogOptions(logOption, WithLogMaxAge(testutils.Int(5)))
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogOptions(logOption))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"logOptions": {
-					"maxAge": 5
-				},
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging options with max size", func() {
-		logOption := &LogOptions{}
-		MutateLogOptions(logOption, WithLogMaxSize(testutils.Int(100)))
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogOptions(logOption))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"logOptions": {
-					"maxSize": 100
-				},
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging options with log max backups", func() {
-		logOption := &LogOptions{}
-		MutateLogOptions(logOption, WithLogMaxBackups(testutils.Int(5)))
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogOptions(logOption))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"logOptions": {
-					"maxBackups": 5
-				},
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with logging options with log compress", func() {
-		logOption := &LogOptions{}
-		MutateLogOptions(logOption, WithLogCompress(testutils.Bool(true)))
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithLogOptions(logOption))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"logOptions": {
-					"compress": true
-				},
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("generates a multus config with CNI configuration directory", func() {
-		cniConfigDir := "/host/etc/cni/net.d"
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithCniConfigDir(cniConfigDir))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"cniConfigDir":"/host/etc/cni/net.d",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("generates a multus config with a custom socket directory", func() {
-		socketDir := "/var/run/multus/multussock/"
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithSocketDir(socketDir))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"socketDir":"/var/run/multus/multussock/",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with global namespace", func() {
-		const globalNamespace = "come-along-ns"
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithGlobalNamespaces(globalNamespace))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"globalNamespaces":"come-along-ns",
-				"type":"myCNI"
-			}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
-	It("multus config with additional binDir", func() {
-		const anotherCNIBinDir = "a-dir-somewhere"
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithAdditionalBinaryFileDir(anotherCNIBinDir))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-			{
-				"binDir":"a-dir-somewhere",
-				"cniVersion":"0.4.0",
-				"clusterNetwork":"%s",
-				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with capabilities", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`{"capabilities": {"portMappings": true}}`)),
-		)
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(documentHelper(`{"capabilities": {"portMappings": true}}`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{
@@ -355,78 +103,97 @@ var _ = Describe("Configuration Generator", func() {
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with multiple capabilities", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`)),
-		)
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(
+			documentHelper(`{"capabilities": {"portMappings": true, "tuning": true}}`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{"portMappings":true,"tuning":true},
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with multiple capabilities filter only enabled", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`)),
-		)
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(
+			documentHelper(`{"capabilities": {"portMappings": true, "tuning": false}}`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{"portMappings":true},
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with multiple capabilities defined on a plugin", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`)),
-		)
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(
+			documentHelper(
+				`{"plugins": [ {"capabilities": {"portMappings": true, "tuning": true}} ] }`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{"portMappings":true,"tuning":true},
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with multiple capabilities defined on multiple plugins", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(
+			documentHelper(`
 				{
 					"plugins": [
 					{
@@ -436,27 +203,31 @@ var _ = Describe("Configuration Generator", func() {
 						"capabilities": { "tuning": true }
 					}
 					]
-				}`)),
-		)
-		Expect(err).NotTo(HaveOccurred())
+				}`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{"portMappings":true,"tuning":true},
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
 
 	It("multus config with multiple capabilities defined on multiple plugins filter only enabled", func() {
-		multusConfig, err := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			withCapabilities(
-				documentHelper(`
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(multusConfig.setCapabilities(
+			documentHelper(`
 				{
 					"plugins": [
 					{
@@ -470,39 +241,17 @@ var _ = Describe("Configuration Generator", func() {
 						}
 					}
 					]
-				}`),
-			),
-		)
-		Expect(err).NotTo(HaveOccurred())
+				}`))).To(Succeed())
 		expectedResult := fmt.Sprintf(`
 			{
 				"capabilities":{"portMappings":true},
 				"cniVersion":"0.4.0",
 				"clusterNetwork":"%s",
 				"name":"multus-cni-network",
-				"type":"myCNI"
+				"type":"multus-shim"
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
-
-	It("multus config with overridden name", func() {
-		newNetworkName := "mega-net-2000"
-		multusConfig, _ := newMultusConfigWithDelegates(
-			primaryCNIName,
-			cniVersion,
-			primaryCNIFile,
-			WithOverriddenName(newNetworkName))
-		Expect(err).NotTo(HaveOccurred())
-		expectedResult := fmt.Sprintf(`
-		{
-			"cniVersion":"0.4.0",
-			"clusterNetwork":"%s",
-			"name":"mega-net-2000",
-			"type":"myCNI"
-		}`, primaryCNIFile)
-		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
-	})
-
 })
 
 func documentHelper(pluginInfo string) interface{} {

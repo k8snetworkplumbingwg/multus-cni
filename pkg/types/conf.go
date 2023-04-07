@@ -418,36 +418,6 @@ func LoadNetConf(bytes []byte) (*NetConf, error) {
 	return netconf, nil
 }
 
-const (
-	// const block for multus-daemon configs
-
-	// DefaultMultusDaemonConfigFile is the Default path of the config file
-	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
-	// DefaultMultusRunDir specifies default RunDir for multus
-	DefaultMultusRunDir           = "/run/multus/"
-)
-
-// LoadDaemonNetConf loads the configuration for the multus daemon
-func LoadDaemonNetConf(config []byte) (*ControllerNetConf, error) {
-	daemonNetConf := &ControllerNetConf{
-		SocketDir: DefaultMultusRunDir,
-	}
-	if err := json.Unmarshal(config, daemonNetConf); err != nil {
-		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
-	}
-
-	logging.SetLogStderr(daemonNetConf.LogToStderr)
-	if daemonNetConf.LogFile != DefaultMultusDaemonConfigFile {
-		logging.SetLogFile(daemonNetConf.LogFile)
-	}
-	if daemonNetConf.LogLevel != "" {
-		logging.SetLogLevel(daemonNetConf.LogLevel)
-	}
-	daemonNetConf.ConfigFileContents = config
-
-	return daemonNetConf, nil
-}
-
 // AddDelegates appends the new delegates to the delegates list
 func (n *NetConf) AddDelegates(newDelegates []*DelegateNetConf) error {
 	logging.Debugf("AddDelegates: %v", newDelegates)

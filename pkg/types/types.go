@@ -181,19 +181,3 @@ type ResourceClient interface {
 	// GetPodResourceMap returns an instance of a map of Pod ResourceInfo given a (Pod name, namespace) tuple
 	GetPodResourceMap(*v1.Pod) (map[string]*ResourceInfo, error)
 }
-
-// ControllerNetConf for the controller cni configuration
-type ControllerNetConf struct {
-	ChrootDir   string `json:"chrootDir,omitempty"`
-	LogFile     string `json:"logFile"`
-	LogLevel    string `json:"logLevel"`
-	LogToStderr bool   `json:"logToStderr,omitempty"`
-
-	MetricsPort *int `json:"metricsPort,omitempty"`
-
-	// Option to point to the path of the unix domain socket through which the
-	// multus client / server communicate.
-	SocketDir string `json:"socketDir"`
-
-	ConfigFileContents []byte `json:"-"`
-}
