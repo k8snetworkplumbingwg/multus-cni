@@ -112,11 +112,7 @@ data:
     {
         "chrootDir": "/hostroot",
         "confDir": "/host/etc/cni/net.d",
-        "logToStderr": true,
         "logLevel": "verbose",
-        "logFile": "/tmp/multus.log",
-        "binDir": "/opt/cni/bin",
-        "cniDir": "/var/lib/cni/multus",
         "socketDir": "/host/run/multus/",
         "cniVersion": "0.3.1",
         "cniConfigDir": "/host/etc/cni/net.d",

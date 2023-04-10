@@ -108,7 +108,7 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 		configWatcher:        watcher,
 		multusConfig:         &config,
 		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
+		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
 	}
 
@@ -144,16 +144,16 @@ func (m *Manager) OverrideNetworkName() error {
 	if networkName == "" {
 		return fmt.Errorf("the primary CNI Configuration does not feature the network name: %v", m.cniConfigData)
 	}
-	return m.multusConfig.Mutate(WithOverriddenName(networkName))
+	m.multusConfig.Name = networkName
+	return nil
 }
 
 func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface{}) error {
 	cniConfigData := primaryCNIConfigData.(map[string]interface{})
 
 	m.cniConfigData = cniConfigData
-	return m.multusConfig.Mutate(
-		withClusterNetwork(m.primaryCNIConfigPath),
-		withCapabilities(cniConfigData))
+	m.multusConfig.ClusterNetwork = m.primaryCNIConfigPath
+	return m.multusConfig.setCapabilities(cniConfigData)
 }
 
 // GenerateConfig generates a multus configuration from its current state

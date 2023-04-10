@@ -34,26 +34,8 @@ import (
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-)
-
-const (
-	multusPluginName                    = "multus-shim"
-	defaultCniConfigDir                 = "/etc/cni/net.d"
-	defaultMultusGlobalNamespaces       = ""
-	defaultMultusLogFile                = ""
-	defaultMultusLogMaxSize             = 100 // megabytes
-	defaultMultusLogMaxAge              = 5   // days
-	defaultMultusLogMaxBackups          = 5
-	defaultMultusLogCompress            = true
-	defaultMultusLogLevel               = ""
-	defaultMultusLogToStdErr            = false
-	defaultMultusMasterCNIFile          = ""
-	defaultMultusNamespaceIsolation     = false
-	defaultMultusReadinessIndicatorFile = ""
-	defaultSocketDir                    = "/run/multus/"
 )
 
 func main() {
@@ -62,7 +44,7 @@ func main() {
 	// keep in command line option
 	version := flag.Bool("version", false, "Show version")
 
-	configFilePath := flag.String("config", types.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
+	configFilePath := flag.String("config", srv.DefaultMultusDaemonConfigFile, "Specify the path to the multus-daemon configuration")
 
 	flag.Parse()
 
@@ -98,75 +80,14 @@ func main() {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
-		var configurationOptions []config.Option
-
-		if multusConf.NamespaceIsolation {
-			configurationOptions = append(
-				configurationOptions, config.WithNamespaceIsolation())
-		}
-
-		if multusConf.RawNonIsolatedNamespaces != defaultMultusGlobalNamespaces {
-			configurationOptions = append(
-				configurationOptions, config.WithGlobalNamespaces(multusConf.RawNonIsolatedNamespaces))
-		}
-
-		if multusConf.LogToStderr != defaultMultusLogToStdErr {
-			configurationOptions = append(
-				configurationOptions, config.WithLogToStdErr())
-		}
-
-		if multusConf.LogLevel != defaultMultusLogLevel {
-			configurationOptions = append(
-				configurationOptions, config.WithLogLevel(multusConf.LogLevel))
-		}
-
-		if multusConf.LogFile != defaultMultusLogFile {
-			configurationOptions = append(
-				configurationOptions, config.WithLogFile(multusConf.LogFile))
-		}
-
-		if multusConf.ReadinessIndicatorFile != defaultMultusReadinessIndicatorFile {
-			configurationOptions = append(
-				configurationOptions, config.WithReadinessFileIndicator(multusConf.ReadinessIndicatorFile))
-		}
-
-		configurationOptions = append(
-			configurationOptions,
-			config.WithCniConfigDir(multusConf.CniConfigDir),
-			config.WithSocketDir(daemonConf.SocketDir))
-
-		var logOptionFuncs []config.LogOptionFunc
-		if multusConf.LogMaxAge != defaultMultusLogMaxAge {
-			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxAge(&multusConf.LogMaxAge))
-		}
-		if multusConf.LogMaxSize != defaultMultusLogMaxSize {
-			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxSize(&multusConf.LogMaxSize))
-		}
-		if multusConf.LogMaxBackups != defaultMultusLogMaxBackups {
-			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxBackups(&multusConf.LogMaxBackups))
-		}
-		if multusConf.LogCompress != defaultMultusLogCompress {
-			logOptionFuncs = append(logOptionFuncs, config.WithLogCompress(&multusConf.LogCompress))
-		}
-
-		if len(logOptionFuncs) > 0 {
-			logOptions := &config.LogOptions{}
-			config.MutateLogOptions(logOptions, logOptionFuncs...)
-			configurationOptions = append(configurationOptions, config.WithLogOptions(logOptions))
-		}
-
-		multusConfig, err := config.NewMultusConfig(multusPluginName, multusConf.CNIVersion, configurationOptions...)
-		if err != nil {
-			_ = logging.Errorf("Failed to create multus config: %v", err)
-			os.Exit(3)
-		}
+		multusConf.SocketDir = daemonConf.SocketDir
 
 		var configManager *config.Manager
 		if multusConf.MultusMasterCni == "" {
-			configManager, err = config.NewManager(*multusConfig, multusConf.MultusAutoconfigDir, multusConf.ForceCNIVersion)
+			configManager, err = config.NewManager(*multusConf, multusConf.MultusAutoconfigDir, multusConf.ForceCNIVersion)
 		} else {
 			configManager, err = config.NewManagerWithExplicitPrimaryCNIPlugin(
-				*multusConfig, multusConf.MultusAutoconfigDir, multusConf.MultusMasterCni, multusConf.ForceCNIVersion)
+				*multusConf, multusConf.MultusAutoconfigDir, multusConf.MultusMasterCni, multusConf.ForceCNIVersion)
 		}
 		if err != nil {
 			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
@@ -221,7 +142,7 @@ func main() {
 	// never reached
 }
 
-func startMultusDaemon(daemonConfig *types.ControllerNetConf, stopCh chan struct{}, done chan struct{}) error {
+func startMultusDaemon(daemonConfig *srv.ControllerNetConf, stopCh chan struct{}, done chan struct{}) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -263,12 +184,12 @@ func startMultusDaemon(daemonConfig *types.ControllerNetConf, stopCh chan struct
 	return nil
 }
 
-func cniServerConfig(configFilePath string) (*types.ControllerNetConf, error) {
+func cniServerConfig(configFilePath string) (*srv.ControllerNetConf, error) {
 	configFileContents, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
-	return types.LoadDaemonNetConf(configFileContents)
+	return srv.LoadDaemonNetConf(configFileContents)
 }
 
 func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error {

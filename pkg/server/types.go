@@ -24,6 +24,15 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
 )
 
+const (
+	// const block for multus-daemon configs
+
+	// DefaultMultusDaemonConfigFile is the Default path of the config file
+	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
+	// DefaultMultusRunDir specifies default RunDir for multus
+	DefaultMultusRunDir = "/run/multus/"
+)
+
 // Metrics represents server's metrics.
 type Metrics struct {
 	requestCounter *prometheus.CounterVec
@@ -38,4 +47,20 @@ type Server struct {
 	exec         invoke.Exec
 	serverConfig []byte
 	metrics      *Metrics
+}
+
+// ControllerNetConf for the controller cni configuration
+type ControllerNetConf struct {
+	ChrootDir   string `json:"chrootDir,omitempty"`
+	LogFile     string `json:"logFile"`
+	LogLevel    string `json:"logLevel"`
+	LogToStderr bool   `json:"logToStderr,omitempty"`
+
+	MetricsPort *int `json:"metricsPort,omitempty"`
+
+	// Option to point to the path of the unix domain socket through which the
+	// multus client / server communicate.
+	SocketDir string `json:"socketDir"`
+
+	ConfigFileContents []byte `json:"-"`
 }

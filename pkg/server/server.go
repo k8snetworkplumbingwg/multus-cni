@@ -128,7 +128,7 @@ func GetListener(socketPath string) (net.Listener, error) {
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(daemonConfig *types.ControllerNetConf, serverConfig []byte) (*Server, error) {
+func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte) (*Server, error) {
 	kubeClient, err := k8s.InClusterK8sClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting k8s client: %v", err)
@@ -278,7 +278,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	if err := json.Unmarshal(b, &cr); err != nil {
 		return nil, err
 	}
-	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig) // not override config
+	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
@@ -529,4 +529,25 @@ func cmdDelegateDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, exec invoke.E
 	}
 	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
 	return multus.DelegateDel(exec, pod, delegateCNIConf, rt, multusConfig)
+}
+
+// LoadDaemonNetConf loads the configuration for the multus daemon
+func LoadDaemonNetConf(config []byte) (*ControllerNetConf, error) {
+	daemonNetConf := &ControllerNetConf{
+		SocketDir: DefaultMultusRunDir,
+	}
+	if err := json.Unmarshal(config, daemonNetConf); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
+	}
+
+	logging.SetLogStderr(daemonNetConf.LogToStderr)
+	if daemonNetConf.LogFile != DefaultMultusDaemonConfigFile {
+		logging.SetLogFile(daemonNetConf.LogFile)
+	}
+	if daemonNetConf.LogLevel != "" {
+		logging.SetLogLevel(daemonNetConf.LogLevel)
+	}
+	daemonNetConf.ConfigFileContents = config
+
+	return daemonNetConf, nil
 }

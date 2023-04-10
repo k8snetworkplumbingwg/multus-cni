@@ -25,68 +25,42 @@ import (
 	"time"
 
 	"github.com/blang/semver"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
 )
 
 const (
 	configListCapabilityKey   = "plugins"
+	multusPluginName          = "multus-shim"
 	singleConfigCapabilityKey = "capabilities"
 )
-
-// LogOptionFunc mutates the `LoggingOptions` object
-type LogOptionFunc func(logOptions *LogOptions)
 
 // Option mutates the `conf` object
 type Option func(conf *MultusConf) error
 
-// MultusConf holds the multus configuration, and persists it to disk
+// MultusConf holds the multus configuration
 type MultusConf struct {
-	BinDir                   string          `json:"binDir,omitempty"`
-	Capabilities             map[string]bool `json:"capabilities,omitempty"`
-	CNIVersion               string          `json:"cniVersion"`
-	LogFile                  string          `json:"logFile,omitempty"`
-	LogLevel                 string          `json:"logLevel,omitempty"`
-	LogToStderr              bool            `json:"logToStderr,omitempty"`
-	LogOptions               *LogOptions     `json:"logOptions,omitempty"`
-	Name                     string          `json:"name"`
-	ClusterNetwork           string          `json:"clusterNetwork,omitempty"`
-	NamespaceIsolation       bool            `json:"namespaceIsolation,omitempty"`
-	RawNonIsolatedNamespaces string          `json:"globalNamespaces,omitempty"`
-	ReadinessIndicatorFile   string          `json:"readinessindicatorfile,omitempty"`
-	Type                     string          `json:"type"`
-	CniDir                   string          `json:"cniDir,omitempty"`
-	CniConfigDir             string          `json:"cniConfigDir,omitempty"`
-	SocketDir                string          `json:"socketDir,omitempty"`
-	MultusConfigFile         string          `json:"multusConfigFile,omitempty"`
-	LogMaxAge                int             `json:"logMaxAge,omitempty"`
-	LogMaxSize               int             `json:"logMaxSize,omitempty"`
-	LogMaxBackups            int             `json:"logMaxBackups,omitempty"`
-	LogCompress              bool            `json:"logCompress,omitempty"`
-	MultusMasterCni          string          `json:"multusMasterCNI,omitempty"`
-	MultusAutoconfigDir      string          `json:"multusAutoconfigDir,omitempty"`
-	ForceCNIVersion          bool            `json:"forceCNIVersion,omitempty"`
-	OverrideNetworkName      bool            `json:"overrideNetworkName,omitempty"`
-}
-
-// LogOptions specifies the configuration of the log
-type LogOptions struct {
-	MaxAge     *int  `json:"maxAge,omitempty"`
-	MaxSize    *int  `json:"maxSize,omitempty"`
-	MaxBackups *int  `json:"maxBackups,omitempty"`
-	Compress   *bool `json:"compress,omitempty"`
-}
-
-// NewMultusConfig creates a basic configuration generator. It can be mutated
-// via the `With...` methods.
-func NewMultusConfig(pluginName string, cniVersion string, configurationOptions ...Option) (*MultusConf, error) {
-	multusConfig := &MultusConf{
-		Name:         MultusDefaultNetworkName,
-		CNIVersion:   cniVersion,
-		Type:         pluginName,
-		Capabilities: map[string]bool{},
-	}
-
-	err := multusConfig.Mutate(configurationOptions...)
-	return multusConfig, err
+	BinDir                   string              `json:"binDir,omitempty"`
+	Capabilities             map[string]bool     `json:"capabilities,omitempty"`
+	CNIVersion               string              `json:"cniVersion"`
+	LogFile                  string              `json:"logFile,omitempty"`
+	LogLevel                 string              `json:"logLevel,omitempty"`
+	LogToStderr              bool                `json:"logToStderr,omitempty"`
+	LogOptions               *logging.LogOptions `json:"logOptions,omitempty"`
+	Name                     string              `json:"name"`
+	ClusterNetwork           string              `json:"clusterNetwork,omitempty"`
+	NamespaceIsolation       bool                `json:"namespaceIsolation,omitempty"`
+	RawNonIsolatedNamespaces string              `json:"globalNamespaces,omitempty"`
+	ReadinessIndicatorFile   string              `json:"readinessindicatorfile,omitempty"`
+	Type                     string              `json:"type"`
+	CniDir                   string              `json:"cniDir,omitempty"`
+	CniConfigDir             string              `json:"cniConfigDir,omitempty"`
+	SocketDir                string              `json:"socketDir,omitempty"`
+	MultusConfigFile         string              `json:"multusConfigFile,omitempty"`
+	MultusMasterCni          string              `json:"multusMasterCNI,omitempty"`
+	MultusAutoconfigDir      string              `json:"multusAutoconfigDir,omitempty"`
+	ForceCNIVersion          bool                `json:"forceCNIVersion,omitempty"`
+	OverrideNetworkName      bool                `json:"overrideNetworkName,omitempty"`
 }
 
 // ParseMultusConfig parses multus config from configPath and create MultusConf.
@@ -96,11 +70,17 @@ func ParseMultusConfig(configPath string) (*MultusConf, error) {
 		return nil, fmt.Errorf("ParseMultusConfig failed to read the config file's contents: %w", err)
 	}
 
-	multusconf := MultusConf{MultusConfigFile: "auto"}
+	multusconf := MultusConf{
+		MultusConfigFile: "auto",
+		Type:             multusPluginName,
+		Capabilities:     map[string]bool{},
+		CniConfigDir:     "/etc/cni/net.d",
+	}
 
 	if err := json.Unmarshal(config, &multusconf); err != nil {
 		return nil, fmt.Errorf("failed to unmarshall the daemon configuration: %w", err)
 	}
+	multusconf.Name = MultusDefaultNetworkName // change name
 
 	return &multusconf, nil
 }
@@ -142,138 +122,16 @@ func CheckVersionCompatibility(mc *MultusConf, delegate interface{}) error {
 // Generate generates the multus configuration from whatever state is currently
 // held
 func (mc *MultusConf) Generate() (string, error) {
+	// before marshal, flush variables which is not required for multus-shim config
+	mc.CniConfigDir = ""
+	mc.MultusConfigFile = ""
+	mc.MultusAutoconfigDir = ""
+
 	data, err := json.Marshal(mc)
 	return string(data), err
 }
 
-// Mutate updates the MultusConf attributes according to the provided
-// configuration `Option`s
-func (mc *MultusConf) Mutate(configurationOptions ...Option) error {
-	for _, configOption := range configurationOptions {
-		err := configOption(mc)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// WithNamespaceIsolation mutates the inner state to enable the
-// NamespaceIsolation attribute
-func WithNamespaceIsolation() Option {
-	return func(conf *MultusConf) error {
-		conf.NamespaceIsolation = true
-		return nil
-	}
-}
-
-// WithGlobalNamespaces mutates the inner state to set the
-// RawNonIsolatedNamespaces attribute
-func WithGlobalNamespaces(globalNamespaces string) Option {
-	return func(conf *MultusConf) error {
-		conf.RawNonIsolatedNamespaces = globalNamespaces
-		return nil
-	}
-}
-
-// WithLogToStdErr mutates the inner state to enable the
-// WithLogToStdErr attribute
-func WithLogToStdErr() Option {
-	return func(conf *MultusConf) error {
-		conf.LogToStderr = true
-		return nil
-	}
-}
-
-// WithLogLevel mutates the inner state to set the
-// LogLevel attribute
-func WithLogLevel(logLevel string) Option {
-	return func(conf *MultusConf) error {
-		conf.LogLevel = logLevel
-		return nil
-	}
-}
-
-// WithLogFile mutates the inner state to set the
-// logFile attribute
-func WithLogFile(logFile string) Option {
-	return func(conf *MultusConf) error {
-		conf.LogFile = logFile
-		return nil
-	}
-}
-
-// WithLogOptions mutates the inner state to set the
-// LogOptions attribute
-func WithLogOptions(logOptions *LogOptions) Option {
-	return func(conf *MultusConf) error {
-		conf.LogOptions = logOptions
-		return nil
-	}
-}
-
-// WithReadinessFileIndicator mutates the inner state to set the
-// ReadinessIndicatorFile attribute
-func WithReadinessFileIndicator(path string) Option {
-	return func(conf *MultusConf) error {
-		conf.ReadinessIndicatorFile = path
-		return nil
-	}
-}
-
-// WithAdditionalBinaryFileDir mutates the inner state to set the
-// BinDir attribute
-func WithAdditionalBinaryFileDir(directoryPath string) Option {
-	return func(conf *MultusConf) error {
-		conf.BinDir = directoryPath
-		return nil
-	}
-}
-
-// WithOverriddenName mutates the inner state to set the
-// Name attribute
-func WithOverriddenName(networkName string) Option {
-	return func(conf *MultusConf) error {
-		conf.Name = networkName
-		return nil
-	}
-}
-
-// WithCniDir mutates the inner state to set the
-// multus CNI cache directory
-func WithCniDir(cniDir string) Option {
-	return func(conf *MultusConf) error {
-		conf.CniDir = cniDir
-		return nil
-	}
-}
-
-// WithCniConfigDir mutates the inner state to set the
-// multus CNI configuration directory
-func WithCniConfigDir(confDir string) Option {
-	return func(conf *MultusConf) error {
-		conf.CniConfigDir = confDir
-		return nil
-	}
-}
-
-// WithSocketDir mutates the socket directory
-func WithSocketDir(sockDir string) Option {
-	return func(conf *MultusConf) error {
-		conf.SocketDir = sockDir
-		return nil
-	}
-}
-
-func withClusterNetwork(clusterNetwork string) Option {
-	return func(conf *MultusConf) error {
-		conf.ClusterNetwork = clusterNetwork
-		return nil
-	}
-}
-
-func withCapabilities(cniData interface{}) Option {
+func (mc *MultusConf) setCapabilities(cniData interface{}) error {
 	var enabledCapabilities []string
 	var pluginsList []interface{}
 	cniDataMap, ok := cniData.(map[string]interface{})
@@ -282,9 +140,7 @@ func withCapabilities(cniData interface{}) Option {
 			pluginsList = pluginsListEntry.([]interface{})
 		}
 	} else {
-		return func(conf *MultusConf) error {
-			return errors.New("couldn't get cni config from delegate")
-		}
+		return errors.New("couldn't get cni config from delegate")
 	}
 
 	if len(pluginsList) > 0 {
@@ -297,52 +153,10 @@ func withCapabilities(cniData interface{}) Option {
 		enabledCapabilities = extractCapabilities(cniData)
 	}
 
-	return func(conf *MultusConf) error {
-		for _, capability := range enabledCapabilities {
-			conf.Capabilities[capability] = true
-		}
-		return nil
+	for _, capability := range enabledCapabilities {
+		mc.Capabilities[capability] = true
 	}
-}
-
-// MutateLogOptions update the LoggingOptions of the MultusConf according
-// to the provided configuration `loggingOptions`
-func MutateLogOptions(logOption *LogOptions, logOptionFunc ...LogOptionFunc) {
-	for _, loggingOption := range logOptionFunc {
-		loggingOption(logOption)
-	}
-}
-
-// WithLogMaxSize mutates the inner state to set the
-// logMaxSize attribute
-func WithLogMaxSize(maxSize *int) LogOptionFunc {
-	return func(logOptions *LogOptions) {
-		logOptions.MaxSize = maxSize
-	}
-}
-
-// WithLogMaxAge mutates the inner state to set the
-// logMaxAge attribute
-func WithLogMaxAge(maxAge *int) LogOptionFunc {
-	return func(logOptions *LogOptions) {
-		logOptions.MaxAge = maxAge
-	}
-}
-
-// WithLogMaxBackups mutates the inner state to set the
-// logMaxBackups attribute
-func WithLogMaxBackups(maxBackups *int) LogOptionFunc {
-	return func(logOptions *LogOptions) {
-		logOptions.MaxBackups = maxBackups
-	}
-}
-
-// WithLogCompress mutates the inner state to set the
-// logCompress attribute
-func WithLogCompress(compress *bool) LogOptionFunc {
-	return func(logOptions *LogOptions) {
-		logOptions.Compress = compress
-	}
+	return nil
 }
 
 func extractCapabilities(capabilitiesInterface interface{}) []string {
