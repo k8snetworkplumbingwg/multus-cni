@@ -74,7 +74,6 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.MultusBinFile, "multus-bin-file", "/usr/src/multus-cni/bin/multus", "multus binary file path")
 	fs.BoolVar(&o.SkipMultusBinaryCopy, "skip-multus-binary-copy", false, "skip multus binary file copy")
 
-	// XXX Note: idea: "auto", create kubeconfig and update auto. otherwise just use given file path
 	fs.StringVar(&o.MultusKubeConfigFileHost, "multus-kubeconfig-file-host", "/etc/cni/net.d/multus.d/multus.kubeconfig", "kubeconfig for multus (used only with --multus-conf-file=auto)")
 	fs.StringVar(&o.MultusMasterCNIFileName, "multus-master-cni-file-name", "", "master CNI file in multus-autoconfig-dir")
 	fs.BoolVar(&o.NamespaceIsolation, "namespace-isolation", false, "namespace isolation")
@@ -509,7 +508,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		return
 	}
-	//XXX: RenameConfFile and CleanupConfigOnExit might be conflict, so need to check
 
 	// copy multus binary
 	if !opt.SkipMultusBinaryCopy {
