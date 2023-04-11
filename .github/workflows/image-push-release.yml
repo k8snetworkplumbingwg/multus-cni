@@ -3,20 +3,22 @@ on:
   push:
     tags:
       - v*
+env:
+  image-push-owner: 'k8snetworkplumbingwg'
 jobs:
-  push-amd64:
-    name: Image push/amd64
+  push-thick-amd64:
+    name: Image push thick image/amd64
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        if: github.repository_owner == ${{ env.image-push-owner }}
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -24,46 +26,37 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
-          tag-latest: false
+          flavor: |
+            latest=false
 
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+      - name: Push container image for thick plugin
+        if: github.repository_owner == ${{ env.image-push-owner }}
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:stable-amd64
-            ${{ steps.docker_meta.outputs.tags }}-amd64
-          file: images/Dockerfile
-
-      - name: Push container image for daemon based deployment
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:stable-thick-amd64
-            ${{ steps.docker_meta.outputs.tags }}-thick-amd64
+            ghcr.io/${{ github.repository }}:stable-thick
+            ${{ steps.docker_meta.outputs.tags }}-thick
           file: images/Dockerfile.thick
+          platforms: linux/amd64
 
-  push-arm64:
-    name: Image push/arm64
+  push-thin:
+    name: Image push thin image/amd64
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
+        if: github.repository_owner == ${{ env.image-push-owner }}
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -71,129 +64,39 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
-          tag-latest: false
+          flavor: |
+            latest=false
 
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+      - name: Push thin container image
+        if: github.repository_owner == ${{ env.image-push-owner }}
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:stable-arm64
-            ${{ steps.docker_meta.outputs.tags }}-arm64
-          file: images/Dockerfile.arm64
+            ghcr.io/${{ github.repository }}:stable
+            ${{ steps.docker_meta.outputs.tags }}
+          file: images/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
-  push-arm32:
-    name: Image push/arm32
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker meta
-        id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tag-latest: false
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
+      - name: Push thin container debug image
+        if: github.repository_owner == ${{ env.image-push-owner }}
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:stable-arm32
-            ${{ steps.docker_meta.outputs.tags }}-arm32
-          file: images/Dockerfile.arm32
-
-  push-ppc64le:
-    name: Image push/ppc64le
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker meta
-        id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tag-latest: false
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:stable-ppc64le
-            ${{ steps.docker_meta.outputs.tags }}-ppc64le
-          file: images/Dockerfile.ppc64le
-
-  push-s390x:
-    name: Image push/s390x
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Docker meta
-        id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tag-latest: false
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:stable-s390x
-            ${{ steps.docker_meta.outputs.tags }}-s390x
-          file: images/Dockerfile.s390x
+            ghcr.io/${{ github.repository }}:stable-debug
+            ${{ steps.docker_meta.outputs.tags }}-debug
+          file: images/Dockerfile.debug
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
 # TODO: need to fix this action
 #  push-origin:
@@ -231,74 +134,3 @@ jobs:
 #            ghcr.io/${{ github.repository }}:stable-origin
 #            ${{ steps.docker_meta.outputs.tags }}-origin
 #          file: images/Dockerfile.openshift
-
-  push-manifest:
-    needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
-    runs-on: ubuntu-latest
-    env:
-      REPOSITORY: ghcr.io/${{ github.repository }}
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Docker meta
-        id: docker_meta
-        uses: crazy-max/ghaction-docker-meta@v1
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tag-latest: false
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v1
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create manifest for multi-arch images
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        run: |
-          # <tag>-thick
-          # get artifacts from previous steps
-          docker pull ${{ steps.docker_meta.outputs.tags }}-thick-amd64
-          docker manifest create ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }}-thick ${{ steps.docker_meta.outputs.tags }}-thick-amd64 --arch amd64
-          docker manifest push ${{ steps.docker_meta.outputs.tags }}-thick
-
-          # stable-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:stable-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:stable-thick ${{ env.REPOSITORY }}:stable-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:stable-thick
-
-          # <tag>
-          # get artifacts from previous steps
-          docker pull ${{ steps.docker_meta.outputs.tags }}-amd64
-          docker pull ${{ steps.docker_meta.outputs.tags }}-arm64
-          docker pull ${{ steps.docker_meta.outputs.tags }}-arm32
-          docker pull ${{ steps.docker_meta.outputs.tags }}-ppc64le
-          docker pull ${{ steps.docker_meta.outputs.tags }}-s390x
-          docker manifest create ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-amd64 ${{ steps.docker_meta.outputs.tags }}-arm64 ${{ steps.docker_meta.outputs.tags }}-arm32 ${{ steps.docker_meta.outputs.tags }}-ppc64le ${{ steps.docker_meta.outputs.tags }}-s390x
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-amd64 --arch amd64
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-arm64 --arch arm64
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-arm32 --arch arm
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-ppc64le --arch ppc64le
-          docker manifest annotate ${{ steps.docker_meta.outputs.tags }} ${{ steps.docker_meta.outputs.tags }}-s390x --arch s390x
-          docker manifest push ${{ steps.docker_meta.outputs.tags }}
-
-          # stable
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:stable-amd64
-          docker pull ${{ env.REPOSITORY }}:stable-arm64
-          docker pull ${{ env.REPOSITORY }}:stable-arm32
-          docker pull ${{ env.REPOSITORY }}:stable-ppc64le
-          docker pull ${{ env.REPOSITORY }}:stable-s390x
-          docker manifest create ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-amd64 ${{ env.REPOSITORY }}:stable-arm64 ${{ env.REPOSITORY }}:stable-arm32 ${{ env.REPOSITORY }}:stable-ppc64le ${{ env.REPOSITORY }}:stable-s390x
-          docker manifest annotate ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-amd64 --arch amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-arm64 --arch arm64
-          docker manifest annotate ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-arm32 --arch arm
-          docker manifest annotate ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-ppc64le --arch ppc64le
-          docker manifest annotate ${{ env.REPOSITORY }}:stable ${{ env.REPOSITORY }}:stable-s390x --arch s390x
-          docker manifest push ${{ env.REPOSITORY }}:stable

@@ -33,8 +33,11 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Setup python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.x
 
@@ -47,8 +50,15 @@ jobs:
         run: docker run -d --restart=always -p "5000:5000" --name "kind-registry" registry:2
 
       - name: Build latest-amd64
-        run: docker build -t localhost:5000/multus:e2e -f ${{ matrix.docker-file }} .
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          load: true
+          tags: localhost:5000/multus:e2e
+          file: ${{ matrix.docker-file }}
+          platforms: linux/amd64
 
+      # docker buildx push is failed due to https://github.com/docker/buildx/issues/94
       - name: Push to local registry
         run: docker push localhost:5000/multus:e2e
 

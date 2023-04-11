@@ -3,9 +3,11 @@ on:
   push:
     branches:
       - master
+env:
+  image-push-owner: 'k8snetworkplumbingwg'
 jobs:
-  push-amd64:
-    name: Image push/amd64
+  push-thick-amd64:
+    name: Image push thick image/amd64
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -15,37 +17,27 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
+        if: github.repository_owner == ${{ env.image-push-owner }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
+      - name: Push container image for thick plugin
+        if: github.repository_owner == ${{ env.image-push-owner }}
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest-amd64
-            ghcr.io/${{ github.repository }}:snapshot-amd64
-          file: images/Dockerfile
-
-      - name: Push container image for daemon based deployment
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest-thick-amd64
-            ghcr.io/${{ github.repository }}:snapshot-thick-amd64
+            ghcr.io/${{ github.repository }}:latest-thick
+            ghcr.io/${{ github.repository }}:snapshot-thick
           file: images/Dockerfile.thick
+          platforms: linux/amd64
 
-  push-arm64:
-    name: Image push/arm64
+  push-thin:
+    name: Image push thin image
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -55,110 +47,40 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
+        if: github.repository_owner == ${{ env.image-push-owner }}
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
+      - name: Push thin container image
+        if: github.repository_owner == ${{ env.image-push-owner }}
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest-arm64
-            ghcr.io/${{ github.repository }}:snapshot-arm64
-          file: images/Dockerfile.arm64
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:snapshot
+          file: images/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
-  push-arm32:
-    name: Image push/arm32
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
+      - name: Push thin container debug image
+        if: github.repository_owner == ${{ env.image-push-owner }}
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest-arm32
-            ghcr.io/${{ github.repository }}:snapshot-arm32
-          file: images/Dockerfile.arm32
-
-  push-ppc64le:
-    name: Image push/ppc64le
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest-ppc64le
-            ghcr.io/${{ github.repository }}:snapshot-ppc64le
-          file: images/Dockerfile.ppc64le
-
-  push-s390x:
-    name: Image push/s390x
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push container image
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest-s390x
-            ghcr.io/${{ github.repository }}:snapshot-s390x
-          file: images/Dockerfile.s390x
+            ghcr.io/${{ github.repository }}:latest-debug
+            ghcr.io/${{ github.repository }}:snapshot-debug
+          file: images/Dockerfile.debug
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
 # TODO: need to fix this action
 #  push-origin:
@@ -190,67 +112,3 @@ jobs:
 #            ghcr.io/${{ github.repository }}:snapshot-origin
 #          file: images/Dockerfile.openshift
 
-  push-manifest:
-    needs: [push-amd64, push-arm64, push-ppc64le, push-s390x]
-    runs-on: ubuntu-latest
-    env:
-      REPOSITORY: ghcr.io/${{ github.repository }}
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Login to GitHub Container Registry
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create manifest for multi-arch images
-        if: github.repository_owner == 'k8snetworkplumbingwg'
-        run: |
-          # snapshot-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:snapshot-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot-thick ${{ env.REPOSITORY }}:snapshot-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:snapshot-thick
-
-          # latest-thick
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:latest-thick-amd64
-          docker manifest create ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:latest-thick ${{ env.REPOSITORY }}:latest-thick-amd64 --arch amd64
-          docker manifest push ${{ env.REPOSITORY }}:latest-thick
-
-          # snapshot
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:snapshot-amd64
-          docker pull ${{ env.REPOSITORY }}:snapshot-arm64
-          docker pull ${{ env.REPOSITORY }}:snapshot-arm32
-          docker pull ${{ env.REPOSITORY }}:snapshot-ppc64le
-          docker pull ${{ env.REPOSITORY }}:snapshot-s390x
-          docker manifest create ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 ${{ env.REPOSITORY }}:snapshot-arm64 ${{ env.REPOSITORY }}:snapshot-arm32 ${{ env.REPOSITORY }}:snapshot-ppc64le ${{ env.REPOSITORY }}:snapshot-s390x
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-amd64 --arch amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm64 --arch arm64
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-arm32 --arch arm
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-ppc64le --arch ppc64le
-          docker manifest annotate ${{ env.REPOSITORY }}:snapshot ${{ env.REPOSITORY }}:snapshot-s390x --arch s390x
-          docker manifest push ${{ env.REPOSITORY }}:snapshot
-
-          # latest
-          # get artifacts from previous steps
-          docker pull ${{ env.REPOSITORY }}:latest-amd64
-          docker pull ${{ env.REPOSITORY }}:latest-arm64
-          docker pull ${{ env.REPOSITORY }}:latest-arm32
-          docker pull ${{ env.REPOSITORY }}:latest-ppc64le
-          docker pull ${{ env.REPOSITORY }}:latest-s390x
-
-          docker manifest create ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 ${{ env.REPOSITORY }}:latest-arm64 ${{ env.REPOSITORY }}:latest-arm32 ${{ env.REPOSITORY }}:latest-ppc64le ${{ env.REPOSITORY }}:latest-s390x
-          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-amd64 --arch amd64
-          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm64 --arch arm64
-          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-arm32 --arch arm
-          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-ppc64le --arch ppc64le
-          docker manifest annotate ${{ env.REPOSITORY }}:latest ${{ env.REPOSITORY }}:latest-s390x --arch s390x
-          docker manifest push ${{ env.REPOSITORY }}:latest

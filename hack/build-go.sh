@@ -7,6 +7,19 @@ if [ ! -d ${DEST_DIR} ]; then
 	mkdir ${DEST_DIR}
 fi
 
+# Specify correspondingGOARCH from TARGETPLATFORM
+if [ "$TARGETPLATFORM" = "linux/amd64" ]; then
+	export GOARCH=amd64
+elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then
+	export GOARCH=arm64
+elif [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then
+	export GOARCH=arm
+elif [ "$TARGETPLATFORM" = "linux/ppc64le" ]; then
+	export GOARCH=ppc64le
+elif [ "$TARGETPLATFORM" = "linux/s390x" ]; then
+	export GOARCH=s390x
+fi
+
 # version information
 hasGit=true
 git version > /dev/null 2>&1 || hasGit=false

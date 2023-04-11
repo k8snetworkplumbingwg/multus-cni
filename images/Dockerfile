@@ -1,13 +1,14 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM golang:1.19 as build
+FROM --platform=$BUILDPLATFORM golang:1.19 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
 
+ARG TARGETPLATFORM
 RUN  cd /usr/src/multus-cni && \
      ./hack/build-go.sh
 
-FROM gcr.io/distroless/base-debian11
+FROM gcr.io/distroless/base-debian11:latest
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
