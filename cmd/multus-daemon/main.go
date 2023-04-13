@@ -29,11 +29,11 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
-	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus"
+	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/api"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/config"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

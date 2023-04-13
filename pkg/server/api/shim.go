@@ -23,7 +23,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
 // ShimNetConf for the SHIM cni config file written in json

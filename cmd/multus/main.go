@@ -25,7 +25,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cniversion "github.com/containernetworking/cni/pkg/version"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus"
 )
 
 func main() {

@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/cmdutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 )
 
 func main() {

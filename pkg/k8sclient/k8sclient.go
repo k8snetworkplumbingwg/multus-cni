@@ -42,9 +42,9 @@ import (
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/kubeletclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 )
 
 const (

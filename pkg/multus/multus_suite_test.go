@@ -29,7 +29,7 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 

@@ -20,7 +20,7 @@ builds:
       - arm64
       - s390x
     ldflags:
-      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.date={{ .Date }}
+      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date={{ .Date }}
   - env:
       - CGO_ENABLED=0
     id: multus-daemon
@@ -35,7 +35,7 @@ builds:
       - arm64
       - s390x
     ldflags:
-      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.date={{ .Date }}
+      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date={{ .Date }}
   - env:
       - CGO_ENABLED=0
     id: multus-shim
@@ -50,7 +50,7 @@ builds:
       - arm64
       - s390x
     ldflags:
-      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.date={{ .Date }}
+      - -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version={{ .Tag }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.commit={{ .Commit }} -X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date={{ .Date }}
 archives:
   - wrap_in_directory: true
 checksum:

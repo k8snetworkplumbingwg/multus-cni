@@ -52,11 +52,11 @@ fi
 # Add version/commit/date into binary
 DATE=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" --iso-8601=seconds)
 COMMIT=${COMMIT:-$(git rev-parse --verify HEAD)}
-LDFLAGS="-X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.version=${VERSION} \
-	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.commit=${COMMIT} \
-	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.gitTreeState=${GIT_TREE_STATE} \
-	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.releaseStatus=${RELEASE_STATUS} \
-	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus.date=${DATE}"
+LDFLAGS="-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version=${VERSION} \
+	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.commit=${COMMIT} \
+	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.gitTreeState=${GIT_TREE_STATE} \
+	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.releaseStatus=${RELEASE_STATUS} \
+	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date=${DATE}"
 export CGO_ENABLED=0
 
 # build with go modules

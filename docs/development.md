@@ -16,7 +16,7 @@ Multus now uses [gopkg.in](http://gopkg.in/) to expose its code as library.
 You can use following command to import our code into your go code.
 
 ```
-go get gopkg.in/k8snetworkplumbingwg/multus-cni.v3
+go get gopkg.in/k8snetworkplumbingwg/multus-cni.v4
 ```
 
 ## How do I submit an issue?

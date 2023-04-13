@@ -27,9 +27,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/checkpoint"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/checkpoint"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )

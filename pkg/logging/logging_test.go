@@ -20,7 +20,7 @@ import (
 	"os"
 	"testing"
 
-	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
+	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/testing"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	. "github.com/onsi/ginkgo/v2"

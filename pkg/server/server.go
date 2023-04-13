@@ -32,12 +32,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/multus"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/config"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/api"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 )
 
 const (

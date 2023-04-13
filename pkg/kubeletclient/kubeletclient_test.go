@@ -33,7 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
 
-	mtypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	mtypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
 

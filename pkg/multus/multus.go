@@ -39,10 +39,10 @@ import (
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/netutils"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/types"
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/netutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 )
 
 const (

@@ -18,7 +18,7 @@ package types
 import (
 	"net"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 
 	"github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"

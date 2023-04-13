@@ -25,7 +25,7 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/logging"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
 // DeleteDefaultGW removes the default gateway from marked interfaces.

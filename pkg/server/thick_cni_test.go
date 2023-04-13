@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/k8sclient"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/server/api"
-	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v3/pkg/testing"
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/api"
+	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/testing"
 )
 
 const suiteName = "Thick CNI architecture"
