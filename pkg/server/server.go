@@ -136,10 +136,12 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte) (*Server
 
 	exec := invoke.Exec(nil)
 	if daemonConfig.ChrootDir != "" {
-		exec = &ChrootExec{
+		chrootExec := &ChrootExec{
 			Stderr:    os.Stderr,
 			chrootDir: daemonConfig.ChrootDir,
 		}
+		types.ChrootMutex = &chrootExec.mu
+		exec = chrootExec
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 

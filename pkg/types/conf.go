@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -38,6 +39,9 @@ const (
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
 )
+
+// ChrootMutex provides lock to access host filesystem
+var ChrootMutex *sync.Mutex
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {

@@ -542,6 +542,13 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 		}
 
 		// option2) search CNI json config file, which has <netname> as CNI name, from confDir
+
+		// acquire lock to access file
+		if types.ChrootMutex != nil {
+			types.ChrootMutex.Lock()
+			defer types.ChrootMutex.Unlock()
+		}
+
 		configBytes, err = netutils.GetCNIConfigFromFile(netname, confdir)
 		if err == nil {
 			delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
@@ -551,6 +558,12 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 			return delegate, resourceMap, nil
 		}
 	} else {
+		// acquire lock to access file
+		if types.ChrootMutex != nil {
+			types.ChrootMutex.Lock()
+			defer types.ChrootMutex.Unlock()
+		}
+
 		fInfo, err := os.Stat(netname)
 		if err != nil {
 			return nil, resourceMap, err
