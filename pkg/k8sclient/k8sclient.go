@@ -292,6 +292,11 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		}
 	}
 
+	// acquire lock to access file
+	if types.ChrootMutex != nil {
+		types.ChrootMutex.Lock()
+		defer types.ChrootMutex.Unlock()
+	}
 	configBytes, err := netutils.GetCNIConfig(customResource, confdir)
 	if err != nil {
 		return nil, resourceMap, err
