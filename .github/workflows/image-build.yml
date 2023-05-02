@@ -64,10 +64,13 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Download OKD Builder Dockerfile
-        run: curl https://raw.githubusercontent.com/okd-project/images/main/okd-builder.Dockerfile -o images/okd-builder.Dockerfile
+        run: curl https://raw.githubusercontent.com/okd-project/images/main/builder/Dockerfile -o images/okd-builder.Dockerfile
 
       - name: Patch OKD Builder Dockerfile to workaround error
         run: sed -i -e "s/yum install -y yum-utils/rpm --import \/etc\/pki\/rpm-gpg\/*;yum install -y yum-utils/" images/okd-builder.Dockerfile
+
+      - name: Create root for builder
+        run: mkdir root
 
       - name: Organically build golang builder image
         run: docker build -t local/okdbuilder:latest -f images/okd-builder.Dockerfile .
