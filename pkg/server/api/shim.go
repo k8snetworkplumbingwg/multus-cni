@@ -65,7 +65,8 @@ func CmdCheck(args *skel.CmdArgs) error {
 func CmdDel(args *skel.CmdArgs) error {
 	_, _, err := postRequest(args)
 	if err != nil {
-		return logging.Errorf("CmdDel (shim): %v", err)
+		// No error in DEL (as of CNI spec)
+		logging.Errorf("CmdCheck (shim): %v", err)
 	}
 	return nil
 }
