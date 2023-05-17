@@ -247,6 +247,67 @@ var _ = Describe("multus operations cniVersion 0.3.1 config", func() {
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 	})
 
+	It("executes delegates (plugin without interface)", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "0.3.1",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "0.3.1",
+	        "type": "other-plugin"
+	    }]
+	}`),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedResult1 := &cni040.Result{
+			CNIVersion: "0.3.1",
+			IPs: []*cni040.IPConfig{{
+				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			}},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "0.3.1",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin040(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		// other1 just returns empty result
+		expectedResult2 := &cni040.Result{
+			CNIVersion: "0.3.1",
+		}
+		expectedConf2 := `{
+	    "name": "other1",
+	    "cniVersion": "0.3.1",
+	    "type": "other-plugin"
+	}`
+		fExec.addPlugin040(nil, "net1", expectedConf2, expectedResult2, nil)
+
+		result, err := CmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		r := result.(*cni040.Result)
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
+
+		err = CmdDel(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+	})
+
 	It("fails when pod UID is provided and does not match Kube API pod UID", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "net1", "")
 		net1 := `{
