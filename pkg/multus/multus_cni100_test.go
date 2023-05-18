@@ -192,6 +192,71 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		Expect(err).To(MatchError("[//:weave1]: error adding container to network \"weave1\": DelegateAdd: cannot set \"weave-net\" interface name to \"eth0\": validateIfName: no net namespace fsdadfad found: failed to Statfs \"fsdadfad\": no such file or directory"))
 	})
 
+	It("executes delegates (plugin without interface)", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "1.0.0",
+	        "type": "weave-net"
+	    },{
+	        "name": "other1",
+	        "cniVersion": "1.0.0",
+	        "type": "other-plugin"
+	    }]
+	}`),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedResult1 := &cni100.Result{
+			CNIVersion: "1.0.0",
+			IPs: []*cni100.IPConfig{{
+				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
+			},
+			},
+		}
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "1.0.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin100(nil, "eth0", expectedConf1, expectedResult1, nil)
+
+		// other1 just returns empty result
+		expectedResult2 := &cni100.Result{
+			CNIVersion: "0.4.0",
+		}
+		expectedConf2 := `{
+	    "name": "other1",
+	    "cniVersion": "1.0.0",
+	    "type": "other-plugin"
+	}`
+		fExec.addPlugin100(nil, "net1", expectedConf2, expectedResult2, nil)
+
+		result, err := CmdAdd(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
+		// plugin 1 is the masterplugin
+		Expect(reflect.DeepEqual(result, expectedResult1)).To(BeTrue())
+
+		err = CmdCheck(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = CmdDel(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
+	})
+
 	It("returns the previous result using CmdCheck", func() {
 		args := &skel.CmdArgs{
 			ContainerID: "123456789",
