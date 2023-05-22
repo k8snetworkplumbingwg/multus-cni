@@ -57,24 +57,29 @@ type LogOptions struct {
 // SetLogOptions set the LoggingOptions of NetConf
 func SetLogOptions(options *LogOptions) {
 	// give some default value
-	logger.MaxSize = 100
-	logger.MaxAge = 5
-	logger.MaxBackups = 5
-	logger.Compress = true
+	updatedLogger := lumberjack.Logger{
+		Filename:   logger.Filename,
+		MaxAge:     5,
+		MaxBackups: 5,
+		Compress:   true,
+		MaxSize:    100,
+		LocalTime:  logger.LocalTime,
+	}
 	if options != nil {
 		if options.MaxAge != nil {
-			logger.MaxAge = *options.MaxAge
+			updatedLogger.MaxAge = *options.MaxAge
 		}
 		if options.MaxSize != nil {
-			logger.MaxSize = *options.MaxSize
+			updatedLogger.MaxSize = *options.MaxSize
 		}
 		if options.MaxBackups != nil {
-			logger.MaxBackups = *options.MaxBackups
+			updatedLogger.MaxBackups = *options.MaxBackups
 		}
 		if options.Compress != nil {
-			logger.Compress = *options.Compress
+			updatedLogger.Compress = *options.Compress
 		}
 	}
+	logger = &updatedLogger
 	loggingW = logger
 }
 
@@ -174,10 +179,16 @@ func SetLogFile(filename string) {
 	if filename == "" {
 		return
 	}
-
-	logger.Filename = filename
+	updatedLogger := lumberjack.Logger{
+		Filename:   filename,
+		MaxAge:     logger.MaxAge,
+		MaxBackups: logger.MaxBackups,
+		Compress:   logger.Compress,
+		MaxSize:    logger.MaxSize,
+		LocalTime:  logger.LocalTime,
+	}
+	logger = &updatedLogger
 	loggingW = logger
-
 }
 
 func init() {
