@@ -589,7 +589,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		return nil, err
 	}
 
-	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
+	// resourceMap holds Pod device allocation information; only initialized if CRD contains 'resourceName' annotation.
 	// This will only be initialized once and all delegate objects can reference this to look up device info.
 	var resourceMap map[string]*types.ResourceInfo
 
