@@ -1421,3 +1421,23 @@ var _ = Describe("netutil cnicache function testing", func() {
 
 	})
 })
+
+var _ = Describe("other function unit testing", func() {
+	It("deleteDefaultGWResultRoutes with invalid config", func() {
+		cniRouteConfig := []byte(`[
+		{ "dst": "0.0.0.0/0", "gw": "10.1.1.1" },
+		{ "dst": "10.1.1.0/24" },
+		{ "dst": "0.0.0.0/0", "gw": "10.1.1.1" }
+		]`)
+
+		var routes []interface{}
+		err := json.Unmarshal(cniRouteConfig, &routes)
+		Expect(err).NotTo(HaveOccurred())
+
+		newRoute, err := deleteDefaultGWResultRoutes(routes, "0.0.0.0/0")
+		Expect(err).NotTo(HaveOccurred())
+		routeJSON, err := json.Marshal(newRoute)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(routeJSON).Should(MatchJSON(`[{"dst":"10.1.1.0/24"}]`))
+	})
+})

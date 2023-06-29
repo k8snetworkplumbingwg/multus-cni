@@ -139,6 +139,7 @@ func deleteDefaultGWCacheBytes(cacheFile []byte, ipv4, ipv6 bool) ([]byte, error
 }
 
 func deleteDefaultGWResultRoutes(routes []interface{}, dstGW string) ([]interface{}, error) {
+	var newRoutes []interface{}
 	for i, r := range routes {
 		route, ok := r.(map[string]interface{})
 		if !ok {
@@ -150,12 +151,12 @@ func deleteDefaultGWResultRoutes(routes []interface{}, dstGW string) ([]interfac
 			if !ok {
 				return nil, fmt.Errorf("wrong dst format: %v", route["dst"])
 			}
-			if dst == dstGW {
-				routes = append(routes[:i], routes[i+1:]...)
+			if dst != dstGW {
+				newRoutes = append(newRoutes, routes[i])
 			}
 		}
 	}
-	return routes, nil
+	return newRoutes, nil
 }
 
 func deleteDefaultGWResult(result map[string]interface{}, ipv4, ipv6 bool) (map[string]interface{}, error) {
