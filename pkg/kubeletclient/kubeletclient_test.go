@@ -60,10 +60,6 @@ func (m *fakeResourceServer) Get(_ context.Context, _ *podresourcesapi.GetPodRes
 }
 
 func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodResourcesRequest) (*podresourcesapi.ListPodResourcesResponse, error) {
-	podName := "pod-name"
-	podNamespace := "pod-namespace"
-	containerName := "container-name"
-
 	devs := []*podresourcesapi.ContainerDevices{
 		{
 			ResourceName: "resource",
@@ -71,15 +67,46 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 		},
 	}
 
+	cdiDevices := []*podresourcesapi.CDIDevice{
+		{
+			Name: "cdi-kind=cdi-resource",
+		},
+	}
+
+	claimsResource := []*podresourcesapi.ClaimResource{
+		{
+			CDIDevices: cdiDevices,
+		},
+	}
+
+	dynamicResources := []*podresourcesapi.DynamicResource{
+		{
+			ClassName:      "resource-class",
+			ClaimName:      "resource-claim",
+			ClaimNamespace: "dynamic-resource-pod-namespace",
+			ClaimResources: claimsResource,
+		},
+	}
+
 	resp := &podresourcesapi.ListPodResourcesResponse{
 		PodResources: []*podresourcesapi.PodResources{
 			{
-				Name:      podName,
-				Namespace: podNamespace,
+				Name:      "pod-name",
+				Namespace: "pod-namespace",
 				Containers: []*podresourcesapi.ContainerResources{
 					{
-						Name:    containerName,
+						Name:    "container-name",
 						Devices: devs,
+					},
+				},
+			},
+			{
+				Name:      "dynamic-resource-pod-name",
+				Namespace: "dynamic-resource-pod-namespace",
+				Containers: []*podresourcesapi.ContainerResources{
+					{
+						Name:             "dynamic-resource-container-name",
+						DynamicResources: dynamicResources,
 					},
 				},
 			},
@@ -188,7 +215,7 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 		})
 	})
 	Context("GetPodResourceMap() with valid pod name and namespace", func() {
-		It("should return no error", func() {
+		It("should return no error with device plugin resource", func() {
 			podUID := k8sTypes.UID("970a395d-bb3b-11e8-89df-408d5c537d23")
 			fakePod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -209,6 +236,34 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 
 			outputRMap := map[string]*mtypes.ResourceInfo{
 				"resource": {DeviceIDs: []string{"dev0", "dev1"}},
+			}
+			resourceMap, err := client.GetPodResourceMap(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceMap).ShouldNot(BeNil())
+			Expect(resourceMap).To(Equal(outputRMap))
+		})
+
+		It("should return no error with dynamic resource", func() {
+			podUID := k8sTypes.UID("9f94e27b-4233-43d6-bd10-f73b4de6f456")
+			fakePod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "dynamic-resource-pod-name",
+					Namespace: "dynamic-resource-pod-namespace",
+					UID:       podUID,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "dynamic-resource-container-name",
+						},
+					},
+				},
+			}
+			client, err := getKubeletClient(testKubeletSocket)
+			Expect(err).NotTo(HaveOccurred())
+
+			outputRMap := map[string]*mtypes.ResourceInfo{
+				"resource-class": {DeviceIDs: []string{"cdi-resource"}},
 			}
 			resourceMap, err := client.GetPodResourceMap(fakePod)
 			Expect(err).NotTo(HaveOccurred())
