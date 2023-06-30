@@ -14,7 +14,7 @@ operation fails. Configuration and results are a JSON encoded string.
 Once the shim is invoked by the runtime (Kubernetes) it will contact the
 multus-daemon (server) via a unix domain socket which is bind mounted to the
 host's file-system; the multus-daemon is the one that will do all the
-heavy-pulling: fetch the delegate CNI configuration from the corresponding
+heavy-lifting: fetch the delegate CNI configuration from the corresponding
 `net-attach-def`, compute the `RuntimeConfig`, and finally, invoke the delegate.
 
 It will then return the result of the operation back to the client.
@@ -108,6 +108,10 @@ It allows the following keys:
 
 #### Chroot configuration
 
-In thick plugin case, delegate CNI plugin is executed by multus-daemon from Pod, hence if the delegate CNI requires resources in container host, for example unix socket or even file, then CNI plugin is failed to execute because multus-daemon runs in Pod. Multus-daemon supports "chrootDir" option which executes delegate CNI under chroot (to container host).
+In the thick plugin case, delegate CNI plugin is executed by multus-daemon from Pod, hence if the delegate CNI requires resources in container host, for example unix socket or even file, then CNI plugin is failed to execute because multus-daemon runs in Pod. Multus-daemon supports "chrootDir" option which executes delegate CNI under chroot (to container host).
 
 This configuration is enabled in deployments/multus-daemonset-thick.yml as default.
+
+#### Resource requests/limits
+
+When running in thick plugin mode, the delegate CNI plugin runs inside the multus pod and it shares the resource requests/limits of the multus pod.  You may need to increase the memeory/CPU limits on the multus pod if the delegate CNI requires additional resources.
