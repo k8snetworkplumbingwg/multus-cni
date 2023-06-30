@@ -268,6 +268,9 @@ func newCNIRuntimeConf(containerID, sandboxID, podName, podNamespace, podUID, ne
 		if delegateRc.CNIDeviceInfoFile != "" {
 			capabilityArgs["CNIDeviceInfoFile"] = delegateRc.CNIDeviceInfoFile
 		}
+		if delegateRc.PodAnnotations != nil {
+			capabilityArgs["io.kubernetes.cri.pod-annotations"] = delegateRc.PodAnnotations
+		}
 		rt.CapabilityArgs = capabilityArgs
 	}
 	return rt, cniDeviceInfoFile
