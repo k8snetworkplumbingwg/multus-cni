@@ -1,8 +1,6 @@
-// +build appengine
-
 /*
  *
- * Copyright 2020 gRPC authors.
+ * Copyright 2021 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +16,5 @@
  *
  */
 
-package credentials
-
-import (
-	"crypto/tls"
-	"net/url"
-)
-
-// SPIFFEIDFromState is a no-op for appengine builds.
-func SPIFFEIDFromState(state tls.ConnectionState) *url.URL {
-	return nil
-}
+// Package grpcutil provides utility functions used across the gRPC codebase.
+package grpcutil

@@ -1,8 +1,6 @@
-// +build go1.13
-
 /*
  *
- * Copyright 2019 gRPC authors.
+ * Copyright 2022 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +16,17 @@
  *
  */
 
-package dns
+package grpcsync
 
-import "net"
+import (
+	"sync"
+)
 
-func init() {
-	filterError = func(err error) error {
-		if dnsErr, ok := err.(*net.DNSError); ok && dnsErr.IsNotFound {
-			// The name does not exist; not an error.
-			return nil
-		}
-		return err
+// OnceFunc returns a function wrapping f which ensures f is only executed
+// once even if the returned function is executed multiple times.
+func OnceFunc(f func()) func() {
+	var once sync.Once
+	return func() {
+		once.Do(f)
 	}
 }

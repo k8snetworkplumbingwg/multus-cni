@@ -133,9 +133,11 @@ type cleanupStream struct {
 func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in a RST_STREAM
 
 type earlyAbortStream struct {
+	httpStatus     uint32
 	streamID       uint32
 	contentSubtype string
 	status         *status.Status
+	rst            bool
 }
 
 func (*earlyAbortStream) isTransportResponseFrame() bool { return false }
@@ -189,7 +191,7 @@ type goAway struct {
 	code      http2.ErrCode
 	debugData []byte
 	headsUp   bool
-	closeConn bool
+	closeConn error // if set, loopyWriter will exit, resulting in conn closure
 }
 
 func (*goAway) isTransportResponseFrame() bool { return false }
@@ -206,6 +208,14 @@ type outFlowControlSizeRequest struct {
 }
 
 func (*outFlowControlSizeRequest) isTransportResponseFrame() bool { return false }
+
+// closeConnection is an instruction to tell the loopy writer to flush the
+// framer and exit, which will cause the transport's connection to be closed
+// (by the client or server).  The transport itself will close after the reader
+// encounters the EOF caused by the connection closure.
+type closeConnection struct{}
+
+func (closeConnection) isTransportResponseFrame() bool { return false }
 
 type outStreamState int
 
@@ -406,7 +416,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			return nil, ErrConnClosing
+			return nil, errors.New("transport closed by client")
 		}
 	}
 }
@@ -517,18 +527,9 @@ const minBatchSize = 1000
 // As an optimization, to increase the batch size for each flush, loopy yields the processor, once
 // if the batch size is too low to give stream goroutines a chance to fill it up.
 func (l *loopyWriter) run() (err error) {
-	defer func() {
-		if err == ErrConnClosing {
-			// Don't log ErrConnClosing as error since it happens
-			// 1. When the connection is closed by some other known issue.
-			// 2. User closed the connection.
-			// 3. A graceful close of connection.
-			if logger.V(logLevel) {
-				logger.Infof("transport: loopyWriter.run returning. %v", err)
-			}
-			err = nil
-		}
-	}()
+	// Always flush the writer before exiting in case there are pending frames
+	// to be sent.
+	defer l.framer.writer.Flush()
 	for {
 		it, err := l.cbuf.get(true)
 		if err != nil {
@@ -572,7 +573,6 @@ func (l *loopyWriter) run() (err error) {
 			}
 			l.framer.writer.Flush()
 			break hasdata
-
 		}
 	}
 }
@@ -653,18 +653,19 @@ func (l *loopyWriter) headerHandler(h *headerFrame) error {
 		itl:   &itemList{},
 		wq:    h.wq,
 	}
-	str.itl.enqueue(h)
-	return l.originateStream(str)
+	return l.originateStream(str, h)
 }
 
-func (l *loopyWriter) originateStream(str *outStream) error {
-	hdr := str.itl.dequeue().(*headerFrame)
-	if err := hdr.initStream(str.id); err != nil {
-		if err == ErrConnClosing {
-			return err
-		}
-		// Other errors(errStreamDrain) need not close transport.
+func (l *loopyWriter) originateStream(str *outStream, hdr *headerFrame) error {
+	// l.draining is set when handling GoAway. In which case, we want to avoid
+	// creating new streams.
+	if l.draining {
+		// TODO: provide a better error with the reason we are in draining.
+		hdr.onOrphaned(errStreamDrain)
 		return nil
+	}
+	if err := hdr.initStream(str.id); err != nil {
+		return err
 	}
 	if err := l.writeHeader(str.id, hdr.endStream, hdr.hf, hdr.onWrite); err != nil {
 		return err
@@ -761,8 +762,8 @@ func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 			return err
 		}
 	}
-	if l.side == clientSide && l.draining && len(l.estdStreams) == 0 {
-		return ErrConnClosing
+	if l.draining && len(l.estdStreams) == 0 {
+		return errors.New("finished processing active streams while in draining mode")
 	}
 	return nil
 }
@@ -771,9 +772,12 @@ func (l *loopyWriter) earlyAbortStreamHandler(eas *earlyAbortStream) error {
 	if l.side == clientSide {
 		return errors.New("earlyAbortStream not handled on client")
 	}
-
+	// In case the caller forgets to set the http status, default to 200.
+	if eas.httpStatus == 0 {
+		eas.httpStatus = 200
+	}
 	headerFields := []hpack.HeaderField{
-		{Name: ":status", Value: "200"},
+		{Name: ":status", Value: strconv.Itoa(int(eas.httpStatus))},
 		{Name: "content-type", Value: grpcutil.ContentType(eas.contentSubtype)},
 		{Name: "grpc-status", Value: strconv.Itoa(int(eas.status.Code()))},
 		{Name: "grpc-message", Value: encodeGrpcMessage(eas.status.Message())},
@@ -782,6 +786,11 @@ func (l *loopyWriter) earlyAbortStreamHandler(eas *earlyAbortStream) error {
 	if err := l.writeHeader(eas.streamID, true, headerFields, nil); err != nil {
 		return err
 	}
+	if eas.rst {
+		if err := l.framer.fr.WriteRSTStream(eas.streamID, http2.ErrCodeNo); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -789,7 +798,7 @@ func (l *loopyWriter) incomingGoAwayHandler(*incomingGoAway) error {
 	if l.side == clientSide {
 		l.draining = true
 		if len(l.estdStreams) == 0 {
-			return ErrConnClosing
+			return errors.New("received GOAWAY with no active streams")
 		}
 	}
 	return nil
@@ -805,6 +814,13 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 		l.draining = draining
 	}
 	return nil
+}
+
+func (l *loopyWriter) closeConnectionHandler() error {
+	// Exit loopyWriter entirely by returning an error here.  This will lead to
+	// the transport closing the connection, and, ultimately, transport
+	// closure.
+	return ErrConnClosing
 }
 
 func (l *loopyWriter) handle(i interface{}) error {
@@ -835,6 +851,8 @@ func (l *loopyWriter) handle(i interface{}) error {
 		return l.goAwayHandler(i)
 	case *outFlowControlSizeRequest:
 		return l.outFlowControlSizeRequestHandler(i)
+	case closeConnection:
+		return l.closeConnectionHandler()
 	default:
 		return fmt.Errorf("transport: unknown control message type %T", i)
 	}
@@ -876,9 +894,9 @@ func (l *loopyWriter) processData() (bool, error) {
 	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
 	// A data item is represented by a dataFrame, since it later translates into
 	// multiple HTTP2 data frames.
-	// Every dataFrame has two buffers; h that keeps grpc-message header and d that is acutal data.
+	// Every dataFrame has two buffers; h that keeps grpc-message header and d that is actual data.
 	// As an optimization to keep wire traffic low, data from d is copied to h to make as big as the
-	// maximum possilbe HTTP2 frame size.
+	// maximum possible HTTP2 frame size.
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // Empty data frame
 		// Client sends out empty data frame with endStream = true
