@@ -26,6 +26,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+	apierrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 // DeleteDefaultGW removes the default gateway from marked interfaces.
@@ -38,14 +39,25 @@ func DeleteDefaultGW(netnsPath string, ifName string) error {
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		var err error
-		link, _ := netlink.LinkByName(ifName)
-		routes, _ := netlink.RouteList(link, netlink.FAMILY_ALL)
+		link, err := netlink.LinkByName(ifName)
+		if err != nil {
+			return err
+		}
+
+		routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return err
+		}
+
+		var errors []error
 		for _, nlroute := range routes {
 			if nlroute.Dst == nil {
-				err = netlink.RouteDel(&nlroute)
+				if err = netlink.RouteDel(&nlroute); err != nil {
+					errors = append(errors, err)
+				}
 			}
 		}
-		return err
+		return apierrors.NewAggregate(errors)
 	})
 	return err
 }
