@@ -65,6 +65,18 @@ func TestBasicMultusConfig(t *testing.T) {
 	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
 }
 
+func TestMultusConfigWithConfDir(t *testing.T) {
+	multusConfig, err := newMultusConfigWithDelegates(
+		primaryCNIName,
+		cniVersion,
+		kubeconfig,
+		primaryCNIConfig,
+		WithConfDir("/etc/cni/net.d"))
+	assertError(t, err, nil)
+	expectedResult := "{\"confDir\":\"/etc/cni/net.d\",\"cniVersion\":\"0.4.0\",\"delegates\":[{\"cniVersion\":\"1.0.0\",\"dns\":\"{}\",\"ipam\":\"{}\",\"logFile\":\"/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log\",\"logLevel\":\"5\",\"logfile-maxage\":5,\"logfile-maxbackups\":5,\"logfile-maxsize\":100,\"name\":\"ovn-kubernetes\",\"type\":\"ovn-k8s-cni-overlay\"}],\"kubeconfig\":\"/a/b/c/kubeconfig.kubeconfig\",\"name\":\"multus-cni-network\",\"type\":\"myCNI\"}"
+	newTestCase(t, multusConfig.Generate).assertResult(expectedResult)
+}
+
 func TestMultusConfigWithNamespaceIsolation(t *testing.T) {
 	multusConfig, err := newMultusConfigWithDelegates(
 		primaryCNIName,

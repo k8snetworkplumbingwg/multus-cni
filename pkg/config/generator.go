@@ -42,6 +42,7 @@ type Option func(conf *MultusConf)
 // MultusConf holds the multus configuration, and persists it to disk
 type MultusConf struct {
 	BinDir                   string          `json:"binDir,omitempty"`
+	ConfDir                  string          `json:"confDir,omitempty"`
 	Capabilities             map[string]bool `json:"capabilities,omitempty"`
 	CNIVersion               string          `json:"cniVersion"`
 	Delegates                []interface{}   `json:"delegates"`
@@ -132,6 +133,14 @@ func (mc *MultusConf) Mutate(configurationOptions ...Option) error {
 	}
 
 	return CheckVersionCompatibility(mc)
+}
+
+// WithConfDir mutates the inner state to enable the
+// WithConfDir attribute
+func WithConfDir(confDir string) Option {
+	return func(conf *MultusConf) {
+		conf.ConfDir = confDir
+	}
 }
 
 // WithNamespaceIsolation mutates the inner state to enable the
