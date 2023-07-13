@@ -119,6 +119,10 @@ func main() {
 		}
 
 		var configurationOptions []config.Option
+		if *cniConfigDir != "" {
+			configurationOptions = append(configurationOptions, config.WithConfDir(*cniConfigDir))
+		}
+
 		if *namespaceIsolation {
 			configurationOptions = append(
 				configurationOptions, config.WithNamespaceIsolation())
@@ -155,7 +159,6 @@ func main() {
 		}
 
 		// logOptions
-
 		var logOptionFuncs []config.LogOptionFunc
 		if *logMaxAge != defaultMultusLogMaxAge {
 			logOptionFuncs = append(logOptionFuncs, config.WithLogMaxAge(logMaxAge))

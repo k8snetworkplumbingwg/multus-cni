@@ -352,6 +352,10 @@ if [ "$MULTUS_CONF_FILE" == "auto" ]; then
         ADDITIONAL_BIN_DIR_STRING="\"binDir\": \"$ADDITIONAL_BIN_DIR\","
       fi
 
+      CNI_CONF_DIR_STRING=""
+      if [ ! -z "${CNI_CONF_DIR// }" ]; then
+        CNI_CONF_DIR_STRING="\"confDir\": \"$CNI_CONF_DIR\","
+      fi
 
       READINESS_INDICATOR_FILE_STRING=""
       if [ ! -z "${MULTUS_READINESS_INDICATOR_FILE// }" ]; then
@@ -406,6 +410,7 @@ EOF
           $LOG_TO_STDERR_STRING
           $LOG_LEVEL_STRING
           $LOG_FILE_STRING
+          $CNI_CONF_DIR_STRING
           $ADDITIONAL_BIN_DIR_STRING
           $READINESS_INDICATOR_FILE_STRING
           "kubeconfig": "$MULTUS_KUBECONFIG_FILE_HOST",
