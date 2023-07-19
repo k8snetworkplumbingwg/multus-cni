@@ -16,6 +16,8 @@
 package cmdutils
 
 import (
+	"bytes"
+	"crypto/md5"
 	"fmt"
 	"io"
 	"os"
@@ -24,6 +26,15 @@ import (
 
 // CopyFileAtomic does file copy atomically
 func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) error {
+	destFilePath := filepath.Join(destDir, destFileName)
+	destMD5, _ := getMD5FromFile(destFilePath)
+	if destMD5 != nil {
+		srcMD5, _ := getMD5FromFile(srcFilePath)
+		if bytes.Compare(destMD5, srcMD5) == 0 {
+			fmt.Fprintf(os.Stderr, "not need to copy file, %s and %s is same\n", srcFilePath, destFilePath)
+			return nil
+		}
+	}
 	tempFilePath := filepath.Join(destDir, tempFileName)
 	// check temp filepath and remove old file if exists
 	if _, err := os.Stat(tempFilePath); err == nil {
@@ -61,7 +72,7 @@ func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) err
 	}
 
 	// change file mode if different
-	destFilePath := filepath.Join(destDir, destFileName)
+	// destFilePath := filepath.Join(destDir, destFileName)
 	_, err = os.Stat(destFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -81,4 +92,17 @@ func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) err
 	}
 
 	return nil
+}
+
+func getMD5FromFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	defer f.Close()
+	if err != nil {
+		return nil, err
+	}
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
 }

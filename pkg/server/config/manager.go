@@ -15,6 +15,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -218,6 +219,11 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
 func (m Manager) PersistMultusConfig(config string) error {
 	logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
+	oldConfigbs, _ := os.ReadFile(m.multusConfigFilePath)
+	if oldConfigbs != nil && bytes.Compare(oldConfigbs, []byte(config)) == 0 {
+		logging.Debugf("Not need to write Multus CNI configuration %s", m.multusConfigFilePath)
+		return nil
+	}
 	return os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
