@@ -651,7 +651,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 		// check Interfaces and IPs because some CNI plugin does not create any interface
 		// and just returns empty result
-		if res != nil &&  (res.Interfaces != nil || res.IPs != nil) {
+		if res != nil && (res.Interfaces != nil || res.IPs != nil) {
 			// Remove gateway from routing table if the gateway is not used
 			deleteV4gateway := false
 			deleteV6gateway := false

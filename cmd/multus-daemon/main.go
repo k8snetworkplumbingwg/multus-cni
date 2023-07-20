@@ -80,8 +80,6 @@ func main() {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
-		multusConf.SocketDir = daemonConf.SocketDir
-
 		var configManager *config.Manager
 		if multusConf.MultusMasterCni == "" {
 			configManager, err = config.NewManager(*multusConf, multusConf.MultusAutoconfigDir, multusConf.ForceCNIVersion)

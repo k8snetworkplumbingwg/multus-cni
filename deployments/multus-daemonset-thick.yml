@@ -111,13 +111,12 @@ data:
   daemon-config.json: |
     {
         "chrootDir": "/hostroot",
-        "confDir": "/host/etc/cni/net.d",
-        "logLevel": "verbose",
-        "socketDir": "/host/run/multus/",
         "cniVersion": "0.3.1",
-        "cniConfigDir": "/host/etc/cni/net.d",
+        "logLevel": "verbose",
+        "logToStderr": true,
+        "multusAutoconfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
-        "multusAutoconfigDir": "/host/etc/cni/net.d"
+        "socketDir": "/host/run/multus/"
     }
 ---
 apiVersion: apps/v1
