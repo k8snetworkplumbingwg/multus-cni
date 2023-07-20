@@ -55,7 +55,7 @@ type MultusConf struct {
 	Type                     string              `json:"type"`
 	CniDir                   string              `json:"cniDir,omitempty"`
 	CniConfigDir             string              `json:"cniConfigDir,omitempty"`
-	SocketDir                string              `json:"socketDir,omitempty"`
+	DaemonSocketDir          string              `json:"daemonSocketDir,omitempty"`
 	MultusConfigFile         string              `json:"multusConfigFile,omitempty"`
 	MultusMasterCni          string              `json:"multusMasterCNI,omitempty"`
 	MultusAutoconfigDir      string              `json:"multusAutoconfigDir,omitempty"`

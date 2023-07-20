@@ -108,7 +108,7 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 		configWatcher:        watcher,
 		multusConfig:         &config,
 		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(multusConfigDir, multusConfigFileName),
+		multusConfigFilePath: cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
 		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
 	}
 

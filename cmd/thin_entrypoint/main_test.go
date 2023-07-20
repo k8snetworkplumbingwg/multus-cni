@@ -210,6 +210,7 @@ var _ = Describe("thin entrypoint testing", func() {
 			MultusLogLevel:           "DEBUG",
 			MultusLogFile:            "/tmp/foobar.log",
 			AdditionalBinDir:         "/tmp/add_bin_dir",
+			MultusCNIConfDir:         "/tmp/multus/net.d",
 			ReadinessIndicatorFile:   "/var/lib/foobar_indicator",
 		}).createMultusConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -225,6 +226,7 @@ var _ = Describe("thin entrypoint testing", func() {
         "logLevel": "debug",
         "logFile": "/tmp/foobar.log",
         "binDir": "/tmp/add_bin_dir",
+        "cniConf": "/tmp/multus/net.d",
         "readinessindicatorfile": "/var/lib/foobar_indicator",
         "kubeconfig": "/etc/foobar_kubeconfig",
         "delegates": [
@@ -368,6 +370,7 @@ var _ = Describe("thin entrypoint testing", func() {
 			MultusLogLevel:           "DEBUG",
 			MultusLogFile:            "/tmp/foobar.log",
 			AdditionalBinDir:         "/tmp/add_bin_dir",
+			MultusCNIConfDir:         "/tmp/multus/net.d",
 			ReadinessIndicatorFile:   "/var/lib/foobar_indicator",
 		}).createMultusConfig()
 		Expect(err).NotTo(HaveOccurred())
@@ -385,6 +388,7 @@ var _ = Describe("thin entrypoint testing", func() {
         "logLevel": "debug",
         "logFile": "/tmp/foobar.log",
         "binDir": "/tmp/add_bin_dir",
+        "cniConf": "/tmp/multus/net.d",
         "readinessindicatorfile": "/var/lib/foobar_indicator",
         "kubeconfig": "/etc/foobar_kubeconfig",
         "delegates": [

@@ -41,6 +41,7 @@ type Options struct {
 	CNIVersion               string
 	MultusConfFile           string
 	MultusBinFile            string // may be hidden or remove?
+	MultusCNIConfDir         string
 	SkipMultusBinaryCopy     bool
 	MultusKubeConfigFileHost string
 	MultusMasterCNIFileName  string
@@ -72,6 +73,7 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.CNIVersion, "cni-version", "", "CNI version for multus CNI config (e.g. '0.3.1')")
 	fs.StringVar(&o.MultusConfFile, "multus-conf-file", "auto", "multus CNI config file")
 	fs.StringVar(&o.MultusBinFile, "multus-bin-file", "/usr/src/multus-cni/bin/multus", "multus binary file path")
+	fs.StringVar(&o.MultusCNIConfDir, "multus-cni-conf-dir", "/host/etc/cni/multus/net.d", "multus specific CNI config directory")
 	fs.BoolVar(&o.SkipMultusBinaryCopy, "skip-multus-binary-copy", false, "skip multus binary file copy")
 
 	fs.StringVar(&o.MultusKubeConfigFileHost, "multus-kubeconfig-file-host", "/etc/cni/net.d/multus.d/multus.kubeconfig", "kubeconfig for multus (used only with --multus-conf-file=auto)")
@@ -150,6 +152,11 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 	// create multus.d directory
 	if err := os.MkdirAll(fmt.Sprintf("%s/multus.d", o.CNIConfDir), 0755); err != nil {
 		return nil, fmt.Errorf("cannot create multus.d directory: %v", err)
+	}
+
+	// create multus cni conf directory
+	if err := os.MkdirAll(o.MultusCNIConfDir, 0755); err != nil {
+		return nil, fmt.Errorf("cannot create multus-cni-conf-dir(%s) directory: %v", o.MultusCNIConfDir, err)
 	}
 
 	// get Kubernetes service protocol/host/port
@@ -250,6 +257,8 @@ const multusConflistTemplate = `{
         }}{{
             .AdditionalBinDirConfig
         }}{{
+            .MultusCNIConfDirConfig
+        }}{{
             .ReadinessIndicatorFileConfig
         }}
         "kubeconfig": "{{ .MultusKubeConfigFileHost }}",
@@ -277,6 +286,8 @@ const multusConfTemplate = `{
             .LogFileConfig
         }}{{
             .AdditionalBinDirConfig
+        }}{{
+            .MultusCNIConfDirConfig
         }}{{
             .ReadinessIndicatorFileConfig
         }}
@@ -415,6 +426,12 @@ func (o *Options) createMultusConfig() (string, error) {
 		additionalBinDirConfig = fmt.Sprintf("\n        \"binDir\": %q,", o.AdditionalBinDir)
 	}
 
+	// check MultusCNIConfDir
+	multusCNIConfDirConfig := ""
+	if o.MultusCNIConfDir != "" {
+		multusCNIConfDirConfig = fmt.Sprintf("\n        \"cniConf\": %q,", o.MultusCNIConfDir)
+	}
+
 	// check ReadinessIndicatorFile
 	readinessIndicatorFileConfig := ""
 	if o.ReadinessIndicatorFile != "" {
@@ -459,6 +476,7 @@ func (o *Options) createMultusConfig() (string, error) {
 		"LogLevelConfig":               logLevelConfig,
 		"LogFileConfig":                logFileConfig,
 		"AdditionalBinDirConfig":       additionalBinDirConfig,
+		"MultusCNIConfDirConfig":       multusCNIConfDirConfig,
 		"ReadinessIndicatorFileConfig": readinessIndicatorFileConfig,
 		"MultusKubeConfigFileHost":     o.MultusKubeConfigFileHost, // be fixed?
 		"MasterPluginJSON":             string(masterPluginByte),
