@@ -225,7 +225,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	// handle for '/healthz'
 	router.HandleFunc(api.MultusHealthAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet {
+			if r.Method != http.MethodGet && r.Method != http.MethodPost {
 				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
 				return
 			}
