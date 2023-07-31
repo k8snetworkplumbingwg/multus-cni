@@ -15,6 +15,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -98,14 +99,15 @@ var _ = Describe("Configuration Manager", func() {
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 
-		err = configManager.PersistMultusConfig(config)
+		_, err = configManager.PersistMultusConfig(config)
 		Expect(err).NotTo(HaveOccurred())
 
+		ctx, cancel := context.WithCancel(context.Background())
 		configWatcherDoneChannel := make(chan struct{})
-		go func(stopChannel chan struct{}, doneChannel chan struct{}) {
-			err := configManager.MonitorPluginConfiguration(configWatcherDoneChannel, stopChannel)
+		go func(ctx context.Context, doneChannel chan struct{}) {
+			err := configManager.MonitorPluginConfiguration(ctx, doneChannel)
 			Expect(err).NotTo(HaveOccurred())
-		}(make(chan struct{}), configWatcherDoneChannel)
+		}(ctx, configWatcherDoneChannel)
 
 		updatedCNIConfig := `
 {
@@ -126,7 +128,7 @@ var _ = Describe("Configuration Manager", func() {
 		Expect(string(file)).To(Equal(config))
 
 		// stop groutine
-		configWatcherDoneChannel <- struct{}{}
+		cancel()
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
