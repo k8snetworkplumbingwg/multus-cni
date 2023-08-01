@@ -58,11 +58,6 @@ var (
 	releaseStatus = ""
 )
 
-var (
-	pollDuration = 1000 * time.Millisecond
-	pollTimeout  = 45 * time.Second
-)
-
 // PrintVersionString ...
 func PrintVersionString() string {
 	return fmt.Sprintf("version:%s(%s%s), commit:%s, date:%s", version, gitTreeState, releaseStatus, commit, date)
@@ -575,11 +570,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	}
 
 	if n.ReadinessIndicatorFile != "" {
-		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
-			_, err := os.Stat(n.ReadinessIndicatorFile)
-			return err == nil, nil
-		})
-		if err != nil {
+		if err := types.GetReadinessIndicatorFile(n.ReadinessIndicatorFile); err != nil {
 			return nil, cmdErr(k8sArgs, "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", n.ReadinessIndicatorFile, err)
 		}
 	}
@@ -813,11 +804,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	if in.ReadinessIndicatorFile != "" {
-		err := wait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
-			_, err := os.Stat(in.ReadinessIndicatorFile)
-			return err == nil, nil
-		})
-		if err != nil {
+		if err := types.GetReadinessIndicatorFile(in.ReadinessIndicatorFile); err != nil {
 			return cmdErr(k8sArgs, "PollImmediate error waiting for ReadinessIndicatorFile (on del): %v", err)
 		}
 	}

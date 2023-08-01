@@ -57,13 +57,18 @@ func FilesystemPreRequirements(rundir string) error {
 	return nil
 }
 
+func printCmdArgs(args *skel.CmdArgs) string {
+	return fmt.Sprintf("ContainerID:%q Netns:%q IfName:%q Args:%q Path:%q",
+		args.ContainerID, args.Netns, args.IfName, args.Args, args.Path)
+}
+
 // HandleCNIRequest is the CNI server handler function; it is invoked whenever
 // a CNI request is processed.
 func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) ([]byte, error) {
 	var result []byte
 	var err error
 
-	logging.Verbosef("%s starting CNI request %+v", cmd, cniCmdArgs)
+	logging.Verbosef("%s starting CNI request %s", cmd, printCmdArgs(cniCmdArgs))
 	switch cmd {
 	case "ADD":
 		result, err = cmdAdd(cniCmdArgs, k8sArgs, exec, kubeClient)
@@ -74,10 +79,10 @@ func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs
 	default:
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
-	logging.Verbosef("%s finished CNI request %+v, result: %q, err: %v", cmd, *cniCmdArgs, string(result), err)
+	logging.Verbosef("%s finished CNI request %s, result: %q, err: %v", cmd, printCmdArgs(cniCmdArgs), string(result), err)
 	if err != nil {
 		// Prefix errors with request info for easier failure debugging
-		return nil, fmt.Errorf("%+v ERRORED: %v", *cniCmdArgs, err)
+		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
 	}
 	return result, nil
 }
@@ -95,7 +100,7 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 		return nil, err
 	}
 
-	logging.Verbosef("%s starting delegate request %+v", cmd, cniCmdArgs)
+	logging.Verbosef("%s starting delegate request %s", cmd, printCmdArgs(cniCmdArgs))
 	switch cmd {
 	case "ADD":
 		result, err = cmdDelegateAdd(cniCmdArgs, k8sArgs, exec, kubeClient, multusConfig, interfaceAttributes)
@@ -106,10 +111,10 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 	default:
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
-	logging.Verbosef("%s finished Delegate request %+v, result: %q, err: %v", cmd, *cniCmdArgs, string(result), err)
+	logging.Verbosef("%s finished Delegate request %s, result: %q, err: %v", cmd, printCmdArgs(cniCmdArgs), string(result), err)
 	if err != nil {
 		// Prefix errors with request info for easier failure debugging
-		return nil, fmt.Errorf("%+v ERRORED: %v", *cniCmdArgs, err)
+		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
 	}
 	return result, nil
 }
@@ -293,7 +298,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, s.exec, s.kubeclient, cr.InterfaceAttributes)
 	if err != nil {
 		// Prefix error with request information for easier debugging
-		return nil, fmt.Errorf("%+v %v", cniCmdArgs, err)
+		return nil, fmt.Errorf("%s %v", printCmdArgs(cniCmdArgs), err)
 	}
 	return result, nil
 }

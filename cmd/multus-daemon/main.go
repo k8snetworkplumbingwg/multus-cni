@@ -23,8 +23,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
 	"os/user"
 	"path/filepath"
+	"sync"
+	"syscall"
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,6 +38,7 @@ import (
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/api"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/config"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -54,19 +58,15 @@ func main() {
 		os.Exit(4)
 	}
 
-	configWatcherStopChannel := make(chan struct{})
 	configWatcherDoneChannel := make(chan struct{})
-	serverStopChannel := make(chan struct{})
 	serverDoneChannel := make(chan struct{})
+	multusConfigFile := ""
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
 
 	daemonConf, err := cniServerConfig(*configFilePath)
 	if err != nil {
 		os.Exit(1)
-	}
-
-	if err := startMultusDaemon(daemonConf, serverStopChannel, serverDoneChannel); err != nil {
-		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
-		os.Exit(3)
 	}
 
 	multusConf, err := config.ParseMultusConfig(*configFilePath)
@@ -75,11 +75,30 @@ func main() {
 		os.Exit(1)
 	}
 
+	logging.Verbosef("multus-daemon started")
+
+	if multusConf.ReadinessIndicatorFile != "" {
+		// Check readinessindicator file before daemon launch
+		logging.Verbosef("Readiness Indicator file check")
+		if err := types.GetReadinessIndicatorFile(multusConf.ReadinessIndicatorFile); err != nil {
+			_ = logging.Errorf("have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", multusConf.ReadinessIndicatorFile, err)
+			os.Exit(1)
+		}
+		logging.Verbosef("Readiness Indicator file check done!")
+	}
+
+	if err := startMultusDaemon(ctx, daemonConf, serverDoneChannel); err != nil {
+		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
+		os.Exit(3)
+	}
+
 	// Wait until daemon ready
+	logging.Verbosef("API readiness check")
 	if waitUntilAPIReady(daemonConf.SocketDir) != nil {
 		logging.Panicf("failed to ready multus-daemon socket: %v", err)
 		os.Exit(1)
 	}
+	logging.Verbosef("API readiness check done!")
 
 	// Generate multus CNI config from current CNI config
 	if multusConf.MultusConfigFile == "auto" {
@@ -111,39 +130,51 @@ func main() {
 		}
 		logging.Verbosef("Generated MultusCNI config: %s", generatedMultusConfig)
 
-		if err := configManager.PersistMultusConfig(generatedMultusConfig); err != nil {
+		multusConfigFile, err = configManager.PersistMultusConfig(generatedMultusConfig)
+		if err != nil {
 			_ = logging.Errorf("failed to persist the multus configuration: %v", err)
 		}
 
-		go func(stopChannel chan<- struct{}, doneChannel chan<- struct{}) {
-			if err := configManager.MonitorPluginConfiguration(configWatcherStopChannel, doneChannel); err != nil {
+		go func(ctx context.Context, doneChannel chan<- struct{}) {
+			if err := configManager.MonitorPluginConfiguration(ctx, doneChannel); err != nil {
 				_ = logging.Errorf("error watching file: %v", err)
 			}
-		}(configWatcherStopChannel, configWatcherDoneChannel)
-
-		<-configWatcherDoneChannel
+		}(ctx, configWatcherDoneChannel)
 	} else {
 		if err := copyUserProvidedConfig(multusConf.MultusConfigFile, multusConf.CniConfigDir); err != nil {
 			logging.Errorf("failed to copy the user provided configuration %s: %v", multusConf.MultusConfigFile, err)
 		}
 	}
 
-	serverDone := false
-	configWatcherDone := false
-	for {
-		select {
-		case <-configWatcherDoneChannel:
-			logging.Verbosef("ConfigWatcher done")
-			configWatcherDone = true
-		case <-serverDoneChannel:
-			logging.Verbosef("multus-server done.")
-			serverDone = true
+	signalCh := make(chan os.Signal, 16)
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		for sig := range signalCh {
+			logging.Verbosef("caught %v, stopping...", sig)
+			cancel()
 		}
+	}()
 
-		if serverDone && configWatcherDone {
-			return
-		}
+	var wg sync.WaitGroup
+	if multusConf.MultusConfigFile == "auto" {
+		wg.Add(1)
+		go func() {
+			<-configWatcherDoneChannel
+			logging.Verbosef("ConfigWatcher done")
+			logging.Verbosef("Delete old config @ %v", multusConfigFile)
+			os.Remove(multusConfigFile)
+			wg.Done()
+		}()
 	}
+
+	wg.Add(1)
+	go func() {
+		<-serverDoneChannel
+		logging.Verbosef("multus-server done.")
+		wg.Done()
+	}()
+
+	wg.Wait()
 	// never reached
 }
 
@@ -157,7 +188,7 @@ func waitUntilAPIReady(socketPath string) error {
 	})
 }
 
-func startMultusDaemon(daemonConfig *srv.ControllerNetConf, stopCh chan struct{}, done chan struct{}) error {
+func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, done chan struct{}) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -172,11 +203,11 @@ func startMultusDaemon(daemonConfig *srv.ControllerNetConf, stopCh chan struct{}
 	}
 
 	if daemonConfig.MetricsPort != nil {
-		go utilwait.Until(func() {
+		go utilwait.UntilWithContext(ctx, func(ctx context.Context) {
 			http.Handle("/metrics", promhttp.Handler())
 			logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
 			logging.Debugf("metrics: %s", http.ListenAndServe(fmt.Sprintf(":%d", *daemonConfig.MetricsPort), nil))
-		}, 0, stopCh)
+		}, 0)
 	}
 
 	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
@@ -186,13 +217,13 @@ func startMultusDaemon(daemonConfig *srv.ControllerNetConf, stopCh chan struct{}
 
 	server.SetKeepAlivesEnabled(false)
 	go func() {
-		utilwait.Until(func() {
+		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
 			logging.Debugf("open for business")
 			if err := server.Serve(l); err != nil {
 				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
 			}
-		}, 0, stopCh)
-		server.Shutdown(context.TODO())
+		}, 0)
+		server.Shutdown(context.Background())
 		close(done)
 	}()
 

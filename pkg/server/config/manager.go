@@ -15,9 +15,11 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -34,12 +36,13 @@ const (
 // Manager monitors the configuration of the primary CNI plugin, and
 // regenerates multus configuration whenever it gets updated.
 type Manager struct {
-	cniConfigData        map[string]interface{}
-	configWatcher        *fsnotify.Watcher
-	multusConfig         *MultusConf
-	multusConfigDir      string
-	multusConfigFilePath string
-	primaryCNIConfigPath string
+	cniConfigData              map[string]interface{}
+	configWatcher              *fsnotify.Watcher
+	multusConfig               *MultusConf
+	multusConfigDir            string
+	multusConfigFilePath       string
+	readinessIndicatorFilePath string
+	primaryCNIConfigPath       string
 }
 
 // NewManager returns a config manager object, configured to read the
@@ -95,7 +98,12 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 		}
 	}
 
-	watcher, err := newWatcher(multusConfigDir)
+	readinessIndicatorPath := ""
+	if config.ReadinessIndicatorFile != "" {
+		readinessIndicatorPath = filepath.Dir(config.ReadinessIndicatorFile)
+	}
+
+	watcher, err := newWatcher(multusConfigDir, readinessIndicatorPath)
 	if err != nil {
 		return nil, err
 	}
@@ -105,11 +113,12 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 	}
 
 	configManager := &Manager{
-		configWatcher:        watcher,
-		multusConfig:         &config,
-		multusConfigDir:      multusConfigDir,
-		multusConfigFilePath: cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
-		primaryCNIConfigPath: cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
+		configWatcher:              watcher,
+		multusConfig:               &config,
+		multusConfigDir:            multusConfigDir,
+		multusConfigFilePath:       cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
+		primaryCNIConfigPath:       cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
+		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -157,7 +166,7 @@ func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface
 }
 
 // GenerateConfig generates a multus configuration from its current state
-func (m Manager) GenerateConfig() (string, error) {
+func (m *Manager) GenerateConfig() (string, error) {
 	if err := m.loadPrimaryCNIConfigFromFile(); err != nil {
 		_ = logging.Errorf("failed to read the primary CNI plugin config from %s", m.primaryCNIConfigPath)
 		return "", nil
@@ -168,22 +177,22 @@ func (m Manager) GenerateConfig() (string, error) {
 // MonitorPluginConfiguration monitors the configuration file pointed
 // to by the primaryCNIPluginName attribute, and re-generates the multus
 // configuration whenever the primary CNI config is updated.
-func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<- struct{}) error {
+func (m *Manager) MonitorPluginConfiguration(ctx context.Context, done chan<- struct{}) error {
 	logging.Verbosef("started to watch file %s", m.primaryCNIConfigPath)
 
 	for {
 		select {
 		case event := <-m.configWatcher.Events:
-			// we're watching the DIR where the config sits, and the event
-			// does not concern the primary CNI config. Skip it.
-			if event.Name != m.primaryCNIConfigPath {
-				logging.Debugf("skipping un-related event %v", event)
+			if !m.shouldRegenerateConfig(event) {
 				continue
 			}
 			logging.Debugf("process event: %v", event)
 
-			if !shouldRegenerateConfig(event) {
-				continue
+			// if readinessIndicatorFile is removed, then restart multus
+			if m.readinessIndicatorFilePath != "" && m.readinessIndicatorFilePath == event.Name {
+				logging.Verbosef("readiness indicator file is gone. restart multus-daemon")
+				os.Remove(m.multusConfigFilePath)
+				os.Exit(2)
 			}
 
 			updatedConfig, err := m.GenerateConfig()
@@ -192,7 +201,7 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 			}
 
 			logging.Debugf("Re-generated MultusCNI config: %s", updatedConfig)
-			if err := m.PersistMultusConfig(updatedConfig); err != nil {
+			if _, err := m.PersistMultusConfig(updatedConfig); err != nil {
 				_ = logging.Errorf("failed to persist the multus configuration: %v", err)
 			}
 			if err := m.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -205,10 +214,9 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 			}
 			logging.Errorf("CNI monitoring error %v", err)
 
-		case <-shutDown:
+		case <-ctx.Done():
 			logging.Verbosef("Stopped monitoring, closing channel ...")
 			_ = m.configWatcher.Close()
-			close(done)
 			return nil
 		}
 	}
@@ -216,9 +224,24 @@ func (m Manager) MonitorPluginConfiguration(shutDown <-chan struct{}, done chan<
 
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
-func (m Manager) PersistMultusConfig(config string) error {
+func (m *Manager) PersistMultusConfig(config string) (string, error) {
 	logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
-	return os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
+	return m.multusConfigFilePath, os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
+}
+
+func (m *Manager) shouldRegenerateConfig(event fsnotify.Event) bool {
+	// first, check the readiness indicator file existence
+	if event.Name == m.readinessIndicatorFilePath {
+		return event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename)
+	}
+
+	// we're watching the DIR where the config sits, and the event
+	// does not concern the primary CNI config. Skip it.
+	if event.Name == m.primaryCNIConfigPath {
+		return event.Has(fsnotify.Write) || event.Has(fsnotify.Create)
+	}
+	logging.Debugf("skipping un-related event %v", event)
+	return false
 }
 
 func getPrimaryCNIPluginName(multusAutoconfigDir string) (string, error) {
@@ -233,7 +256,7 @@ func cniPluginConfigFilePath(cniConfigDir string, cniConfigFileName string) stri
 	return cniConfigDir + fmt.Sprintf("/%s", cniConfigFileName)
 }
 
-func newWatcher(cniConfigDir string) (*fsnotify.Watcher, error) {
+func newWatcher(cniConfigDir string, readinessIndicatorDir string) (*fsnotify.Watcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new watcher for %q: %v", cniConfigDir, err)
@@ -246,14 +269,16 @@ func newWatcher(cniConfigDir string) (*fsnotify.Watcher, error) {
 	}()
 
 	if err = watcher.Add(cniConfigDir); err != nil {
-		return nil, fmt.Errorf("failed to add watch on %q: %v", cniConfigDir, err)
+		return nil, fmt.Errorf("failed to add watch on %q for cni config: %v", cniConfigDir, err)
+	}
+	// if readinessIndicatorDir is different from cniConfigDir,
+	if readinessIndicatorDir != "" && cniConfigDir != readinessIndicatorDir {
+		if err = watcher.Add(readinessIndicatorDir); err != nil {
+			return nil, fmt.Errorf("failed to add watch on %q for readinessIndicator: %v", readinessIndicatorDir, err)
+		}
 	}
 
 	return watcher, nil
-}
-
-func shouldRegenerateConfig(event fsnotify.Event) bool {
-	return event.Has(fsnotify.Write) || event.Has(fsnotify.Create)
 }
 
 func primaryCNIData(masterCNIPluginPath string) (interface{}, error) {
