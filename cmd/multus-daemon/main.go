@@ -167,15 +167,8 @@ func main() {
 		}()
 	}
 
-	wg.Add(1)
-	go func() {
-		<-serverDoneChannel
-		logging.Verbosef("multus-server done.")
-		wg.Done()
-	}()
-
 	wg.Wait()
-	// never reached
+	logging.Verbosef("multus daemon is exited")
 }
 
 func waitUntilAPIReady(socketPath string) error {
@@ -223,8 +216,10 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
 			}
 		}, 0)
+	}()
+	go func() {
+		<-ctx.Done()
 		server.Shutdown(context.Background())
-		close(done)
 	}()
 
 	return nil

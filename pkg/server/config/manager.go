@@ -217,6 +217,7 @@ func (m *Manager) MonitorPluginConfiguration(ctx context.Context, done chan<- st
 		case <-ctx.Done():
 			logging.Verbosef("Stopped monitoring, closing channel ...")
 			_ = m.configWatcher.Close()
+			close(done)
 			return nil
 		}
 	}
@@ -225,7 +226,11 @@ func (m *Manager) MonitorPluginConfiguration(ctx context.Context, done chan<- st
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
 func (m *Manager) PersistMultusConfig(config string) (string, error) {
-	logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
+	if _, err := os.Stat(m.multusConfigFilePath); err == nil {
+		logging.Debugf("Overwriting Multus CNI configuration @ %s", m.multusConfigFilePath)
+	} else {
+		logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
+	}
 	return m.multusConfigFilePath, os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
