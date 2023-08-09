@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
@@ -294,7 +296,20 @@ func (o *Options) createMultusConfig() (string, error) {
 		return "", fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
 	}
 
-	masterConfigPath := files[0]
+	var masterConfigPath string
+	// skip existing multus configuration file to avoid creating a situation
+	// where multus delegates to itself and breaks pod networking
+	multusRegexp, err := regexp.Compile("00-multus.conf{,list}")
+	if err != nil {
+		return "", fmt.Errorf("regexp compilation failed: %v", err)
+	}
+	for _, filename := range files {
+		if !multusRegexp.MatchString(path.Base(filename)) {
+			masterConfigPath = filename
+			break
+		}
+	}
+
 	masterConfigBytes, err := os.ReadFile(masterConfigPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot read master CNI config file %q: %v", masterConfigPath, err)
