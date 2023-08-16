@@ -305,7 +305,17 @@ func (o *Options) createMultusConfig() (string, error) {
 		return "", fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
 	}
 
-	masterConfigPath := files[0]
+	masterConfigPath := ""
+	for _, filename := range files {
+		if !strings.HasPrefix(filepath.Base(filename), "00-multus.conf") {
+			masterConfigPath = filename
+			break
+		}
+	}
+	if masterConfigPath == "" {
+		return "", fmt.Errorf("cannot find valid master CNI config in %q", o.MultusAutoconfigDir)
+	}
+
 	masterConfigBytes, err := os.ReadFile(masterConfigPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot read master CNI config file %q: %v", masterConfigPath, err)
