@@ -57,22 +57,22 @@ LDFLAGS="-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version=${VER
 	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.gitTreeState=${GIT_TREE_STATE} \
 	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.releaseStatus=${RELEASE_STATUS} \
 	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date=${DATE}"
-export CGO_ENABLED=0
+export CGO_ENABLED=${CGO_ENABLED:-0}
 
 # build with go modules
 export GO111MODULE=on
-BUILD_ARGS=(-o ${DEST_DIR}/multus -tags no_openssl)
+
 if [ -n "$MODMODE" ]; then
-	BUILD_ARGS+=(-mod "$MODMODE")
+	BUILD_ARGS=(-mod "$MODMODE")
 fi
 
 echo "Building multus"
-go build ${BUILD_ARGS[*]} -ldflags "${LDFLAGS}" "$@" ./cmd/multus
+go build -o ${DEST_DIR}/multus ${BUILD_ARGS} -ldflags "${LDFLAGS}" "$@" ./cmd/multus
 echo "Building multus-daemon"
-go build -o "${DEST_DIR}"/multus-daemon -ldflags "${LDFLAGS}" ./cmd/multus-daemon
+go build -o "${DEST_DIR}"/multus-daemon ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/multus-daemon
 echo "Building multus-shim"
-go build -o "${DEST_DIR}"/multus-shim -ldflags "${LDFLAGS}" ./cmd/multus-shim
+go build -o "${DEST_DIR}"/multus-shim ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/multus-shim
 echo "Building install_multus"
-go build -o "${DEST_DIR}"/install_multus -ldflags "${LDFLAGS}" ./cmd/install_multus
+go build -o "${DEST_DIR}"/install_multus ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/install_multus
 echo "Building thin_entrypoint"
-go build -o "${DEST_DIR}"/thin_entrypoint -ldflags "${LDFLAGS}" ./cmd/thin_entrypoint
+go build -o "${DEST_DIR}"/thin_entrypoint ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/thin_entrypoint
