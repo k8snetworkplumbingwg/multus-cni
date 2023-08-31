@@ -114,6 +114,7 @@ data:
         "cniVersion": "0.3.1",
         "logLevel": "verbose",
         "logToStderr": true,
+        "cniConfigDir": "/host/etc/cni/net.d",
         "multusAutoconfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
         "socketDir": "/host/run/multus/"
