@@ -441,6 +441,10 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	config.ContentType = "application/vnd.kubernetes.protobuf"
 	// Set the config timeout to one minute.
 	config.Timeout = time.Minute
+	// Allow multus (especially in server mode) to make more concurrent requests
+	// to reduce client-side throttling
+	config.QPS = 50
+	config.Burst = 50
 
 	return newClientInfo(config)
 }
