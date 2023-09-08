@@ -30,7 +30,6 @@ import (
 	"syscall"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -207,15 +206,8 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf)
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
 	}
 
-	server.SetKeepAlivesEnabled(false)
-	go func() {
-		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
-			logging.Debugf("open for business")
-			if err := server.Serve(l); err != nil {
-				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
-			}
-		}, 0)
-	}()
+	server.Start(ctx, l)
+
 	go func() {
 		<-ctx.Done()
 		server.Shutdown(context.Background())

@@ -16,6 +16,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,6 +39,9 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/api"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
+
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -180,6 +184,8 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			),
 		},
 	}
+	s.SetKeepAlivesEnabled(false)
+
 	// register metrics
 	prometheus.MustRegister(s.metrics.requestCounter)
 
@@ -247,6 +253,18 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		})))
 
 	return s, nil
+}
+
+// Start starts the server and begins serving on the given listener
+func (s *Server) Start(ctx context.Context, l net.Listener) {
+	go func() {
+		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
+			logging.Debugf("open for business")
+			if err := s.Serve(l); err != nil {
+				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
+			}
+		}, 0)
+	}()
 }
 
 func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {

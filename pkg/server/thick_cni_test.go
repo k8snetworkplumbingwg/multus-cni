@@ -30,8 +30,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 
@@ -102,6 +100,8 @@ var _ = Describe(suiteName, func() {
 			cniServer *Server
 			K8sClient *k8s.ClientInfo
 			netns     ns.NetNS
+			ctx       context.Context
+			cancel    context.CancelFunc
 		)
 
 		BeforeEach(func() {
@@ -109,7 +109,9 @@ var _ = Describe(suiteName, func() {
 			K8sClient = fakeK8sClient()
 
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
-			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient, nil)
+
+			ctx, cancel = context.WithCancel(context.TODO())
+			cniServer, err = startCNIServer(ctx, thickPluginRunDir, K8sClient, nil)
 			Expect(err).NotTo(HaveOccurred())
 
 			netns, err = testutils.NewNS()
@@ -121,6 +123,7 @@ var _ = Describe(suiteName, func() {
 		})
 
 		AfterEach(func() {
+			cancel()
 			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
@@ -151,6 +154,8 @@ var _ = Describe(suiteName, func() {
 			cniServer *Server
 			K8sClient *k8s.ClientInfo
 			netns     ns.NetNS
+			ctx       context.Context
+			cancel    context.CancelFunc
 		)
 
 		BeforeEach(func() {
@@ -163,7 +168,9 @@ var _ = Describe(suiteName, func() {
 			}`
 
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
-			cniServer, err = startCNIServer(thickPluginRunDir, K8sClient, []byte(dummyServerConfig))
+
+			ctx, cancel = context.WithCancel(context.TODO())
+			cniServer, err = startCNIServer(ctx, thickPluginRunDir, K8sClient, []byte(dummyServerConfig))
 			Expect(err).NotTo(HaveOccurred())
 
 			netns, err = testutils.NewNS()
@@ -175,6 +182,7 @@ var _ = Describe(suiteName, func() {
 		})
 
 		AfterEach(func() {
+			cancel()
 			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
@@ -245,7 +253,7 @@ func createFakePod(k8sClient *k8s.ClientInfo, podName string) error {
 	return err
 }
 
-func startCNIServer(runDir string, k8sClient *k8s.ClientInfo, servConfig []byte) (*Server, error) {
+func startCNIServer(ctx context.Context, runDir string, k8sClient *k8s.ClientInfo, servConfig []byte) (*Server, error) {
 	const period = 0
 
 	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{}, servConfig)
@@ -258,12 +266,8 @@ func startCNIServer(runDir string, k8sClient *k8s.ClientInfo, servConfig []byte)
 		return nil, fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(runDir), err)
 	}
 
-	cniServer.SetKeepAlivesEnabled(false)
-	go utilwait.Forever(func() {
-		if err := cniServer.Serve(l); err != nil {
-			utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
-		}
-	}, period)
+	cniServer.Start(ctx, l)
+
 	return cniServer, nil
 }
 
