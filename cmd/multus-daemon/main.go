@@ -59,7 +59,6 @@ func main() {
 	}
 
 	configWatcherDoneChannel := make(chan struct{})
-	serverDoneChannel := make(chan struct{})
 	multusConfigFile := ""
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -87,7 +86,7 @@ func main() {
 		logging.Verbosef("Readiness Indicator file check done!")
 	}
 
-	if err := startMultusDaemon(ctx, daemonConf, serverDoneChannel); err != nil {
+	if err := startMultusDaemon(ctx, daemonConf); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
 		os.Exit(3)
 	}
@@ -181,7 +180,7 @@ func waitUntilAPIReady(socketPath string) error {
 	})
 }
 
-func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, done chan struct{}) error {
+func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
