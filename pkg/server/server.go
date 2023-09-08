@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -40,8 +41,16 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server/config"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
+	informerfactory "k8s.io/client-go/informers"
+	v1coreinformers "k8s.io/client-go/informers/core/v1"
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -136,6 +145,33 @@ func GetListener(socketPath string) (net.Listener, error) {
 	return l, nil
 }
 
+func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
+	var tweakFunc internalinterfaces.TweakListOptionsFunc
+	if nodeName != "" {
+		logging.Verbosef("Filtering pod watch for node %q", nodeName)
+		// Only watch for local pods
+		tweakFunc = func(opts *metav1.ListOptions) {
+			opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", nodeName).String()
+		}
+	}
+
+	// Multus only watches pods so there's no possibility of race conditions
+	// between multiple resources that might require a resync to resolve
+	const resyncInterval time.Duration = 0 * time.Second
+
+	informerFactory := informerfactory.NewSharedInformerFactory(kubeClient, resyncInterval)
+	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return v1coreinformers.NewFilteredPodInformer(
+			c,
+			kapi.NamespaceAll,
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+			tweakFunc)
+	})
+
+	return informerFactory, podInformer
+}
+
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
 func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte) (*Server, error) {
 	kubeClient, err := k8s.InClusterK8sClient()
@@ -165,6 +201,8 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		servConfig = bytes.Replace(servConfig, []byte("{"), []byte(","), 1)
 	}
 
+	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
+
 	router := http.NewServeMux()
 	s := &Server{
 		Server: http.Server{
@@ -183,6 +221,8 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 				[]string{"handler", "code", "method"},
 			),
 		},
+		informerFactory: informerFactory,
+		podInformer:     podInformer,
 	}
 	s.SetKeepAlivesEnabled(false)
 
@@ -257,6 +297,16 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 // Start starts the server and begins serving on the given listener
 func (s *Server) Start(ctx context.Context, l net.Listener) {
+	s.informerFactory.Start(ctx.Done())
+
+	// Give the initial sync some time to complete in large clusters, but
+	// don't wait forever
+	waitCtx, waitCancel := context.WithTimeout(ctx, 20*time.Second)
+	if !cache.WaitForCacheSync(waitCtx.Done(), s.podInformer.HasSynced) {
+		logging.Errorf("failed to sync pod informer cache")
+	}
+	waitCancel()
+
 	go func() {
 		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
 			logging.Debugf("open for business")
@@ -440,7 +490,7 @@ func (s *Server) cmdAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) ([]byte, 
 	}
 
 	logging.Debugf("CmdAdd for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
-	result, err := multus.CmdAdd(cmdArgs, s.exec, s.kubeclient)
+	result, err := multus.CmdAdd(cmdArgs, s.exec, s.kubeclient, s.podInformer)
 	if err != nil {
 		return nil, fmt.Errorf("error configuring pod [%s/%s] networking: %v", namespace, podName, err)
 	}
@@ -455,7 +505,7 @@ func (s *Server) cmdDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
 	}
 
 	logging.Debugf("CmdDel for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
-	return multus.CmdDel(cmdArgs, s.exec, s.kubeclient)
+	return multus.CmdDel(cmdArgs, s.exec, s.kubeclient, s.podInformer)
 }
 
 func (s *Server) cmdCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
@@ -489,7 +539,7 @@ func (s *Server) cmdDelegateAdd(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, m
 	if namespace == "" || podName == "" {
 		return nil, fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
 	}
-	pod, err := multus.GetPod(s.kubeclient, k8sArgs, false)
+	pod, err := multus.GetPod(s.kubeclient, s.podInformer, k8sArgs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +593,7 @@ func (s *Server) cmdDelegateDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, m
 	if namespace == "" || podName == "" {
 		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
 	}
-	pod, err := multus.GetPod(s.kubeclient, k8sArgs, false)
+	pod, err := multus.GetPod(s.kubeclient, s.podInformer, k8sArgs, false)
 	if err != nil {
 		return err
 	}

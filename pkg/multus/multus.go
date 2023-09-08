@@ -38,6 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -46,8 +48,9 @@ import (
 )
 
 const (
-	shortPollDuration = 250 * time.Millisecond
-	shortPollTimeout  = 2500 * time.Millisecond
+	shortPollDuration    = 250 * time.Millisecond
+	informerPollDuration = 50 * time.Millisecond
+	shortPollTimeout     = 2500 * time.Millisecond
 )
 
 var (
@@ -506,7 +509,7 @@ func isCriticalRequestRetriable(err error) bool {
 
 // GetPod retrieves Kubernetes Pod object from given namespace/name in k8sArgs (i.e. cni args)
 // GetPod also get pod UID, but it is not used to retrieve, but it is used for double check
-func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (*v1.Pod, error) {
+func GetPod(kubeClient *k8s.ClientInfo, podInformer cache.SharedIndexInformer, k8sArgs *types.K8sArgs, isDel bool) (*v1.Pod, error) {
 	if kubeClient == nil {
 		return nil, nil
 	}
@@ -515,31 +518,63 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (
 	podName := string(k8sArgs.K8S_POD_NAME)
 	podUID := string(k8sArgs.K8S_POD_UID)
 
-	pod, err := kubeClient.GetPod(podNamespace, podName)
-	if err != nil {
-		// in case of a retriable error, retry 10 times with 0.25 sec interval
-		if isCriticalRequestRetriable(err) {
-			waitErr := wait.PollImmediate(shortPollDuration, shortPollTimeout, func() (bool, error) {
-				pod, err = kubeClient.GetPod(podNamespace, podName)
-				return pod != nil, err
-			})
-			// retry failed, then return error with retry out
-			if waitErr != nil {
-				return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
-			}
-		} else if warnOnly && errors.IsNotFound(err) {
-			// If not found, proceed to remove interface with cache
+	// Keep track of how long getting the pod takes
+	logging.Debugf("GetPod for [%s/%s] starting", podNamespace, podName)
+	start := time.Now()
+	defer func() {
+		logging.Debugf("GetPod for [%s/%s] took %v", podNamespace, podName, time.Since(start))
+	}()
+
+	// Standard getter grabs pod directly from the apiserver
+	podGetter := func(ns, name string) (*v1.Pod, error) {
+		return kubeClient.GetPod(ns, name)
+	}
+	// Use a fairly long 0.25 sec interval so we don't hammer the apiserver
+	pollDuration := shortPollDuration
+	retryOnNotFound := func(error) bool {
+		return false
+	}
+
+	if podInformer != nil {
+		logging.Debugf("GetPod for [%s/%s] will use informer cache", podNamespace, podName)
+		// If we have an informer get the pod from the informer cache
+		podGetter = func(ns, name string) (*v1.Pod, error) {
+			return listers.NewPodLister(podInformer.GetIndexer()).Pods(ns).Get(name)
+		}
+		// Use short retry intervals with the informer since it's a local cache
+		pollDuration = informerPollDuration
+		// Retry NotFound on ADD since the cache may be a bit behind the apiserver
+		retryOnNotFound = func(e error) bool {
+			return !isDel && errors.IsNotFound(e)
+		}
+	}
+
+	var pod *v1.Pod
+	if err := wait.PollImmediate(pollDuration, shortPollTimeout, func() (bool, error) {
+		var getErr error
+		pod, getErr = podGetter(podNamespace, podName)
+		if isCriticalRequestRetriable(getErr) || retryOnNotFound(getErr) {
+			return false, nil
+		}
+		return pod != nil, getErr
+	}); err != nil {
+		if isDel && errors.IsNotFound(err) {
+			// On DEL pod may already be gone from apiserver/informer
 			return nil, nil
-		} else {
-			// Other case, return error
-			return nil, cmdErr(k8sArgs, "error getting pod: %v", err)
+		}
+		// Try one more time to get the pod directly from the apiserver;
+		// TODO: figure out why static pods don't show up via the informer
+		// and always hit this case.
+		pod, err = kubeClient.GetPod(podNamespace, podName)
+		if err != nil {
+			return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
 		}
 	}
 
 	// In case of static pod, UID through kube api is different because of mirror pod, hence it is expected.
 	if podUID != "" && string(pod.UID) != podUID && !k8s.IsStaticPod(pod) {
 		msg := fmt.Sprintf("expected pod UID %q but got %q from Kube API", podUID, pod.UID)
-		if warnOnly {
+		if isDel {
 			// On CNI DEL we just operate on the cache when these mismatch, we don't error out.
 			// For example: stateful sets namespace/name can remain the same while podUID changes.
 			logging.Verbosef("warning: %s", msg)
@@ -552,7 +587,7 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, warnOnly bool) (
 }
 
 // CmdAdd ...
-func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (cnitypes.Result, error) {
+func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, podInformer cache.SharedIndexInformer) (cnitypes.Result, error) {
 	n, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdAdd: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
@@ -575,7 +610,7 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	pod, err := GetPod(kubeClient, k8sArgs, false)
+	pod, err := GetPod(kubeClient, podInformer, k8sArgs, false)
 	if err != nil {
 		return nil, err
 	}
@@ -772,7 +807,7 @@ func CmdCheck(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) 
 }
 
 // CmdDel ...
-func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo, podInformer cache.SharedIndexInformer) error {
 	in, err := types.LoadNetConf(args.StdinData)
 	logging.Debugf("CmdDel: %v, %v, %v", args, exec, kubeClient)
 	if err != nil {
@@ -814,7 +849,7 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		return cmdErr(nil, "error getting k8s client: %v", err)
 	}
 
-	pod, err := GetPod(kubeClient, k8sArgs, true)
+	pod, err := GetPod(kubeClient, podInformer, k8sArgs, true)
 	if err != nil {
 		// GetPod may be failed but just do print error in its log and continue to delete
 		logging.Errorf("Multus: GetPod failed: %v, but continue to delete", err)

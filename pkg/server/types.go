@@ -22,6 +22,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+
+	"k8s.io/client-go/informers/internalinterfaces"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -42,11 +45,13 @@ type Metrics struct {
 // the CNI shim requests issued when a pod is added / removed.
 type Server struct {
 	http.Server
-	rundir       string
-	kubeclient   *k8sclient.ClientInfo
-	exec         invoke.Exec
-	serverConfig []byte
-	metrics      *Metrics
+	rundir          string
+	kubeclient      *k8sclient.ClientInfo
+	exec            invoke.Exec
+	serverConfig    []byte
+	metrics         *Metrics
+	informerFactory internalinterfaces.SharedInformerFactory
+	podInformer     cache.SharedIndexInformer
 }
 
 // ControllerNetConf for the controller cni configuration
