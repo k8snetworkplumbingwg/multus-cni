@@ -126,6 +126,8 @@ func (mc *MultusConf) Generate() (string, error) {
 	mc.CniConfigDir = ""
 	mc.MultusConfigFile = ""
 	mc.MultusAutoconfigDir = ""
+	mc.MultusMasterCni = ""
+	mc.ForceCNIVersion = false
 
 	data, err := json.Marshal(mc)
 	return string(data), err

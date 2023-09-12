@@ -98,19 +98,15 @@ func main() {
 	}
 	logging.Verbosef("API readiness check done!")
 
+	var configManager *config.Manager
+
 	// Generate multus CNI config from current CNI config
 	if multusConf.MultusConfigFile == "auto" {
 		if multusConf.CNIVersion == "" {
 			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
 		}
 
-		var configManager *config.Manager
-		if multusConf.MultusMasterCni == "" {
-			configManager, err = config.NewManager(*multusConf, multusConf.MultusAutoconfigDir, multusConf.ForceCNIVersion)
-		} else {
-			configManager, err = config.NewManagerWithExplicitPrimaryCNIPlugin(
-				*multusConf, multusConf.MultusAutoconfigDir, multusConf.MultusMasterCni, multusConf.ForceCNIVersion)
-		}
+		configManager, err = config.NewManager(*multusConf)
 		if err != nil {
 			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
 			os.Exit(2)
@@ -154,7 +150,7 @@ func main() {
 	}()
 
 	var wg sync.WaitGroup
-	if multusConf.MultusConfigFile == "auto" {
+	if configManager != nil {
 		wg.Add(1)
 		go func() {
 			<-configWatcherDoneChannel

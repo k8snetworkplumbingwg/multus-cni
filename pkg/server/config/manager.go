@@ -46,23 +46,21 @@ type Manager struct {
 }
 
 // NewManager returns a config manager object, configured to read the
-// primary CNI configuration in `multusAutoconfigDir`. This constructor will auto-discover
-// the primary CNI for which it will delegate.
-func NewManager(config MultusConf, multusAutoconfigDir string, forceCNIVersion bool) (*Manager, error) {
-	defaultCNIPluginName, err := getPrimaryCNIPluginName(multusAutoconfigDir)
-	if err != nil {
-		_ = logging.Errorf("failed to find the primary CNI plugin: %v", err)
-		return nil, err
+// primary CNI configuration in `config.MultusAutoconfigDir`. If
+// `config.MultusMasterCni` is empty, this constructor will auto-discover the
+// primary CNI for which it will delegate.
+func NewManager(config MultusConf) (*Manager, error) {
+	var err error
+	defaultPluginName := config.MultusMasterCni
+	if defaultPluginName == "" {
+		defaultPluginName, err = getPrimaryCNIPluginName(config.MultusAutoconfigDir)
+		if err != nil {
+			_ = logging.Errorf("failed to find the primary CNI plugin: %v", err)
+			return nil, err
+		}
 	}
-	return newManager(config, multusAutoconfigDir, defaultCNIPluginName, forceCNIVersion)
-}
 
-// NewManagerWithExplicitPrimaryCNIPlugin returns a config manager object,
-// configured to persist the configuration to `multusAutoconfigDir`. This
-// constructor will use the primary CNI plugin indicated by the user, via the
-// primaryCNIPluginName variable.
-func NewManagerWithExplicitPrimaryCNIPlugin(config MultusConf, multusAutoconfigDir, primaryCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
-	return newManager(config, multusAutoconfigDir, primaryCNIPluginName, forceCNIVersion)
+	return newManager(config, defaultPluginName)
 }
 
 // overrideCNIVersion overrides cniVersion in cniConfigFile, it should be used only in kind case
@@ -90,9 +88,9 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 	return nil
 }
 
-func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string, forceCNIVersion bool) (*Manager, error) {
-	if forceCNIVersion {
-		err := overrideCNIVersion(cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName), config.CNIVersion)
+func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error) {
+	if config.ForceCNIVersion {
+		err := overrideCNIVersion(cniPluginConfigFilePath(config.MultusAutoconfigDir, defaultCNIPluginName), config.CNIVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -103,21 +101,21 @@ func newManager(config MultusConf, multusConfigDir, defaultCNIPluginName string,
 		readinessIndicatorPath = filepath.Dir(config.ReadinessIndicatorFile)
 	}
 
-	watcher, err := newWatcher(multusConfigDir, readinessIndicatorPath)
+	watcher, err := newWatcher(config.MultusAutoconfigDir, readinessIndicatorPath)
 	if err != nil {
 		return nil, err
 	}
 
-	if defaultCNIPluginName == fmt.Sprintf("%s/%s", multusConfigDir, multusConfigFileName) {
-		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", multusConfigDir, multusConfigFileName)
+	if defaultCNIPluginName == fmt.Sprintf("%s/%s", config.MultusAutoconfigDir, multusConfigFileName) {
+		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", config.MultusAutoconfigDir, multusConfigFileName)
 	}
 
 	configManager := &Manager{
 		configWatcher:              watcher,
 		multusConfig:               &config,
-		multusConfigDir:            multusConfigDir,
+		multusConfigDir:            config.MultusAutoconfigDir,
 		multusConfigFilePath:       cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
-		primaryCNIConfigPath:       cniPluginConfigFilePath(multusConfigDir, defaultCNIPluginName),
+		primaryCNIConfigPath:       cniPluginConfigFilePath(config.MultusAutoconfigDir, defaultCNIPluginName),
 		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
 	}
 

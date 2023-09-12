@@ -54,15 +54,18 @@ var _ = Describe("Configuration Manager", func() {
 
 		multusConfFile := fmt.Sprintf(`{
 			"name": %q,
-			"cniVersion": %q
-		}`, defaultCniConfig, cniVersion)
+			"cniVersion": %q,
+			"multusAutoconfigDir": %q,
+			"multusMasterCNI": %q,
+			"forceCNIVersion": false
+		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName)
 		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
 		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 
 		multusConf, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
 
-		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
+		configManager, err = NewManager(*multusConf)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -173,14 +176,17 @@ var _ = Describe("Configuration Manager with mismatched cniVersion", func() {
 
 		multusConfFile := fmt.Sprintf(`{
 			"name": %q,
-			"cniVersion": %q
-		}`, defaultCniConfig, cniVersion)
+			"cniVersion": %q,
+			"multusAutoconfigDir": %q,
+			"multusMasterCNI": %q,
+			"forceCNIVersion": false
+		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName)
 		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
 		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 
 		multusConf, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
-		_, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
+		_, err = NewManager(*multusConf)
 		Expect(err).To(MatchError("failed to load the primary CNI configuration as a multus delegate with error 'delegate cni version is 0.3.1 while top level cni version is 0.4.0'"))
 	})
 
