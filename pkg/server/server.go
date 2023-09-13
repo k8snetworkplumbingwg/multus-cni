@@ -15,7 +15,6 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -45,6 +44,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	informerfactory "k8s.io/client-go/informers"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
@@ -105,11 +105,9 @@ func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs
 func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, interfaceAttributes *api.DelegateInterfaceAttributes) ([]byte, error) {
 	var result []byte
 	var err error
-	var multusConfByte []byte
 
-	multusConfByte = bytes.Replace(s.serverConfig, []byte(","), []byte("{"), 1)
 	multusConfig := types.GetDefaultNetConf()
-	if err = json.Unmarshal(multusConfByte, multusConfig); err != nil {
+	if err = json.Unmarshal(s.serverConfig, multusConfig); err != nil {
 		return nil, err
 	}
 
@@ -173,7 +171,7 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte) (*Server, error) {
+func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
 	kubeClient, err := k8s.InClusterK8sClient()
 	if err != nil {
 		return nil, fmt.Errorf("error getting k8s client: %v", err)
@@ -190,17 +188,10 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte) (*Server
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 
-	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig)
+	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator)
 }
 
-func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte) (*Server, error) {
-
-	// preprocess server config to be used to override multus CNI config
-	// see extractCniData() for the detail
-	if servConfig != nil {
-		servConfig = bytes.Replace(servConfig, []byte("{"), []byte(","), 1)
-	}
-
+func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
 	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
 
 	router := http.NewServeMux()
@@ -221,8 +212,9 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 				[]string{"handler", "code", "method"},
 			),
 		},
-		informerFactory: informerFactory,
-		podInformer:     podInformer,
+		informerFactory:          informerFactory,
+		podInformer:              podInformer,
+		ignoreReadinessIndicator: ignoreReadinessIndicator,
 	}
 	s.SetKeepAlivesEnabled(false)
 
@@ -326,7 +318,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	if err := json.Unmarshal(b, &cr); err != nil {
 		return nil, err
 	}
-	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig)
+	cmdType, cniCmdArgs, err := s.extractCniData(&cr, s.serverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
@@ -353,7 +345,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	if err := json.Unmarshal(b, &cr); err != nil {
 		return nil, err
 	}
-	cmdType, cniCmdArgs, err := extractCniData(&cr, s.serverConfig)
+	cmdType, cniCmdArgs, err := s.extractCniData(&cr, s.serverConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
@@ -371,7 +363,42 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	return result, nil
 }
 
-func extractCniData(cniRequest *api.Request, overrideConf []byte) (string, *skel.CmdArgs, error) {
+func overrideCNIConfigWithServerConfig(cniConf []byte, overrideConf []byte, ignoreReadinessIndicator bool) ([]byte, error) {
+	if len(overrideConf) == 0 {
+		return cniConf, nil
+	}
+
+	var cni map[string]interface{}
+	if err := json.Unmarshal(cniConf, &cni); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall CNI config: %w", err)
+	}
+
+	var override map[string]interface{}
+	if err := json.Unmarshal(overrideConf, &override); err != nil {
+		return nil, fmt.Errorf("failed to unmarshall CNI override config: %w", err)
+	}
+
+	// Copy each key of the override config into the CNI config except for
+	// a few specific keys
+	ignoreKeys := sets.NewString()
+	if ignoreReadinessIndicator {
+		ignoreKeys.Insert("readinessindicatorfile")
+	}
+	for overrideKey, overrideVal := range override {
+		if !ignoreKeys.Has(overrideKey) {
+			cni[overrideKey] = overrideVal
+		}
+	}
+
+	newBytes, err := json.Marshal(cni)
+	if err != nil {
+		return nil, fmt.Errorf("failed ot marshall new CNI config with overrides: %w", err)
+	}
+
+	return newBytes, nil
+}
+
+func (s *Server) extractCniData(cniRequest *api.Request, overrideConf []byte) (string, *skel.CmdArgs, error) {
 	cmd, ok := cniRequest.Env["CNI_COMMAND"]
 	if !ok {
 		return "", nil, fmt.Errorf("unexpected or missing CNI_COMMAND")
@@ -398,18 +425,10 @@ func extractCniData(cniRequest *api.Request, overrideConf []byte) (string, *skel
 	}
 	cniCmdArgs.Args = cniArgs
 
-	if overrideConf != nil {
-		// trim the close bracket from multus CNI config and put the server config
-		// to override CNI config with server config.
-		// note: if there are two or more value in same key, then the
-		// latest one is used at golang json implementation
-		idx := bytes.LastIndex(cniRequest.Config, []byte("}"))
-		if idx == -1 {
-			return "", nil, fmt.Errorf("invalid CNI config")
-		}
-		cniCmdArgs.StdinData = append(cniRequest.Config[:idx], overrideConf...)
-	} else {
-		cniCmdArgs.StdinData = cniRequest.Config
+	var err error
+	cniCmdArgs.StdinData, err = overrideCNIConfigWithServerConfig(cniRequest.Config, overrideConf, s.ignoreReadinessIndicator)
+	if err != nil {
+		return "", nil, err
 	}
 
 	return cmd, cniCmdArgs, nil

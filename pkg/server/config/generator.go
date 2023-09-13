@@ -128,6 +128,9 @@ func (mc *MultusConf) Generate() (string, error) {
 	mc.MultusAutoconfigDir = ""
 	mc.MultusMasterCni = ""
 	mc.ForceCNIVersion = false
+	// Readiness indicator file existence is already handled by the
+	// ConfigManager via an fsnotify watch, so CmdAdd/CmdDel don't need to.
+	mc.ReadinessIndicatorFile = ""
 
 	data, err := json.Marshal(mc)
 	return string(data), err

@@ -52,6 +52,8 @@ type Server struct {
 	metrics         *Metrics
 	informerFactory internalinterfaces.SharedInformerFactory
 	podInformer     cache.SharedIndexInformer
+
+	ignoreReadinessIndicator bool
 }
 
 // ControllerNetConf for the controller cni configuration

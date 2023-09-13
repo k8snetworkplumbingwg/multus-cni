@@ -256,7 +256,7 @@ func createFakePod(k8sClient *k8s.ClientInfo, podName string) error {
 func startCNIServer(ctx context.Context, runDir string, k8sClient *k8s.ClientInfo, servConfig []byte) (*Server, error) {
 	const period = 0
 
-	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{}, servConfig)
+	cniServer, err := newCNIServer(runDir, k8sClient, &fakeExec{}, servConfig, true)
 	if err != nil {
 		return nil, err
 	}
