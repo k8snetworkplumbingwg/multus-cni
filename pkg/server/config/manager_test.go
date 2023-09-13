@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -104,12 +103,9 @@ var _ = Describe("Configuration Manager", func() {
 	})
 
 	It("Check MonitorPluginConfiguration", func() {
-		config, err := configManager.GenerateConfig()
-		Expect(err).NotTo(HaveOccurred())
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		err = configManager.Start(ctx, wg)
+		err := configManager.Start(ctx, wg)
 		Expect(err).NotTo(HaveOccurred())
 
 		updatedCNIConfig := `
@@ -117,6 +113,7 @@ var _ = Describe("Configuration Manager", func() {
   "cniVersion": "0.4.0",
   "name": "mycni-name",
   "type": "mycni2",
+  "capabilities": {"portMappings": true},
   "ipam": {},
   "dns": {}
 }
@@ -125,10 +122,11 @@ var _ = Describe("Configuration Manager", func() {
 		Expect(os.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
 
 		// wait for a while to get fsnotify event
-		time.Sleep(100 * time.Millisecond)
-		file, err := os.ReadFile(configManager.multusConfigFilePath)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(file)).To(Equal(config))
+		Eventually(func() string {
+			file, err := os.ReadFile(configManager.multusConfigFilePath)
+			Expect(err).NotTo(HaveOccurred())
+			return string(file)
+		}, 2).Should(ContainSubstring("portMappings"))
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
