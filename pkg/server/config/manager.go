@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 
@@ -123,7 +124,41 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		return nil, fmt.Errorf("failed to load the primary CNI configuration as a multus delegate with error '%v'", err)
 	}
 
+	if config.OverrideNetworkName {
+		if err := configManager.OverrideNetworkName(); err != nil {
+			return nil, logging.Errorf("could not override the network name: %v", err)
+		}
+	}
+
 	return configManager, nil
+}
+
+// Start generates an updated Multus config, writes it, and begins watching
+// the config directory and readiness indicator files for changes
+func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
+	generatedMultusConfig, err := m.GenerateConfig()
+	if err != nil {
+		return logging.Errorf("failed to generated the multus configuration: %v", err)
+	}
+	logging.Verbosef("Generated MultusCNI config: %s", generatedMultusConfig)
+
+	multusConfigFile, err := m.PersistMultusConfig(generatedMultusConfig)
+	if err != nil {
+		return logging.Errorf("failed to persist the multus configuration: %v", err)
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := m.MonitorPluginConfiguration(ctx); err != nil {
+			_ = logging.Errorf("error watching file: %v", err)
+		}
+		logging.Verbosef("ConfigWatcher done")
+		logging.Verbosef("Delete old config @ %v", multusConfigFile)
+		os.Remove(multusConfigFile)
+	}()
+
+	return nil
 }
 
 func (m *Manager) loadPrimaryCNIConfigFromFile() error {
@@ -175,7 +210,7 @@ func (m *Manager) GenerateConfig() (string, error) {
 // MonitorPluginConfiguration monitors the configuration file pointed
 // to by the primaryCNIPluginName attribute, and re-generates the multus
 // configuration whenever the primary CNI config is updated.
-func (m *Manager) MonitorPluginConfiguration(ctx context.Context, done chan<- struct{}) error {
+func (m *Manager) MonitorPluginConfiguration(ctx context.Context) error {
 	logging.Verbosef("started to watch file %s", m.primaryCNIConfigPath)
 
 	for {
@@ -215,7 +250,6 @@ func (m *Manager) MonitorPluginConfiguration(ctx context.Context, done chan<- st
 		case <-ctx.Done():
 			logging.Verbosef("Stopped monitoring, closing channel ...")
 			_ = m.configWatcher.Close()
-			close(done)
 			return nil
 		}
 	}

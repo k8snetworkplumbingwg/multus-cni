@@ -57,8 +57,6 @@ func main() {
 		os.Exit(4)
 	}
 
-	configWatcherDoneChannel := make(chan struct{})
-	multusConfigFile := ""
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -111,29 +109,6 @@ func main() {
 			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
 			os.Exit(2)
 		}
-
-		if multusConf.OverrideNetworkName {
-			if err := configManager.OverrideNetworkName(); err != nil {
-				_ = logging.Errorf("could not override the network name: %v", err)
-			}
-		}
-
-		generatedMultusConfig, err := configManager.GenerateConfig()
-		if err != nil {
-			_ = logging.Errorf("failed to generated the multus configuration: %v", err)
-		}
-		logging.Verbosef("Generated MultusCNI config: %s", generatedMultusConfig)
-
-		multusConfigFile, err = configManager.PersistMultusConfig(generatedMultusConfig)
-		if err != nil {
-			_ = logging.Errorf("failed to persist the multus configuration: %v", err)
-		}
-
-		go func(ctx context.Context, doneChannel chan<- struct{}) {
-			if err := configManager.MonitorPluginConfiguration(ctx, doneChannel); err != nil {
-				_ = logging.Errorf("error watching file: %v", err)
-			}
-		}(ctx, configWatcherDoneChannel)
 	} else {
 		if err := copyUserProvidedConfig(multusConf.MultusConfigFile, multusConf.CniConfigDir); err != nil {
 			logging.Errorf("failed to copy the user provided configuration %s: %v", multusConf.MultusConfigFile, err)
@@ -151,14 +126,10 @@ func main() {
 
 	var wg sync.WaitGroup
 	if configManager != nil {
-		wg.Add(1)
-		go func() {
-			<-configWatcherDoneChannel
-			logging.Verbosef("ConfigWatcher done")
-			logging.Verbosef("Delete old config @ %v", multusConfigFile)
-			os.Remove(multusConfigFile)
-			wg.Done()
-		}()
+		if err := configManager.Start(ctx, &wg); err != nil {
+			_ = logging.Errorf("failed to start config manager: %v", err)
+			os.Exit(3)
+		}
 	}
 
 	wg.Wait()

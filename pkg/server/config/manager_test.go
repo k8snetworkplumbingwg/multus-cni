@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -42,6 +43,7 @@ var _ = Describe("Configuration Manager", func() {
 	var configManager *Manager
 	var multusConfigDir string
 	var defaultCniConfig string
+	var wg *sync.WaitGroup
 
 	BeforeEach(func() {
 		var err error
@@ -67,9 +69,12 @@ var _ = Describe("Configuration Manager", func() {
 
 		configManager, err = NewManager(*multusConf)
 		Expect(err).NotTo(HaveOccurred())
+
+		wg = &sync.WaitGroup{}
 	})
 
 	AfterEach(func() {
+		wg.Wait()
 		Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
 	})
 
@@ -102,15 +107,10 @@ var _ = Describe("Configuration Manager", func() {
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = configManager.PersistMultusConfig(config)
-		Expect(err).NotTo(HaveOccurred())
-
 		ctx, cancel := context.WithCancel(context.Background())
-		configWatcherDoneChannel := make(chan struct{})
-		go func(ctx context.Context, doneChannel chan struct{}) {
-			err := configManager.MonitorPluginConfiguration(ctx, doneChannel)
-			Expect(err).NotTo(HaveOccurred())
-		}(ctx, configWatcherDoneChannel)
+		defer cancel()
+		err = configManager.Start(ctx, wg)
+		Expect(err).NotTo(HaveOccurred())
 
 		updatedCNIConfig := `
 {
@@ -129,9 +129,6 @@ var _ = Describe("Configuration Manager", func() {
 		file, err := os.ReadFile(configManager.multusConfigFilePath)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(string(file)).To(Equal(config))
-
-		// stop groutine
-		cancel()
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
