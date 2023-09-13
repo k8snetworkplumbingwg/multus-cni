@@ -131,7 +131,7 @@ var _ = Describe("Configuration Manager", func() {
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
 		BeforeEach(func() {
-			Expect(configManager.OverrideNetworkName()).To(Succeed())
+			Expect(configManager.overrideNetworkName()).To(Succeed())
 		})
 
 		It("Overrides the name of the multus configuration when requested", func() {

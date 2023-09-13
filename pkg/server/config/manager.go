@@ -125,7 +125,7 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 	}
 
 	if config.OverrideNetworkName {
-		if err := configManager.OverrideNetworkName(); err != nil {
+		if err := configManager.overrideNetworkName(); err != nil {
 			return nil, logging.Errorf("could not override the network name: %v", err)
 		}
 	}
@@ -150,7 +150,7 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := m.MonitorPluginConfiguration(ctx); err != nil {
+		if err := m.monitorPluginConfiguration(ctx); err != nil {
 			_ = logging.Errorf("error watching file: %v", err)
 		}
 		logging.Verbosef("ConfigWatcher done")
@@ -174,9 +174,9 @@ func (m *Manager) loadPrimaryCNIConfigFromFile() error {
 	return m.loadPrimaryCNIConfigurationData(primaryCNIConfigData)
 }
 
-// OverrideNetworkName overrides the name of the multus configuration with the
+// overrideNetworkName overrides the name of the multus configuration with the
 // name of the delegated primary CNI.
-func (m *Manager) OverrideNetworkName() error {
+func (m *Manager) overrideNetworkName() error {
 	name, ok := m.cniConfigData["name"]
 	if !ok {
 		return fmt.Errorf("failed to access delegate CNI plugin name")
@@ -207,10 +207,10 @@ func (m *Manager) GenerateConfig() (string, error) {
 	return m.multusConfig.Generate()
 }
 
-// MonitorPluginConfiguration monitors the configuration file pointed
+// monitorPluginConfiguration monitors the configuration file pointed
 // to by the primaryCNIPluginName attribute, and re-generates the multus
 // configuration whenever the primary CNI config is updated.
-func (m *Manager) MonitorPluginConfiguration(ctx context.Context) error {
+func (m *Manager) monitorPluginConfiguration(ctx context.Context) error {
 	logging.Verbosef("started to watch file %s", m.primaryCNIConfigPath)
 
 	for {
