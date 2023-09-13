@@ -91,7 +91,7 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 
 func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error) {
 	if config.ForceCNIVersion {
-		err := overrideCNIVersion(cniPluginConfigFilePath(config.MultusAutoconfigDir, defaultCNIPluginName), config.CNIVersion)
+		err := overrideCNIVersion(filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName), config.CNIVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -115,8 +115,8 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		configWatcher:              watcher,
 		multusConfig:               &config,
 		multusConfigDir:            config.MultusAutoconfigDir,
-		multusConfigFilePath:       cniPluginConfigFilePath(config.CniConfigDir, multusConfigFileName),
-		primaryCNIConfigPath:       cniPluginConfigFilePath(config.MultusAutoconfigDir, defaultCNIPluginName),
+		multusConfigFilePath:       filepath.Join(config.CniConfigDir, multusConfigFileName),
+		primaryCNIConfigPath:       filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName),
 		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
 	}
 
@@ -287,10 +287,6 @@ func getPrimaryCNIPluginName(multusAutoconfigDir string) (string, error) {
 		return "", fmt.Errorf("failed to find the cluster master CNI plugin: %w", err)
 	}
 	return masterCniConfigFileName, nil
-}
-
-func cniPluginConfigFilePath(cniConfigDir string, cniConfigFileName string) string {
-	return cniConfigDir + fmt.Sprintf("/%s", cniConfigFileName)
 }
 
 func newWatcher(cniConfigDir string, readinessIndicatorDir string) (*fsnotify.Watcher, error) {
