@@ -19,7 +19,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	k8s.io/api v0.22.8
 	k8s.io/apimachinery v0.22.8
-	k8s.io/client-go v0.22.8
+	k8s.io/client-go v1.5.2
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20220413171646-5e7f5fdc6da6 // indirect

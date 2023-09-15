@@ -396,13 +396,14 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 // InClusterK8sClient returns the `k8s.ClientInfo` struct to use to connect to
 // the k8s API.
 func InClusterK8sClient() (*ClientInfo, error) {
-	config, err := rest.InClusterConfig()
+	clientInfo, err := GetK8sClient("", nil)
 	if err != nil {
 		return nil, err
 	}
-
-	logging.Debugf("InClusterK8sClient: in cluster config: %+v", config)
-	return NewClientInfo(config)
+	if clientInfo == nil {
+		return nil, fmt.Errorf("failed to create in-cluster kube client")
+	}
+	return clientInfo, err
 }
 
 // GetK8sClient gets client info from kubeconfig
@@ -440,13 +441,17 @@ func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error
 	config.ContentType = "application/vnd.kubernetes.protobuf"
 	// Set the config timeout to one minute.
 	config.Timeout = time.Minute
+	// Allow multus (especially in server mode) to make more concurrent requests
+	// to reduce client-side throttling
+	config.QPS = 50
+	config.Burst = 50
 
-	return NewClientInfo(config)
+	return newClientInfo(config)
 }
 
-// NewClientInfo returns a `ClientInfo` from a configuration created from an
+// newClientInfo returns a `ClientInfo` from a configuration created from an
 // existing kubeconfig file.
-func NewClientInfo(config *rest.Config) (*ClientInfo, error) {
+func newClientInfo(config *rest.Config) (*ClientInfo, error) {
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		return nil, err

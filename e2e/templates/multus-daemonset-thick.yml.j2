@@ -43,6 +43,7 @@ rules:
       - pods/status
     verbs:
       - get
+      - list
       - update
   - apiGroups:
       - ""
@@ -157,6 +158,11 @@ spec:
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
+        env:
+        - name: MULTUS_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
       initContainers:
       - name: install-multus-shim
         image: localhost:5000/multus:e2e

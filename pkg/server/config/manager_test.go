@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
+	"sync"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,6 +42,7 @@ var _ = Describe("Configuration Manager", func() {
 	var configManager *Manager
 	var multusConfigDir string
 	var defaultCniConfig string
+	var wg *sync.WaitGroup
 
 	BeforeEach(func() {
 		var err error
@@ -54,19 +55,25 @@ var _ = Describe("Configuration Manager", func() {
 
 		multusConfFile := fmt.Sprintf(`{
 			"name": %q,
-			"cniVersion": %q
-		}`, defaultCniConfig, cniVersion)
+			"cniVersion": %q,
+			"multusAutoconfigDir": %q,
+			"multusMasterCNI": %q,
+			"forceCNIVersion": false
+		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName)
 		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
 		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 
 		multusConf, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
 
-		configManager, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
+		configManager, err = NewManager(*multusConf)
 		Expect(err).NotTo(HaveOccurred())
+
+		wg = &sync.WaitGroup{}
 	})
 
 	AfterEach(func() {
+		wg.Wait()
 		Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
 	})
 
@@ -96,24 +103,17 @@ var _ = Describe("Configuration Manager", func() {
 	})
 
 	It("Check MonitorPluginConfiguration", func() {
-		config, err := configManager.GenerateConfig()
-		Expect(err).NotTo(HaveOccurred())
-
-		_, err = configManager.PersistMultusConfig(config)
-		Expect(err).NotTo(HaveOccurred())
-
 		ctx, cancel := context.WithCancel(context.Background())
-		configWatcherDoneChannel := make(chan struct{})
-		go func(ctx context.Context, doneChannel chan struct{}) {
-			err := configManager.MonitorPluginConfiguration(ctx, doneChannel)
-			Expect(err).NotTo(HaveOccurred())
-		}(ctx, configWatcherDoneChannel)
+		defer cancel()
+		err := configManager.Start(ctx, wg)
+		Expect(err).NotTo(HaveOccurred())
 
 		updatedCNIConfig := `
 {
   "cniVersion": "0.4.0",
   "name": "mycni-name",
   "type": "mycni2",
+  "capabilities": {"portMappings": true},
   "ipam": {},
   "dns": {}
 }
@@ -122,18 +122,16 @@ var _ = Describe("Configuration Manager", func() {
 		Expect(os.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
 
 		// wait for a while to get fsnotify event
-		time.Sleep(100 * time.Millisecond)
-		file, err := os.ReadFile(configManager.multusConfigFilePath)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(file)).To(Equal(config))
-
-		// stop groutine
-		cancel()
+		Eventually(func() string {
+			file, err := os.ReadFile(configManager.multusConfigFilePath)
+			Expect(err).NotTo(HaveOccurred())
+			return string(file)
+		}, 2).Should(ContainSubstring("portMappings"))
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
 		BeforeEach(func() {
-			Expect(configManager.OverrideNetworkName()).To(Succeed())
+			Expect(configManager.overrideNetworkName()).To(Succeed())
 		})
 
 		It("Overrides the name of the multus configuration when requested", func() {
@@ -173,14 +171,17 @@ var _ = Describe("Configuration Manager with mismatched cniVersion", func() {
 
 		multusConfFile := fmt.Sprintf(`{
 			"name": %q,
-			"cniVersion": %q
-		}`, defaultCniConfig, cniVersion)
+			"cniVersion": %q,
+			"multusAutoconfigDir": %q,
+			"multusMasterCNI": %q,
+			"forceCNIVersion": false
+		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName)
 		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
 		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 
 		multusConf, err := ParseMultusConfig(multusConfFileName)
 		Expect(err).NotTo(HaveOccurred())
-		_, err = NewManagerWithExplicitPrimaryCNIPlugin(*multusConf, multusConfigDir, primaryCNIPluginName, false)
+		_, err = NewManager(*multusConf)
 		Expect(err).To(MatchError("failed to load the primary CNI configuration as a multus delegate with error 'delegate cni version is 0.3.1 while top level cni version is 0.4.0'"))
 	})
 

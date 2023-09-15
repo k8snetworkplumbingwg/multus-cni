@@ -45,7 +45,7 @@ func main() {
 
 	skel.PluginMain(
 		func(args *skel.CmdArgs) error {
-			result, err := multus.CmdAdd(args, nil, nil)
+			result, err := multus.CmdAdd(args, nil, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -54,6 +54,6 @@ func main() {
 		func(args *skel.CmdArgs) error {
 			return multus.CmdCheck(args, nil, nil)
 		},
-		func(args *skel.CmdArgs) error { return multus.CmdDel(args, nil, nil) },
+		func(args *skel.CmdArgs) error { return multus.CmdDel(args, nil, nil, nil) },
 		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }

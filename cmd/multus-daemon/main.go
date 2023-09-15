@@ -30,7 +30,6 @@ import (
 	"syscall"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -58,9 +57,6 @@ func main() {
 		os.Exit(4)
 	}
 
-	configWatcherDoneChannel := make(chan struct{})
-	serverDoneChannel := make(chan struct{})
-	multusConfigFile := ""
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -87,7 +83,30 @@ func main() {
 		logging.Verbosef("Readiness Indicator file check done!")
 	}
 
-	if err := startMultusDaemon(ctx, daemonConf, serverDoneChannel); err != nil {
+	var configManager *config.Manager
+	var ignoreReadinessIndicator bool
+	if multusConf.MultusConfigFile == "auto" {
+		if multusConf.CNIVersion == "" {
+			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
+		}
+
+		// Generate multus CNI config from current CNI config
+		configManager, err = config.NewManager(*multusConf)
+		if err != nil {
+			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
+			os.Exit(2)
+		}
+		// ConfigManager watches the readiness indicator file (if configured)
+		// and exits the daemon when that is removed. The CNIServer does
+		// not need to re-do that check every CNI operation
+		ignoreReadinessIndicator = true
+	} else {
+		if err := copyUserProvidedConfig(multusConf.MultusConfigFile, multusConf.CniConfigDir); err != nil {
+			logging.Errorf("failed to copy the user provided configuration %s: %v", multusConf.MultusConfigFile, err)
+		}
+	}
+
+	if err := startMultusDaemon(ctx, daemonConf, ignoreReadinessIndicator); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
 		os.Exit(3)
 	}
@@ -100,52 +119,6 @@ func main() {
 	}
 	logging.Verbosef("API readiness check done!")
 
-	// Generate multus CNI config from current CNI config
-	if multusConf.MultusConfigFile == "auto" {
-		if multusConf.CNIVersion == "" {
-			_ = logging.Errorf("the CNI version is a mandatory parameter when the '-multus-config-file=auto' option is used")
-		}
-
-		var configManager *config.Manager
-		if multusConf.MultusMasterCni == "" {
-			configManager, err = config.NewManager(*multusConf, multusConf.MultusAutoconfigDir, multusConf.ForceCNIVersion)
-		} else {
-			configManager, err = config.NewManagerWithExplicitPrimaryCNIPlugin(
-				*multusConf, multusConf.MultusAutoconfigDir, multusConf.MultusMasterCni, multusConf.ForceCNIVersion)
-		}
-		if err != nil {
-			_ = logging.Errorf("failed to create the configuration manager for the primary CNI plugin: %v", err)
-			os.Exit(2)
-		}
-
-		if multusConf.OverrideNetworkName {
-			if err := configManager.OverrideNetworkName(); err != nil {
-				_ = logging.Errorf("could not override the network name: %v", err)
-			}
-		}
-
-		generatedMultusConfig, err := configManager.GenerateConfig()
-		if err != nil {
-			_ = logging.Errorf("failed to generated the multus configuration: %v", err)
-		}
-		logging.Verbosef("Generated MultusCNI config: %s", generatedMultusConfig)
-
-		multusConfigFile, err = configManager.PersistMultusConfig(generatedMultusConfig)
-		if err != nil {
-			_ = logging.Errorf("failed to persist the multus configuration: %v", err)
-		}
-
-		go func(ctx context.Context, doneChannel chan<- struct{}) {
-			if err := configManager.MonitorPluginConfiguration(ctx, doneChannel); err != nil {
-				_ = logging.Errorf("error watching file: %v", err)
-			}
-		}(ctx, configWatcherDoneChannel)
-	} else {
-		if err := copyUserProvidedConfig(multusConf.MultusConfigFile, multusConf.CniConfigDir); err != nil {
-			logging.Errorf("failed to copy the user provided configuration %s: %v", multusConf.MultusConfigFile, err)
-		}
-	}
-
 	signalCh := make(chan os.Signal, 16)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -156,15 +129,11 @@ func main() {
 	}()
 
 	var wg sync.WaitGroup
-	if multusConf.MultusConfigFile == "auto" {
-		wg.Add(1)
-		go func() {
-			<-configWatcherDoneChannel
-			logging.Verbosef("ConfigWatcher done")
-			logging.Verbosef("Delete old config @ %v", multusConfigFile)
-			os.Remove(multusConfigFile)
-			wg.Done()
-		}()
+	if configManager != nil {
+		if err := configManager.Start(ctx, &wg); err != nil {
+			_ = logging.Errorf("failed to start config manager: %v", err)
+			os.Exit(3)
+		}
 	}
 
 	wg.Wait()
@@ -181,7 +150,7 @@ func waitUntilAPIReady(socketPath string) error {
 	})
 }
 
-func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, done chan struct{}) error {
+func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -190,7 +159,7 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
-	server, err := srv.NewCNIServer(daemonConfig, daemonConfig.ConfigFileContents)
+	server, err := srv.NewCNIServer(daemonConfig, daemonConfig.ConfigFileContents, ignoreReadinessIndicator)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
 	}
@@ -208,15 +177,8 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
 	}
 
-	server.SetKeepAlivesEnabled(false)
-	go func() {
-		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
-			logging.Debugf("open for business")
-			if err := server.Serve(l); err != nil {
-				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))
-			}
-		}, 0)
-	}()
+	server.Start(ctx, l)
+
 	go func() {
 		<-ctx.Done()
 		server.Shutdown(context.Background())

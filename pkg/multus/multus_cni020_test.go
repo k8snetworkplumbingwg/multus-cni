@@ -142,14 +142,14 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 	}`
 		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
-		result, err := CmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
-		err = CmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -203,14 +203,14 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 	}`
 		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
-		result, err := CmdAdd(args, fExec, nil)
+		result, err := CmdAdd(args, fExec, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
 		// plugin 1 is the masterplugin
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
-		err = CmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -265,7 +265,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 	}`
 		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
-		_, err := CmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil, nil)
 		Expect(err).To(MatchError("[//:weave1]: error adding container to network \"weave1\": DelegateAdd: cannot set \"weave-net\" interface name to \"eth0\": validateIfName: no net namespace fsdadfad found: failed to Statfs \"fsdadfad\": no such file or directory"))
 	})
 
@@ -319,10 +319,10 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 	}`
 		fExec.addPlugin020(nil, "net1", expectedConf2, expectedResult2, nil)
 
-		_, err := CmdAdd(args, fExec, nil)
+		_, err := CmdAdd(args, fExec, nil, nil)
 		Expect(err).To(HaveOccurred())
 
-		err = CmdDel(args, fExec, nil)
+		err = CmdDel(args, fExec, nil, nil)
 		Expect(err).To(HaveOccurred())
 	})
 
@@ -363,7 +363,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		err := fmt.Errorf("expected plugin failure")
 		fExec.addPlugin020(nil, "net1", expectedConf2, nil, err)
 
-		_, err = CmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil, nil)
 		Expect(fExec.addIndex).To(Equal(2))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(MatchError("[//:other1]: error adding container to network \"other1\": expected plugin failure"))
@@ -409,7 +409,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		err := fmt.Errorf("expected plugin failure")
 		fExec.addPlugin020(nil, "net1", expectedConf2, nil, err)
 
-		_, err = CmdAdd(args, fExec, nil)
+		_, err = CmdAdd(args, fExec, nil, nil)
 		Expect(fExec.addIndex).To(Equal(1))
 		Expect(fExec.delIndex).To(Equal(2))
 		Expect(err).To(HaveOccurred())
@@ -491,7 +491,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net3", net3))
 		Expect(err).NotTo(HaveOccurred())
 
-		result, err := CmdAdd(args, fExec, clientInfo)
+		result, err := CmdAdd(args, fExec, clientInfo, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -557,7 +557,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
-		result, err := CmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -568,7 +568,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		err = fKubeClient.DeletePod(fakePod.ObjectMeta.Namespace, fakePod.ObjectMeta.Name)
 		Expect(err).NotTo(HaveOccurred())
 
-		err = CmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -609,13 +609,13 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
-		result, err := CmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
 		Expect(reflect.DeepEqual(r, expectedResult1)).To(BeTrue())
 
-		err = CmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -674,7 +674,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err = fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
-		result, err := CmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -687,7 +687,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Delete and check net count is not incremented")
-		err = CmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
@@ -746,7 +746,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		_, err = fKubeClient.AddNetAttachDef(
 			testhelpers.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
-		result, err := CmdAdd(args, fExec, fKubeClient)
+		result, err := CmdAdd(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.addIndex).To(Equal(len(fExec.plugins)))
 		r := result.(*types020.Result)
@@ -762,7 +762,7 @@ var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Delete and check pod/net count is incremented")
-		err = CmdDel(args, fExec, fKubeClient)
+		err = CmdDel(args, fExec, fKubeClient, nil)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})

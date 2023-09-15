@@ -69,6 +69,7 @@ rules:
       - pods/status
     verbs:
       - get
+      - list
       - update
   - apiGroups:
       - ""
@@ -183,6 +184,11 @@ spec:
             - name: hostroot
               mountPath: /hostroot
               mountPropagation: HostToContainer
+          env:
+            - name: MULTUS_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
       initContainers:
         - name: install-multus-binary
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
