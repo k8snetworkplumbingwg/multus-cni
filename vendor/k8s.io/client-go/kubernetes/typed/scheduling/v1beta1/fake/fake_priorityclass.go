@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/scheduling/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	schedulingv1beta1 "k8s.io/client-go/applyconfigurations/scheduling/v1beta1"
@@ -38,9 +37,9 @@ type FakePriorityClasses struct {
 	Fake *FakeSchedulingV1beta1
 }
 
-var priorityclassesResource = schema.GroupVersionResource{Group: "scheduling.k8s.io", Version: "v1beta1", Resource: "priorityclasses"}
+var priorityclassesResource = v1beta1.SchemeGroupVersion.WithResource("priorityclasses")
 
-var priorityclassesKind = schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: "v1beta1", Kind: "PriorityClass"}
+var priorityclassesKind = v1beta1.SchemeGroupVersion.WithKind("PriorityClass")
 
 // Get takes name of the priorityClass, and returns the corresponding priorityClass object, and an error if there is any.
 func (c *FakePriorityClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PriorityClass, err error) {
@@ -102,7 +101,7 @@ func (c *FakePriorityClasses) Update(ctx context.Context, priorityClass *v1beta1
 // Delete takes name of the priorityClass and deletes it. Returns an error if one occurs.
 func (c *FakePriorityClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(priorityclassesResource, name), &v1beta1.PriorityClass{})
+		Invokes(testing.NewRootDeleteActionWithOptions(priorityclassesResource, name, opts), &v1beta1.PriorityClass{})
 	return err
 }
 

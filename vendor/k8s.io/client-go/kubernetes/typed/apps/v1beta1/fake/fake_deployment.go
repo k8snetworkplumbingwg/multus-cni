@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta1 "k8s.io/client-go/applyconfigurations/apps/v1beta1"
@@ -39,9 +38,9 @@ type FakeDeployments struct {
 	ns   string
 }
 
-var deploymentsResource = schema.GroupVersionResource{Group: "apps", Version: "v1beta1", Resource: "deployments"}
+var deploymentsResource = v1beta1.SchemeGroupVersion.WithResource("deployments")
 
-var deploymentsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta1", Kind: "Deployment"}
+var deploymentsKind = v1beta1.SchemeGroupVersion.WithKind("Deployment")
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
 func (c *FakeDeployments) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Deployment, err error) {
@@ -120,7 +119,7 @@ func (c *FakeDeployments) UpdateStatus(ctx context.Context, deployment *v1beta1.
 // Delete takes name of the deployment and deletes it. Returns an error if one occurs.
 func (c *FakeDeployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(deploymentsResource, c.ns, name), &v1beta1.Deployment{})
+		Invokes(testing.NewDeleteActionWithOptions(deploymentsResource, c.ns, name, opts), &v1beta1.Deployment{})
 
 	return err
 }

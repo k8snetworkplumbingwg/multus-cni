@@ -1106,7 +1106,7 @@ func applyRetainKeysDirective(original, patch map[string]interface{}, options Me
 // Then, sort them by the relative order in setElementOrder, patch list and live list.
 // The precedence is $setElementOrder > order in patch list > order in live list.
 // This function will delete the item after merging it to prevent process it again in the future.
-// Ref: https://git.k8s.io/community/contributors/design-proposals/cli/preserve-order-in-strategic-merge-patch.md
+// Ref: https://git.k8s.io/design-proposals-archive/cli/preserve-order-in-strategic-merge-patch.md
 func mergePatchIntoOriginal(original, patch map[string]interface{}, schema LookupPatchMeta, mergeOptions MergeOptions) error {
 	for key, patchV := range patch {
 		// Do nothing if there is no ordering directive
@@ -1328,15 +1328,25 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 
 		_, ok := original[k]
 		if !ok {
-			// If it's not in the original document, just take the patch value.
-			original[k] = patchV
+			if !isDeleteList {
+				// If it's not in the original document, just take the patch value.
+				if mergeOptions.IgnoreUnmatchedNulls {
+					discardNullValuesFromPatch(patchV)
+				}
+				original[k] = patchV
+			}
 			continue
 		}
 
 		originalType := reflect.TypeOf(original[k])
 		patchType := reflect.TypeOf(patchV)
 		if originalType != patchType {
-			original[k] = patchV
+			if !isDeleteList {
+				if mergeOptions.IgnoreUnmatchedNulls {
+					discardNullValuesFromPatch(patchV)
+				}
+				original[k] = patchV
+			}
 			continue
 		}
 		// If they're both maps or lists, recurse into the value.
@@ -1369,6 +1379,25 @@ func mergeMap(original, patch map[string]interface{}, schema LookupPatchMeta, me
 		}
 	}
 	return original, nil
+}
+
+// discardNullValuesFromPatch discards all null property values from patch.
+// It traverses all slices and map types.
+func discardNullValuesFromPatch(patchV interface{}) {
+	switch patchV := patchV.(type) {
+	case map[string]interface{}:
+		for k, v := range patchV {
+			if v == nil {
+				delete(patchV, k)
+			} else {
+				discardNullValuesFromPatch(v)
+			}
+		}
+	case []interface{}:
+		for _, v := range patchV {
+			discardNullValuesFromPatch(v)
+		}
+	}
 }
 
 // mergeMapHandler handles how to merge `patchV` whose key is `key` with `original` respecting

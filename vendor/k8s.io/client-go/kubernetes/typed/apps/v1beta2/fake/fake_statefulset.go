@@ -26,7 +26,6 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
@@ -39,9 +38,9 @@ type FakeStatefulSets struct {
 	ns   string
 }
 
-var statefulsetsResource = schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "statefulsets"}
+var statefulsetsResource = v1beta2.SchemeGroupVersion.WithResource("statefulsets")
 
-var statefulsetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}
+var statefulsetsKind = v1beta2.SchemeGroupVersion.WithKind("StatefulSet")
 
 // Get takes name of the statefulSet, and returns the corresponding statefulSet object, and an error if there is any.
 func (c *FakeStatefulSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.StatefulSet, err error) {
@@ -120,7 +119,7 @@ func (c *FakeStatefulSets) UpdateStatus(ctx context.Context, statefulSet *v1beta
 // Delete takes name of the statefulSet and deletes it. Returns an error if one occurs.
 func (c *FakeStatefulSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(statefulsetsResource, c.ns, name), &v1beta2.StatefulSet{})
+		Invokes(testing.NewDeleteActionWithOptions(statefulsetsResource, c.ns, name, opts), &v1beta2.StatefulSet{})
 
 	return err
 }

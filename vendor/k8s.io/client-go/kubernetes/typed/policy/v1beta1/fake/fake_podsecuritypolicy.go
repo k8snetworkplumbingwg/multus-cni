@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	policyv1beta1 "k8s.io/client-go/applyconfigurations/policy/v1beta1"
@@ -38,9 +37,9 @@ type FakePodSecurityPolicies struct {
 	Fake *FakePolicyV1beta1
 }
 
-var podsecuritypoliciesResource = schema.GroupVersionResource{Group: "policy", Version: "v1beta1", Resource: "podsecuritypolicies"}
+var podsecuritypoliciesResource = v1beta1.SchemeGroupVersion.WithResource("podsecuritypolicies")
 
-var podsecuritypoliciesKind = schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "PodSecurityPolicy"}
+var podsecuritypoliciesKind = v1beta1.SchemeGroupVersion.WithKind("PodSecurityPolicy")
 
 // Get takes name of the podSecurityPolicy, and returns the corresponding podSecurityPolicy object, and an error if there is any.
 func (c *FakePodSecurityPolicies) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PodSecurityPolicy, err error) {
@@ -102,7 +101,7 @@ func (c *FakePodSecurityPolicies) Update(ctx context.Context, podSecurityPolicy 
 // Delete takes name of the podSecurityPolicy and deletes it. Returns an error if one occurs.
 func (c *FakePodSecurityPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(podsecuritypoliciesResource, name), &v1beta1.PodSecurityPolicy{})
+		Invokes(testing.NewRootDeleteActionWithOptions(podsecuritypoliciesResource, name, opts), &v1beta1.PodSecurityPolicy{})
 	return err
 }
 
