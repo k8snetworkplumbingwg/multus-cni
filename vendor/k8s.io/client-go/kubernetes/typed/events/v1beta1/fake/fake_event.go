@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	eventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
@@ -39,9 +38,9 @@ type FakeEvents struct {
 	ns   string
 }
 
-var eventsResource = schema.GroupVersionResource{Group: "events.k8s.io", Version: "v1beta1", Resource: "events"}
+var eventsResource = v1beta1.SchemeGroupVersion.WithResource("events")
 
-var eventsKind = schema.GroupVersionKind{Group: "events.k8s.io", Version: "v1beta1", Kind: "Event"}
+var eventsKind = v1beta1.SchemeGroupVersion.WithKind("Event")
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
 func (c *FakeEvents) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Event, err error) {
@@ -108,7 +107,7 @@ func (c *FakeEvents) Update(ctx context.Context, event *v1beta1.Event, opts v1.U
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
 func (c *FakeEvents) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(eventsResource, c.ns, name), &v1beta1.Event{})
+		Invokes(testing.NewDeleteActionWithOptions(eventsResource, c.ns, name, opts), &v1beta1.Event{})
 
 	return err
 }

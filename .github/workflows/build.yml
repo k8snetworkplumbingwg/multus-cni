@@ -4,7 +4,7 @@ jobs:
   build:
     strategy:
       matrix:
-        go-version: [1.19.x, 1.20.x]
+        go-version: [1.20.x, 1.21.x]
         goarch: [386, amd64, arm, arm64, ppc64le, s390x]
         os: [ubuntu-latest] #, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}

@@ -26,7 +26,6 @@ import (
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
@@ -39,9 +38,9 @@ type FakeDaemonSets struct {
 	ns   string
 }
 
-var daemonsetsResource = schema.GroupVersionResource{Group: "apps", Version: "v1beta2", Resource: "daemonsets"}
+var daemonsetsResource = v1beta2.SchemeGroupVersion.WithResource("daemonsets")
 
-var daemonsetsKind = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}
+var daemonsetsKind = v1beta2.SchemeGroupVersion.WithKind("DaemonSet")
 
 // Get takes name of the daemonSet, and returns the corresponding daemonSet object, and an error if there is any.
 func (c *FakeDaemonSets) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.DaemonSet, err error) {
@@ -120,7 +119,7 @@ func (c *FakeDaemonSets) UpdateStatus(ctx context.Context, daemonSet *v1beta2.Da
 // Delete takes name of the daemonSet and deletes it. Returns an error if one occurs.
 func (c *FakeDaemonSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(daemonsetsResource, c.ns, name), &v1beta2.DaemonSet{})
+		Invokes(testing.NewDeleteActionWithOptions(daemonsetsResource, c.ns, name, opts), &v1beta2.DaemonSet{})
 
 	return err
 }
