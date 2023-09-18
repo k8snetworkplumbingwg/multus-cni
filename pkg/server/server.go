@@ -170,11 +170,38 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 	return informerFactory, podInformer
 }
 
+func isPerNodeCertEnabled(config *PerNodeCertificate) (bool, error) {
+	if config != nil && config.Enabled {
+		if config.BootstrapKubeconfig != "" && config.CertDir != "" {
+			return true, nil
+		}
+		return true, logging.Errorf("failed to configure PerNodeCertificate: enabled: %v, BootstrapKubeconfig: %q, CertDir: %q", config.Enabled, config.BootstrapKubeconfig, config.CertDir)
+	}
+	return false, nil
+}
+
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
 func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
-	kubeClient, err := k8s.InClusterK8sClient()
-	if err != nil {
-		return nil, fmt.Errorf("error getting k8s client: %v", err)
+	var kubeClient *k8s.ClientInfo
+	enabled, err := isPerNodeCertEnabled(daemonConfig.PerNodeCertificate)
+	if enabled {
+		if err != nil {
+			return nil, err
+		}
+		perNodeCertConfig := daemonConfig.PerNodeCertificate
+		nodeName := os.Getenv("K8S_NODE")
+		if nodeName == "" {
+			return nil, logging.Errorf("error getting node name for perNodeCertificate")
+		}
+		kubeClient, err = k8s.PerNodeK8sClient(nodeName, perNodeCertConfig.BootstrapKubeconfig, perNodeCertConfig.CertDir)
+		if err != nil {
+			return nil, logging.Errorf("error getting perNodeClient: %v", err)
+		}
+	} else {
+		kubeClient, err = k8s.InClusterK8sClient()
+		if err != nil {
+			return nil, fmt.Errorf("error getting k8s client: %v", err)
+		}
 	}
 
 	exec := invoke.Exec(nil)

@@ -56,12 +56,20 @@ type Server struct {
 	ignoreReadinessIndicator bool
 }
 
+// PerNodeCertificate for auto certificate generation for per node
+type PerNodeCertificate struct {
+	Enabled             bool   `json:"enabled,omitempty"`
+	BootstrapKubeconfig string `json:"bootstrapKubeconfig,omitempty"`
+	CertDir             string `json:"certDir,omitempty"`
+}
+
 // ControllerNetConf for the controller cni configuration
 type ControllerNetConf struct {
-	ChrootDir   string `json:"chrootDir,omitempty"`
-	LogFile     string `json:"logFile"`
-	LogLevel    string `json:"logLevel"`
-	LogToStderr bool   `json:"logToStderr,omitempty"`
+	ChrootDir          string              `json:"chrootDir,omitempty"`
+	LogFile            string              `json:"logFile"`
+	LogLevel           string              `json:"logLevel"`
+	LogToStderr        bool                `json:"logToStderr,omitempty"`
+	PerNodeCertificate *PerNodeCertificate `json:"perNodeCertificate,omitempty"`
 
 	MetricsPort *int `json:"metricsPort,omitempty"`
 
