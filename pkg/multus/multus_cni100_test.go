@@ -42,7 +42,7 @@ import (
 )
 
 func newPodInformer(ctx context.Context, kclient kubernetes.Interface) cache.SharedIndexInformer {
-	informerFactory := informerfactory.NewSharedInformerFactory(kclient, 0 * time.Second)
+	informerFactory := informerfactory.NewSharedInformerFactory(kclient, 0*time.Second)
 
 	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return v1coreinformers.NewFilteredPodInformer(
@@ -55,7 +55,7 @@ func newPodInformer(ctx context.Context, kclient kubernetes.Interface) cache.Sha
 
 	informerFactory.Start(ctx.Done())
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 20 * time.Second)
+	waitCtx, waitCancel := context.WithTimeout(ctx, 20*time.Second)
 	if !cache.WaitForCacheSync(waitCtx.Done(), podInformer.HasSynced) {
 		logging.Errorf("failed to sync pod informer cache")
 	}
