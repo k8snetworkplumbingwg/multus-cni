@@ -210,7 +210,6 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 			Stderr:    os.Stderr,
 			chrootDir: daemonConfig.ChrootDir,
 		}
-		types.ChrootMutex = &chrootExec.mu
 		exec = chrootExec
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
