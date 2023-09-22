@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -42,9 +41,6 @@ const (
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
 )
-
-// ChrootMutex provides lock to access host filesystem
-var ChrootMutex *sync.Mutex
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
