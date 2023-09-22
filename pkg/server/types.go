@@ -16,6 +16,7 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/containernetworking/cni/pkg/invoke"
 
@@ -34,6 +35,8 @@ const (
 	DefaultMultusDaemonConfigFile = "/etc/cni/net.d/multus.d/daemon-config.json"
 	// DefaultMultusRunDir specifies default RunDir for multus
 	DefaultMultusRunDir = "/run/multus/"
+	// DefaultCertDuration specifies default duration for certs in per-node-certs config
+	DefaultCertDuration = 10 * time.Minute
 )
 
 // Metrics represents server's metrics.
@@ -61,6 +64,7 @@ type PerNodeCertificate struct {
 	Enabled             bool   `json:"enabled,omitempty"`
 	BootstrapKubeconfig string `json:"bootstrapKubeconfig,omitempty"`
 	CertDir             string `json:"certDir,omitempty"`
+	CertDuration        string `json:"certDuration,omitempty"`
 }
 
 // ControllerNetConf for the controller cni configuration

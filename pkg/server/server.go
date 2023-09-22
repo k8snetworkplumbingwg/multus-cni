@@ -189,11 +189,20 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 			return nil, err
 		}
 		perNodeCertConfig := daemonConfig.PerNodeCertificate
-		nodeName := os.Getenv("K8S_NODE")
+		nodeName := os.Getenv("MULTUS_NODE_NAME")
 		if nodeName == "" {
-			return nil, logging.Errorf("error getting node name for perNodeCertificate")
+			return nil, logging.Errorf("error getting node name for perNodeCertificate, please check manifest to have MULTUS_NODE_NAME")
 		}
-		kubeClient, err = k8s.PerNodeK8sClient(nodeName, perNodeCertConfig.BootstrapKubeconfig, perNodeCertConfig.CertDir)
+
+		certDuration := DefaultCertDuration
+		if perNodeCertConfig.CertDuration != "" {
+			certDuration, err = time.ParseDuration(perNodeCertConfig.CertDuration)
+			if err != nil {
+				return nil, logging.Errorf("failed to parse certDuration: %v", err)
+			}
+		}
+
+		kubeClient, err = k8s.PerNodeK8sClient(nodeName, perNodeCertConfig.BootstrapKubeconfig, certDuration, perNodeCertConfig.CertDir)
 		if err != nil {
 			return nil, logging.Errorf("error getting perNodeClient: %v", err)
 		}
