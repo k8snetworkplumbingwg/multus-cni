@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"syscall"
 	"text/template"
+	"time"
 
 	"github.com/spf13/pflag"
 
@@ -58,6 +59,7 @@ func main() {
 	certDir := pflag.StringP("certdir", "", "/tmp", "specify cert directory")
 	bootstrapConfig := pflag.StringP("bootstrap-config", "", "/tmp/kubeconfig", "specify bootstrap kubernetes config")
 	kubeconfigPath := pflag.StringP("kubeconfig", "", "/run/multus/kubeconfig", "specify output kubeconfig path")
+	certDurationString := pflag.StringP("cert-duration", "", "10m", "specify certificate duration")
 	helpFlag := pflag.BoolP("help", "h", false, "show help message and quit")
 
 	pflag.Parse()
@@ -77,10 +79,14 @@ func main() {
 	if !st.IsDir() {
 		klog.Fatalf("cert directory %q is not directory", *certDir)
 	}
+	certDuration, err := time.ParseDuration(*certDurationString)
+	if err != nil {
+		klog.Fatalf("failed to parse duration %q: %v", *certDurationString, err)
+	}
 
-	nodeName := os.Getenv("K8S_NODE")
+	nodeName := os.Getenv("MULTUS_NODE_NAME")
 	if nodeName == "" {
-		klog.Fatalf("cannot identify node name from K8S_NODE env variables")
+		klog.Fatalf("cannot identify node name from MULTUS_NODE_NAME env variables")
 	}
 
 	// retrieve API server from bootstrapConfig()
@@ -92,7 +98,7 @@ func main() {
 	caData := base64.StdEncoding.EncodeToString(config.CAData)
 
 	// run certManager to create certification
-	if _, err = k8sclient.PerNodeK8sClient(nodeName, *bootstrapConfig, *certDir); err != nil {
+	if _, err = k8sclient.PerNodeK8sClient(nodeName, *bootstrapConfig, certDuration, *certDir); err != nil {
 		klog.Fatalf("failed to start cert manager: %v", err)
 	}
 

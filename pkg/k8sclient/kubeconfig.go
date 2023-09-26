@@ -75,7 +75,7 @@ func getPerNodeKubeconfig(bootstrap *rest.Config, certDir string) *rest.Config {
 }
 
 // PerNodeK8sClient creates/reload new multus kubeconfig per-node.
-func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile, certDir string) (*ClientInfo, error) {
+func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration time.Duration, certDir string) (*ClientInfo, error) {
 	bootstrapKubeconfig, err := clientcmd.BuildConfigFromFlags("", bootstrapKubeconfigFile)
 	if err != nil {
 		return nil, logging.Errorf("failed to load bootstrap kubeconfig %s: %v", bootstrapKubeconfigFile, err)
@@ -98,7 +98,6 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile, certDir string) (*Clien
 		return nil, logging.Errorf("failed to initialize the certificate store: %v", err)
 	}
 
-	certDuration := 10 * time.Minute
 	certManager, err := certificate.NewManager(&certificate.Config{
 		ClientsetFn: newClientsetFn,
 		Template: &x509.CertificateRequest{
