@@ -52,6 +52,11 @@ func (m *fakeResourceServer) GetAllocatableResources(_ context.Context, _ *podre
 	return &podresourcesapi.AllocatableResourcesResponse{}, nil
 }
 
+// TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
+func (m *fakeResourceServer) Get(_ context.Context, _ *podresourcesapi.GetPodResourcesRequest) (*podresourcesapi.GetPodResourcesResponse, error) {
+	return &podresourcesapi.GetPodResourcesResponse{}, nil
+}
+
 func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodResourcesRequest) (*podresourcesapi.ListPodResourcesResponse, error) {
 	podName := "pod-name"
 	podNamespace := "pod-namespace"

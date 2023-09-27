@@ -55,7 +55,7 @@ type MultusConf struct {
 	Type                     string              `json:"type"`
 	CniDir                   string              `json:"cniDir,omitempty"`
 	CniConfigDir             string              `json:"cniConfigDir,omitempty"`
-	SocketDir                string              `json:"socketDir,omitempty"`
+	DaemonSocketDir          string              `json:"daemonSocketDir,omitempty"`
 	MultusConfigFile         string              `json:"multusConfigFile,omitempty"`
 	MultusMasterCni          string              `json:"multusMasterCNI,omitempty"`
 	MultusAutoconfigDir      string              `json:"multusAutoconfigDir,omitempty"`
@@ -126,6 +126,11 @@ func (mc *MultusConf) Generate() (string, error) {
 	mc.CniConfigDir = ""
 	mc.MultusConfigFile = ""
 	mc.MultusAutoconfigDir = ""
+	mc.MultusMasterCni = ""
+	mc.ForceCNIVersion = false
+	// Readiness indicator file existence is already handled by the
+	// ConfigManager via an fsnotify watch, so CmdAdd/CmdDel don't need to.
+	mc.ReadinessIndicatorFile = ""
 
 	data, err := json.Marshal(mc)
 	return string(data), err

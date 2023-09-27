@@ -25,6 +25,8 @@ jobs:
 #          - docker-file: images/Dockerfile
 #            cni-version: "1.0.0"
 #            multus-manifest: multus-daemonset.yml
+    env:
+      JOB_NAME: "${{ matrix.cni-version }}-${{ matrix.multus-manifest }}"
 
     if: >
       (( github.event.pull_request.head.repo.owner.login != github.event.pull_request.base.repo.owner.login ) &&
@@ -89,6 +91,19 @@ jobs:
       - name: Test default route1
         working-directory: ./e2e
         run: ./test-default-route1.sh
+
+      - name: Export kind logs
+        if: always()
+        run: |
+          mkdir -p /tmp/kind/logs
+          kind export logs --loglevel=debug /tmp/kind/logs
+
+      - name: Upload kind logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: kind-logs-${{ env.JOB_NAME }}-${{ github.run_id }}
+          path: /tmp/kind/logs
 
       - name: cleanup cluster and registry
         run: |

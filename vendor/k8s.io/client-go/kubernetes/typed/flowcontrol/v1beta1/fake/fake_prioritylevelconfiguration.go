@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/flowcontrol/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	flowcontrolv1beta1 "k8s.io/client-go/applyconfigurations/flowcontrol/v1beta1"
@@ -38,9 +37,9 @@ type FakePriorityLevelConfigurations struct {
 	Fake *FakeFlowcontrolV1beta1
 }
 
-var prioritylevelconfigurationsResource = schema.GroupVersionResource{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1", Resource: "prioritylevelconfigurations"}
+var prioritylevelconfigurationsResource = v1beta1.SchemeGroupVersion.WithResource("prioritylevelconfigurations")
 
-var prioritylevelconfigurationsKind = schema.GroupVersionKind{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1", Kind: "PriorityLevelConfiguration"}
+var prioritylevelconfigurationsKind = v1beta1.SchemeGroupVersion.WithKind("PriorityLevelConfiguration")
 
 // Get takes name of the priorityLevelConfiguration, and returns the corresponding priorityLevelConfiguration object, and an error if there is any.
 func (c *FakePriorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.PriorityLevelConfiguration, err error) {
@@ -113,7 +112,7 @@ func (c *FakePriorityLevelConfigurations) UpdateStatus(ctx context.Context, prio
 // Delete takes name of the priorityLevelConfiguration and deletes it. Returns an error if one occurs.
 func (c *FakePriorityLevelConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(prioritylevelconfigurationsResource, name), &v1beta1.PriorityLevelConfiguration{})
+		Invokes(testing.NewRootDeleteActionWithOptions(prioritylevelconfigurationsResource, name, opts), &v1beta1.PriorityLevelConfiguration{})
 	return err
 }
 

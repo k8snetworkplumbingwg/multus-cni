@@ -1,5 +1,5 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM golang:1.19 as build
+FROM golang:1.21 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
@@ -11,6 +11,7 @@ FROM debian:stable-slim
 LABEL org.opencontainers.image.source https://github.com/k8snetworkplumbingwg/multus-cni
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
+COPY --from=build /usr/src/multus-cni/bin/cert-approver /
 WORKDIR /
 
 ENTRYPOINT [ "/usr/src/multus-cni/bin/multus-daemon" ]

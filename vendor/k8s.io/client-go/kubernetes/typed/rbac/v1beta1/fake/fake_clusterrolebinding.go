@@ -26,7 +26,6 @@ import (
 	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rbacv1beta1 "k8s.io/client-go/applyconfigurations/rbac/v1beta1"
@@ -38,9 +37,9 @@ type FakeClusterRoleBindings struct {
 	Fake *FakeRbacV1beta1
 }
 
-var clusterrolebindingsResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "clusterrolebindings"}
+var clusterrolebindingsResource = v1beta1.SchemeGroupVersion.WithResource("clusterrolebindings")
 
-var clusterrolebindingsKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "ClusterRoleBinding"}
+var clusterrolebindingsKind = v1beta1.SchemeGroupVersion.WithKind("ClusterRoleBinding")
 
 // Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
 func (c *FakeClusterRoleBindings) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ClusterRoleBinding, err error) {
@@ -102,7 +101,7 @@ func (c *FakeClusterRoleBindings) Update(ctx context.Context, clusterRoleBinding
 // Delete takes name of the clusterRoleBinding and deletes it. Returns an error if one occurs.
 func (c *FakeClusterRoleBindings) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteAction(clusterrolebindingsResource, name), &v1beta1.ClusterRoleBinding{})
+		Invokes(testing.NewRootDeleteActionWithOptions(clusterrolebindingsResource, name, opts), &v1beta1.ClusterRoleBinding{})
 	return err
 }
 

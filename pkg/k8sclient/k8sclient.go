@@ -23,18 +23,12 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -292,11 +286,6 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		}
 	}
 
-	// acquire lock to access file
-	if types.ChrootMutex != nil {
-		types.ChrootMutex.Lock()
-		defer types.ChrootMutex.Unlock()
-	}
 	configBytes, err := netutils.GetCNIConfig(customResource, confdir)
 	if err != nil {
 		return nil, resourceMap, err
@@ -393,82 +382,6 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 	return 0, clientInfo, err
 }
 
-// InClusterK8sClient returns the `k8s.ClientInfo` struct to use to connect to
-// the k8s API.
-func InClusterK8sClient() (*ClientInfo, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	logging.Debugf("InClusterK8sClient: in cluster config: %+v", config)
-	return NewClientInfo(config)
-}
-
-// GetK8sClient gets client info from kubeconfig
-func GetK8sClient(kubeconfig string, kubeClient *ClientInfo) (*ClientInfo, error) {
-	logging.Debugf("GetK8sClient: %s, %v", kubeconfig, kubeClient)
-	// If we get a valid kubeClient (eg from testcases) just return that
-	// one.
-	if kubeClient != nil {
-		return kubeClient, nil
-	}
-
-	var err error
-	var config *rest.Config
-
-	// Otherwise try to create a kubeClient from a given kubeConfig
-	if kubeconfig != "" {
-		// uses the current context in kubeconfig
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			return nil, logging.Errorf("GetK8sClient: failed to get context for the kubeconfig %v: %v", kubeconfig, err)
-		}
-	} else if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_SERVICE_PORT") != "" {
-		// Try in-cluster config where multus might be running in a kubernetes pod
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, logging.Errorf("GetK8sClient: failed to get context for in-cluster kube config: %v", err)
-		}
-	} else {
-		// No kubernetes config; assume we shouldn't talk to Kube at all
-		return nil, nil
-	}
-
-	// Specify that we use gRPC
-	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
-	config.ContentType = "application/vnd.kubernetes.protobuf"
-	// Set the config timeout to one minute.
-	config.Timeout = time.Minute
-
-	return NewClientInfo(config)
-}
-
-// NewClientInfo returns a `ClientInfo` from a configuration created from an
-// existing kubeconfig file.
-func NewClientInfo(config *rest.Config) (*ClientInfo, error) {
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	netclient, err := netclient.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
-	return &ClientInfo{
-		Client:           client,
-		NetClient:        netclient,
-		EventBroadcaster: broadcaster,
-		EventRecorder:    recorder,
-	}, nil
-}
-
 // GetPodNetwork gets net-attach-def annotation from pod
 func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 	logging.Debugf("GetPodNetwork: %v", pod)
@@ -548,12 +461,6 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 
 		// option2) search CNI json config file, which has <netname> as CNI name, from confDir
 
-		// acquire lock to access file
-		if types.ChrootMutex != nil {
-			types.ChrootMutex.Lock()
-			defer types.ChrootMutex.Unlock()
-		}
-
 		configBytes, err = netutils.GetCNIConfigFromFile(netname, confdir)
 		if err == nil {
 			delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
@@ -563,12 +470,6 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 			return delegate, resourceMap, nil
 		}
 	} else {
-		// acquire lock to access file
-		if types.ChrootMutex != nil {
-			types.ChrootMutex.Lock()
-			defer types.ChrootMutex.Unlock()
-		}
-
 		fInfo, err := os.Stat(netname)
 		if err != nil {
 			return nil, resourceMap, err

@@ -21,7 +21,9 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
+	"time"
+
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
@@ -39,9 +41,6 @@ const (
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
 )
-
-// ChrootMutex provides lock to access host filesystem
-var ChrootMutex *sync.Mutex
 
 // LoadDelegateNetConfList reads DelegateNetConf from bytes
 func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error {
@@ -608,4 +607,14 @@ func CheckSystemNamespaces(namespace string, systemNamespaces []string) bool {
 		}
 	}
 	return false
+}
+
+// GetReadinessIndicatorFile waits for readinessIndicatorFile
+func GetReadinessIndicatorFile(readinessIndicatorFile string) error {
+	pollDuration := 1000 * time.Millisecond
+	pollTimeout := 45 * time.Second
+	return utilwait.PollImmediate(pollDuration, pollTimeout, func() (bool, error) {
+		_, err := os.Stat(readinessIndicatorFile)
+		return err == nil, nil
+	})
 }

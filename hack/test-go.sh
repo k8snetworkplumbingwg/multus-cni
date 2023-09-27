@@ -19,5 +19,5 @@ if [ "$GO111MODULE" == "off" ]; then
 	bash -c "umask 0; cd ${GOPATH}/src/${REPO_PATH}; PATH=${GOROOT}/bin:$(pwd)/bin:${PATH} go test -v -covermode=count -coverprofile=coverage.out ./..."
 else
 	# test with go modules
-	bash -c "umask 0; go test -v -covermode=count -coverprofile=coverage.out ./..."
+	bash -c "umask 0; go test -v -race -covermode=atomic -coverprofile=coverage.out ./..."
 fi

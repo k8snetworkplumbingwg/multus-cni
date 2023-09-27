@@ -20,10 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -34,91 +32,24 @@ import (
 
 // ChrootExec implements invoke.Exec to execute CNI with chroot
 type ChrootExec struct {
-	Stderr     io.Writer
-	chrootDir  string
-	workingDir string   // working directory in the outer root
-	outerRoot  *os.File // outer root directory
+	Stderr    io.Writer
+	chrootDir string
 	version.PluginDecoder
-	mu sync.Mutex
 }
 
 var _ invoke.Exec = &ChrootExec{}
 
-func (e *ChrootExec) chroot() error {
-	var err error
-	e.workingDir, err = os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "getwd before chroot failed: %v\n", err)
-		return fmt.Errorf("getwd before chroot failed: %v", err)
-	}
-
-	e.outerRoot, err = os.Open("/")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "getwd before chroot failed: %v\n", err)
-		return fmt.Errorf("getwd before chroot failed: %v", err)
-	}
-
-	if err := syscall.Chroot(e.chrootDir); err != nil {
-		fmt.Fprintf(os.Stderr, "chroot to %s failed: %v\n", e.chrootDir, err)
-		return fmt.Errorf("chroot to %s failed: %v", e.chrootDir, err)
-	}
-
-	if err := os.Chdir("/"); err != nil {
-		fmt.Fprintf(os.Stderr, "chdir to \"/\" failed: %v\n", err)
-		return fmt.Errorf("chdir to \"/\" failed: %v", err)
-	}
-
-	return nil
-}
-
-func (e *ChrootExec) escape() error {
-	if e.outerRoot == nil || e.workingDir == "" {
-		return nil
-	}
-
-	// change directory to outer root and close it
-	if err := syscall.Fchdir(int(e.outerRoot.Fd())); err != nil {
-		fmt.Fprintf(os.Stderr, "changing directory to outer root failed: %v\n", err)
-		return fmt.Errorf("changing directory to outer root failed: %v", err)
-	}
-
-	if err := e.outerRoot.Close(); err != nil {
-		fmt.Fprintf(os.Stderr, "closing outer root failed: %v\n", err)
-		return fmt.Errorf("closing outer root failed: %v", err)
-	}
-
-	// chroot to current directory aka "." being the outer root
-	if err := syscall.Chroot("."); err != nil {
-		fmt.Fprintf(os.Stderr, "chroot to current directory failed: %v\n", err)
-		return fmt.Errorf("chroot to current directory failed: %v", err)
-	}
-
-	if err := os.Chdir(e.workingDir); err != nil {
-		fmt.Fprintf(os.Stderr, "chdir to working directory failed: %v\n", err)
-		return fmt.Errorf("chdir to working directory failed: %v", err)
-	}
-	e.outerRoot = nil
-	e.workingDir = ""
-
-	return nil
-}
-
 // ExecPlugin executes CNI plugin with given environment/stdin data.
 func (e *ChrootExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
-	// lock and do chroot to execute plugin with host root
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	err := e.chroot()
-	defer e.escape()
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "ExecPlugin failed at chroot: %v\n", err)
-		return nil, fmt.Errorf("ExecPlugin failed at chroot: %v", err)
-	}
+	var err error
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	c := exec.CommandContext(ctx, pluginPath)
+	// execute delegate CNI with host filesystem context.
+	c.SysProcAttr = &syscall.SysProcAttr{
+		Chroot: e.chrootDir,
+	}
 	c.Env = environ
 	c.Stdin = bytes.NewBuffer(stdinData)
 	c.Stdout = stdout
@@ -169,14 +100,5 @@ func (e *ChrootExec) pluginErr(err error, stdout, stderr []byte) error {
 
 // FindInPath try to find CNI plugin based on given path
 func (e *ChrootExec) FindInPath(plugin string, paths []string) (string, error) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	err := e.chroot()
-	defer e.escape()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FindInPath failed at chroot: %v\n", err)
-		return "", fmt.Errorf("FindInPath failed at chroot: %v", err)
-	}
-
 	return invoke.FindInPath(plugin, paths)
 }
