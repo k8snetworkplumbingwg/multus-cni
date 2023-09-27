@@ -258,7 +258,7 @@ func (m *Manager) monitorPluginConfiguration(ctx context.Context) error {
 
 // PersistMultusConfig persists the provided configuration to the disc, with
 // Read / Write permissions. The output file path is `<multus auto config dir>/00-multus.conf`
-func (m Manager) PersistMultusConfig(config string) (string, error) {
+func (m *Manager) PersistMultusConfig(config string) (string, error) {
 	if _, err := os.Stat(m.multusConfigFilePath); err == nil {
 		oldConfigbs, _ := os.ReadFile(m.multusConfigFilePath)
 		if oldConfigbs != nil && bytes.Compare(oldConfigbs, []byte(config)) == 0 {
