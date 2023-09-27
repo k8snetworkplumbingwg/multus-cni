@@ -486,7 +486,8 @@ func kubernetesRuntimeArgs(cniRequestEnvVariables map[string]string, kubeClient 
 
 	uid, err := podUID(kubeClient, cniEnv, podNamespace, podName)
 	if err != nil {
-		return nil, err
+		logging.Errorf("missing K8S_POD_UID", err.Error())
+		uid = "unknownUID"
 	}
 
 	sandboxID := cniRequestEnvVariables["K8S_POD_INFRA_CONTAINER_ID"]
