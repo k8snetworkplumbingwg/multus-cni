@@ -70,19 +70,26 @@ const (
 )
 
 var (
+	// ControllerName provides controller name
 	ControllerName = "csr-approver"
+	// NamePrefix specifies which name in certification request should be target to approve
 	NamePrefix     = "system:multus"
+	// Organization specifies which org in certification request should be target to approve
 	Organization   = []string{"system:multus"}
+	// Groups specifies which group in certification request should be target to approve
 	Groups         = sets.New[string]("system:nodes", "system:multus", "system:authenticated")
+	// UserPrefixes specifies which name prefix in certification request should be target to approve
 	UserPrefixes   = sets.New[string]("system:node", NamePrefix)
+	// Usages specifies which usage in certification request should be target to approve
 	Usages         = sets.New[certificatesv1.KeyUsage](
 		certificatesv1.UsageDigitalSignature,
 		certificatesv1.UsageClientAuth)
 )
 
+// NewCertController creates certcontroller
 func NewCertController() (*CertController, error) {
 	var clientset kubernetes.Interface
-	/* setup Kubernetes API client */
+	// setup Kubernetes API client
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -131,6 +138,7 @@ func NewCertController() (*CertController, error) {
 	return c, nil
 }
 
+// Run starts controller
 func (c *CertController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
@@ -347,7 +355,7 @@ func isApprovedOrDenied(status *certificatesv1.CertificateSigningRequestStatus) 
 func main() {
 	klog.Infof("starting cert-approver")
 
-	//Start watching for pod creations
+	// Start watching for pod creations
 	certController, err := NewCertController()
 	if err != nil {
 		klog.Fatal(err)
