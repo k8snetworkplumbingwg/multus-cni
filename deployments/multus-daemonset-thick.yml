@@ -205,6 +205,9 @@ spec:
             requests:
               cpu: "10m"
               memory: "15Mi"
+            limits:
+              cpu: "10m"
+              memory: "15Mi"
           securityContext:
             privileged: true
           volumeMounts:
