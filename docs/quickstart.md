@@ -236,7 +236,7 @@ metadata:
 spec:
   containers:
   - name: samplepod
-    command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
     image: alpine
 EOF
 ```
