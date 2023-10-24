@@ -1,7 +1,16 @@
-## Multus-cni Configuration Reference
+# Multus-cni Configuration Reference
+
+## Introduction
+
+Aside from setting options for Multus, one of the goals of configuration is to set the configuration for your *default network*. The default network is also sometimes referred as the "primary CNI plugin", the "primary network", or a "default CNI plugin" and is the CNI plugin that is used to implement [the Kubernetes networking model](https://kubernetes.io/docs/concepts/services-networking/#the-kubernetes-network-model) in your cluster. Common examples include Flannel, Weave, Calico, Cillium, and OVN-Kubernetes, among others.
+
+Here we will refer to this as your default CNI plugin or default network.
+
+## Example configuration
 
 Following is the example of multus config file, in `/etc/cni/net.d/`.
-(`"Note1"` and `"Note2"` are just comments, so you can remove them at your configuration)
+
+Example configuration using `clusterNetwork` (see also [using delegates](#using-delegates))
 
 ```
 {
@@ -23,65 +32,107 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
     "capabilities": {
         "portMappings": true
     },    
-    "readinessindicatorfile": "",
     "namespaceIsolation": false,
-"Note1":"NOTE: you can set clusterNetwork+defaultNetworks OR delegates!!",
-    "clusterNetwork": "defaultCRD",
-    "defaultNetworks": ["sidecarCRD", "flannel"],
+    "clusterNetwork": "/etc/cni/net.d/99-flannel.conf",
+    "defaultNetworks": ["sidecarCRD", "exampleNetwork"],
     "systemNamespaces": ["kube-system", "admin"],
     "multusNamespace": "kube-system",
-"Note2":"NOTE: If you use clusterNetwork/defaultNetworks, delegates is ignored",
+    allowTryDeleteOnErr: false
+}
+```
+
+## Index of configuration options
+
+This is a general index of options, however note that you must set either the `clusterNetwork` or `delegates` options, see the following sections after the index for details.
+
+* `name` (string, required): The name of the network
+* `type` (string, required): Must be set to the value of &quot;multus&quot;
+* `confDir` (string, optional): directory for CNI config file that multus reads. default `/etc/cni/multus/net.d`
+* `cniDir` (string, optional): Multus CNI data directory, default `/var/lib/cni/multus`
+* `binDir` (string, optional): additional directory for CNI plugins which multus calls, in addition to the default (the default is typically set to `/opt/cni/bin`)
+* `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
+* [`logToStderr`](#Logging-via-STDERR) (bool, optional): Enable or disable logging to `STDERR`. Defaults to true.
+* [`logFile`](#Writing-to-a-Log-File) (string, optional): file path for log file. multus puts log in given file
+* [`logLevel`](#Logging-Level) (string, optional): logging level (values in decreasing order of verbosity: "debug", "error", "verbose", or "panic")
+* [`logOptions`](#Logging-Options) (object, optional): logging option, More detailed log configuration
+* [`namespaceIsolation`](#Namespace-Isolation) (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
+* [`globalNamespaces`](#Allow-specific-namespaces-to-be-used-across-namespaces-when-using-namespace-isolation): (string, optional): Used only when `namespaceIsolation` is true, allows specification of comma-delimited list of namespaces which may be referred to outside of namespace isolation.
+* `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
+* [`readinessindicatorfile`](#Default-Network-Readiness-Indicator): The path to a file whose existence denotes that the default network is ready
+message to next when some missing error. Defaults to false.
+* `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
+* `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
+* `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
+
+### Using `clusterNetwork`
+
+Using the `clusterNetwork` option and the `delegates` are **mutually exclusive**. If `clusterNetwork` is set, the `delegates` field is *ignored*. 
+
+You **must** set one or the other.
+
+Therefore:
+
+* Set `clusterNetwork` and if this is set, optionally set the `defaultNetworks`.
+* OR you **must** set `delegates`.
+
+Options:
+
+* `clusterNetwork` (string, required if not using `delegates`): the default CNI plugin to be executed.
+* `defaultNetworks` ([]string, optional): Additional / secondary network attachment that is always attached to each pod. 
+
+The following values are valid for both `clusterNetwork` and `defaultNetworks` and are processed in the following order:
+
+* The name of a `NetworkAttachmentDefinition` custom resource in the namespace specified  by the `multusNamespace` configuration option
+* The `"name"` value in the contents of a CNI JSON configuration file in the CNI configuration directory, 
+  * The given name for `clusterNetwork` should match the value for `name` key in the contents of the CNI JSON file (e.g. `"name": "test"` in `my.conf` when `"clusterNetwork": "test"`)
+* A path to a directory containing CNI json configuration files. The alphabetically first file will be used.
+* Absolute file path for CNI config file
+* If none of the above are found using the value, Multus will raise an error.
+
+If for example you have `defaultNetworks` set as:
+
+```
+"defaultNetworks": ["sidecarNetwork", "exampleNetwork"],
+```
+
+In this example, the values in the expression refer to `NetworkAttachmentDefinition` custom resource names. Therefore, there must be `NetworkAttachmentDefinitions` already created with the names `sidecarNetwork` and `exampleNetwork`.
+
+This means that in addition to the cluster network, each pod would be assigned two additional networks by default, and the pod would present three interfaces, e.g. `eth0`, `net1`, and `net2`, with `net1` and `net2` being set by the above described `NetworkAttachmentDefinitions`. Additional attachments as made by setting `k8s.v1.cni.cncf.io/networks` on pods will be made in addition to those set in the `defaultNetworks` configuration option.
+
+### Using `delegates`
+
+If `clusterNetwork` is not set, you **must** use `delegates`.
+
+* `delegates` ([]map, required if not using `clusterNetwork`). List of CNI configurations to be used as your default CNI plugin(s).
+
+Example configuration using `delegates`:
+
+```
+{
+    "cniVersion": "0.3.1",
+    "name": "node-cni-network",
+    "type": "multus",
+    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+    "confDir": "/etc/cni/multus/net.d",
+    "cniDir": "/var/lib/cni/multus",
+    "binDir": "/opt/cni/bin",
     "delegates": [{
         "type": "weave-net",
         "hairpinMode": true
     }, {
         "type": "macvlan",
         ... (snip)
-    }],
-    allowTryDeleteOnErr: false
+    }]
 }
 ```
 
-* `name` (string, required): the name of the network
-* `type` (string, required): &quot;multus&quot;
-* `confDir` (string, optional): directory for CNI config file that multus reads. default `/etc/cni/multus/net.d`
-* `cniDir` (string, optional): Multus CNI data directory, default `/var/lib/cni/multus`
-* `binDir` (string, optional): additional directory for CNI plugins which multus calls, in addition to the default (the default is typically set to `/opt/cni/bin`)
-* `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
-* `logToStderr` (bool, optional): Enable or disable logging to `STDERR`. Defaults to true.
-* `logFile` (string, optional): file path for log file. multus puts log in given file
-* `logLevel` (string, optional): logging level ("debug", "error", "verbose", or "panic")
-* `logOptions` (object, optional): logging option, More detailed log configuration
-* `namespaceIsolation` (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
-* `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
-* `readinessindicatorfile`: The path to a file whose existence denotes that the default network is ready
-
-User should chose following parameters combination (`clusterNetwork`+`defaultNetworks` or `delegates`):
-
-* `clusterNetwork` (string, required): default CNI network for pods, used in kubernetes cluster (Pod IP and so on): name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist), directory for CNI config file or absolute file path for CNI config file
-* `defaultNetworks` ([]string, required): default CNI network attachment: name of network-attachment-definition, CNI json file name (without extension, .conf/.conflist), directory for CNI config file or absolute file path for CNI config file
-* `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
-* `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks`
-* `delegates` ([]map,required): number of delegate details in the Multus
-* `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL message to next when some missing error. Defaults to false.
-
-### Network selection flow of clusterNetwork/defaultNetworks
-
-Multus will find network for clusterNetwork/defaultNetworks as following sequences:
-
-1. CRD object for given network name, in 'kube-system' namespace
-1. CNI json config file in `confDir`. Given name should be without extension, like .conf/.conflist. (e.g. "test" for "test.conf"). The given name for `clusterNetwork` should match the value for `name` key in the config file (e.g. `"name": "test"` in "test.conf" when `"clusterNetwork": "test"`)
-1. Directory for CNI json config file. Multus will find alphabetically first file for the network
-1. File path for CNI json confile file.
-1. Multus failed to find network. Multus raise error message
-
-## Miscellaneous config
+## Configuration Option Details
 
 ### Default Network Readiness Indicator
 
-You may wish for your "default network" (that is, the CNI plugin & its configuration you specify as your default delegate) to become ready before you attach networks with Multus. This is disabled by default and not used unless you add the readiness check option(s) to your CNI configuration file.
+You may desire that your default network becomes ready before attaching networks with Multus. This is disabled by default and not used unless you set the `readinessindicatorfile` option to a non-blank value.
 
-For example, if you use Flannel as a default network, the recommended method for Flannel to be installed is via a daemonset that also drops a configuration file in `/etc/cni/net.d/`. This may apply to other plugins that place that configuration file upon their readiness, hence, Multus uses their configuration filename as a semaphore and optionally waits to attach networks to pods until that file exists.
+For example, if you use Flannel as a default network, the recommended method for Flannel to be installed is via a daemonset that also drops a configuration file in `/etc/cni/net.d/`. This may apply to other plugins that place that configuration file upon their readiness, therefore, Multus uses their configuration filename as a semaphore and optionally waits to attach networks to pods until that file exists.
 
 In this manner, you may prevent pods from crash looping, and instead wait for that default network to be ready.
 
