@@ -15,6 +15,8 @@
 
 package logging
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"fmt"
 	"os"
@@ -106,13 +108,13 @@ var _ = Describe("logging operations", func() {
 		Verbosef("foobar")
 		Expect(Errorf("foobar")).NotTo(BeNil())
 		Panicf("foobar")
-		logger.Filename = ""
+		logger = nil
 		loggingW = nil
 		err = os.RemoveAll(tmpDir)
 		Expect(err).NotTo(HaveOccurred())
 		// Revert the log variable to init
 		loggingW = nil
-		logger = &lumberjack.Logger{}
+		logger = nil
 	})
 
 	// Tests public getter

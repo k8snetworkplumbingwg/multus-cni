@@ -14,6 +14,8 @@
 
 package server
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"context"
 	"os"

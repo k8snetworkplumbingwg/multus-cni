@@ -15,6 +15,8 @@
 // Package cmdutils is the package that contains utilities for multus command
 package cmdutils
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"fmt"
 	"os"
