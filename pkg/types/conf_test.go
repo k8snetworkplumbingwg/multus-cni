@@ -15,6 +15,8 @@
 
 package types
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"encoding/json"
 	"fmt"

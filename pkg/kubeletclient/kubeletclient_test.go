@@ -15,6 +15,8 @@
 
 package kubeletclient
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"context"
 	"fmt"
