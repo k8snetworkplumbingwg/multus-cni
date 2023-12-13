@@ -587,7 +587,7 @@ func main() {
 
 			// if masterConfigFilePath is no longer exists
 			if os.IsNotExist(err) {
-				fmt.Printf("Master plugin @ %q has been deleted. Allowing 45 seconds for its restoration...\n", masterConfigFilePath)
+				fmt.Printf("Master plugin @ %q has been deleted. Wait until the master configuration is found...\n", masterConfigFilePath)
 				time.Sleep(10 * time.Second)
 
 				for range time.Tick(1 * time.Second) {
