@@ -36,6 +36,7 @@ import (
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
@@ -541,7 +542,7 @@ func GetDefaultNetworks(pod *v1.Pod, conf *types.NetConf, kubeClient *ClientInfo
 	delegate, resourceMap, err := getNetDelegate(kubeClient, pod, conf.ClusterNetwork, conf.ConfDir, conf.MultusNamespace, resourceMap)
 
 	if err != nil {
-		return resourceMap, logging.Errorf("GetDefaultNetworks: failed to get clusterNetwork %s in namespace %s", conf.ClusterNetwork, conf.MultusNamespace)
+		return resourceMap, logging.Errorf("GetDefaultNetworks: failed to get clusterNetwork %s in namespace %s: %v", conf.ClusterNetwork, conf.MultusNamespace, err)
 	}
 	delegate.MasterPlugin = true
 	delegates = append(delegates, delegate)
