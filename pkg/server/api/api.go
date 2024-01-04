@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -43,30 +44,40 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to marshal CNI request %v: %v", req, err)
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			Dial: func(proto, addr string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
+	// Retry parameters
+	maxRetries := 60
+	delay := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		client := &http.Client{
+			Transport: &http.Transport{
+				Dial: func(proto, addr string) (net.Conn, error) {
+					return net.Dial("unix", socketPath)
+				},
 			},
-		},
+		}
+
+		resp, err := client.Post(url, "application/json", bytes.NewReader(data))
+		if err == nil {
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read CNI result: %v", err)
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				return nil, fmt.Errorf("CNI request failed with status %v: '%s'", resp.StatusCode, string(body))
+			}
+
+			return body, nil
+		}
+
+		// Wait for the next retry
+		time.Sleep(delay)
 	}
 
-	resp, err := client.Post(url, "application/json", bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("failed to send CNI request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CNI result: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("CNI request failed with status %v: '%s'", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	return nil, fmt.Errorf("failed to send CNI request after %d retries: %v", maxRetries, err)
 }
 
 // GetAPIEndpoint returns endpoint URL for multus-daemon
