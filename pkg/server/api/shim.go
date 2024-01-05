@@ -24,6 +24,8 @@ import (
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
+
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 // ShimNetConf for the SHIM cni config file written in json
@@ -77,12 +79,21 @@ func postRequest(args *skel.CmdArgs) (*Response, string, error) {
 		return nil, "", fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
 	}
 
+	// check API readiness
+	if err := WaitUntilAPIReady(multusShimConfig.MultusSocketDir); err != nil {
+		return nil, multusShimConfig.CNIVersion, err
+	}
+
 	cniRequest, err := newCNIRequest(args)
 	if err != nil {
 		return nil, multusShimConfig.CNIVersion, err
 	}
 
-	body, err := DoCNI("http://dummy/cni", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
+	var body []byte
+	err = utilwait.PollImmediate(APIReadyPollDuration, APIReadyPollTimeout, func() (bool, error) {
+		body, err = DoCNI("http://dummy/cni", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
+		return err == nil, nil
+	})
 	if err != nil {
 		return nil, multusShimConfig.CNIVersion, err
 	}
