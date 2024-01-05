@@ -73,15 +73,15 @@ var (
 	// ControllerName provides controller name
 	ControllerName = "csr-approver"
 	// NamePrefix specifies which name in certification request should be target to approve
-	NamePrefix     = "system:multus"
+	NamePrefix = "system:multus"
 	// Organization specifies which org in certification request should be target to approve
-	Organization   = []string{"system:multus"}
+	Organization = []string{"system:multus"}
 	// Groups specifies which group in certification request should be target to approve
-	Groups         = sets.New[string]("system:nodes", "system:multus", "system:authenticated")
+	Groups = sets.New[string]("system:nodes", "system:multus", "system:authenticated")
 	// UserPrefixes specifies which name prefix in certification request should be target to approve
-	UserPrefixes   = sets.New[string]("system:node", NamePrefix)
+	UserPrefixes = sets.New[string]("system:node", NamePrefix)
 	// Usages specifies which usage in certification request should be target to approve
-	Usages         = sets.New[certificatesv1.KeyUsage](
+	Usages = sets.New[certificatesv1.KeyUsage](
 		certificatesv1.UsageDigitalSignature,
 		certificatesv1.UsageClientAuth)
 )

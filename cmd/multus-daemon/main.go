@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
-	"time"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
@@ -113,7 +112,7 @@ func main() {
 
 	// Wait until daemon ready
 	logging.Verbosef("API readiness check")
-	if waitUntilAPIReady(daemonConf.SocketDir) != nil {
+	if api.WaitUntilAPIReady(daemonConf.SocketDir) != nil {
 		logging.Panicf("failed to ready multus-daemon socket: %v", err)
 		os.Exit(1)
 	}
@@ -138,16 +137,6 @@ func main() {
 
 	wg.Wait()
 	logging.Verbosef("multus daemon is exited")
-}
-
-func waitUntilAPIReady(socketPath string) error {
-	apiReadyPollDuration := 100 * time.Millisecond
-	apiReadyPollTimeout := 1000 * time.Millisecond
-
-	return utilwait.PollImmediate(apiReadyPollDuration, apiReadyPollTimeout, func() (bool, error) {
-		_, err := api.DoCNI(api.GetAPIEndpoint(api.MultusHealthAPIEndpoint), nil, api.SocketPath(socketPath))
-		return err == nil, nil
-	})
 }
 
 func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool) error {

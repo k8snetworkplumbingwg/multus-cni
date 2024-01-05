@@ -22,9 +22,17 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
+
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
+	// APIReadyPollDuration specifies duration for API readiness check polling
+	APIReadyPollDuration = 100 * time.Millisecond
+	// APIReadyPollTimeout specifies timeout for API readiness check polling
+	APIReadyPollTimeout = 60000 * time.Millisecond
+
 	// MultusCNIAPIEndpoint is an endpoint for multus CNI request (for multus-shim)
 	MultusCNIAPIEndpoint = "/cni"
 	// MultusDelegateAPIEndpoint is an endpoint for multus delegate request (for hotplug)
@@ -87,4 +95,12 @@ func CreateDelegateRequest(cniCommand, cniContainerID, cniNetNS, cniIFName, podN
 		Config:              cniConfig,
 		InterfaceAttributes: interfaceAttributes,
 	}
+}
+
+// WaitUntilAPIReady checks API readiness
+func WaitUntilAPIReady(socketPath string) error {
+	return utilwait.PollImmediate(APIReadyPollDuration, APIReadyPollTimeout, func() (bool, error) {
+		_, err := DoCNI(GetAPIEndpoint(MultusHealthAPIEndpoint), nil, SocketPath(socketPath))
+		return err == nil, nil
+	})
 }
