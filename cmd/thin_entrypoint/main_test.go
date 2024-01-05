@@ -1,12 +1,14 @@
 package main
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"fmt"
 	"os"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2" //nolint:golint
+	. "github.com/onsi/gomega"    //nolint:golint
 )
 
 func TestThinEntrypoint(t *testing.T) {

@@ -14,6 +14,8 @@
 
 package config
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
