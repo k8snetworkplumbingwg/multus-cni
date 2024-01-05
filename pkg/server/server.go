@@ -41,6 +41,7 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	kapi "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -143,6 +144,23 @@ func GetListener(socketPath string) (net.Listener, error) {
 	return l, nil
 }
 
+// Informer transform to trim object fields for memory efficiency.
+func informerObjectTrim(obj interface{}) (interface{}, error) {
+	if accessor, err := meta.Accessor(obj); err == nil {
+		accessor.SetManagedFields(nil)
+	}
+	if pod, ok := obj.(*kapi.Pod); ok {
+		pod.Spec.Volumes = []kapi.Volume{}
+		for i := range pod.Spec.Containers {
+			pod.Spec.Containers[i].Command = nil
+			pod.Spec.Containers[i].Args = nil
+			pod.Spec.Containers[i].Env = nil
+			pod.Spec.Containers[i].VolumeMounts = nil
+		}
+	}
+	return obj, nil
+}
+
 func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
 	var tweakFunc internalinterfaces.TweakListOptionsFunc
 	if nodeName != "" {
@@ -157,7 +175,7 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 	// between multiple resources that might require a resync to resolve
 	const resyncInterval time.Duration = 0 * time.Second
 
-	informerFactory := informerfactory.NewSharedInformerFactory(kubeClient, resyncInterval)
+	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(kubeClient, resyncInterval, informerfactory.WithTransform(informerObjectTrim))
 	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return v1coreinformers.NewFilteredPodInformer(
 			c,
