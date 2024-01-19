@@ -28,13 +28,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
-	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
+	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
+	netlister "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -55,9 +58,13 @@ type NoK8sNetworkError struct {
 // ClientInfo contains information given from k8s client
 type ClientInfo struct {
 	Client           kubernetes.Interface
-	NetClient        netclient.K8sCniCncfIoV1Interface
+	NetClient        netclient.Interface
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
+
+	// multus-thick uses these informer
+	PodInformer    cache.SharedIndexInformer
+	NetDefInformer cache.SharedIndexInformer
 }
 
 // AddPod adds pod into kubernetes
@@ -67,6 +74,10 @@ func (c *ClientInfo) AddPod(pod *v1.Pod) (*v1.Pod, error) {
 
 // GetPod gets pod from kubernetes
 func (c *ClientInfo) GetPod(namespace, name string) (*v1.Pod, error) {
+	if c.PodInformer != nil {
+		logging.Debugf("GetPod for [%s/%s] will use informer cache", namespace, name)
+		return listers.NewPodLister(c.PodInformer.GetIndexer()).Pods(namespace).Get(name)
+	}
 	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
@@ -77,7 +88,16 @@ func (c *ClientInfo) DeletePod(namespace, name string) error {
 
 // AddNetAttachDef adds net-attach-def into kubernetes
 func (c *ClientInfo) AddNetAttachDef(netattach *nettypes.NetworkAttachmentDefinition) (*nettypes.NetworkAttachmentDefinition, error) {
-	return c.NetClient.NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(context.TODO(), netattach, metav1.CreateOptions{})
+	return c.NetClient.K8sCniCncfIoV1().NetworkAttachmentDefinitions(netattach.ObjectMeta.Namespace).Create(context.TODO(), netattach, metav1.CreateOptions{})
+}
+
+// GetNetAttachDef get net-attach-def from kubernetes
+func (c *ClientInfo) GetNetAttachDef(namespace, name string) (*nettypes.NetworkAttachmentDefinition, error) {
+	if c.NetDefInformer != nil {
+		logging.Debugf("GetNetAttachDef for [%s/%s] will use informer cache", namespace, name)
+		return netlister.NewNetworkAttachmentDefinitionLister(c.NetDefInformer.GetIndexer()).NetworkAttachmentDefinitions(namespace).Get(name)
+	}
+	return c.NetClient.K8sCniCncfIoV1().NetworkAttachmentDefinitions(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
 // Eventf puts event into kubernetes events
@@ -107,7 +127,7 @@ func SetPodNetworkStatusAnnotation(client *ClientInfo, podName string, podNamesp
 	if err != nil {
 		return logging.Errorf("SetNetworkStatus: %v", err)
 	}
-	if client == nil || client.Client == nil {
+	if client == nil {
 		if len(conf.Delegates) == 0 {
 			// No available kube client and no delegates, we can't do anything
 			return logging.Errorf("SetNetworkStatus: must have either Kubernetes config or delegates")
@@ -248,7 +268,8 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
-	customResource, err := client.NetClient.NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
+
+	customResource, err := client.GetNetAttachDef(net.Namespace, net.Name)
 	if err != nil {
 		errMsg := fmt.Sprintf("cannot find a network-attachment-definition (%s) in namespace (%s): %v", net.Name, net.Namespace, err)
 		if client != nil {
