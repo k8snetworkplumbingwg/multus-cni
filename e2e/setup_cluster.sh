@@ -11,6 +11,10 @@ OCI_BIN="${OCI_BIN:-docker}"
 # Acceptable values are `multus-daemonset.yml`. `multus-daemonset-thick.yml`.
 # Defaults to `multus-daemonset-thick.yml`.
 MULTUS_MANIFEST="${MULTUS_MANIFEST:-multus-daemonset-thick.yml}"
+# define the dockerfile to build multus.
+# Acceptable values are `Dockerfile`. `Dockerfile.thick`.
+# Defaults to `Dockerfile.thick`.
+MULTUS_DOCKERFILE="${MULTUS_MANIFEST:-Dockerfile.thick}"
 
 kind_network='kind'
 reg_name='kind-registry'
@@ -19,7 +23,7 @@ running="$($OCI_BIN inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null ||
 if [ "${running}" != 'true' ]; then
   # run registry and push the multus image
   $OCI_BIN run -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" registry:2
-  $OCI_BIN build -t localhost:5000/multus:e2e -f ../images/Dockerfile ..
+  $OCI_BIN build -t localhost:5000/multus:e2e -f ../images/${MULTUS_DOCKERFILE} ..
   $OCI_BIN push localhost:5000/multus:e2e
 fi
 reg_host="${reg_name}"
