@@ -603,6 +603,7 @@ func main() {
 				fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
 				return
 			}
+			time.Sleep(1 * time.Second)
 		}
 	} else {
 		// sleep infinitely
