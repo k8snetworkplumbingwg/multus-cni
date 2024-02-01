@@ -54,3 +54,4 @@ spec:
     image: dougbtv/centos-network
     ports:
     - containerPort: 80
+  automountServiceAccountToken: false
