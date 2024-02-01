@@ -45,3 +45,4 @@ spec:
       limits:
         intel.com/sriov: '1'
   restartPolicy: "Never"
+  automountServiceAccountToken: false
