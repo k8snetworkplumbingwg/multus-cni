@@ -627,6 +627,10 @@ master CNI configuration and kubeconfig. when such change detected, the script w
 
     --skip-config-watch
 
+The poll interval of the config changes watcher is configurable with `--multus-config-watch-timer=<duration>`. Please refer to the [time.Duration](https://pkg.go.dev/time#Duration) to configure the time interval. The following example watches the config change every 5 minutes.
+
+    --multus-config-watch-timer=5m
+
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 
     --rename-conf-file=true
