@@ -57,6 +57,7 @@ type Options struct {
 	AdditionalBinDir         string
 	ForceCNIVersion          bool
 	SkipTLSVerify            bool
+	WatchTimer               time.Duration
 }
 
 const (
@@ -90,6 +91,7 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.AdditionalBinDir, "additional-bin-dir", "", "adds binDir option to configuration (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.SkipTLSVerify, "skip-tls-verify", false, "skip TLS verify")
 	fs.BoolVar(&o.ForceCNIVersion, "force-cni-version", false, "force cni version to '--cni-version' (only for e2e-kind testing)")
+	fs.DurationVar(&o.WatchTimer, "multus-config-watch-timer", 1*time.Second, "how long to wait before reconciling multus config")
 	fs.MarkHidden("force-cni-version")
 	fs.MarkHidden("skip-tls-verify")
 }
@@ -594,9 +596,12 @@ func main() {
 		fmt.Printf("multus config file is created.\n")
 	}
 
+	watcher := time.NewTicker(opt.WatchTimer)
+	defer watcher.Stop()
+
 	if opt.CleanupConfigOnExit && opt.MultusConfFile == "auto" {
 		fmt.Printf("Entering watch loop...\n")
-		for {
+		for range watcher.C {
 			// Check kubeconfig and update if different (i.e. service account updated)
 			caHash, saTokenHash, err = opt.createKubeConfig(caHash, saTokenHash)
 			if err != nil {
@@ -625,7 +630,6 @@ func main() {
 				fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
 				return
 			}
-			time.Sleep(1 * time.Second)
 		}
 	} else {
 		// sleep infinitely
