@@ -353,7 +353,7 @@ func (s *Server) Start(ctx context.Context, l net.Listener) {
 	waitCancel()
 
 	go func() {
-		utilwait.UntilWithContext(ctx, func(ctx context.Context) {
+		utilwait.UntilWithContext(ctx, func(_ context.Context) {
 			logging.Debugf("open for business")
 			if err := s.Serve(l); err != nil {
 				utilruntime.HandleError(fmt.Errorf("CNI server Serve() failed: %v", err))

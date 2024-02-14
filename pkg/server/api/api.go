@@ -53,7 +53,7 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: func(proto, addr string) (net.Conn, error) {
+			Dial: func(_, _ string) (net.Conn, error) {
 				return net.Dial("unix", socketPath)
 			},
 		},
