@@ -154,7 +154,7 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 	}
 
 	if daemonConfig.MetricsPort != nil {
-		go utilwait.UntilWithContext(ctx, func(ctx context.Context) {
+		go utilwait.UntilWithContext(ctx, func(_ context.Context) {
 			http.Handle("/metrics", promhttp.Handler())
 			logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
 			logging.Debugf("metrics: %s", http.ListenAndServe(fmt.Sprintf(":%d", *daemonConfig.MetricsPort), nil))
@@ -177,7 +177,12 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 }
 
 func cniServerConfig(configFilePath string) (*srv.ControllerNetConf, error) {
-	configFileContents, err := os.ReadFile(configFilePath)
+	path, err := filepath.Abs(configFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("illegal path %s in server config path %s: %w", path, configFilePath, err)
+	}
+
+	configFileContents, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -185,9 +190,14 @@ func cniServerConfig(configFilePath string) (*srv.ControllerNetConf, error) {
 }
 
 func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error {
-	srcFile, err := os.Open(multusConfigPath)
+	path, err := filepath.Abs(multusConfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to open (READ only) file %s: %w", multusConfigPath, err)
+		return fmt.Errorf("illegal path %s in multusConfigPath %s: %w", path, multusConfigPath, err)
+	}
+
+	srcFile, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open (READ only) file %s: %w", path, err)
 	}
 
 	dstFileName := cniConfigDir + "/" + filepath.Base(multusConfigPath)
