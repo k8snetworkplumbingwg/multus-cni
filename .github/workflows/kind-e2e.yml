@@ -48,9 +48,6 @@ jobs:
           sudo apt-get install -y j2cli
           echo $(j2 --version)
 
-      - name: Setup registry
-        run: docker run -d --restart=always -p "5000:5000" --name "kind-registry" registry:2
-
       - name: Build latest-amd64
         uses: docker/build-push-action@v5
         with:
@@ -59,10 +56,6 @@ jobs:
           tags: localhost:5000/multus:e2e
           file: ${{ matrix.docker-file }}
           platforms: linux/amd64
-
-      # docker buildx push is failed due to https://github.com/docker/buildx/issues/94
-      - name: Push to local registry
-        run: docker push localhost:5000/multus:e2e
 
       - name: Get kind/kubectl/koko
         working-directory: ./e2e
@@ -74,7 +67,7 @@ jobs:
 
       - name: Setup cluster
         working-directory: ./e2e
-        run: MULTUS_MANIFEST=${{ matrix.multus-manifest }} ./setup_cluster.sh
+        run: MULTUS_MANIFEST=${{ matrix.multus-manifest }} MULTUS_DOCKERFILE=none ./setup_cluster.sh
 
       - name: Test simple pod
         working-directory: ./e2e
@@ -108,5 +101,3 @@ jobs:
       - name: cleanup cluster and registry
         run: |
           kind delete cluster
-          docker kill kind-registry
-          docker rm kind-registry
