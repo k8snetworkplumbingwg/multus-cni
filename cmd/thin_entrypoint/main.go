@@ -460,13 +460,6 @@ func (o *Options) createMultusConfig() (string, error) {
 		return "", fmt.Errorf("cannot encode master CNI config: %v", err)
 	}
 
-	// generate multus config
-	tempFileName := fmt.Sprintf("%s/00-multus.conf.new", o.CNIConfDir)
-	fp, err := os.OpenFile(tempFileName, os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return "", fmt.Errorf("cannot create multus cni temp file: %v", err)
-	}
-
 	// use conflist template if cniVersionConfig == "1.0.0"
 	multusConfFilePath := fmt.Sprintf("%s/00-multus.conf", o.CNIConfDir)
 	templateMultusConfig, err := template.New("multusCNIConfig").Parse(multusConfTemplate)
@@ -481,6 +474,10 @@ func (o *Options) createMultusConfig() (string, error) {
 			return "", fmt.Errorf("template parse error: %v", err)
 		}
 	}
+
+	newHash := sha256.New()
+	var buf bytes.Buffer
+	writer := io.MultiWriter(newHash, &buf)
 
 	templateData := map[string]string{
 		"CNIVersion":                   cniVersionConfig,
@@ -497,8 +494,30 @@ func (o *Options) createMultusConfig() (string, error) {
 		"MultusKubeConfigFileHost":     o.MultusKubeConfigFileHost, // be fixed?
 		"MasterPluginJSON":             string(masterPluginByte),
 	}
-	if err = templateMultusConfig.Execute(fp, templateData); err != nil {
+	if err = templateMultusConfig.Execute(writer, templateData); err != nil {
 		return "", fmt.Errorf("cannot create multus cni config: %v", err)
+	}
+
+	currentHash := sha256.New()
+	if contents, err := os.ReadFile(multusConfFilePath); err == nil {
+		_, _ = io.Copy(currentHash, bytes.NewReader(contents))
+	}
+
+	if bytes.Equal(currentHash.Sum(nil), newHash.Sum(nil)) {
+		fmt.Printf("[%s] contents are up-to-date; not overwriting\n", multusConfFilePath)
+		return masterConfigPath, nil
+	}
+
+	// generate multus config
+	tempFileName := fmt.Sprintf("%s/00-multus.conf.new", o.CNIConfDir)
+	fp, err := os.OpenFile(tempFileName, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return "", fmt.Errorf("cannot create multus cni temp file: %v", err)
+	}
+	defer fp.Close()
+
+	if _, err := io.Copy(fp, &buf); err != nil {
+		return "", fmt.Errorf("cannot write out rendered config to temp file: %v", err)
 	}
 
 	if err := fp.Sync(); err != nil {
