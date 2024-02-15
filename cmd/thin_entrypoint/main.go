@@ -186,13 +186,10 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 		return nil, fmt.Errorf("cannot read service account token file: %v", err)
 	}
 
-	// create kubeconfig by template and replace it by atomic
-	tempKubeConfigFile := fmt.Sprintf("%s/multus.d/multus.kubeconfig.new", o.CNIConfDir)
-	multusKubeConfig := fmt.Sprintf("%s/multus.d/multus.kubeconfig", o.CNIConfDir)
-	fp, err := os.OpenFile(tempKubeConfigFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create kubeconfig temp file: %v", err)
-	}
+	// Prepare
+	var buf bytes.Buffer
+	hash := sha256.New()
+	writer := io.MultiWriter(hash, &buf)
 
 	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
 	if err != nil {
@@ -204,13 +201,29 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 		"KubeServiceAccountToken": string(saTokenByte),
 	}
 
-	// Prepare
-	hash := sha256.New()
-	writer := io.MultiWriter(hash, fp)
-
 	// genearate kubeconfig from template
 	if err = templateKubeconfig.Execute(writer, templateData); err != nil {
 		return nil, fmt.Errorf("cannot create kubeconfig: %v", err)
+	}
+
+	newFileHash := hash.Sum(nil)
+
+	if bytes.Equal(newFileHash, currentFileHash) {
+		fmt.Printf("kubeconfig is same, not copy\n")
+		return currentFileHash, nil
+	}
+
+	// create kubeconfig by template and replace it by atomic
+	tempKubeConfigFile := fmt.Sprintf("%s/multus.d/multus.kubeconfig.new", o.CNIConfDir)
+	multusKubeConfig := fmt.Sprintf("%s/multus.d/multus.kubeconfig", o.CNIConfDir)
+	fp, err := os.OpenFile(tempKubeConfigFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create kubeconfig temp file: %v", err)
+	}
+	defer fp.Close()
+
+	if _, err := io.Copy(fp, &buf); err != nil {
+		return nil, fmt.Errorf("cannot write out updated kubeconfig to temp file: %v", err)
 	}
 
 	if err := fp.Sync(); err != nil {
@@ -220,13 +233,6 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 	if err := fp.Close(); err != nil {
 		os.Remove(fp.Name())
 		return nil, fmt.Errorf("cannot close kubeconfig temp file: %v", err)
-	}
-
-	newFileHash := hash.Sum(nil)
-	if currentFileHash != nil && bytes.Compare(newFileHash, currentFileHash) == 0 {
-		fmt.Printf("kubeconfig is same, not copy\n")
-		os.Remove(fp.Name())
-		return currentFileHash, nil
 	}
 
 	// replace file with tempfile
