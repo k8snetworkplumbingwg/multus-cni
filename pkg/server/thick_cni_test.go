@@ -210,7 +210,7 @@ func fakeK8sClient() *k8s.ClientInfo {
 	const magicNumber = 10
 	return &k8s.ClientInfo{
 		Client:        fake.NewSimpleClientset(),
-		NetClient:     netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+		NetClient:     netfake.NewSimpleClientset(),
 		EventRecorder: record.NewFakeRecorder(magicNumber),
 	}
 }

@@ -33,13 +33,14 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/klog"
 
-	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/typed/k8s.cni.cncf.io/v1"
+	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
@@ -169,6 +170,12 @@ func InClusterK8sClient() (*ClientInfo, error) {
 		return nil, fmt.Errorf("failed to create in-cluster kube client")
 	}
 	return clientInfo, err
+}
+
+// SetK8sClientInformers adds informer structure to ClientInfo to utilize in thick daemon
+func (c *ClientInfo) SetK8sClientInformers(podInformer, netDefInformer cache.SharedIndexInformer) {
+	c.PodInformer = podInformer
+	c.NetDefInformer = netDefInformer
 }
 
 // GetK8sClient gets client info from kubeconfig

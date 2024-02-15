@@ -48,7 +48,7 @@ func TestK8sClient(t *testing.T) {
 func NewFakeClientInfo() *ClientInfo {
 	return &ClientInfo{
 		Client:    fake.NewSimpleClientset(),
-		NetClient: netfake.NewSimpleClientset().K8sCniCncfIoV1(),
+		NetClient: netfake.NewSimpleClientset(),
 	}
 }
 

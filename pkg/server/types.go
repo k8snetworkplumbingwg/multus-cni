@@ -24,6 +24,7 @@ import (
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 
+	netdefinformer "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
 	"k8s.io/client-go/informers/internalinterfaces"
 	"k8s.io/client-go/tools/cache"
 )
@@ -48,13 +49,15 @@ type Metrics struct {
 // the CNI shim requests issued when a pod is added / removed.
 type Server struct {
 	http.Server
-	rundir          string
-	kubeclient      *k8sclient.ClientInfo
-	exec            invoke.Exec
-	serverConfig    []byte
-	metrics         *Metrics
-	informerFactory internalinterfaces.SharedInformerFactory
-	podInformer     cache.SharedIndexInformer
+	rundir                string
+	kubeclient            *k8sclient.ClientInfo
+	exec                  invoke.Exec
+	serverConfig          []byte
+	metrics               *Metrics
+	informerFactory       internalinterfaces.SharedInformerFactory
+	podInformer           cache.SharedIndexInformer
+	netdefInformerFactory netdefinformer.SharedInformerFactory
+	netdefInformer        cache.SharedIndexInformer
 
 	ignoreReadinessIndicator bool
 }
