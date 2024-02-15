@@ -133,7 +133,6 @@ spec:
       containers:
       - name: kube-multus
         image: localhost:5000/multus:e2e
-        imagePullPolicy: Always
         command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
         resources:
           requests:
