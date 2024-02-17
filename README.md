@@ -1,8 +1,11 @@
+> [!NOTE]  
+> This fork provides arm64 and other architecture builds for [multus-cni thick plugin](deployments/multus-daemonset-thick.yaml) as the official repo only builds for amd64.
+
 # Multus-CNI
 
 ![multus-cni Logo](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/images/Multus.png)
 
-[![Build](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml)[![Test](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/multus-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/k8snetworkplumbingwg/multus-cni/badge.svg)](https://coveralls.io/github/k8snetworkplumbingwg/multus-cni)
+[![Build](https://github.com/fishgrimsby/multus-cni/actions/workflows/build.yml/badge.svg)](https://github.com/fishgrimsby/multus-cni/actions/workflows/build.yml)[![Test](https://github.com/fishgrimsby/multus-cni/actions/workflows/test.yml/badge.svg)](https://github.com/fishgrimsby/multus-cni/actions/workflows/test.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/fishgrimsby/multus-cni)](https://goreportcard.com/report/github.com/fishgrimsby/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/fishgrimsby/multus-cni/badge.svg)](https://coveralls.io/github/fishgrimsby/multus-cni)
 
 Multus CNI enables attaching multiple network interfaces to pods in Kubernetes.
 
@@ -46,8 +49,8 @@ cat ./deployments/multus-daemonset.yml | kubectl apply -f -
 
 In addition to the [quick-start guide](docs/quickstart.md), you may:
 
-- Download binaries from [release page](https://github.com/k8snetworkplumbingwg/multus-cni/releases)
-- By Docker image from [GitHub Container Registry](https://github.com/orgs/k8snetworkplumbingwg/packages/container/package/multus-cni)
+- Download binaries from [release page](https://github.com/fishgrimsby/multus-cni/releases)
+- By Docker image from [GitHub Container Registry](https://github.com/orgs/fishgrimsby/packages/container/package/multus-cni)
 - Or, roll-your-own and build from source
   - See [Development](docs/development.md)
 
