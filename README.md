@@ -1,5 +1,5 @@
 > [!NOTE]  
-> This fork provides arm64 and other architecture builds for [multus-cni thick plugin](deployments/multus-daemonset-thick.yaml) as the official repo only builds for amd64.
+> This fork provides arm64 and other architecture builds for [multus-cni thick plugin](deployments/multus-daemonset-thick.yml) as the official repo only builds for amd64.
 
 # Multus-CNI
 
