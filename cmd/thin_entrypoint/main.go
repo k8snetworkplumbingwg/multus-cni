@@ -21,7 +21,6 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -140,23 +139,56 @@ contexts:
 current-context: multus-context
 `
 
-func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
-	// check file exists
-	if _, err := os.Stat(serviceAccountTokenFile); err != nil {
-		return nil, fmt.Errorf("service account token is not found: %v", err)
+func getFileAndHash(filepath string) ([]byte, []byte, error) {
+	if _, err := os.Stat(filepath); err != nil {
+		return nil, nil, fmt.Errorf("file %s not found: %v", filepath, err)
 	}
-	if _, err := os.Stat(serviceAccountCAFile); err != nil {
-		return nil, fmt.Errorf("service account ca is not found: %v", err)
+	content, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot read %s file: %v", filepath, err)
+	}
+
+	hash := sha256.New()
+	hash.Write(content)
+	return content, hash.Sum(nil), nil
+}
+
+func (o *Options) createKubeConfig(prevCAHash, prevSATokenHash []byte) ([]byte, []byte, error) {
+	caFileByte, caHash, err := getFileAndHash(serviceAccountCAFile)
+	if err != nil {
+		return nil, nil, err
+	}
+	saTokenByte, saTokenHash, err := getFileAndHash(serviceAccountTokenFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	caUnchanged := prevCAHash != nil && bytes.Equal(prevCAHash, caHash)
+	saUnchanged := prevSATokenHash != nil && bytes.Equal(prevSATokenHash, saTokenHash)
+
+	if o.SkipTLSVerify {
+		if saUnchanged {
+			return caHash, saTokenHash, nil
+		}
+	} else {
+		if caUnchanged && saUnchanged {
+			return caHash, saTokenHash, nil
+		}
+	}
+
+	if prevSATokenHash != nil {
+		// don't log "recreating" on first function execution
+		fmt.Printf("CA (%v) or SA token (%v) changed - recreating kubeconfig\n", !caUnchanged, !saUnchanged)
 	}
 
 	// create multus.d directory
 	if err := os.MkdirAll(fmt.Sprintf("%s/multus.d", o.CNIConfDir), 0755); err != nil {
-		return nil, fmt.Errorf("cannot create multus.d directory: %v", err)
+		return nil, nil, fmt.Errorf("cannot create multus.d directory: %v", err)
 	}
 
 	// create multus cni conf directory
 	if err := os.MkdirAll(o.MultusCNIConfDir, 0755); err != nil {
-		return nil, fmt.Errorf("cannot create multus-cni-conf-dir(%s) directory: %v", o.MultusCNIConfDir, err)
+		return nil, nil, fmt.Errorf("cannot create multus-cni-conf-dir(%s) directory: %v", o.MultusCNIConfDir, err)
 	}
 
 	// get Kubernetes service protocol/host/port
@@ -173,17 +205,8 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 		tlsConfig = "insecure-skip-tls-verify: true"
 	} else {
 		// create tlsConfig by service account CA file
-		caFileByte, err := os.ReadFile(serviceAccountCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read service account ca file: %v", err)
-		}
 		caFileB64 := bytes.ReplaceAll([]byte(b64.StdEncoding.EncodeToString(caFileByte)), []byte("\n"), []byte(""))
 		tlsConfig = fmt.Sprintf("certificate-authority-data: %s", string(caFileB64))
-	}
-
-	saTokenByte, err := os.ReadFile(serviceAccountTokenFile)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read service account token file: %v", err)
 	}
 
 	// create kubeconfig by template and replace it by atomic
@@ -191,12 +214,12 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 	multusKubeConfig := fmt.Sprintf("%s/multus.d/multus.kubeconfig", o.CNIConfDir)
 	fp, err := os.OpenFile(tempKubeConfigFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create kubeconfig temp file: %v", err)
+		return nil, nil, fmt.Errorf("cannot create kubeconfig temp file: %v", err)
 	}
 
 	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
 	if err != nil {
-		return nil, fmt.Errorf("template parse error: %v", err)
+		return nil, nil, fmt.Errorf("template parse error: %v", err)
 	}
 	templateData := map[string]string{
 		"KubeConfigHost":          fmt.Sprintf("%s://[%s]:%s", kubeProtocol, kubeHost, kubePort),
@@ -204,38 +227,27 @@ func (o *Options) createKubeConfig(currentFileHash []byte) ([]byte, error) {
 		"KubeServiceAccountToken": string(saTokenByte),
 	}
 
-	// Prepare
-	hash := sha256.New()
-	writer := io.MultiWriter(hash, fp)
-
-	// genearate kubeconfig from template
-	if err = templateKubeconfig.Execute(writer, templateData); err != nil {
-		return nil, fmt.Errorf("cannot create kubeconfig: %v", err)
+	// generate kubeconfig from template
+	if err = templateKubeconfig.Execute(fp, templateData); err != nil {
+		return nil, nil, fmt.Errorf("cannot create kubeconfig: %v", err)
 	}
 
 	if err := fp.Sync(); err != nil {
 		os.Remove(fp.Name())
-		return nil, fmt.Errorf("cannot flush kubeconfig temp file: %v", err)
+		return nil, nil, fmt.Errorf("cannot flush kubeconfig temp file: %v", err)
 	}
 	if err := fp.Close(); err != nil {
 		os.Remove(fp.Name())
-		return nil, fmt.Errorf("cannot close kubeconfig temp file: %v", err)
-	}
-
-	newFileHash := hash.Sum(nil)
-	if currentFileHash != nil && bytes.Compare(newFileHash, currentFileHash) == 0 {
-		fmt.Printf("kubeconfig is same, not copy\n")
-		os.Remove(fp.Name())
-		return currentFileHash, nil
+		return nil, nil, fmt.Errorf("cannot close kubeconfig temp file: %v", err)
 	}
 
 	// replace file with tempfile
 	if err := os.Rename(tempKubeConfigFile, multusKubeConfig); err != nil {
-		return nil, fmt.Errorf("cannot replace %q with temp file %q: %v", multusKubeConfig, tempKubeConfigFile, err)
+		return nil, nil, fmt.Errorf("cannot replace %q with temp file %q: %v", multusKubeConfig, tempKubeConfigFile, err)
 	}
 
 	fmt.Printf("kubeconfig is created in %s\n", multusKubeConfig)
-	return newFileHash, nil
+	return caHash, saTokenHash, nil
 }
 
 const multusConflistTemplate = `{
@@ -298,11 +310,11 @@ const multusConfTemplate = `{
 }
 `
 
-func (o *Options) createMultusConfig() (string, error) {
+func (o *Options) createMultusConfig(prevMasterConfigFileHash []byte) (string, []byte, error) {
 	// find master file from MultusAutoconfigDir
 	files, err := libcni.ConfFiles(o.MultusAutoconfigDir, []string{".conf", ".conflist"})
 	if err != nil {
-		return "", fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
+		return "", nil, fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
 	}
 
 	masterConfigPath := ""
@@ -313,22 +325,32 @@ func (o *Options) createMultusConfig() (string, error) {
 		}
 	}
 	if masterConfigPath == "" {
-		return "", fmt.Errorf("cannot find valid master CNI config in %q", o.MultusAutoconfigDir)
+		return "", nil, fmt.Errorf("cannot find valid master CNI config in %q", o.MultusAutoconfigDir)
 	}
 
-	masterConfigBytes, err := os.ReadFile(masterConfigPath)
+	masterConfigBytes, masterConfigFileHash, err := getFileAndHash(masterConfigPath)
 	if err != nil {
-		return "", fmt.Errorf("cannot read master CNI config file %q: %v", masterConfigPath, err)
+		return "", nil, err
 	}
+
+	if prevMasterConfigFileHash != nil && bytes.Equal(prevMasterConfigFileHash, masterConfigFileHash) {
+		return masterConfigPath, masterConfigFileHash, nil
+	}
+
+	if prevMasterConfigFileHash != nil {
+		// don't log "recreating" on first function execution
+		fmt.Printf("master config changed - recreating multus config\n")
+	}
+
 	masterConfig := map[string]interface{}{}
 	if err = json.Unmarshal(masterConfigBytes, &masterConfig); err != nil {
-		return "", fmt.Errorf("cannot read master CNI config json: %v", err)
+		return "", nil, fmt.Errorf("cannot read master CNI config json: %v", err)
 	}
 
 	// check CNIVersion
 	masterCNIVersionElem, ok := masterConfig["cniVersion"]
 	if !ok {
-		return "", fmt.Errorf("cannot get cniVersion in master CNI config file %q: %v", masterConfigPath, err)
+		return "", nil, fmt.Errorf("cannot get cniVersion in master CNI config file %q: %v", masterConfigPath, err)
 	}
 
 	if o.ForceCNIVersion {
@@ -337,7 +359,7 @@ func (o *Options) createMultusConfig() (string, error) {
 	} else {
 		masterCNIVersion := masterCNIVersionElem.(string)
 		if o.CNIVersion != "" && masterCNIVersion != o.CNIVersion {
-			return "", fmt.Errorf("Multus cni version is %q while master plugin cni version is %q", o.CNIVersion, masterCNIVersion)
+			return "", nil, fmt.Errorf("Multus cni version is %q while master plugin cni version is %q", o.CNIVersion, masterCNIVersion)
 		}
 		o.CNIVersion = masterCNIVersion
 	}
@@ -348,7 +370,7 @@ func (o *Options) createMultusConfig() (string, error) {
 	if o.OverrideNetworkName {
 		masterPluginNetworkElem, ok := masterConfig["name"]
 		if !ok {
-			return "", fmt.Errorf("cannot get name in master CNI config file %q: %v", masterConfigPath, err)
+			return "", nil, fmt.Errorf("cannot get name in master CNI config file %q: %v", masterConfigPath, err)
 		}
 
 		masterPluginNetworkName = masterPluginNetworkElem.(string)
@@ -362,7 +384,7 @@ func (o *Options) createMultusConfig() (string, error) {
 	if isMasterConfList {
 		masterPluginsElem, ok := masterConfig["plugins"]
 		if !ok {
-			return "", fmt.Errorf("cannot get 'plugins' field in master CNI config file %q: %v", masterConfigPath, err)
+			return "", nil, fmt.Errorf("cannot get 'plugins' field in master CNI config file %q: %v", masterConfigPath, err)
 		}
 		masterPlugins := masterPluginsElem.([]interface{})
 		for _, v := range masterPlugins {
@@ -389,7 +411,7 @@ func (o *Options) createMultusConfig() (string, error) {
 	if len(masterCapabilities) != 0 {
 		capabilitiesByte, err := json.Marshal(masterCapabilities)
 		if err != nil {
-			return "", fmt.Errorf("cannot get capabilities map: %v", err)
+			return "", nil, fmt.Errorf("cannot get capabilities map: %v", err)
 		}
 		nestedCapabilitiesConf = fmt.Sprintf("\n        \"capabilities\": %s,", string(capabilitiesByte))
 	}
@@ -421,7 +443,7 @@ func (o *Options) createMultusConfig() (string, error) {
 	case "":
 		// no logLevel config, skipped
 	default:
-		return "", fmt.Errorf("Log levels should be one of: debug/verbose/error/panic, did not understand: %q", o.MultusLogLevel)
+		return "", nil, fmt.Errorf("Log levels should be one of: debug/verbose/error/panic, did not understand: %q", o.MultusLogLevel)
 	}
 
 	// check MultusLogFile
@@ -451,28 +473,28 @@ func (o *Options) createMultusConfig() (string, error) {
 	// fill .MasterPluginJSON
 	masterPluginByte, err := json.Marshal(masterConfig)
 	if err != nil {
-		return "", fmt.Errorf("cannot encode master CNI config: %v", err)
+		return "", nil, fmt.Errorf("cannot encode master CNI config: %v", err)
 	}
 
 	// generate multus config
 	tempFileName := fmt.Sprintf("%s/00-multus.conf.new", o.CNIConfDir)
 	fp, err := os.OpenFile(tempFileName, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
-		return "", fmt.Errorf("cannot create multus cni temp file: %v", err)
+		return "", nil, fmt.Errorf("cannot create multus cni temp file: %v", err)
 	}
 
 	// use conflist template if cniVersionConfig == "1.0.0"
 	multusConfFilePath := fmt.Sprintf("%s/00-multus.conf", o.CNIConfDir)
 	templateMultusConfig, err := template.New("multusCNIConfig").Parse(multusConfTemplate)
 	if err != nil {
-		return "", fmt.Errorf("template parse error: %v", err)
+		return "", nil, fmt.Errorf("template parse error: %v", err)
 	}
 
 	if o.CNIVersion == "1.0.0" { //Check 1.0.0 or above!
 		multusConfFilePath = fmt.Sprintf("%s/00-multus.conflist", o.CNIConfDir)
 		templateMultusConfig, err = template.New("multusCNIConfig").Parse(multusConflistTemplate)
 		if err != nil {
-			return "", fmt.Errorf("template parse error: %v", err)
+			return "", nil, fmt.Errorf("template parse error: %v", err)
 		}
 	}
 
@@ -492,32 +514,32 @@ func (o *Options) createMultusConfig() (string, error) {
 		"MasterPluginJSON":             string(masterPluginByte),
 	}
 	if err = templateMultusConfig.Execute(fp, templateData); err != nil {
-		return "", fmt.Errorf("cannot create multus cni config: %v", err)
+		return "", nil, fmt.Errorf("cannot create multus cni config: %v", err)
 	}
 
 	if err := fp.Sync(); err != nil {
 		os.Remove(tempFileName)
-		return "", fmt.Errorf("cannot flush multus cni config: %v", err)
+		return "", nil, fmt.Errorf("cannot flush multus cni config: %v", err)
 	}
 	if err := fp.Close(); err != nil {
 		os.Remove(tempFileName)
-		return "", fmt.Errorf("cannot close multus cni config: %v", err)
+		return "", nil, fmt.Errorf("cannot close multus cni config: %v", err)
 	}
 
 	if err := os.Rename(tempFileName, multusConfFilePath); err != nil {
-		return "", fmt.Errorf("cannot replace %q with temp file %q: %v", multusConfFilePath, tempFileName, err)
+		return "", nil, fmt.Errorf("cannot replace %q with temp file %q: %v", multusConfFilePath, tempFileName, err)
 	}
 
 	if o.RenameConfFile {
 		//masterConfigPath
 		renamedMasterConfigPath := fmt.Sprintf("%s.old", masterConfigPath)
 		if err := os.Rename(masterConfigPath, renamedMasterConfigPath); err != nil {
-			return "", fmt.Errorf("cannot move original master file to %q", renamedMasterConfigPath)
+			return "", nil, fmt.Errorf("cannot move original master file to %q", renamedMasterConfigPath)
 		}
 		fmt.Printf("Original master file moved to %q\n", renamedMasterConfigPath)
 	}
 
-	return masterConfigPath, nil
+	return masterConfigPath, masterConfigFileHash, nil
 }
 
 func main() {
@@ -546,7 +568,7 @@ func main() {
 		}
 	}
 
-	var kubeConfigHash []byte
+	var masterConfigHash, caHash, saTokenHash []byte
 	var masterConfigFilePath string
 	// copy user specified multus conf to CNI conf directory
 	if opt.MultusConfFile != "auto" {
@@ -558,13 +580,13 @@ func main() {
 		}
 		fmt.Printf("multus config file %s is copied.\n", opt.MultusConfFile)
 	} else { // auto generate multus config
-		kubeConfigHash, err = opt.createKubeConfig(nil)
+		caHash, saTokenHash, err = opt.createKubeConfig(nil, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create multus kubeconfig: %v\n", err)
 			return
 		}
 		fmt.Printf("kubeconfig file is created.\n")
-		masterConfigFilePath, err = opt.createMultusConfig()
+		masterConfigFilePath, masterConfigHash, err = opt.createMultusConfig(nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
 			return
@@ -576,7 +598,7 @@ func main() {
 		fmt.Printf("Entering watch loop...\n")
 		for {
 			// Check kubeconfig and update if different (i.e. service account updated)
-			kubeConfigHash, err = opt.createKubeConfig(kubeConfigHash)
+			caHash, saTokenHash, err = opt.createKubeConfig(caHash, saTokenHash)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to update multus kubeconfig: %v\n", err)
 				return
@@ -598,7 +620,7 @@ func main() {
 					}
 				}
 			}
-			masterConfigFilePath, err = opt.createMultusConfig()
+			masterConfigFilePath, masterConfigHash, err = opt.createMultusConfig(masterConfigHash)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
 				return
