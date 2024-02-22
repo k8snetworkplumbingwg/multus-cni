@@ -815,8 +815,13 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	if in.ReadinessIndicatorFile != "" {
-		if err := types.GetReadinessIndicatorFile(in.ReadinessIndicatorFile); err != nil {
-			return cmdErr(k8sArgs, "PollImmediate error waiting for ReadinessIndicatorFile (on del): %v", err)
+		readinessfileexists, err := types.ReadinessIndicatorExistsNow(in.ReadinessIndicatorFile)
+		if err != nil {
+			return cmdErr(k8sArgs, "error checking readinessindicatorfile on CNI DEL @ %v: %v", in.ReadinessIndicatorFile, err)
+		}
+
+		if !readinessfileexists {
+			logging.Verbosef("warning: readinessindicatorfile @ %v does not exist on CNI DEL", in.ReadinessIndicatorFile)
 		}
 	}
 
