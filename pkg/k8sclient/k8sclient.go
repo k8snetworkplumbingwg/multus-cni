@@ -23,6 +23,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"syscall"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -182,13 +183,19 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	// Check and see if each item matches the specification for valid attachment name.
 	// "Valid attachment names must be comprised of units of the DNS-1123 label format"
 	// [a-z0-9]([-a-z0-9]*[a-z0-9])?
-	// And we allow at (@), and forward slash (/) (units separated by commas)
 	// It must start and end alphanumerically.
-	allItems := []string{netNsName, networkName, netIfName}
+	allItems := []string{netNsName, networkName}
+	expr := regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 	for i := range allItems {
-		matched, _ := regexp.MatchString("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", allItems[i])
+		matched := expr.MatchString(allItems[i])
 		if !matched && len([]rune(allItems[i])) > 0 {
 			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
+		}
+	}
+
+	if len(netIfName) > 0 {
+		if len(netIfName) > (syscall.IFNAMSIZ-1) || strings.ContainsAny(netIfName, " \t\n\v\f\r/") {
+			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse interface name: must be less than 15 chars and not contain '/' or spaces. interface name '%s'", netIfName))
 		}
 	}
 
