@@ -1002,36 +1002,30 @@ users:
 	})
 
 	Context("parsePodNetworkObjectName", func() {
-		It("fails to get podnetwork given bad annotation values", func() {
-			fakePod := testutils.NewFakePod(fakePodName, "net1", "")
-
-			clientInfo := NewFakeClientInfo()
-			_, err := clientInfo.AddPod(fakePod)
-			Expect(err).NotTo(HaveOccurred())
-
-			_, err = clientInfo.AddNetAttachDef(
-				testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", "{\"type\": \"mynet\"}"))
-			Expect(err).NotTo(HaveOccurred())
-
-			k8sArgs, err := GetK8sArgs(args)
-			Expect(err).NotTo(HaveOccurred())
-			pod, err := clientInfo.GetPod(string(k8sArgs.K8S_POD_NAMESPACE), string(k8sArgs.K8S_POD_NAME))
-
-			// invalid case 1 - can't have more than 2 items separated by "/"
-			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP/root@thirdIP"
+		DescribeTable("fails to get podnetwork given bad annotation values", func(networkAnnot string) {
+			pod := testutils.NewFakePod(fakePodName, "net1", "")
+			pod.Annotations[networkAttachmentAnnot] = networkAnnot
 			_, err = GetPodNetwork(pod)
 			Expect(err).To(HaveOccurred())
+		},
+			Entry("can't have more than 2 items separated by \"/\"", "root@someIP/root@someOtherIP/root@thirdIP"),
+			Entry("can't have more than 2 items separated by \"@\"", "root@someIP/root@someOtherIP@garbagevalue"),
+			Entry("not matching comma-delimited format", "root@someIP/root@someOtherIP"),
+			Entry("invalid network interface name space in netdev name", "default/net1@myIfc Name"),
+			Entry("invalid network interface name too long", "default/net1@very_long_interface_name"),
+		)
 
-			// invalid case 2 - can't have more than 2 items separated by "@"
-			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP@garbagevalue"
+		DescribeTable("gets pod network successfully from annotation values", func(networkAnnot string) {
+			pod := testutils.NewFakePod(fakePodName, "net1", "")
+			pod.Annotations[networkAttachmentAnnot] = networkAnnot
 			_, err = GetPodNetwork(pod)
-			Expect(err).To(HaveOccurred())
-
-			// invalid case 3 - not matching comma-delimited format
-			pod.Annotations[networkAttachmentAnnot] = "root@someIP/root@someOtherIP"
-			_, err = GetPodNetwork(pod)
-			Expect(err).To(HaveOccurred())
-		})
+			Expect(err).ToNot(HaveOccurred())
+		},
+			Entry("network without namespace", "net1"),
+			Entry("network with namespace", "default/net1"),
+			Entry("network with interface name", "net1@my_interface"),
+			Entry("network with interface name and namespace", "default/net1@my_interface"),
+		)
 	})
 
 	Context("setPodNetworkAnnotation", func() {
