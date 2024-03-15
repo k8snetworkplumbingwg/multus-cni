@@ -99,11 +99,7 @@ func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
 	logging.Verbosef("%s finished CNI request %s, result: %q, err: %v", cmd, printCmdArgs(cniCmdArgs), string(result), err)
-	if err != nil {
-		// Prefix errors with request info for easier failure debugging
-		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
-	}
-	return result, nil
+	return result, err
 }
 
 // HandleDelegateRequest is the CNI server handler function; it is invoked whenever
@@ -129,11 +125,7 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
 	logging.Verbosef("%s finished Delegate request %s, result: %q, err: %v", cmd, printCmdArgs(cniCmdArgs), string(result), err)
-	if err != nil {
-		// Prefix errors with request info for easier failure debugging
-		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
-	}
-	return result, nil
+	return result, err
 }
 
 // GetListener creates a listener to a unix socket located in `socketPath`
@@ -415,7 +407,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	result, err := s.HandleCNIRequest(cmdType, k8sArgs, cniCmdArgs)
 	if err != nil {
 		// Prefix error with request information for easier debugging
-		return nil, fmt.Errorf("%+v %v", cniCmdArgs, err)
+		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
 	}
 	return result, nil
 }
@@ -442,7 +434,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, cr.InterfaceAttributes)
 	if err != nil {
 		// Prefix error with request information for easier debugging
-		return nil, fmt.Errorf("%s %v", printCmdArgs(cniCmdArgs), err)
+		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
 	}
 	return result, nil
 }
