@@ -34,7 +34,21 @@ nodes:
       nodeRegistration:
         kubeletExtraArgs:
           pod-manifest-path: "/etc/kubernetes/manifests/"
+          feature-gates: "DynamicResourceAllocation=true,KubeletPodResourcesDynamicResources=true"
   - role: worker
+# Required by DRA Integration
+##
+featureGates:
+  DynamicResourceAllocation: true
+runtimeConfig:
+  "api/alpha": "true"
+containerdConfigPatches:
+# Enable CDI as described in
+# https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+- |-
+  [plugins."io.containerd.grpc.v1.cri"]
+      enable_cdi = true
+##
 EOF
 
 # load multus image from container host to kind node

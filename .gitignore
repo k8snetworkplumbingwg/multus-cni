@@ -2,6 +2,7 @@
 bin/
 e2e/bin/
 e2e/yamls/
+e2e/repos/
 
 # GOPATH created by the build script
 gopath/
