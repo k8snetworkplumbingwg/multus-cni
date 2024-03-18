@@ -1,0 +1,49 @@
+---
+apiVersion: resource.k8s.io/v1alpha2
+kind: ResourceClaimTemplate
+metadata:
+  name: gpu.example.com
+spec:
+  spec:
+    resourceClassName: gpu.example.com
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: dra-net 
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: gpu.example.com
+spec:
+  config: '{
+        "cniVersion": "{{ CNI_VERSION }}",
+        "plugins": [{
+            "name": "mynet",
+            "type": "dummy",
+            "ipam": {
+                "type": "host-local",
+                "subnet": "10.1.2.0/24"
+            }
+        }]
+    }'
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dra-integration
+  labels:
+    app: dra-integration
+  annotations:
+    k8s.v1.cni.cncf.io/networks: default/dra-net
+spec:
+  containers:
+  - name: ctr0
+    image: ubuntu:22.04
+    command: ["bash", "-c"]
+    args: ["export; sleep 9999"]
+    resources:
+      claims:
+      - name: gpu
+  resourceClaims:
+  - name: gpu
+    source:
+      resourceClaimTemplateName: gpu.example.com

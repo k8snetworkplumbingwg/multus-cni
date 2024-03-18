@@ -85,6 +85,15 @@ jobs:
         working-directory: ./e2e
         run: ./test-default-route1.sh
 
+      # TODO: Remove this condition
+      # For thick, the test is flaky because sometimes the primary network is broken and the dra driver pods can't reach
+      # the control plane via the default k8s service. The error looks like this:
+      # failed to list *v1alpha2.PodSchedulingContext: Get "https://10.96.0.1:443/apis/resource.k8s.io/v1alpha2/podschedulingcontexts?limit=500&resourceVersion=0": dial tcp 10.96.0.1:443: connect: no route to host
+      - if: ${{ matrix.multus-manifest == 'multus-daemonset.yml' }}
+        name: Test DRA integration
+        working-directory: ./e2e
+        run: ./test-dra-integration.sh
+
       - name: Export kind logs
         if: always()
         run: |
