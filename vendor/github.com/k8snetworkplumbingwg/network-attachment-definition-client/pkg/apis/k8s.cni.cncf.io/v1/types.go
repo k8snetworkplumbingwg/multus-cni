@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"encoding/json"
+	"errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 )
@@ -105,6 +107,7 @@ type NetworkStatus struct {
 	Interface  string      `json:"interface,omitempty"`
 	IPs        []string    `json:"ips,omitempty"`
 	Mac        string      `json:"mac,omitempty"`
+	Mtu        int         `json:"mtu,omitempty"`
 	Default    bool        `json:"default,omitempty"`
 	DNS        DNS         `json:"dns,omitempty"`
 	DeviceInfo *DeviceInfo `json:"device-info,omitempty"`
@@ -162,6 +165,23 @@ type NetworkSelectionElement struct {
 	CNIArgs *map[string]interface{} `json:"cni-args,omitempty"`
 	// GatewayRequest contains default route IP address for the pod
 	GatewayRequest []net.IP `json:"default-route,omitempty"`
+	// IPAMClaimReference container the IPAMClaim name where the IPs for this
+	// attachment will be located.
+	IPAMClaimReference string `json:"ipam-claim-reference,omitempty"`
+}
+
+func (nse *NetworkSelectionElement) UnmarshalJSON(b []byte) error {
+	type networkSelectionElement NetworkSelectionElement
+
+	var netSelectionElement networkSelectionElement
+	if err := json.Unmarshal(b, &netSelectionElement); err != nil {
+		return err
+	}
+	if len(netSelectionElement.IPRequest) > 0 && netSelectionElement.IPAMClaimReference != "" {
+		return TooManyIPSources
+	}
+	*nse = NetworkSelectionElement(netSelectionElement)
+	return nil
 }
 
 const (
@@ -178,3 +198,5 @@ type NoK8sNetworkError struct {
 }
 
 func (e *NoK8sNetworkError) Error() string { return string(e.Message) }
+
+var TooManyIPSources = errors.New("cannot provide a static IP and a reference of an IPAM claim in the same network selection element")
