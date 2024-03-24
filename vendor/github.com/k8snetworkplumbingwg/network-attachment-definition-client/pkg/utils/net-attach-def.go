@@ -139,6 +139,7 @@ func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork b
 		if ifs.Sandbox != "" {
 			netStatus.Interface = ifs.Name
 			netStatus.Mac = ifs.Mac
+			netStatus.Mtu = ifs.Mtu
 		}
 	}
 
