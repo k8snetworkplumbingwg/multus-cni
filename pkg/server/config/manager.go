@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -64,6 +65,32 @@ func NewManager(config MultusConf) (*Manager, error) {
 	return newManager(config, defaultPluginName)
 }
 
+// atomicFileWrite writes our configs atomically to avoid partial reads
+func atomicFileWrite(filename string, data []byte, perm os.FileMode) error {
+	// Create a temporary file in the same directory as the destination file
+	dir := filepath.Dir(filename)
+	tmpFile, err := ioutil.TempFile(dir, ".multus.tmp")
+	if err != nil {
+		return err
+	}
+	tmpFileName := tmpFile.Name()
+
+	// Always remove that temp file...
+	defer os.Remove(tmpFileName)
+
+	// Write data to the temporary file
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	// Atomically rename the temporary file to the final filename
+	return os.Rename(tmpFileName, filename)
+}
+
 // overrideCNIVersion overrides cniVersion in cniConfigFile, it should be used only in kind case
 func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 	path, err := filepath.Abs(cniConfigFile)
@@ -87,7 +114,7 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 		return fmt.Errorf("couldn't update cluster network config: %v", err)
 	}
 
-	err = os.WriteFile(path, configBytes, 0644)
+	err = atomicFileWrite(path, configBytes, 0644)
 	if err != nil {
 		return fmt.Errorf("couldn't update cluster network config: %v", err)
 	}
@@ -268,7 +295,7 @@ func (m *Manager) PersistMultusConfig(config string) (string, error) {
 	} else {
 		logging.Debugf("Writing Multus CNI configuration @ %s", m.multusConfigFilePath)
 	}
-	return m.multusConfigFilePath, os.WriteFile(m.multusConfigFilePath, []byte(config), UserRWPermission)
+	return m.multusConfigFilePath, atomicFileWrite(m.multusConfigFilePath, []byte(config), UserRWPermission)
 }
 
 func (m *Manager) shouldRegenerateConfig(event fsnotify.Event) bool {
