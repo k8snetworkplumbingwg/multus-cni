@@ -97,7 +97,7 @@ This is the default config, as most of the systems just get deployed with one pr
     }
 ```
 #### Example 2 (Configure Master CNI):
-In this case you can define your primary CNI conffile as ```multusMasterCNI``` as present in the ```multusAutoconfigDir```. This is helpful when you have multiple CNIs and in same usecases or race conditions, multus selects the unintended CNI as primary CNIs. In this case similar to option 1 all other configurations are automatically created but primary CNI remains fixed. Below example configures vpc cni (10-aws.conflist) as primary CNI, you can change it to your primary CNI conf such as calico, flannel etc. 
+In this case you can define your primary CNI conffile as ```multusMasterCNI``` as present in the ```multusAutoconfigDir```. This is helpful when you have multiple CNIs and in same usecases or race conditions, multus selects the unintended CNI as primary CNIs. In this case similar to option 1 all other configurations are automatically created but primary CNI remains fixed. Below example configures the 10-cloudprovider.conflist as primary CNI, you can change it to your primary CNI conf file such as calico, flannel, vpc cni etc. 
 
 ```json
 {
@@ -113,7 +113,7 @@ In this case you can define your primary CNI conffile as ```multusMasterCNI``` a
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
         "multusAutoconfigDir": "/host/etc/cni/net.d",
-        "multusMasterCNI": "10-aws.conflist"
+        "multusMasterCNI": "10-cloudprovider.conflist"
     }
 ```
 ### Client / Shim configuration
