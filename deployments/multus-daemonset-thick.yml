@@ -165,6 +165,7 @@ spec:
               memory: "50Mi"
           securityContext:
             privileged: true
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - name: cni
               mountPath: /host/etc/cni/net.d
@@ -208,6 +209,7 @@ spec:
               memory: "15Mi"
           securityContext:
             privileged: true
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - name: cnibin
               mountPath: /host/opt/cni/bin
