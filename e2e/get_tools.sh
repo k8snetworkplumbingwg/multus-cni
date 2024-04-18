@@ -13,3 +13,5 @@ curl -Lo ./bin/koko https://github.com/redhat-nfvpe/koko/releases/download/v0.83
 chmod +x ./bin/koko
 curl -Lo ./bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
 chmod +x ./bin/jq
+curl -Lo ./bin/gomplate https://github.com/hairyhenderson/gomplate/releases/download/v3.11.7/gomplate_linux-amd64-slim
+chmod +x ./bin/gomplate

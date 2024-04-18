@@ -149,7 +149,7 @@ spec:
         args:
         - "--multus-conf-file=auto"
         - "--force-cni-version=true"
-        - "--cni-version={{ CNI_VERSION }}"
+        - "--cni-version={{ .Env.CNI_VERSION }}"
         resources:
           requests:
             cpu: "100m"

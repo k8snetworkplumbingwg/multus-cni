@@ -86,14 +86,15 @@ metadata:
 data:
   daemon-config.json: |
     {
+        "chrootDir": "/hostroot",
         "confDir": "/host/etc/cni/net.d",
         "logToStderr": true,
         "logLevel": "debug",
         "logFile": "/tmp/multus.log",
-        "binDir": "/host/opt/cni/bin",
+        "binDir": "/opt/cni/bin",
         "cniDir": "/var/lib/cni/multus",
         "socketDir": "/host/run/multus",
-        "cniVersion": "{{ CNI_VERSION }}",
+        "cniVersion": "{{ .Env.CNI_VERSION }}",
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
         "forceCNIVersion": true,
@@ -147,7 +148,7 @@ spec:
         - name: cni
           mountPath: /host/etc/cni/net.d
         - name: cnibin
-          mountPath: /host/opt/cni/bin
+          mountPath: /opt/cni/bin
         - name: host-run
           mountPath: /host/run
         - name: host-var-lib-cni-multus
@@ -158,6 +159,9 @@ spec:
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
+        - name: hostroot
+          mountPath: /hostroot
+          mountPropagation: HostToContainer
         env:
         - name: MULTUS_NODE_NAME
           valueFrom:
@@ -187,6 +191,9 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
+        - name: hostroot
+          hostPath:
+            path: /
         - name: multus-daemon-config
           configMap:
             name: multus-daemon-config

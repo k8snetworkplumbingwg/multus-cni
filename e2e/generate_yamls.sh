@@ -12,6 +12,6 @@ templates_dir="$(dirname $(readlink -f $0))/templates"
 # generate yaml files based on templates/*.j2 to yamls directory
 for i in `ls templates/`; do
 	echo $i
-	j2 -e CNI_VERSION ${templates_dir}/$i -o yamls/${i%.j2}
+	gomplate -o yamls/${i%.j2} -f ${templates_dir}/$i
 done
 unset CNI_VERSION

@@ -5,7 +5,7 @@ metadata:
   name: macvlan1-config
 spec: 
   config: '{
-            "cniVersion": "{{ CNI_VERSION }}",
+            "cniVersion": "{{ .Env.CNI_VERSION }}",
             "plugins": [
                 {
                     "type": "macvlan",

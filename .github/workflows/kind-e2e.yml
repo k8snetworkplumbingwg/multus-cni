@@ -43,11 +43,6 @@ jobs:
         with:
           python-version: 3.x
 
-      - name: Setup j2cli
-        run: |
-          sudo apt-get install -y j2cli
-          echo $(j2 --version)
-
       - name: Build latest-amd64
         uses: docker/build-push-action@v5
         with:
@@ -63,7 +58,7 @@ jobs:
 
       - name: generate yaml files
         working-directory: ./e2e
-        run: env CNI_VERSION=${{ matrix.cni-version }} ./generate_yamls.sh
+        run: env CNI_VERSION=${{ matrix.cni-version }} PATH=${PATH}:./bin ./generate_yamls.sh
 
       - name: Setup cluster
         working-directory: ./e2e

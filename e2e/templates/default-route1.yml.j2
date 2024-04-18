@@ -5,7 +5,7 @@ metadata:
   name: default-route-config
 spec: 
   config: '{
-            "cniVersion": "{{ CNI_VERSION }}",
+            "cniVersion": "{{ .Env.CNI_VERSION }}",
             "plugins": [
                 {
                     "type": "macvlan",
