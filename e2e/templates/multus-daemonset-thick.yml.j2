@@ -168,9 +168,11 @@ spec:
       - name: install-multus-shim
         image: localhost:5000/multus:e2e
         command:
-          - "cp"
-          - "/usr/src/multus-cni/bin/multus-shim"
-          - "/host/opt/cni/bin/multus-shim"
+	  - "/usr/src/multus-cni/bin/install_multus"
+	  - "-d"
+          - "/host/opt/cni/bin"
+          - "-t"
+          - "thick"
         resources:
           requests:
             cpu: "10m"
