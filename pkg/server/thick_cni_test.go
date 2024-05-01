@@ -96,6 +96,7 @@ var _ = Describe(suiteName, func() {
 			containerID = "123456789"
 			ifaceName   = "eth0"
 			podName     = "my-little-pod"
+			configPath  = "/tmp/foo.multus.conf"
 		)
 
 		var (
@@ -109,6 +110,8 @@ var _ = Describe(suiteName, func() {
 		BeforeEach(func() {
 			var err error
 			K8sClient = fakeK8sClient()
+			// Touch the default network file.
+			os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
 
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
 
@@ -126,6 +129,11 @@ var _ = Describe(suiteName, func() {
 
 		AfterEach(func() {
 			cancel()
+			// Cleanup default network file.
+			if _, errStat := os.Stat(configPath); errStat == nil {
+				errRemove := os.Remove(configPath)
+				Expect(errRemove).NotTo(HaveOccurred())
+			}
 			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
@@ -150,6 +158,7 @@ var _ = Describe(suiteName, func() {
 			containerID = "123456789"
 			ifaceName   = "eth0"
 			podName     = "my-little-pod"
+			configPath  = "/tmp/foo.multus.conf"
 		)
 
 		var (
@@ -169,6 +178,8 @@ var _ = Describe(suiteName, func() {
 				"dummy_key2": "dummy_val2"
 			}`
 
+			// Touch the default network file.
+			os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
 
 			ctx, cancel = context.WithCancel(context.TODO())
@@ -185,6 +196,11 @@ var _ = Describe(suiteName, func() {
 
 		AfterEach(func() {
 			cancel()
+			// Cleanup default network file.
+			if _, errStat := os.Stat(configPath); errStat == nil {
+				errRemove := os.Remove(configPath)
+				Expect(errRemove).NotTo(HaveOccurred())
+			}
 			unregisterMetrics(cniServer)
 			Expect(cniServer.Close()).To(Succeed())
 			Expect(teardownCNIEnv()).To(Succeed())
@@ -286,7 +302,7 @@ func referenceConfig(thickPluginSocketDir string) string {
         "name": "node-cni-network",
         "type": "multus",
         "daemonSocketDir": "%s",
-        "defaultnetworkfile": "/tmp/foo.multus.conf",
+        "readinessindicatorfile": "/tmp/foo.multus.conf",
         "defaultnetworkwaitseconds": 3,
         "delegates": [{
             "name": "weave1",
