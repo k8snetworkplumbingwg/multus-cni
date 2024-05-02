@@ -601,7 +601,7 @@ var _ = Describe("config operations", func() {
 			StdinData: []byte(`{
     "name": "node-cni-network",
     "type": "multus",
-    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "readinessindicatorfile": "/tmp/foo.multus.conf",
     "defaultnetworkwaitseconds": 3,
     "delegates": [{
         "name": "weave1",
@@ -649,7 +649,7 @@ var _ = Describe("config operations", func() {
 			StdinData: []byte(`{
     "name": "node-cni-network",
     "type": "multus",
-    "defaultnetworkfile": "/tmp/foo.multus.conf",
+    "readinessindicatorfile": "/tmp/foo.multus.conf",
     "defaultnetworkwaitseconds": 3,
     "delegates": [{
         "name": "weave1",
