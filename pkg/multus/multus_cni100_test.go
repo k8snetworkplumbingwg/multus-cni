@@ -1227,3 +1227,127 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		Expect(err).To(HaveOccurred())
 	})
 })
+
+var _ = Describe("multus operations cniVersion 1.1.0 config", func() {
+	var testNS ns.NetNS
+	var tmpDir string
+	configPath := "/tmp/foo.multus.conf"
+	var cancel context.CancelFunc
+
+	BeforeEach(func() {
+		// Create a new NetNS so we don't modify the host
+		var err error
+		testNS, err = testutils.NewNS()
+		Expect(err).NotTo(HaveOccurred())
+		os.Setenv("CNI_NETNS", testNS.Path())
+		os.Setenv("CNI_PATH", "/some/path")
+
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Touch the default network file.
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+		_, cancel = context.WithCancel(context.TODO())
+	})
+
+	AfterEach(func() {
+		cancel()
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+
+		Expect(testNS.Close()).To(Succeed())
+		os.Unsetenv("CNI_PATH")
+		os.Unsetenv("CNI_ARGS")
+		err := os.RemoveAll(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("executes delegates with CNI Check", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "weave-net"
+	        }]
+	    },{
+	        "name": "other1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "other-plugin"
+		}]
+	    }]
+	}`),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "1.1.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin100(nil, "", expectedConf1, nil, nil)
+
+		err := CmdStatus(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		// we only execute once for cluster network, not additional one
+		Expect(fExec.statusIndex).To(Equal(1))
+	})
+
+	It("executes delegates with CNI GC", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "weave-net"
+	        }]
+	    },{
+	        "name": "other1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "other-plugin"
+		}]
+	    }]
+	}`),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedConf1 := `{
+	    "cni.dev/valid-attachments": null,
+	    "name": "weave1",
+	    "cniVersion": "1.1.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin100(nil, "", expectedConf1, nil, nil)
+
+		err := CmdGC(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		// we only execute once for cluster network, not additional one
+		Expect(fExec.gcIndex).To(Equal(1))
+	})
+})

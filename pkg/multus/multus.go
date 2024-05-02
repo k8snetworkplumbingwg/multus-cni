@@ -930,3 +930,99 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 
 	return e
 }
+
+// CmdStatus ...
+func CmdStatus(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+	n, err := types.LoadNetConf(args.StdinData)
+	logging.Debugf("CmdStatus: %v, %v, %v", args, exec, kubeClient)
+	if err != nil {
+		return cmdErr(nil, "error loading netconf: %v", err)
+	}
+
+	kubeClient, err = k8s.GetK8sClient(n.Kubeconfig, kubeClient)
+	if err != nil {
+		return cmdErr(nil, "error getting k8s client: %v", err)
+	}
+
+	if n.ReadinessIndicatorFile != "" {
+		if err := types.GetReadinessIndicatorFile(n.ReadinessIndicatorFile); err != nil {
+			return cmdErr(nil, "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", n.ReadinessIndicatorFile, err)
+		}
+	}
+
+	if n.ClusterNetwork != "" {
+		_, err = k8s.GetDefaultNetworks(nil, n, kubeClient, nil)
+		if err != nil {
+			return cmdErr(nil, "failed to get clusterNetwork: %v", err)
+		}
+		// First delegate is always the master plugin
+		n.Delegates[0].MasterPlugin = true
+	}
+
+	// invoke delegate's STATUS command
+	// we only need to check cluster network status
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{n.BinDir}, binDirs...)
+	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, n.CNIDir, exec)
+
+	conf, err := libcni.ConfListFromBytes(n.Delegates[0].Bytes)
+	if err != nil {
+		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	}
+
+	err = cniNet.GetStatusNetworkList(context.TODO(), conf)
+	if err != nil {
+		return logging.Errorf("error in STATUS command: %v", err)
+	}
+
+	return nil
+}
+
+// CmdGC ...
+func CmdGC(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) error {
+	n, err := types.LoadNetConf(args.StdinData)
+	logging.Debugf("CmdStatus: %v, %v, %v", args, exec, kubeClient)
+	if err != nil {
+		return cmdErr(nil, "error loading netconf: %v", err)
+	}
+
+	kubeClient, err = k8s.GetK8sClient(n.Kubeconfig, kubeClient)
+	if err != nil {
+		return cmdErr(nil, "error getting k8s client: %v", err)
+	}
+
+	if n.ReadinessIndicatorFile != "" {
+		if err := types.GetReadinessIndicatorFile(n.ReadinessIndicatorFile); err != nil {
+			return cmdErr(nil, "have you checked that your default network is ready? still waiting for readinessindicatorfile @ %v. pollimmediate error: %v", n.ReadinessIndicatorFile, err)
+		}
+	}
+
+	if n.ClusterNetwork != "" {
+		_, err = k8s.GetDefaultNetworks(nil, n, kubeClient, nil)
+		if err != nil {
+			return cmdErr(nil, "failed to get clusterNetwork: %v", err)
+		}
+		// First delegate is always the master plugin
+		n.Delegates[0].MasterPlugin = true
+	}
+
+	// invoke delegate's GC command
+	// we only need to check cluster network status
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{n.BinDir}, binDirs...)
+	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, n.CNIDir, exec)
+
+	conf, err := libcni.ConfListFromBytes(n.Delegates[0].Bytes)
+	if err != nil {
+		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	}
+
+	err = cniNet.GCNetworkList(context.TODO(), conf, &libcni.GCArgs{
+		ValidAttachments: n.ValidAttachments,
+	})
+	if err != nil {
+		return logging.Errorf("error in GC command: %v", err)
+	}
+
+	return nil
+}
