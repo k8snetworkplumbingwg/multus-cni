@@ -206,7 +206,12 @@ func deleteDefaultGWResult(result map[string]interface{}, ipv4, ipv6 bool) (map[
 			return nil, err
 		}
 	}
-	result["routes"] = routes
+
+	if len(routes) == 0 {
+		delete(result, "routes")
+	} else {
+		result["routes"] = routes
+	}
 
 	return result, nil
 }
