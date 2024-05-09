@@ -303,6 +303,11 @@ func delegateRuntimeConfig(containerID string, delegate *DelegateNetConf, rc *Ru
 			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, containerID, ifName)
 			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
 			logging.Debugf("Adding auto-generated CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
+		} else if delegate.Conf.Capabilities["CNIDeviceInfoFile"] {
+			// generater empty CNIDeviceInfoFile filepath
+			autoDeviceInfo := fmt.Sprintf("%s-%s_%s", delegate.Name, containerID, ifName)
+			delegateRc.CNIDeviceInfoFile = nadutils.GetCNIDeviceInfoPath(autoDeviceInfo)
+			logging.Debugf("CNIDeviceInfoFile is true, Adding auto-generated empty CNIDeviceInfoFile: %s", delegateRc.CNIDeviceInfoFile)
 		}
 	} else {
 		delegateRc = rc
