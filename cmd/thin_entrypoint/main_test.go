@@ -411,4 +411,65 @@ var _ = Describe("thin entrypoint testing", func() {
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
 
+	It("Run createMultusConfig(), with options, conflist", func() {
+		// create directory and files
+		tmpDir, err := os.MkdirTemp("", "multus_thin_entrypoint_tmp")
+		Expect(err).NotTo(HaveOccurred())
+
+		multusAutoConfigDir := fmt.Sprintf("%s/auto_conf", tmpDir)
+		cniConfDir := fmt.Sprintf("%s/cni_conf", tmpDir)
+
+		Expect(os.Mkdir(multusAutoConfigDir, 0755)).To(Succeed())
+		Expect(os.Mkdir(cniConfDir, 0755)).To(Succeed())
+
+		// create master CNI config
+		masterCNIConfigFileName := "10-testcni.conf"
+		masterCNIConfig := `
+		{
+			"cniVersion": "1.0.0",
+			"name": "test1",
+			"type": "cnitesttype"
+		}`
+		Expect(os.WriteFile(fmt.Sprintf("%s/%s", multusAutoConfigDir, masterCNIConfigFileName), []byte(masterCNIConfig), 0755)).To(Succeed())
+
+		// create another CNI config
+		anotherCNIConfigFileName := "09-test2cni.conf" // Alphabetically before masterCNIConfigFileName
+		anotherCNIConfig := `
+		{
+			"cniVersion": "1.0.0",
+			"name": "test2",
+			"type": "cnitest2type"
+		}`
+		Expect(os.WriteFile(fmt.Sprintf("%s/%s", multusAutoConfigDir, anotherCNIConfigFileName), []byte(anotherCNIConfig), 0755)).To(Succeed())
+
+		masterConfigPath, masterConfigHash, err := (&Options{
+			MultusAutoconfigDir:      multusAutoConfigDir,
+			MultusMasterCNIFileName:  masterCNIConfigFileName,
+			CNIConfDir:               cniConfDir,
+			MultusKubeConfigFileHost: "/etc/foobar_kubeconfig",
+		}).createMultusConfig(nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(masterConfigPath).NotTo(Equal(""))
+		Expect(masterConfigHash).NotTo(Equal(""))
+
+		expectedResult :=
+			`{
+    "cniVersion": "1.0.0",
+    "name": "multus-cni-network",
+    "plugins": [ {
+        "type": "multus",
+        "logToStderr": false,
+        "kubeconfig": "/etc/foobar_kubeconfig",
+        "delegates": [
+            {"cniVersion":"1.0.0","name":"test1","type":"cnitesttype"}
+        ]
+    }]
+}
+`
+		conf, err := os.ReadFile(fmt.Sprintf("%s/00-multus.conflist", cniConfDir))
+		Expect(string(conf)).To(Equal(expectedResult))
+
+		Expect(os.RemoveAll(tmpDir)).To(Succeed())
+	})
 })

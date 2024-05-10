@@ -310,22 +310,32 @@ const multusConfTemplate = `{
 }
 `
 
-func (o *Options) createMultusConfig(prevMasterConfigFileHash []byte) (string, []byte, error) {
-	// find master file from MultusAutoconfigDir
-	files, err := libcni.ConfFiles(o.MultusAutoconfigDir, []string{".conf", ".conflist"})
-	if err != nil {
-		return "", nil, fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
+func (o *Options) getMasterConfigPath() (string, error) {
+	// Master config file is specified
+	if o.MultusMasterCNIFileName != "" {
+		return filepath.Join(o.MultusAutoconfigDir, o.MultusMasterCNIFileName), nil
 	}
 
-	masterConfigPath := ""
+	// Pick the alphabetically first config file from MultusAutoconfigDir
+	files, err := libcni.ConfFiles(o.MultusAutoconfigDir, []string{".conf", ".conflist"})
+	if err != nil {
+		return "", fmt.Errorf("cannot find master CNI config in %q: %v", o.MultusAutoconfigDir, err)
+	}
+
 	for _, filename := range files {
 		if !strings.HasPrefix(filepath.Base(filename), "00-multus.conf") {
-			masterConfigPath = filename
-			break
+			return filename, nil
 		}
 	}
-	if masterConfigPath == "" {
-		return "", nil, fmt.Errorf("cannot find valid master CNI config in %q", o.MultusAutoconfigDir)
+
+	// No config file found
+	return "", fmt.Errorf("cannot find valid master CNI config in %q", o.MultusAutoconfigDir)
+}
+
+func (o *Options) createMultusConfig(prevMasterConfigFileHash []byte) (string, []byte, error) {
+	masterConfigPath, err := o.getMasterConfigPath()
+	if err != nil {
+		return "", nil, err
 	}
 
 	masterConfigBytes, masterConfigFileHash, err := getFileAndHash(masterConfigPath)
