@@ -637,9 +637,15 @@ If you wish to have auto configuration use the `readinessindicatorfile` in the c
 
 ### Run pod with network annotation and Dynamic Resource Allocation driver
 
-Dynamic Resource Allocation is alternative mechanism to device plugin which allow to requests pod and container resources. The feature is alpha in k8s 1.27.
+> :warning: Dynamic Resource Allocation (DRA) is [currently an alpha](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/),
+> and is subject to change. Please consider this functionality as a preview. The architecture and usage of DRA in
+> Multus CNI may change in the future as this technology matures.
 
-The following sections describe how to use DRA with multus and Nvidia DRA driver. Other DRA networking driver vendors should follow similar concepts to make use of multus DRA support.
+Dynamic Resource Allocation is alternative mechanism to device plugin which allows to requests pod and container
+resources.
+
+The following sections describe how to use DRA with multus and NVIDIA DRA driver. Other DRA networking driver vendors
+should follow similar concepts to make use of multus DRA support.
 
 #### Prerequisite
 
@@ -650,9 +656,10 @@ The following sections describe how to use DRA with multus and Nvidia DRA driver
 
 #### Install DRA driver
 
-The current example uses Nvidia DRA driver for networking. This DRA driver is not publicly available.
+The current example uses NVIDIA DRA driver for networking. This DRA driver is not publicly available. An alternative to
+this DRA driver is available at [dra-example-driver](https://github.com/kubernetes-sigs/dra-example-driver).
 
-#### Create dynamic resource class with nvidia network DRA driver
+#### Create dynamic resource class with NVIDIA network DRA driver
 
 The `ResourceClass` defines the resource pool of `sf-pool-1`.
 
