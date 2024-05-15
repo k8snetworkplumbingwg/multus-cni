@@ -634,3 +634,7 @@ Sometimes, you may wish to not have the entrypoint copy the binary file onto the
 If you wish to have auto configuration use the `readinessindicatorfile` in the configuration, you can use the `--readiness-indicator-file` to express which file should be used as the readiness indicator.
 
     --readiness-indicator-file=/path/to/file
+
+The thin plugin will reconcile its kubeconfig and config file every second when using `--cleanup-config-on-exit` and `--multus-conf-file=auto`. The config poll interval is configurable with `--multus-config-watch-timer=<duration>`
+
+    --multus-config-watch-timer=5m
