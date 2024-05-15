@@ -40,9 +40,12 @@ type ShimNetConf struct {
 	LogToStderr     bool   `json:"logToStderr,omitempty"`
 }
 
+// Define a type for API readiness check functions
+type APIReadyCheckFunc func(string) error
+
 // CmdAdd implements the CNI spec ADD command handler
 func CmdAdd(args *skel.CmdArgs) error {
-	response, cniVersion, err := postRequest(args)
+	response, cniVersion, err := postRequest(args, WaitUntilAPIReady)
 	if err != nil {
 		return logging.Errorf("CmdAdd (shim): %v", err)
 	}
@@ -53,7 +56,7 @@ func CmdAdd(args *skel.CmdArgs) error {
 
 // CmdCheck implements the CNI spec CHECK command handler
 func CmdCheck(args *skel.CmdArgs) error {
-	_, _, err := postRequest(args)
+	_, _, err := postRequest(args, WaitUntilAPIReady)
 	if err != nil {
 		return logging.Errorf("CmdCheck (shim): %v", err)
 	}
@@ -63,7 +66,7 @@ func CmdCheck(args *skel.CmdArgs) error {
 
 // CmdDel implements the CNI spec DEL command handler
 func CmdDel(args *skel.CmdArgs) error {
-	_, _, err := postRequest(args)
+	_, _, err := postRequest(args, CheckAPIReadyNow)
 	if err != nil {
 		// No error in DEL (as of CNI spec)
 		logging.Errorf("CmdDel (shim): %v", err)
@@ -71,14 +74,14 @@ func CmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
-func postRequest(args *skel.CmdArgs) (*Response, string, error) {
+func postRequest(args *skel.CmdArgs, readinessCheck APIReadyCheckFunc) (*Response, string, error) {
 	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {
 		return nil, "", fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
 	}
 
-	// check API readiness
-	if err := WaitUntilAPIReady(multusShimConfig.MultusSocketDir); err != nil {
+	// Execute the readiness check as necessary (e.g. don't wait on CNI DEL)
+	if err := readinessCheck(multusShimConfig.MultusSocketDir); err != nil {
 		return nil, multusShimConfig.CNIVersion, err
 	}
 
