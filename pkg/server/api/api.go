@@ -104,3 +104,12 @@ func WaitUntilAPIReady(socketPath string) error {
 		return err == nil, nil
 	})
 }
+
+// CheckAPIReadyNow checks API readiness once
+func CheckAPIReadyNow(socketPath string) error {
+	_, err := DoCNI(GetAPIEndpoint(MultusHealthAPIEndpoint), nil, SocketPath(socketPath))
+	if err != nil {
+		return fmt.Errorf("CheckAPIReadyNow: Daemon not reachable over socketfile: %v", err)
+	}
+	return nil
+}
