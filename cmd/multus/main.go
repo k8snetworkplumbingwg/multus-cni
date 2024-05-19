@@ -43,17 +43,16 @@ func main() {
 		return
 	}
 
-	skel.PluginMain(
-		func(args *skel.CmdArgs) error {
+	funcs := skel.CNIFuncs{
+		Add: func(args *skel.CmdArgs) error {
 			result, err := multus.CmdAdd(args, nil, nil)
 			if err != nil {
 				return err
 			}
 			return result.Print()
 		},
-		func(args *skel.CmdArgs) error {
-			return multus.CmdCheck(args, nil, nil)
-		},
-		func(args *skel.CmdArgs) error { return multus.CmdDel(args, nil, nil) },
-		cniversion.All, "meta-plugin that delegates to other CNI plugins")
+		Del:   func(args *skel.CmdArgs) error { return multus.CmdDel(args, nil, nil) },
+		Check: func(args *skel.CmdArgs) error { return multus.CmdCheck(args, nil, nil) },
+	}
+	skel.PluginMainFuncs(funcs, cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }
