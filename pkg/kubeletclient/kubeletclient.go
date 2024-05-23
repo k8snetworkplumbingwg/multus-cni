@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -137,17 +138,43 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 	for _, pr := range rc.resources {
 		if pr.Name == name && pr.Namespace == ns {
 			for _, cnt := range pr.Containers {
-				for _, dev := range cnt.Devices {
-					if rInfo, ok := resourceMap[dev.ResourceName]; ok {
-						rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
-					} else {
-						resourceMap[dev.ResourceName] = &types.ResourceInfo{DeviceIDs: dev.DeviceIds}
-					}
-				}
+				rc.getDevicePluginResources(cnt.Devices, resourceMap)
+				rc.getDRAResources(cnt.DynamicResources, resourceMap)
 			}
 		}
 	}
 	return resourceMap, nil
+}
+
+func (rc *kubeletClient) getDevicePluginResources(devices []*podresourcesapi.ContainerDevices, resourceMap map[string]*types.ResourceInfo) {
+	for _, dev := range devices {
+		if rInfo, ok := resourceMap[dev.ResourceName]; ok {
+			rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
+		} else {
+			resourceMap[dev.ResourceName] = &types.ResourceInfo{DeviceIDs: dev.DeviceIds}
+		}
+	}
+}
+
+func (rc *kubeletClient) getDRAResources(dynamicResources []*podresourcesapi.DynamicResource, resourceMap map[string]*types.ResourceInfo) {
+	for _, dynamicResource := range dynamicResources {
+		var deviceIDs []string
+		for _, claimResource := range dynamicResource.ClaimResources {
+			for _, cdiDevice := range claimResource.CDIDevices {
+				res := strings.Split(cdiDevice.Name, "=")
+				if len(res) == 2 {
+					deviceIDs = append(deviceIDs, res[1])
+				} else {
+					logging.Errorf("GetPodResourceMap: Invalid CDI format")
+				}
+			}
+		}
+		if rInfo, ok := resourceMap[dynamicResource.ClassName]; ok {
+			rInfo.DeviceIDs = append(rInfo.DeviceIDs, deviceIDs...)
+		} else {
+			resourceMap[dynamicResource.ClassName] = &types.ResourceInfo{DeviceIDs: deviceIDs}
+		}
+	}
 }
 
 func hasKubeletAPIEndpoint(url *url.URL) bool {

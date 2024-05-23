@@ -85,6 +85,10 @@ jobs:
         working-directory: ./e2e
         run: ./test-default-route1.sh
 
+      - name: Test DRA integration
+        working-directory: ./e2e
+        run: ./test-dra-integration.sh
+
       - name: Export kind logs
         if: always()
         run: |
