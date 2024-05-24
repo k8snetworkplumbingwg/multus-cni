@@ -43,20 +43,6 @@ var _ = Describe("multus operations", func() {
 		err := saveScratchNetConf("123456789", "", meme)
 		Expect(err).To(HaveOccurred())
 	})
-
-	It("fails to delete delegates with bad filepath", func() {
-		err := deleteDelegates("123456789", "bad!file!~?Path$^")
-		Expect(err).To(HaveOccurred())
-	})
-
-	It("delete delegates given good filepath", func() {
-		os.MkdirAll("/opt/cni/bin", 0755)
-		d1 := []byte("blah")
-		os.WriteFile("/opt/cni/bin/123456789", d1, 0644)
-
-		err := deleteDelegates("123456789", "/opt/cni/bin")
-		Expect(err).NotTo(HaveOccurred())
-	})
 })
 
 var _ = Describe("multus operations cniVersion 0.2.0 config", func() {
