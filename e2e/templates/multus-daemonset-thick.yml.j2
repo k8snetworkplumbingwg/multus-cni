@@ -158,6 +158,9 @@ spec:
         - name: multus-daemon-config
           mountPath: /etc/cni/net.d/multus.d
           readOnly: true
+        - name: kubelet-pod-resources
+          mountPath: /var/lib/kubelet/pod-resources
+          readOnly: true
         env:
         - name: MULTUS_NODE_NAME
           valueFrom:
@@ -187,6 +190,9 @@ spec:
         - name: cnibin
           hostPath:
             path: /opt/cni/bin
+        - name: kubelet-pod-resources
+          hostPath:
+            path: /var/lib/kubelet/pod-resources
         - name: multus-daemon-config
           configMap:
             name: multus-daemon-config
