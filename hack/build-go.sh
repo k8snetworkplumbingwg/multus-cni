@@ -59,13 +59,6 @@ LDFLAGS="-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.version=${VER
 	-X gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus.date=${DATE}"
 export CGO_ENABLED=${CGO_ENABLED:-0}
 
-# build with go modules
-export GO111MODULE=on
-
-if [ -n "$MODMODE" ]; then
-	BUILD_ARGS=(-mod "$MODMODE")
-fi
-
 echo "Building multus"
 go build -o ${DEST_DIR}/multus ${BUILD_ARGS} -ldflags "${LDFLAGS}" "$@" ./cmd/multus
 echo "Building multus-daemon"

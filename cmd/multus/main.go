@@ -29,8 +29,6 @@ import (
 )
 
 func main() {
-
-	// Init command line flags to clear vendored packages' one, especially in init()
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	// add version flag

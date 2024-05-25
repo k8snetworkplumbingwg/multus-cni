@@ -5,7 +5,6 @@ FROM local/okdbuilder:latest as builder
 ADD . /usr/src/multus-cni
 
 WORKDIR /usr/src/multus-cni
-ENV GO111MODULE=off
 RUN ./hack/build-go.sh
 
 FROM quay.io/openshift/origin-base:latest

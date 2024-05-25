@@ -18,8 +18,6 @@ jobs:
 
     - name: Run Revive Action by pulling pre-built image
       uses: docker://morphy/revive-action:v2
-      with:
-        exclude: "./vendor/..."
 
     - name: Run go fmt
       run: go fmt ./...
