@@ -190,7 +190,7 @@ spec:
               readOnly: true
             - name: hostroot
               mountPath: /hostroot
-              mountPropagation: HostToContainer
+              mountPropagation: Bidirectional
           env:
             - name: MULTUS_NODE_NAME
               valueFrom:
