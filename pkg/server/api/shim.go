@@ -40,8 +40,8 @@ type ShimNetConf struct {
 	LogToStderr     bool   `json:"logToStderr,omitempty"`
 }
 
-// Define a type for API readiness check functions
-type APIReadyCheckFunc func(string) error
+// readyCheckFunc defines a type for API readiness check functions
+type readyCheckFunc func(string) error
 
 // CmdAdd implements the CNI spec ADD command handler
 func CmdAdd(args *skel.CmdArgs) error {
@@ -74,7 +74,7 @@ func CmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
-func postRequest(args *skel.CmdArgs, readinessCheck APIReadyCheckFunc) (*Response, string, error) {
+func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, string, error) {
 	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {
 		return nil, "", fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
