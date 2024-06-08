@@ -80,7 +80,7 @@ jobs:
             ghcr.io/${{ github.repository }}:stable
             ${{ steps.docker_meta.outputs.tags }}
           file: images/Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
           sbom: false
           provenance: false
 
@@ -94,7 +94,7 @@ jobs:
             ghcr.io/${{ github.repository }}:stable-debug
             ${{ steps.docker_meta.outputs.tags }}-debug
           file: images/Dockerfile.debug
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/ppc64le,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
           sbom: false
           provenance: false
 
