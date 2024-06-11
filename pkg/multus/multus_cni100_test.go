@@ -48,8 +48,8 @@ import (
 	netdefinformerv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/k8s.cni.cncf.io/v1"
 )
 
-func newPodInformer(ctx context.Context, kclient kubernetes.Interface) cache.SharedIndexInformer {
-	informerFactory := informerfactory.NewSharedInformerFactory(kclient, 0*time.Second)
+func newPodInformer(ctx context.Context, watchClient kubernetes.Interface) cache.SharedIndexInformer {
+	informerFactory := informerfactory.NewSharedInformerFactory(watchClient, 0*time.Second)
 
 	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return v1coreinformers.NewFilteredPodInformer(
@@ -71,8 +71,8 @@ func newPodInformer(ctx context.Context, kclient kubernetes.Interface) cache.Sha
 	return podInformer
 }
 
-func newNetDefInformer(ctx context.Context, client netdefclient.Interface) cache.SharedIndexInformer {
-	informerFactory := netdefinformer.NewSharedInformerFactory(client, 0*time.Second)
+func newNetDefInformer(ctx context.Context, netWatchClient netdefclient.Interface) cache.SharedIndexInformer {
+	informerFactory := netdefinformer.NewSharedInformerFactory(netWatchClient, 0*time.Second)
 
 	netdefInformer := informerFactory.InformerFor(&netdefv1.NetworkAttachmentDefinition{}, func(client netdefclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return netdefinformerv1.NewNetworkAttachmentDefinitionInformer(
@@ -941,8 +941,8 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
-		podInformer := newPodInformer(ctx, fKubeClient.Client)
-		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetClient)
+		podInformer := newPodInformer(ctx, fKubeClient.WatchClient)
+		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetWatchClient)
 		fKubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
 		result, err := CmdAdd(args, fExec, fKubeClient)
@@ -991,8 +991,8 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
 		Expect(err).NotTo(HaveOccurred())
 
-		podInformer := newPodInformer(ctx, fKubeClient.Client)
-		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetClient)
+		podInformer := newPodInformer(ctx, fKubeClient.WatchClient)
+		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetWatchClient)
 		fKubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
 		wg := sync.WaitGroup{}

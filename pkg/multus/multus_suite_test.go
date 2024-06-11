@@ -225,9 +225,11 @@ func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
 // NewFakeClientInfo returns fake client (just for testing)
 func NewFakeClientInfo() *k8sclient.ClientInfo {
 	return &k8sclient.ClientInfo{
-		Client:        fake.NewSimpleClientset(),
-		NetClient:     netfake.NewSimpleClientset(),
-		EventRecorder: record.NewFakeRecorder(10),
+		Client:         fake.NewSimpleClientset(),
+		WatchClient:    fake.NewSimpleClientset(),
+		NetClient:      netfake.NewSimpleClientset(),
+		NetWatchClient: netfake.NewSimpleClientset(),
+		EventRecorder:  record.NewFakeRecorder(10),
 	}
 }
 
