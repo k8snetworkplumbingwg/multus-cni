@@ -35,8 +35,8 @@ jobs:
           sbom: false
           provenance: false
 
-  build-amd64-thick:
-    name: Image build/amd64 thick plugin
+  build-thick:
+    name: Image thick plugin
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -50,8 +50,11 @@ jobs:
         with:
           context: .
           push: false
-          tags: ghcr.io/${{ github.repository }}:latest-amd64-thick
+          tags: ghcr.io/${{ github.repository }}:latest-thick
           file: images/Dockerfile.thick
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
   build-origin:
     name: Image build/origin
