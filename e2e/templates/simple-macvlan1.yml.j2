@@ -61,3 +61,28 @@ spec:
       privileged: true
   nodeSelector:
     kubernetes.io/hostname: kind-worker2
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: macvlan1-control-plane
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name": "macvlan1-config",
+              "ips": [ "10.1.1.13/24" ] }
+    ]'
+  labels:
+    app: macvlan
+spec:
+  containers:
+  - name: macvlan-control-plane
+    image: nicolaka/netshoot:v0.12
+    command: ["/bin/sleep", "10000"]
+    securityContext:
+      privileged: true
+  nodeSelector:
+    kubernetes.io/hostname: kind-control-plane
+  tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: "Exists"
+    effect: NoSchedule
