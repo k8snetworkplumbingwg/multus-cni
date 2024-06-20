@@ -180,6 +180,7 @@ spec:
               mountPath: /var/lib/cni/multus
             - name: host-var-lib-kubelet
               mountPath: /var/lib/kubelet
+              mountPropagation: HostToContainer
             - name: host-run-k8s-cni-cncf-io
               mountPath: /run/k8s.cni.cncf.io
             - name: host-run-netns
