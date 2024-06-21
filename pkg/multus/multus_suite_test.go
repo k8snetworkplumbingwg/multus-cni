@@ -31,9 +31,10 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	cniversion "github.com/containernetworking/cni/pkg/version"
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
+
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -225,11 +226,11 @@ func (f *fakeExec) FindInPath(plugin string, paths []string) (string, error) {
 // NewFakeClientInfo returns fake client (just for testing)
 func NewFakeClientInfo() *k8sclient.ClientInfo {
 	return &k8sclient.ClientInfo{
-		Client:         fake.NewSimpleClientset(),
-		WatchClient:    fake.NewSimpleClientset(),
-		NetClient:      netfake.NewSimpleClientset(),
-		NetWatchClient: netfake.NewSimpleClientset(),
-		EventRecorder:  record.NewFakeRecorder(10),
+		// We use watch clients to avoid reconnections in fixed intervals in production, though we do not
+		// distinguish between non-watch clients and watch clients in tests for simplicity
+		Client:        fake.NewSimpleClientset(),
+		NetClient:     netfake.NewSimpleClientset(),
+		EventRecorder: record.NewFakeRecorder(10),
 	}
 }
 
