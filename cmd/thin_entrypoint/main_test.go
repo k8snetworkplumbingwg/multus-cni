@@ -472,4 +472,43 @@ var _ = Describe("thin entrypoint testing", func() {
 
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
+
+	It("Run createKubeConfig() with expected environment", func() {
+		// create directory and files
+		tmpDir, err := os.MkdirTemp("", "kubeconfig_test_tmp")
+		Expect(err).NotTo(HaveOccurred())
+
+		cniConfDir := fmt.Sprintf("%s/cni_conf", tmpDir)
+		Expect(os.Mkdir(cniConfDir, 0755)).To(Succeed())
+	
+		// Set up the Options struct
+		options := &Options{
+			CNIConfDir:          cniConfDir,
+			MultusCNIConfDir:    "/tmp/multus/net.d",
+		}
+
+		// Create service account CA file and token file with dummy data
+		serviceAccountCAFile := fmt.Sprintf("%s/serviceAccountCAFile", tmpDir)
+		serviceAccountTokenFile := fmt.Sprintf("%s/serviceAccountTokenFile", tmpDir)
+		Expect(os.WriteFile(serviceAccountCAFile, []byte("dummy-ca-content"), 0644)).To(Succeed())
+		Expect(os.WriteFile(serviceAccountTokenFile, []byte("dummy-token-content"), 0644)).To(Succeed())
+	
+		// Run the createKubeConfig function
+		caHash, saTokenHash, err := options.createKubeConfig(serviceAccountCAFile, serviceAccountTokenFile, nil, nil)
+		Expect(err).NotTo(HaveOccurred())
+	
+		// Verify the hashes are not nil
+		Expect(caHash).NotTo(BeNil())
+		Expect(saTokenHash).NotTo(BeNil())
+	
+		// Verify the kubeconfig file was created successfully
+		kubeConfigPath := fmt.Sprintf("%s/multus.d/multus.kubeconfig", options.CNIConfDir)
+		content, err := os.ReadFile(kubeConfigPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).NotTo(BeEmpty())
+	
+		// Cleanup
+		Expect(os.RemoveAll(tmpDir)).To(Succeed())
+	})
+	
 })
