@@ -153,12 +153,19 @@ func getFileAndHash(filepath string) ([]byte, []byte, error) {
 	return content, hash.Sum(nil), nil
 }
 
-func (o *Options) createKubeConfig(prevCAHash, prevSATokenHash []byte) ([]byte, []byte, error) {
-	caFileByte, caHash, err := getFileAndHash(serviceAccountCAFile)
+func (o *Options) createKubeConfig(caFilePath, saTokenFilePath string, prevCAHash, prevSATokenHash []byte) ([]byte, []byte, error) {
+	// Use default paths if nil is passed
+	if caFilePath == "" {
+		caFilePath = serviceAccountCAFile
+	}
+	if saTokenFilePath == "" {
+		saTokenFilePath = serviceAccountTokenFile
+	}
+	caFileByte, caHash, err := getFileAndHash(caFilePath)
 	if err != nil {
 		return nil, nil, err
 	}
-	saTokenByte, saTokenHash, err := getFileAndHash(serviceAccountTokenFile)
+	saTokenByte, saTokenHash, err := getFileAndHash(saTokenFilePath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -582,6 +589,11 @@ func main() {
 	var masterConfigFilePath string
 	// copy user specified multus conf to CNI conf directory
 	if opt.MultusConfFile != "auto" {
+		caHash, saTokenHash, err = opt.createKubeConfig("", "", nil, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create multus kubeconfig: %v\n", err)
+			return
+		}
 		confFileName := filepath.Base(opt.MultusConfFile)
 		tempConfFileName := fmt.Sprintf("%s.temp", confFileName)
 		if err = cmdutils.CopyFileAtomic(opt.MultusConfFile, opt.CNIConfDir, tempConfFileName, confFileName); err != nil {
@@ -590,7 +602,7 @@ func main() {
 		}
 		fmt.Printf("multus config file %s is copied.\n", opt.MultusConfFile)
 	} else { // auto generate multus config
-		caHash, saTokenHash, err = opt.createKubeConfig(nil, nil)
+		caHash, saTokenHash, err = opt.createKubeConfig("", "", nil, nil)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create multus kubeconfig: %v\n", err)
 			return
@@ -608,7 +620,7 @@ func main() {
 		fmt.Printf("Entering watch loop...\n")
 		for {
 			// Check kubeconfig and update if different (i.e. service account updated)
-			caHash, saTokenHash, err = opt.createKubeConfig(caHash, saTokenHash)
+			caHash, saTokenHash, err = opt.createKubeConfig("", "", caHash, saTokenHash)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to update multus kubeconfig: %v\n", err)
 				return
