@@ -1,13 +1,13 @@
 name: Image push release
-on: 
+on:
   push:
     tags:
       - v*
 env:
   image-push-owner: 'k8snetworkplumbingwg'
 jobs:
-  push-thick-amd64:
-    name: Image push thick image/amd64
+  push-thick:
+    name: Image push thick image
     runs-on: ubuntu-latest
     steps:
       - name: Check out code into the Go module directory
@@ -42,7 +42,9 @@ jobs:
             ghcr.io/${{ github.repository }}:stable-thick
             ${{ steps.docker_meta.outputs.tags }}-thick
           file: images/Dockerfile.thick
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
+          sbom: false
+          provenance: false
 
   push-thin:
     name: Image push thin image/amd64

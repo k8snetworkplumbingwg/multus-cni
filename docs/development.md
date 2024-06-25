@@ -59,3 +59,7 @@ The following are the best practices for multus logging:
 ## Multus release schedule
 
 On the first maintainer's meeting, twice yearly, after January 1st and July 1st, if a new version has not been tagged, a new version will tagged.
+
+## Multi-arch builds
+
+Multus is currently built for a number of architectures, however, our testing and validation is only performed against x86 architectures. Our x86 architecture has end to end testing, however, for other architectures, only supported via best effort community contributions.
