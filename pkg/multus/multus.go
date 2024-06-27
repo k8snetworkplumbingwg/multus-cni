@@ -640,6 +640,16 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			if err != nil {
 				logging.Debugf("CmdAdd: CopyDeviceInfoForCNIFromDP returned an error - err=%v", err)
 			}
+		} else if delegate.Conf.Capabilities["CNIDeviceInfoFile"] {
+			devInfo := &nettypes.DeviceInfo{}
+			err = nadutils.SaveDeviceInfoForCNI(cniDeviceInfoPath, devInfo)
+			// For CNIs with Capabilities["CNIDeviceInfoFile"] set to true, a deviceinfofile is
+			// created to conveniently pass the CNIDeviceInfoFile to the CNI. This allows the CNI
+			// to flexibly read and write DeviceInfo in annotations, not limited to CNIs with
+			// deviceID present.
+			if err != nil {
+				logging.Debugf("CmdAdd: SaveDeviceInfoForCNI returned an error - err=%v", err)
+			}
 		}
 
 		// We collect the delegate netName for the cachefile name as well as following errors
