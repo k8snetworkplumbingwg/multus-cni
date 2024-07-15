@@ -312,6 +312,10 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 				entry.Index++ // increment Index for next delegate
 			}
 		}
+
+		if deviceID == "" {
+			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: requested resource not found in resourceMap %+v", resourceMap)
+		}
 	}
 
 	configBytes, err := netutils.GetCNIConfig(customResource, confdir)

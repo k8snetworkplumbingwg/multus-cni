@@ -999,6 +999,67 @@ users:
 			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
 			Expect(err).To(HaveOccurred())
 		})
+		It("fails when the requested resource is not available", func() {
+			fakePod := testutils.NewFakePod(fakePodName, "net1", "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			netConf.ConfDir = tmpDir
+
+			resourceMap := make(map[string]*types.ResourceInfo)
+			resourceMap["some-other-resource"] = &types.ResourceInfo{
+				Index:     0,
+				DeviceIDs: []string{"id-1", "id-2", "id-3"},
+			}
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).To(HaveOccurred())
+		})
+		It("provides deviceID when the requested resource is available", func() {
+			fakePod := testutils.NewFakePod(fakePodName, "net1", "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.2.0"
+	}`
+
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			netConf.ConfDir = tmpDir
+
+			resourceMap := make(map[string]*types.ResourceInfo)
+			// This annotation is set by default in the testutils.NewFakeNetAttachDefAnnotation()
+			resourceMap["intel.com/sriov"] = &types.ResourceInfo{
+				Index:     0,
+				DeviceIDs: []string{"id-1", "id-2", "id-3"},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(string(delegates[0].Bytes)).To(ContainSubstring("id-1"))
+		})
 	})
 
 	Context("parsePodNetworkObjectName", func() {
