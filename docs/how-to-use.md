@@ -126,7 +126,7 @@ Create kubeconfig at master node as following commands:
 mkdir -p /etc/cni/net.d/multus.d
 SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
 SERVICEACCOUNT_TOKEN=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data.token' | base64 -d )
-KUBERNETES_SERVICE_PROTO=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)
+KUBERNETES_SERVICE_PROTOCOL=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].name)
 KUBERNETES_SERVICE_HOST=$(kubectl get all -o json | jq -r .items[0].spec.clusterIP)
 KUBERNETES_SERVICE_PORT=$(kubectl get all -o json | jq -r .items[0].spec.ports[0].port)
 cat > /etc/cni/net.d/multus.d/multus.kubeconfig <<EOF
