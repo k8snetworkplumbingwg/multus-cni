@@ -640,6 +640,9 @@ If you wish to have auto configuration use the `readinessindicatorfile` in the c
 > :warning: Dynamic Resource Allocation (DRA) is [currently an alpha](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/),
 > and is subject to change. Please consider this functionality as a preview. The architecture and usage of DRA in
 > Multus CNI may change in the future as this technology matures.
+>
+> The current DRA integration is based on the DRA API for Kubernetes 1.26 to 1.30. With Kubernetes 1.31, the DRA API
+> will change and multus doesn't integrate with the new API yet.
 
 Dynamic Resource Allocation is alternative mechanism to device plugin which allows to requests pod and container
 resources.
