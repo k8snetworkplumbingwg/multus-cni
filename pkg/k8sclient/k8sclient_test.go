@@ -1199,11 +1199,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
@@ -1254,11 +1257,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
@@ -1312,11 +1318,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
@@ -1394,11 +1403,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
@@ -1450,11 +1462,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
@@ -1505,11 +1520,14 @@ users:
 			delegate, err := types.LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 			Expect(err).NotTo(HaveOccurred())
 
-			delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
-			GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+			delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+			GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 			Expect(err).NotTo(HaveOccurred())
 
-			netstatus := []nettypes.NetworkStatus{*delegateNetStatus}
+			netstatus := make([]nettypes.NetworkStatus, 0)
+			for _, status := range delegateNetStatuses {
+				netstatus = append(netstatus, *status)
+			}
 
 			fakePod := testutils.NewFakePod(fakePodName, "kube-system/net1", "")
 
