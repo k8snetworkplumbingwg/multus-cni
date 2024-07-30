@@ -6,15 +6,16 @@ export PATH=${PATH}:./bin
 # This test is using an example implementation of a DRA driver. This driver is mocking GPU resources. At our test we
 # don't care about what these resources are. We want to ensure that such resource is correctly passed in the Pod using
 # Multus configurations. A couple of notes:
-# - We explitictly don't pin the revision of the dra-example-driver to a specific commit to ensure that the integration
-#   continues to work even when the dra-example-driver is updated (which may also indicate API changes on the DRA).
+# - We explitictly pin the revision of the dra-example-driver to the branch `classic-dra` to indicate that the
+#   integration continues to work even when the dra-example-driver is updated. We know that classic-dra is supported
+#   in Kubernetes versions 1.26 to 1.30. Multus supports DRA in the aforementioned Kubernetes versions.
 # - The chart and latest is image is not published somewhere, therefore we have to build locally. This leads to slower
 #   e2e suite runs.
 echo "installing dra-example-driver"
 repo_path="repos/dra-example-driver"
 
 rm -rf $repo_path || true
-git clone https://github.com/kubernetes-sigs/dra-example-driver.git ${repo_path}
+git clone --branch classic-dra https://github.com/kubernetes-sigs/dra-example-driver.git ${repo_path}
 ${repo_path}/demo/build-driver.sh
 KIND_CLUSTER_NAME=kind ${repo_path}/demo/scripts/load-driver-image-into-kind.sh
 chart_path=${repo_path}/deployments/helm/dra-example-driver/
