@@ -122,6 +122,67 @@ func GetNetworkStatus(pod *corev1.Pod) ([]v1.NetworkStatus, error) {
 	return netStatuses, err
 }
 
+// CreateNetworkStatuses creates an array of NetworkStatus from CNI result
+// Not to be confused with CreateNetworkStatus (singular)
+// This is the preferred method and picks up when CNI ADD results contain multiple container interfaces
+func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork bool, dev *v1.DeviceInfo) ([]*v1.NetworkStatus, error) {
+	var networkStatuses []*v1.NetworkStatus
+	// indexMap is from original CNI result index to networkStatuses index
+	indexMap := make(map[int]int)
+
+	// Convert whatever the IPAM result was into the current Result type
+	result, err := cni100.NewResultFromResult(r)
+	if err != nil {
+		return nil, fmt.Errorf("error converting the type.Result to cni100.Result: %v", err)
+	}
+
+	// Discover default routes upfront and reuse them if necessary.
+	var useDefaultRoute []string
+	for _, route := range result.Routes {
+		if isDefaultRoute(route) {
+			useDefaultRoute = append(useDefaultRoute, route.GW.String())
+		}
+	}
+
+	// Same for DNS
+	v1dns := convertDNS(result.DNS)
+
+	// Initialize NetworkStatus for each container interface (e.g. with sandbox present)
+	indexOfFoundPodInterface := 0
+	for i, iface := range result.Interfaces {
+		if iface.Sandbox != "" {
+			ns := &v1.NetworkStatus{
+				Name:       networkName,
+				Default:    defaultNetwork,
+				Interface:  iface.Name,
+				Mac:        iface.Mac,
+				Mtu:        iface.Mtu,
+				IPs:        []string{},
+				Gateway:    useDefaultRoute,
+				DeviceInfo: dev,
+				DNS:        *v1dns,
+			}
+			networkStatuses = append(networkStatuses, ns)
+			// Map original index to the new slice index
+			indexMap[i] = indexOfFoundPodInterface
+			indexOfFoundPodInterface++
+		}
+	}
+
+	// Map IPs to network interface based on index
+	for _, ipConfig := range result.IPs {
+		if ipConfig.Interface != nil {
+			originalIndex := *ipConfig.Interface
+			if newIndex, ok := indexMap[originalIndex]; ok {
+				ns := networkStatuses[newIndex]
+				ns.IPs = append(ns.IPs, ipConfig.Address.IP.String())
+			}
+		}
+	}
+
+	return networkStatuses, nil
+}
+
 // CreateNetworkStatus create NetworkStatus from CNI result
 func CreateNetworkStatus(r cnitypes.Result, networkName string, defaultNetwork bool, dev *v1.DeviceInfo) (*v1.NetworkStatus, error) {
 	netStatus := &v1.NetworkStatus{}
