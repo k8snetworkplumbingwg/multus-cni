@@ -551,7 +551,7 @@ Typically, you'd modified the daemonset YAML itself to specify these parameters.
 For example, the `command` and `args` parameters in the `containers` section of the DaemonSet may look something like:
 
 ```
-  command: ["/entrypoint.sh"]
+  command: ["/thin_entrypoint"]
   args:
   - "--multus-conf-file=auto"
   - "--namespace-isolation=true"
@@ -590,7 +590,7 @@ The `--multus-conf-file` is one of two options; it can be set to a source file t
 
 The automatic configuration option is used to automatically generate Multus configurations given existing on-disk CNI configurations for your default network.
 
-In the case that `--multus-conf-file=auto` -- The entrypoint script will look at the `--multus-autoconfig-dir` (by default, the same as the `--cni-conf-dir`). Multus will wait (600 seconds) until there's a CNI configuration file there, and it will take the alphabetically first configuration there, and it will wrap that configuration into a Multus configuration.
+In the case that `--multus-conf-file=auto` -- The entrypoint script will look at the `--multus-autoconfig-dir` (by default, the same as the `--cni-conf-dir`). Multus will take the alphabetically first configuration there and wrap that into a Multus configuration.
 
     --multus-autoconfig-dir=/host/etc/cni/net.d
 
@@ -618,6 +618,14 @@ Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version
 In some cases, the original CNI configuration that the Multus configuration was generated from (using `--multus-conf-file=auto`) may be used as a sort of semaphor for network readiness -- as this model is used by the Kubelet itself. If you need to disable Multus' availability, you may wish to clean out the generated configuration file when the source file for autogeneration of the config file is no longer present. You can use this functionality by setting:
 
     --cleanup-config-on-exit=true
+
+When specifying `--cleanup-config-on-exit=true` the entrypoint script will delete any generated/copied Multus configuration files when entrypoint script
+exits (upon Pod termination). This allows Multus to be safely removed from the cluster when its no longer needed.
+
+In addition, when both `--cleanup-config-on-exit=true` and `--multus-conf-file=auto` are specified, the entrypoint script will watch for changes of the
+master CNI configuration and kubeconfig. when such change detected, the script will re-genereate Multus configuration. Watch can be skipped by setting:
+
+    --skip-config-watch
 
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 

@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/signals"
 )
 
 // Options stores command line options
@@ -57,6 +58,7 @@ type Options struct {
 	AdditionalBinDir         string
 	ForceCNIVersion          bool
 	SkipTLSVerify            bool
+	SkipMultusConfWatch      bool
 }
 
 const (
@@ -84,7 +86,8 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.MultusLogLevel, "multus-log-level", "", "multus log level")
 	fs.StringVar(&o.MultusLogFile, "multus-log-file", "", "multus log file")
 	fs.BoolVar(&o.OverrideNetworkName, "override-network-name", false, "override network name from master cni file (used only with --multus-conf-file=auto)")
-	fs.BoolVar(&o.CleanupConfigOnExit, "cleanup-config-on-exit", false, "cleanup config file on exit (used only with --multus-conf-file=auto)")
+	fs.BoolVar(&o.CleanupConfigOnExit, "cleanup-config-on-exit", false, "cleanup config file on exit")
+	fs.BoolVar(&o.SkipMultusConfWatch, "skip-config-watch", false, "dont watch for config (master cni and kubeconfig) changes (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.RenameConfFile, "rename-conf-file", false, "rename master config file to invalidate (used only with --multus-conf-file=auto)")
 	fs.StringVar(&o.ReadinessIndicatorFile, "readiness-indicator-file", "", "readiness indicator file (used only with --multus-conf-file=auto)")
 	fs.StringVar(&o.AdditionalBinDir, "additional-bin-dir", "", "adds binDir option to configuration (used only with --multus-conf-file=auto)")
@@ -604,43 +607,72 @@ func main() {
 		fmt.Printf("multus config file is created.\n")
 	}
 
-	if opt.CleanupConfigOnExit && opt.MultusConfFile == "auto" {
+	ctx := signals.SetupSignalHandler()
+
+	if opt.CleanupConfigOnExit {
+		defer cleanupMultusConf(&opt)
+	}
+
+	watchChanges := opt.CleanupConfigOnExit && opt.MultusConfFile == "auto" && !opt.SkipMultusConfWatch
+	if watchChanges {
 		fmt.Printf("Entering watch loop...\n")
-		for {
-			// Check kubeconfig and update if different (i.e. service account updated)
-			caHash, saTokenHash, err = opt.createKubeConfig(caHash, saTokenHash)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to update multus kubeconfig: %v\n", err)
-				return
-			}
+		masterConfigExists := true
 
-			// TODO: should we watch master CNI config (by fsnotify? https://github.com/fsnotify/fsnotify)
-			_, err = os.Stat(masterConfigFilePath)
+	outer:
+		for range time.Tick(1 * time.Second) {
+			select {
+			case <-ctx.Done():
+				// signal received break from loop
+				break outer
+			default:
+				// Check kubeconfig and update if different (i.e. service account updated)
+				caHash, saTokenHash, err = opt.createKubeConfig(caHash, saTokenHash)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to update multus kubeconfig: %v\n", err)
+					return
+				}
 
-			// if masterConfigFilePath is no longer exists
-			if os.IsNotExist(err) {
-				fmt.Printf("Master plugin @ %q has been deleted. Allowing 45 seconds for its restoration...\n", masterConfigFilePath)
-				time.Sleep(10 * time.Second)
+				// TODO: should we watch master CNI config (by fsnotify? https://github.com/fsnotify/fsnotify)
+				_, err = os.Stat(masterConfigFilePath)
 
-				for range time.Tick(1 * time.Second) {
-					_, err = os.Stat(masterConfigFilePath)
-					if !os.IsNotExist(err) {
-						fmt.Printf("Master plugin @ %q was restored. Regenerating given configuration.\n", masterConfigFilePath)
-						break
+				// if masterConfigFilePath is no longer exists
+				if os.IsNotExist(err) {
+					if masterConfigExists {
+						fmt.Printf("Master plugin @ %q has been deleted. waiting for its restoration...\n", masterConfigFilePath)
 					}
+					masterConfigExists = false
+					continue
+				}
+
+				if !masterConfigExists {
+					fmt.Printf("Master plugin @ %q was restored. Regenerating given configuration.\n", masterConfigFilePath)
+					masterConfigExists = true
+				}
+
+				masterConfigFilePath, masterConfigHash, err = opt.createMultusConfig(masterConfigHash)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
+					return
 				}
 			}
-			masterConfigFilePath, masterConfigHash, err = opt.createMultusConfig(masterConfigHash)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to create multus config: %v\n", err)
-				return
-			}
-			time.Sleep(1 * time.Second)
 		}
 	} else {
-		// sleep infinitely
-		for {
-			time.Sleep(time.Duration(1<<63 - 1))
-		}
+		// wait until signal received
+		<-ctx.Done()
 	}
+}
+
+func cleanupMultusConf(opt *Options) {
+	// try remove multus conf
+	if opt.MultusConfFile == "auto" {
+		multusConfFilePath := fmt.Sprintf("%s/00-multus.conf", opt.CNIConfDir)
+		_ = os.Remove(multusConfFilePath)
+
+		multusConfFilePath = fmt.Sprintf("%s/00-multus.conflist", opt.CNIConfDir)
+		_ = os.Remove(multusConfFilePath)
+	} else {
+		confFileName := filepath.Base(opt.MultusConfFile)
+		_ = os.Remove(filepath.Join(opt.CNIConfDir, confFileName))
+	}
+
 }
