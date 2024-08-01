@@ -5,11 +5,34 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2" //nolint:golint
 	. "github.com/onsi/gomega"    //nolint:golint
 )
+
+// chrootTestHelper performs chroot syscall, returns func to get back to original root or error if occurred
+func chrootTestHelper(path string) (func() error, error) {
+	root, err := os.Open("/")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := syscall.Chroot(path); err != nil {
+		root.Close()
+		return nil, err
+	}
+
+	return func() error {
+		defer root.Close()
+		if err := root.Chdir(); err != nil {
+			return err
+		}
+		return syscall.Chroot(".")
+	}, nil
+}
 
 func TestThinEntrypoint(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -472,4 +495,50 @@ var _ = Describe("thin entrypoint testing", func() {
 
 		Expect(os.RemoveAll(tmpDir)).To(Succeed())
 	})
+
+	It("Run createKubeConfig()", func() {
+		// create temp dir and files
+		tmpDir := GinkgoT().TempDir()
+
+		cniConfDir := "/cni_conf"
+		Expect(os.Mkdir(filepath.Join(tmpDir, cniConfDir), 0755)).To(Succeed())
+
+		multusConfDir := "/multus_conf"
+		Expect(os.Mkdir(filepath.Join(tmpDir, multusConfDir), 0755)).To(Succeed())
+
+		// Create service account CA file and token file with dummy data
+		svcAccountPath := filepath.Join(tmpDir, "var/run/secrets/kubernetes.io/serviceaccount")
+		Expect(os.MkdirAll(svcAccountPath, 0755)).ToNot(HaveOccurred())
+		svcAccountCAFile := filepath.Join(tmpDir, serviceAccountCAFile)
+		svcAccountTokenFile := filepath.Join(tmpDir, serviceAccountTokenFile)
+		Expect(os.WriteFile(svcAccountCAFile, []byte("dummy-ca-content"), 0644)).To(Succeed())
+		Expect(os.WriteFile(svcAccountTokenFile, []byte("dummy-token-content"), 0644)).To(Succeed())
+
+		// Set up the Options struct
+		options := &Options{
+			CNIConfDir:       cniConfDir,
+			MultusCNIConfDir: multusConfDir,
+		}
+
+		// Run the createKubeConfig function in a chroot env
+		back, err := chrootTestHelper(tmpDir)
+		Expect(err).ToNot(HaveOccurred())
+		caHash, saTokenHash, err := options.createKubeConfig(nil, nil)
+		Expect(back()).ToNot(HaveOccurred())
+		// back to original root
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(caHash).NotTo(BeNil())
+		Expect(saTokenHash).NotTo(BeNil())
+
+		// Verify the kubeconfig file was created successfully
+		kubeConfigPath := filepath.Join(tmpDir, cniConfDir, "multus.d", "multus.kubeconfig")
+		content, err := os.ReadFile(kubeConfigPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(content).NotTo(BeEmpty())
+
+		// Cleanup
+		Expect(os.RemoveAll(tmpDir)).To(Succeed())
+	})
+
 })

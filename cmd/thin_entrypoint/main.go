@@ -585,6 +585,11 @@ func main() {
 	var masterConfigFilePath string
 	// copy user specified multus conf to CNI conf directory
 	if opt.MultusConfFile != "auto" {
+		caHash, saTokenHash, err = opt.createKubeConfig(nil, nil)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create multus kubeconfig: %v\n", err)
+			return
+		}
 		confFileName := filepath.Base(opt.MultusConfFile)
 		tempConfFileName := fmt.Sprintf("%s.temp", confFileName)
 		if err = cmdutils.CopyFileAtomic(opt.MultusConfFile, opt.CNIConfDir, tempConfFileName, confFileName); err != nil {
