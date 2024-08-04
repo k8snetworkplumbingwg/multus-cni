@@ -54,7 +54,7 @@ type Server struct {
 	exec                  invoke.Exec
 	serverConfig          []byte
 	metrics               *Metrics
-	informerFactory       internalinterfaces.SharedInformerFactory
+	podInformerFactory    internalinterfaces.SharedInformerFactory
 	podInformer           cache.SharedIndexInformer
 	netdefInformerFactory netdefinformer.SharedInformerFactory
 	netdefInformer        cache.SharedIndexInformer
