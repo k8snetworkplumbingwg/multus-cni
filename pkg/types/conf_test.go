@@ -704,9 +704,9 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 		Expect(err).NotTo(HaveOccurred())
 
-		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+		delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
 
-		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+		GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -737,9 +737,9 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConf([]byte(conf), nil, "0000:00:00.0", "")
 		Expect(err).NotTo(HaveOccurred())
 		fmt.Println("result.Version: ", result.Version())
-		delegateNetStatus, err := netutils.CreateNetworkStatus(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
+		delegateNetStatuses, err := netutils.CreateNetworkStatuses(result, delegate.Conf.Name, delegate.MasterPlugin, nil)
 
-		GinkgoT().Logf("delegateNetStatus %+v\n", delegateNetStatus)
+		GinkgoT().Logf("delegateNetStatuses %+v\n", delegateNetStatuses)
 
 		Expect(err).To(HaveOccurred())
 	})

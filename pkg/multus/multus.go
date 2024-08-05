@@ -738,15 +738,18 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 			logging.Debugf("CmdAdd: getDelegateDeviceInfo returned an error - err=%v", err)
 		}
 
-		// create the network status, only in case Multus as kubeconfig
+		// Create the network statuses, only in case Multus has kubeconfig
 		if kubeClient != nil && kc != nil {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
-				delegateNetStatus, err := nadutils.CreateNetworkStatus(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
+				delegateNetStatuses, err := nadutils.CreateNetworkStatuses(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
 				if err != nil {
-					return nil, cmdErr(k8sArgs, "error setting network status: %v", err)
+					return nil, cmdErr(k8sArgs, "error setting network statuses: %v", err)
 				}
 
-				netStatus = append(netStatus, *delegateNetStatus)
+				// Append all returned statuses after dereferencing each
+				for _, status := range delegateNetStatuses {
+					netStatus = append(netStatus, *status)
+				}
 			}
 		} else if devinfo != nil {
 			// Warn that devinfo exists but could not add it to downwards API
