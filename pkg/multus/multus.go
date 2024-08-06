@@ -258,16 +258,25 @@ func confDel(rt *libcni.RuntimeConf, rawNetconf []byte, multusNetconf *types.Net
 	return err
 }
 
-func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) (cnitypes.Result, error) {
+func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) (cnitypes.Result, error) {
 	logging.Debugf("conflistAdd: %v, %s", rt, string(rawnetconflist))
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.ConfListFromBytes(rawnetconflist)
-	if err != nil {
-		return nil, logging.Errorf("conflistAdd: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return nil, logging.Errorf("conflistAdd: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	result, err := cniNet.AddNetworkList(context.Background(), confList, rt)
@@ -361,7 +370,8 @@ func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	var result cnitypes.Result
 	var err error
 	if delegate.ConfListPlugin {
-		result, err = conflistAdd(rt, delegate.Bytes, multusNetconf, exec)
+		// TODO: why are we passing bytes here? don't we have a better representation of it?
+		result, err = conflistAdd(rt, delegate.Bytes, &delegate.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return nil, err
 		}
@@ -673,6 +683,36 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	_, kc, err := k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
 	if err != nil {
 		return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
+	}
+
+	// we add to the auxiliary CNI chain here.
+	if n.AuxiliaryCNIChainName != "" {
+		logging.Debugf("Using AuxiliaryCNIChainName: %v", n.AuxiliaryCNIChainName)
+
+		// create an passthru cni conflist configuration with our aux chain cni chain name.
+		jsonString := fmt.Sprintf(`{"cniVersion":"%s","name":"%s","plugins":[{"type":"passthru","name":"passthru-cni"}]}`, n.CNIVersion, n.AuxiliaryCNIChainName)
+
+		// Convert the JSON string to a byte array
+		byteArray := []byte(jsonString)
+
+		// Let's try to get the cni path from the ClusterNetwork
+		if !strings.Contains(n.ClusterNetwork, "/") {
+			return nil, cmdErr(k8sArgs, "auxiliary chain used but ClusterNetwork must be a path, and it is not a path: %v", n.ClusterNetwork)
+		}
+
+		// Get the directory part of the ClusterNetwork path
+		// TODO: This could probably be improved.
+		cniPath := filepath.Dir(n.ClusterNetwork)
+
+		// Load chained delegates
+		delegate := k8s.LoadChainedDelegatesFromBytes(byteArray, cniPath)
+		if delegate != nil {
+			// Only if additional plugins were listed do we add this aux chain delegate.
+			if len(delegate.ConfList.Plugins) > 1 {
+				// Add the resulting delegate to n.Delegates
+				n.Delegates = append(n.Delegates, delegate)
+			}
+		}
 	}
 
 	// cache the multus config

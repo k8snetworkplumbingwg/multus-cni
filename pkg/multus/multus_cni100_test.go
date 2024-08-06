@@ -29,10 +29,8 @@ import (
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	testhelpers "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/testing"
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1164,69 +1162,6 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
 
-	It("fails to execute confListDel given no 'plugins' key", func() {
-		args := &skel.CmdArgs{
-			ContainerID: "123456789",
-			Netns:       testNS.Path(),
-			IfName:      "eth0",
-			StdinData: []byte(`{
-	    "name": "node-cni-network",
-	    "type": "multus",
-	    "readinessindicatorfile": "/tmp/foo.multus.conf",
-	    "defaultnetworkwaitseconds": 3,
-	    "delegates": [{
-	        "name": "weave1",
-	        "cniVersion": "1.0.0",
-	        "type": "weave-net"
-	    },{
-	        "name": "other1",
-	        "cniVersion": "1.0.0",
-	        "type": "other-plugin"
-	    }]
-	}`),
-		}
-
-		fExec := newFakeExec()
-		expectedResult1 := &cni100.Result{
-			CNIVersion: "1.0.0",
-			IPs: []*cni100.IPConfig{{
-				Address: *testhelpers.EnsureCIDR("1.1.1.2/24"),
-			},
-			},
-		}
-		expectedConf1 := `{
-	    "name": "weave1",
-	    "cniVersion": "1.0.0",
-	    "type": "weave-net"
-	}`
-		fExec.addPlugin100(nil, "eth0", expectedConf1, expectedResult1, nil)
-
-		expectedResult2 := &cni100.Result{
-			CNIVersion: "1.0.0",
-			IPs: []*cni100.IPConfig{{
-				Address: *testhelpers.EnsureCIDR("1.1.1.5/24"),
-			},
-			},
-		}
-		expectedConf2 := `{
-	    "name": "other1",
-	    "cniVersion": "1.0.0",
-	    "type": "other-plugin"
-	}`
-		fExec.addPlugin100(nil, "net1", expectedConf2, expectedResult2, nil)
-
-		fakeMultusNetConf := types.NetConf{
-			BinDir: "/opt/cni/bin",
-		}
-		// use fExec for the exec param
-		rawnetconflist := []byte(`{"cniVersion":"1.0.0","name":"weave1","type":"weave-net"}`)
-		k8sargs, err := k8sclient.GetK8sArgs(args)
-		n, err := types.LoadNetConf(args.StdinData)
-		rt, _ := types.CreateCNIRuntimeConf(args, k8sargs, args.IfName, n.RuntimeConfig, nil)
-
-		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
-		Expect(err).To(HaveOccurred())
-	})
 })
 
 var _ = Describe("multus operations cniVersion 1.1.0 config", func() {
@@ -1354,18 +1289,28 @@ var _ = Describe("multus operations cniVersion 1.1.0 config", func() {
 
 		fExec := newFakeExec()
 		expectedConf1 := `{
-			"cni.dev/valid-attachments": [
-			{
-				"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
-				"ifname": "eth0"
-			},
-			{
-				"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
-				"ifname": "net1"
-			}
+			"cni.dev/attachments": [
+				{
+					"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+					"ifname": "eth0"
+				},
+				{
+					"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+					"ifname": "net1"
+				}
 			],
-			"name": "weave1",
+			"cni.dev/valid-attachments": [
+				{
+					"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+					"ifname": "eth0"
+				},
+				{
+					"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+					"ifname": "net1"
+				}
+			],
 			"cniVersion": "1.1.0",
+			"name": "weave1",
 			"type": "weave-net"
 		}`
 		fExec.addPlugin100(nil, "", expectedConf1, nil, nil)

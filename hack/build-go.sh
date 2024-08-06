@@ -80,3 +80,5 @@ echo "Building kubeconfig_generator"
 go build -o "${DEST_DIR}"/kubeconfig_generator ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/kubeconfig_generator
 echo "Building cert-approver"
 go build -o "${DEST_DIR}"/cert-approver ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/cert-approver
+echo "Building passthru CNI"
+go build -o "${DEST_DIR}"/passthru ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/passthru-cni
