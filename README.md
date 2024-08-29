@@ -24,10 +24,10 @@ Here's an illustration of the network interfaces attached to a pod, as provision
 
 The quickstart installation method for Multus requires that you have first installed a Kubernetes CNI plugin to serve as your pod-to-pod network, which we refer to as your "default network" (a network interface that every pod will be created with). Each network attachment created by Multus will be in addition to this default network interface. For more detail on installing a default network CNI plugin, refer to our [quick-start guide](docs/quickstart.md).
 
-Clone this GitHub repository, and apply a daemonset which installs Multus using `kubectl`. From the root directory of the clone, apply the daemonset YAML file:
+To use latest features try command below which applies a daemonset and installs thick Multus using `kubectl`:
 
 ```
-cat ./deployments/multus-daemonset-thick.yml | kubectl apply -f -
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](docs/quickstart.md)
@@ -39,7 +39,7 @@ With the multus 4.0 release, we introduce a new client/server-style plugin deplo
 We recommend using the thick plugin in most environments, but if you wish to run the thin plugin, or are in a resource-constrained environment, you may do so with:
 
 ```
-cat ./deployments/multus-daemonset.yml | kubectl apply -f -
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
 ```
 
 ## Additional Installation Options
