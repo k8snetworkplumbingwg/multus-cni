@@ -153,7 +153,7 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 		if iface.Sandbox != "" {
 			ns := &v1.NetworkStatus{
 				Name:       networkName,
-				Default:    defaultNetwork,
+				Default:    defaultNetwork && i == 0,
 				Interface:  iface.Name,
 				Mac:        iface.Mac,
 				Mtu:        iface.Mtu,
