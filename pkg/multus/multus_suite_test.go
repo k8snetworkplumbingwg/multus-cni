@@ -58,6 +58,8 @@ type fakeExec struct {
 	addIndex        int
 	delIndex        int
 	chkIndex        int
+	statusIndex     int
+	gcIndex         int
 	expectedDelSkip int
 	plugins         map[string]*fakePlugin
 }
@@ -168,6 +170,14 @@ func (f *fakeExec) ExecPlugin(_ context.Context, pluginPath string, stdinData []
 		Expect(len(f.plugins)).To(BeNumerically(">", f.delIndex))
 		index = len(f.plugins) - f.expectedDelSkip - f.delIndex - 1
 		f.delIndex++
+	case "GC":
+		Expect(len(f.plugins)).To(BeNumerically(">", f.statusIndex))
+		index = f.gcIndex
+		f.gcIndex++
+	case "STATUS":
+		Expect(len(f.plugins)).To(BeNumerically(">", f.statusIndex))
+		index = f.statusIndex
+		f.statusIndex++
 	default:
 		// Should never be reached
 		Expect(false).To(BeTrue())
