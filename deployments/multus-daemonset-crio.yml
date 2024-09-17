@@ -181,7 +181,7 @@ spec:
       - name: kube-multus
         # crio support requires multus:latest for now. support 3.3 or later.
         image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable
-        command: ["/entrypoint.sh"]
+        command: ["/thin_entrypoint"]
         args:
         - "--cni-version=0.3.1"
         - "--cni-bin-dir=/host/usr/libexec/cni"
