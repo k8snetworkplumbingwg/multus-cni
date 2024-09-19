@@ -41,6 +41,9 @@ const (
 
 	// MultusHealthAPIEndpoint is an endpoint API clients can query to know if they can communicate w/ multus server
 	MultusHealthAPIEndpoint = "/healthz"
+
+	// MultusReadyAPIEndpoint is like health, but starts returning status 500 once a sig-term is received.
+	MultusReadyAPIEndpoint = "/readyz"
 )
 
 // DoCNI sends a CNI request to the CNI server via JSON + HTTP over a root-owned unix socket,
@@ -100,7 +103,7 @@ func CreateDelegateRequest(cniCommand, cniContainerID, cniNetNS, cniIFName, podN
 // WaitUntilAPIReady checks API readiness
 func WaitUntilAPIReady(socketPath string) error {
 	return utilwait.PollImmediate(APIReadyPollDuration, APIReadyPollTimeout, func() (bool, error) {
-		_, err := DoCNI(GetAPIEndpoint(MultusHealthAPIEndpoint), nil, SocketPath(socketPath))
+		_, err := DoCNI(GetAPIEndpoint(MultusReadyAPIEndpoint), nil, SocketPath(socketPath))
 		return err == nil, nil
 	})
 }
