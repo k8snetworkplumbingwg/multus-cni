@@ -8,7 +8,7 @@ require (
 	github.com/containernetworking/plugins v1.1.0
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/go-logr/logr v1.3.0 // indirect
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.3
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.4
 	github.com/onsi/ginkgo/v2 v2.13.2
 	github.com/onsi/gomega v1.30.0
 	github.com/pkg/errors v0.9.1 // indirect

@@ -136,6 +136,11 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 		return nil, fmt.Errorf("error converting the type.Result to cni100.Result: %v", err)
 	}
 
+	if len(result.Interfaces) == 1 {
+		networkStatus, err := CreateNetworkStatus(r, networkName, defaultNetwork, dev)
+		return []*v1.NetworkStatus{networkStatus}, err
+	}
+
 	// Discover default routes upfront and reuse them if necessary.
 	var useDefaultRoute []string
 	for _, route := range result.Routes {
