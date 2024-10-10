@@ -770,6 +770,8 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
+	logging.Debugf("!bang the whole result ON ADD: %+v", result)
+
 	return result, nil
 }
 
