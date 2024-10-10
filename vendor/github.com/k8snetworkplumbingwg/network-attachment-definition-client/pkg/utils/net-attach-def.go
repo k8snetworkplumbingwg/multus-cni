@@ -136,6 +136,11 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 		return nil, fmt.Errorf("error converting the type.Result to cni100.Result: %v", err)
 	}
 
+	if len(result.Interfaces) == 1 {
+		networkStatus, err := CreateNetworkStatus(r, networkName, defaultNetwork, dev)
+		return []*v1.NetworkStatus{networkStatus}, err
+	}
+
 	// Discover default routes upfront and reuse them if necessary.
 	var useDefaultRoute []string
 	for _, route := range result.Routes {
@@ -147,14 +152,40 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 	// Same for DNS
 	v1dns := convertDNS(result.DNS)
 
+	// Check for a gateway-associated interface, we'll use this later if we did to mark as the default.
+	gatewayInterfaceIndex := -1
+	if defaultNetwork {
+		for _, ipConfig := range result.IPs {
+			if ipConfig.Gateway != nil && ipConfig.Interface != nil {
+				// Keep the index of the first interface that has a gateway
+				gatewayInterfaceIndex = *ipConfig.Interface
+				break
+			}
+		}
+	}
+
 	// Initialize NetworkStatus for each container interface (e.g. with sandbox present)
 	indexOfFoundPodInterface := 0
 	foundFirstSandboxIface := false
+	didSetDefault := false
 	for i, iface := range result.Interfaces {
 		if iface.Sandbox != "" {
+			isDefault := false // default to false by default
+
+			// If there's a gateway listed for this interface index found in the ips, we mark that interface as default, the first one we find.
+			if defaultNetwork && i == gatewayInterfaceIndex && !didSetDefault {
+				isDefault = true
+				didSetDefault = true
+			}
+
+			// Otherwise, if we didn't find it, we use the first sandbox interface.
+			if defaultNetwork && gatewayInterfaceIndex == -1 && !foundFirstSandboxIface {
+				isDefault = true
+			}
+
 			ns := &v1.NetworkStatus{
 				Name:       networkName,
-				Default:    defaultNetwork && !foundFirstSandboxIface,
+				Default:    isDefault,
 				Interface:  iface.Name,
 				Mac:        iface.Mac,
 				Mtu:        iface.Mtu,
