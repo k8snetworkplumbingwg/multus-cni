@@ -211,8 +211,6 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# golang.org/x/mod v0.13.0
-## explicit; go 1.18
 # golang.org/x/net v0.23.0
 ## explicit; go 1.18
 golang.org/x/net/context
@@ -229,6 +227,9 @@ golang.org/x/net/trace
 ## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
+# golang.org/x/sync v0.4.0
+## explicit; go 1.17
+golang.org/x/sync/semaphore
 # golang.org/x/sys v0.18.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
@@ -785,10 +786,6 @@ k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/code-generator v0.29.0 => k8s.io/code-generator v0.29.0
-## explicit; go 1.21
-# k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
-## explicit; go 1.13
 # k8s.io/klog v1.0.0
 ## explicit; go 1.12
 k8s.io/klog
