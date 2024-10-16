@@ -72,6 +72,7 @@ is provided.
 - `"logLevel"`: the logging level for the multus daemon logs.
 - `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
 as well. By default, it is disabled.
+- `concurrentExecs`: integer that, if specified, defines the amount of parallel chroot plugin executions (optional).
 
 In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)
 
@@ -89,7 +90,8 @@ Below you can see an example of the daemon configuration:
         "cniVersion": "0.3.1",
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
-        "multusAutoconfigDir": "/host/etc/cni/net.d"
+        "multusAutoconfigDir": "/host/etc/cni/net.d",
+        "concurrentExecs": 10
     }
 ```
 
