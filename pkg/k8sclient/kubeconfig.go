@@ -228,8 +228,19 @@ func newClientInfo(config *rest.Config) (*ClientInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	netClient, err := netclient.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
 
-	netclient, err := netclient.NewForConfig(config)
+	watchConfig := rest.CopyConfig(config)
+	// Do not set timeout for watches and delegate timeout to client-go
+	watchConfig.Timeout = 0
+	watchClient, err := kubernetes.NewForConfig(watchConfig)
+	if err != nil {
+		return nil, err
+	}
+	netWatchClient, err := netclient.NewForConfig(watchConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +251,9 @@ func newClientInfo(config *rest.Config) (*ClientInfo, error) {
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "multus"})
 	return &ClientInfo{
 		Client:           client,
-		NetClient:        netclient,
+		WatchClient:      watchClient,
+		NetClient:        netClient,
+		NetWatchClient:   netWatchClient,
 		EventBroadcaster: broadcaster,
 		EventRecorder:    recorder,
 	}, nil
