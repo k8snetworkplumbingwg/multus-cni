@@ -29,6 +29,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -46,7 +47,7 @@ import (
 	netdefinformerv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions/k8s.cni.cncf.io/v1"
 
 	kapi "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -251,18 +252,33 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 
-	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator)
+	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator, daemonConfig.ConcurrentExecs)
 }
 
-func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
+func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool, concurrency *int) (*Server, error) {
 	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
 	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
 	router := http.NewServeMux()
+	handler := http.Handler(router)
+
+	// limit concurrent requests by using a semaphore
+	if concurrency != nil {
+		sem := semaphore.NewWeighted(int64(*concurrency))
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := sem.Acquire(r.Context(), 1); err != nil {
+				http.Error(w, fmt.Sprintf("%v", err), http.StatusInternalServerError)
+				return
+			}
+			defer sem.Release(1)
+			router.ServeHTTP(w, r)
+		})
+	}
+
 	s := &Server{
 		Server: http.Server{
-			Handler: router,
+			Handler: handler,
 		},
 		rundir:       rundir,
 		kubeclient:   kubeClient,
