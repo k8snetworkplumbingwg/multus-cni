@@ -29,6 +29,7 @@ import (
 	"sync"
 	"syscall"
 
+	"golang.org/x/net/netutil"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -106,7 +107,7 @@ func main() {
 		}
 	}
 
-	if err := startMultusDaemon(ctx, daemonConf, ignoreReadinessIndicator); err != nil {
+	if err := startMultusDaemon(ctx, daemonConf, ignoreReadinessIndicator, daemonConf.ConnectionLimit); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
 		os.Exit(3)
 	}
@@ -140,7 +141,7 @@ func main() {
 	logging.Verbosef("multus daemon is exited")
 }
 
-func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool) error {
+func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool, connectionLimit *int) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -165,6 +166,11 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
 	if err != nil {
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
+	}
+
+	if limit := connectionLimit; limit != nil && *limit > 0 {
+		logging.Debugf("connection limit: %d", *limit)
+		l = netutil.LimitListener(l, *limit)
 	}
 
 	server.Start(ctx, l)
