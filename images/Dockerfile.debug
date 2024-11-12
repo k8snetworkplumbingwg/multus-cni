@@ -1,5 +1,5 @@
 # This Dockerfile is used to build the image available on DockerHub
-FROM --platform=$BUILDPLATFORM golang:1.21 as build
+FROM --platform=$BUILDPLATFORM golang:1.23 as build
 
 # Add everything
 ADD . /usr/src/multus-cni
