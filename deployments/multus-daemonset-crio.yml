@@ -208,7 +208,7 @@ spec:
           mountPath: /host/usr/libexec/cni
         - name: multus-cfg
           mountPath: /tmp/multus-conf
-      terminationGracePeriodSeconds: 10
+      terminationGracePeriodSeconds: 30
       volumes:
         - name: run
           hostPath:
