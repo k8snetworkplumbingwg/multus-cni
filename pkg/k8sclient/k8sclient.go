@@ -82,6 +82,10 @@ func (c *ClientInfo) GetPod(namespace, name string) (*v1.Pod, error) {
 	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
+func (c *ClientInfo) GetPodLive(namespace, name string) (*v1.Pod, error) {
+	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
 // DeletePod deletes a pod from kubernetes
 func (c *ClientInfo) DeletePod(namespace, name string) error {
 	return c.Client.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
