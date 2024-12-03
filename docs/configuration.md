@@ -12,7 +12,7 @@ Following is the example of multus config file, in `/etc/cni/net.d/`.
 
 Example configuration using `clusterNetwork` (see also [using delegates](#using-delegates))
 
-```
+```json
 {
     "cniVersion": "0.3.1",
     "name": "node-cni-network",
@@ -31,7 +31,7 @@ Example configuration using `clusterNetwork` (see also [using delegates](#using-
     },
     "capabilities": {
         "portMappings": true
-    },    
+    },
     "namespaceIsolation": false,
     "clusterNetwork": "/etc/cni/net.d/99-flannel.conf",
     "defaultNetworks": ["sidecarCRD", "exampleNetwork"],
@@ -51,22 +51,22 @@ This is a general index of options, however note that you must set either the `c
 * `cniDir` (string, optional): Multus CNI data directory, default `/var/lib/cni/multus`
 * `binDir` (string, optional): additional directory for CNI plugins which multus calls, in addition to the default (the default is typically set to `/opt/cni/bin`)
 * `kubeconfig` (string, optional): kubeconfig file for the out of cluster communication with kube-apiserver. See the example [kubeconfig](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/node-kubeconfig.yaml). If you would like to use CRD (i.e. network attachment definition), this is required
-* [`logToStderr`](#Logging-via-STDERR) (bool, optional): Enable or disable logging to `STDERR`. Defaults to true.
-* [`logFile`](#Writing-to-a-Log-File) (string, optional): file path for log file. multus puts log in given file
-* [`logLevel`](#Logging-Level) (string, optional): logging level (values in decreasing order of verbosity: "debug", "error", "verbose", or "panic")
-* [`logOptions`](#Logging-Options) (object, optional): logging option, More detailed log configuration
-* [`namespaceIsolation`](#Namespace-Isolation) (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
-* [`globalNamespaces`](#Allow-specific-namespaces-to-be-used-across-namespaces-when-using-namespace-isolation): (string, optional): Used only when `namespaceIsolation` is true, allows specification of comma-delimited list of namespaces which may be referred to outside of namespace isolation.
+* [`logToStderr`](#logging-via-stderr) (bool, optional): Enable or disable logging to `STDERR`. Defaults to true.
+* [`logFile`](#writing-to-a-log-file) (string, optional): file path for log file. multus puts log in given file
+* [`logLevel`](#logging-level) (string, optional): logging level (values in decreasing order of verbosity: "debug", "error", "verbose", or "panic")
+* [`logOptions`](#logging-options) (object, optional): logging option, More detailed log configuration
+* [`namespaceIsolation`](#namespace-isolation) (boolean, optional): Enables a security feature where pods are only allowed to access `NetworkAttachmentDefinitions` in the namespace where the pod resides. Defaults to false.
+* [`globalNamespaces`](#allow-specific-namespaces-to-be-used-across-namespaces-when-using-namespace-isolation): (string, optional): Used only when `namespaceIsolation` is true, allows specification of comma-delimited list of namespaces which may be referred to outside of namespace isolation.
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
-* [`readinessindicatorfile`](#Default-Network-Readiness-Indicator): The path to a file whose existence denotes that the default network is ready
+* [`readinessindicatorfile`](#default-network-readiness-indicator): The path to a file whose existence denotes that the default network is ready
 message to next when some missing error. Defaults to false.
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
-* `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
+* `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL
 
 ### Using `clusterNetwork`
 
-Using the `clusterNetwork` option and the `delegates` are **mutually exclusive**. If `clusterNetwork` is set, the `delegates` field is *ignored*. 
+Using the `clusterNetwork` option and the `delegates` are **mutually exclusive**. If `clusterNetwork` is set, the `delegates` field is *ignored*.
 
 You **must** set one or the other.
 
@@ -78,12 +78,12 @@ Therefore:
 Options:
 
 * `clusterNetwork` (string, required if not using `delegates`): the default CNI plugin to be executed.
-* `defaultNetworks` ([]string, optional): Additional / secondary network attachment that is always attached to each pod. 
+* `defaultNetworks` ([]string, optional): Additional / secondary network attachment that is always attached to each pod.
 
 The following values are valid for both `clusterNetwork` and `defaultNetworks` and are processed in the following order:
 
 * The name of a `NetworkAttachmentDefinition` custom resource in the namespace specified  by the `multusNamespace` configuration option
-* The `"name"` value in the contents of a CNI JSON configuration file in the CNI configuration directory, 
+* The `"name"` value in the contents of a CNI JSON configuration file in the CNI configuration directory,
   * The given name for `clusterNetwork` should match the value for `name` key in the contents of the CNI JSON file (e.g. `"name": "test"` in `my.conf` when `"clusterNetwork": "test"`)
 * A path to a directory containing CNI json configuration files. The alphabetically first file will be used.
 * Absolute file path for CNI config file
@@ -91,7 +91,7 @@ The following values are valid for both `clusterNetwork` and `defaultNetworks` a
 
 If for example you have `defaultNetworks` set as:
 
-```
+```bash
 "defaultNetworks": ["sidecarNetwork", "exampleNetwork"],
 ```
 
@@ -107,7 +107,7 @@ If `clusterNetwork` is not set, you **must** use `delegates`.
 
 Example configuration using `delegates`:
 
-```
+```bash
 {
     "cniVersion": "0.3.1",
     "name": "node-cni-network",
@@ -142,7 +142,6 @@ Only one option is necessary to configure this functionality:
 
 *NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
 
-
 ### Logging
 
 You may wish to enable some enhanced logging for Multus, especially during the process where you're configuring Multus and need to understand what is or isn't working with your particular configuration.
@@ -153,7 +152,7 @@ By default, Multus will log via `STDERR`, which is the standard method by which 
 
 Optionally, you may disable this method by setting the `logToStderr` option in your CNI configuration:
 
-```
+```json
     "logToStderr": false,
 ```
 
@@ -163,7 +162,7 @@ Optionally, you may have Multus log to a file on the filesystem. This file will 
 
 For example in your CNI configuration, you may set:
 
-```
+```json
     "logFile": "/var/log/multus.log",
 ```
 
@@ -180,7 +179,7 @@ The available logging level values, in decreasing order of verbosity are:
 
 You may configure the logging level by using the `LogLevel` option in your CNI configuration. For example:
 
-```
+```json
     "logLevel": "debug",
 ```
 
@@ -195,7 +194,7 @@ If you want a more detailed configuration of the logging, This includes the foll
 
 For example in your CNI configuration, you may set:
 
-```
+```json
     "logOptions": {
         "maxAge": 5,
         "maxSize": 100,
@@ -206,7 +205,7 @@ For example in your CNI configuration, you may set:
 
 ### Namespace Isolation
 
-The functionality provided by the `namespaceIsolation` configuration option enables a mode where Multus only allows pods to access custom resources (the `NetworkAttachmentDefinitions`) within the namespace where that pod resides. In other words, the `NetworkAttachmentDefinitions` are isolated to usage within the namespace in which they're created. 
+The functionality provided by the `namespaceIsolation` configuration option enables a mode where Multus only allows pods to access custom resources (the `NetworkAttachmentDefinitions`) within the namespace where that pod resides. In other words, the `NetworkAttachmentDefinitions` are isolated to usage within the namespace in which they're created.
 
 **NOTE**: The default namespace is special in this scenario. Even with namespace isolation enabled, any pod, in any namespace is allowed to refer to `NetworkAttachmentDefinitions` in the default namespace. This allows you to create commonly used unprivileged `NetworkAttachmentDefinitions` without having to put them in all namespaces. For example, if you had a `NetworkAttachmentDefinition` named `foo` the default namespace, you may reference it in an annotation with: `default/foo`.
 
@@ -220,7 +219,7 @@ Namespace Isolation is disabled by default.
 
 #### Configuration example
 
-```
+```json
   "namespaceIsolation": true,
 ```
 
@@ -235,7 +234,7 @@ Given the above scenario with a Junior & Senior Administrator. You may assume th
 
 Firstly, we show that we have a number of namespaces available:
 
-```
+```bash
 # List the available namespaces
 [user@kube-master ~]$ kubectl get namespaces
 NAME          STATUS   AGE
@@ -248,7 +247,7 @@ privileged    Active   4s
 
 We'll create a `NetworkAttachmentDefinition` in the `privileged` namespace.
 
-```
+```bash
 # Show the network attachment definition we're creating.
 [user@kube-master ~]$ cat cr.yml
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -285,7 +284,7 @@ macvlan-conf   11s
 
 Next, we'll create a pod with an annotation that references the privileged namespace. Pay particular attention to the annotation that reads `k8s.v1.cni.cncf.io/networks: privileged/macvlan-conf` -- where it contains a reference to a `namespace/configuration-name` formatted network attachment name. In this case referring to the `macvlan-conf` in the namespace called `privileged`.
 
-```
+```yaml
 # Show the yaml for a pod.
 [user@kube-master ~]$ cat example.pod.yml
 apiVersion: v1
@@ -307,7 +306,7 @@ pod/samplepod created
 
 You'll note that pod fails to spawn successfully. If you check the Multus logs, you'll see an entry such as:
 
-```
+```bash
 2018-12-18T21:41:32Z [error] GetNetworkDelegates: namespace isolation enabled, annotation violates permission, pod is in namespace development but refers to target namespace privileged
 ```
 
@@ -317,7 +316,7 @@ In a positive example, you'd instead create the `NetworkAttachmentDefinition` in
 
 A positive example may be:
 
-```
+```bash
 # Create the same NetworkAttachmentDefinition as above, however in the development namespace
 [user@kube-master ~]$ kubectl create -f cr.yml -n development
 networkattachmentdefinition.k8s.cni.cncf.io/macvlan-conf created
@@ -350,7 +349,7 @@ samplepod   1/1     Running   0          31s
 
 The `globalNamespaces` configuration option is only used when `namespaceIsolation` is set to true. `globalNamespaces` specifies a comma-delimited list of namespaces which can be referred to from outside of any given namespace in which a pod resides.
 
-```
+```json
   "globalNamespaces": "default,namespace-a,namespace-b",
 ```
 
