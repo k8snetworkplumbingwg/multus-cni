@@ -1,3 +1,5 @@
+#
+
 ## Development/Support Information
 
 ## Which Kubernetes version is supported in multus?
@@ -15,7 +17,7 @@ hence there is no shell command. If you want to execute shell in multus pod, ple
 Multus now uses [gopkg.in](http://gopkg.in/) to expose its code as library.
 You can use following command to import our code into your go code.
 
-```
+```bash
 go get gopkg.in/k8snetworkplumbingwg/multus-cni.v4
 ```
 
@@ -33,7 +35,7 @@ If an issue is closed that you don't feel is sufficiently resolved, please feel 
 
 You can use the built in `./hack/build-go.sh` script!
 
-```
+```bash
 git clone https://github.com/k8snetworkplumbingwg/multus-cni.git
 cd multus-cni
 ./hack/build-go.sh
@@ -43,7 +45,7 @@ cd multus-cni
 
 Multus has go unit tests (based on ginkgo framework).The following commands drive CI tests manually in your environment:
 
-```
+```bash
 sudo ./hack/test-go.sh
 ```
 
@@ -54,7 +56,6 @@ The following are the best practices for multus logging:
 * Add `logging.Debugf()` at the beginning of functions
 * In case of error handling, use `logging.Errorf()` with given error info
 * `logging.Panicf()` only be used for critical errors (it should NOT normally be used)
-
 
 ## Multus release schedule
 

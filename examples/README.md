@@ -12,42 +12,42 @@ More specifically, these examples show:
 
 * Multus configured, using CNI a `.conf` file, with CRD support, specifying that we will use a "default network".
 * A resource definition with a daemonset that places the `.conf` on each node in the cluster.
-* A CRD defining the "networks" @ `network-attachment-definitions.k8s.cni.cncf.io` 
+* A CRD defining the "networks" @ `network-attachment-definitions.k8s.cni.cncf.io`
 * CRD objects containing the configuration for both Flannel & macvlan.
 
 ## Quick-start instructions
 
 * Compile Multus and place binaries into (typically) `/opt/cni/bin/`
-    - Refer to the primary README.md for more details on compilation.
+  * Refer to the primary README.md for more details on compilation.
 * Allow `system:node` access to enable Multus to pull CRD objects.
-    - See "RBAC configuration section below for details."
+  * See "RBAC configuration section below for details."
 * Create the Flannel + Multus setup with the daemonset provided
-    - As in: `kubectl create -f multus-with-flannel.yml`
-    - Optionally, verify that the `/etc/cni/net.d/*.conf` exists on each node.
+  * As in: `kubectl create -f multus-with-flannel.yml`
+  * Optionally, verify that the `/etc/cni/net.d/*.conf` exists on each node.
 * Create the CRDs
-    - Create the CRD itself, `kubectl create -f crd.yml`
-    - Create the network attachment configurations (i.e. CNI configurations packed into CRD objects)
-        + `kubectl create -f flannel-conf.yml`
-        + `kubectl create -f macvlan-conf.yml`
-        + Verify the CRD objects are created with: `kubectl get networks`
+  * Create the CRD itself, `kubectl create -f crd.yml`
+  * Create the network attachment configurations (i.e. CNI configurations packed into CRD objects)
+    * `kubectl create -f flannel-conf.yml`
+    * `kubectl create -f macvlan-conf.yml`
+    * Verify the CRD objects are created with: `kubectl get networks`
 * Spin up an sample pod
-    - `kubectl create -f sample-pod.yml`
-    - Verify that it has multiple interfaces with:
-        + `kubectl exec -it samplepod -- ip a`
+  * `kubectl create -f sample-pod.yml`
+  * Verify that it has multiple interfaces with:
+    * `kubectl exec -it samplepod -- ip a`
 
 ## RBAC configuration
 
-You'll need to enable the `system:node` users access to the API endpoints that will deliver the CRD objects to Multus. 
+You'll need to enable the `system:node` users access to the API endpoints that will deliver the CRD objects to Multus.
 
 Using these examples, you'll first create a cluster role with the provided sample:
 
-```
+```bash
 kubectl create -f clusterrole.yml
 ```
 
 You will then create a `clusterrolebinding` for each hostname in the Kubernetes cluster. Replace `HOSTNAME` below with the host name of a node, and then repeat for all hostnames in the cluster.
 
-```
+```bash
 kubectl create clusterrolebinding multus-node-HOSTNAME \
     --clusterrole=multus-crd-overpowered \
     --user=system:node:HOSTNAME
@@ -62,6 +62,7 @@ A sample `cni-configuration.conf` is provided, typically this file is placed in 
 Primarily in this setup one thing that one should consider are the aspects of the `macvlan-conf.yml`, which is likely specific to the configuration of the node on which this resides.
 
 ## Passing down device information
+
 Some CNI plugins require specific device information which maybe pre-allocated by K8s device plugin. This could be indicated by providing `k8s.v1.cni.cncf.io/resourceName` annotation in its network attachment definition CRD. The file [`examples/sriov-net.yaml`](./sriov-net.yaml) shows an example on how to define a Network attachment definition with specific device allocation information. Multus will get allocated device information and make them available for CNI plugin to work on.
 
 In this example (shown below), it is expected that an [SRIOV Device Plugin](https://github.com/intel/sriov-network-device-plugin/) making a pool of SRIOV VFs available to the K8s with `intel.com/sriov` as their resourceName. Any device allocated from this resource pool will be passed down by Multus to the [sriov-cni](https://github.com/intel/sriov-cni/tree/dev/k8s-deviceid-model) plugin in `deviceID` field. This is up to the sriov-cni plugin to capture this information and work with this specific device information.
@@ -89,6 +90,7 @@ spec:
   }
 }'
 ```
+
 The [sriov-pod.yml](./sriov-pod.yml) is an example Pod manifest file that requesting a SRIOV device from a host which is then configured using the above network attachment definition.
 
 >For further information on how to configure SRIOV Device Plugin and SRIOV-CNI please refer to the links given above.

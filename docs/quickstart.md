@@ -13,7 +13,7 @@ Two things we'll refer to a number of times through this document are:
 
 ## Prerequisites
 
-Our installation method requires that you first have installed Kubernetes and have configured a default network -- that is, a CNI plugin that's used for your pod-to-pod connectivity. 
+Our installation method requires that you first have installed Kubernetes and have configured a default network -- that is, a CNI plugin that's used for your pod-to-pod connectivity.
 
 We support Kubernetes versions that Kubernetes community supports. Please see [Supported versions](https://kubernetes.io/releases/version-skew-policy/#supported-versions) in Kubernetes document.
 
@@ -25,13 +25,13 @@ Alternatively, for advanced use cases, for installing Multus and a default netwo
 
 To verify that you default network is ready, you may list your Kubernetes nodes with:
 
-```
+```bash
 kubectl get nodes
 ```
 
 In the case that your default network is ready you will see the `STATUS` column also switch to `Ready` for each node.
 
-```
+```bash
 NAME                  STATUS   ROLES           AGE    VERSION
 master-0              Ready    master          1h     v1.17.1
 master-1              Ready    master          1h     v1.17.1
@@ -46,14 +46,15 @@ We'll apply a YAML file with `kubectl` from this repo, which installs the Multus
 
 Recommended installation:
 
-```
+```bash
 kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
 ```
+
 See the [thick plugin docs](./thick-plugin.md) for more information about this architecture.
 
 Alternatively, you may install the thin-plugin with:
 
-```
+```bash
 kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
 ```
 
@@ -63,12 +64,11 @@ kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-c
 * Reads the lexicographically (alphabetically) first configuration file in `/etc/cni/net.d`, and creates a new configuration file for Multus on each node as `/etc/cni/net.d/00-multus.conf`, this configuration is auto-generated and is based on the default network configuration (which is assumed to be the alphabetically first configuration)
 * Creates a `/etc/cni/net.d/multus.d` directory on each node with authentication information for Multus to access the Kubernetes API.
 
-
 ### Validating your installation
 
 Generally, the first step in validating your installation is to ensure that the Multus pods have run without error, you may see an overview of those by looking at:
 
-```
+```bash
 kubectl get pods --all-namespaces | grep -i multus
 ```
 
@@ -82,7 +82,7 @@ The first thing we'll do is create configurations for each of the additional int
 
 Each configuration we'll add is a CNI configuration. If you're not familiar with them, let's break them down quickly. Here's an example CNI configuration:
 
-```
+```json
 {
   "cniVersion": "0.3.0",
   "type": "loopback",
@@ -106,7 +106,7 @@ You do not need to reload or refresh the Kubelets when CNI configurations change
 
 So, we want to create an additional interface. Let's create a macvlan interface for pods to use. We'll create a custom resource that defines the CNI configuration for interfaces.
 
-Note in the following command that there's a `kind: NetworkAttachmentDefinition`. This is our fancy name for our configuration -- it's a custom extension of Kubernetes that defines how we attach networks to our pods. 
+Note in the following command that there's a `kind: NetworkAttachmentDefinition`. This is our fancy name for our configuration -- it's a custom extension of Kubernetes that defines how we attach networks to our pods.
 
 Secondarily, note the `config` field. You'll see that this is a CNI configuration just like we explained earlier.
 
@@ -114,7 +114,7 @@ Lastly but *very* importantly, note under `metadata` the `name` field -- here's 
 
 Here's the command to create this example configuration:
 
-```
+```bash
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -144,13 +144,13 @@ EOF
 
 You can see which configurations you've created using `kubectl` here's how you can do that:
 
-```
+```bash
 kubectl get network-attachment-definitions
 ```
 
 You can get more detail by describing them:
 
-```
+```bash
 kubectl describe network-attachment-definitions macvlan-conf
 ```
 
@@ -160,7 +160,7 @@ We're going to create a pod. This will look familiar as any pod you might have c
 
 Let's go ahead and create a pod (that just sleeps for a really long time) with this command:
 
-```
+```bash
 cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
@@ -178,7 +178,7 @@ EOF
 
 You may now inspect the pod and see what interfaces are attached, like so:
 
-```
+```bash
 kubectl exec -it samplepod -- ip a
 ```
 
@@ -192,7 +192,7 @@ You should note that there are 3 interfaces:
 
 For additional confirmation, use `kubectl describe pod samplepod` and there will be an annotations section, similar to the following:
 
-```
+```yaml
 Annotations:        k8s.v1.cni.cncf.io/networks: macvlan-conf
                     k8s.v1.cni.cncf.io/network-status:
                       [{
@@ -219,7 +219,7 @@ This metadata tells us that we have two CNI plugins running successfully.
 
 You can add more interfaces to a pod by creating more custom resources and then referring to them in pod's annotation. You can also reuse configurations, so for example, to attach two macvlan interfaces to a pod, you could create a pod like so:
 
-```
+```bash
 cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
@@ -235,6 +235,6 @@ spec:
 EOF
 ```
 
-Note that the annotation now reads `k8s.v1.cni.cncf.io/networks: macvlan-conf,macvlan-conf`. Where we have the same configuration used twice, separated by a comma. 
+Note that the annotation now reads `k8s.v1.cni.cncf.io/networks: macvlan-conf,macvlan-conf`. Where we have the same configuration used twice, separated by a comma.
 
 If you were to create another custom resource with the name `foo` you could use that such as: `k8s.v1.cni.cncf.io/networks: foo,macvlan-conf`, and use any number of attachments.

@@ -1,3 +1,5 @@
+#
+
 ## Multus CNI usage guide
 
 ### Prerequisites
@@ -11,33 +13,39 @@ Your Kubelet(s) must be configured to run with the CNI network plugin. Please se
 
 Generally we recommend two options: Manually place a Multus binary in your `/opt/cni/bin`, or use our [quick-start method](quickstart.md) -- which creates a daemonset that has an opinionated way of how to install & configure Multus CNI (recommended).
 
-*Copy Multus Binary into place*
+#### Copy Multus Binary into place
 
 You may acquire the Multus binary via compilation (see the [developer guide](development.md)) or download the a binary from the [GitHub releases](https://github.com/k8snetworkplumbingwg/multus-cni/releases) page. Copy multus binary into CNI binary directory, usually `/opt/cni/bin`. Perform this on all nodes in your cluster (master and nodes).
 
+```bash
     cp multus /opt/cni/bin
+```
 
-*Via Daemonset method*
+#### Via Daemonset method
 
 As a [quickstart](quickstart.md), you may apply these YAML files. Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
+```bash
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml  # thin deployment
+```
 
 or
 
+```bash
     kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml # thick (client/server) deployment
+```
 
-If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
+If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide](quickstart.md) or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 
 ### Set up conf file in /etc/cni/net.d/ (Installed automatically by Daemonset)
 
-**If you use daemonset to install multus, skip this section and go to "Create network attachment"**
+#### If you use daemonset to install multus, skip this section and go to "Create network attachment
 
 You put CNI config file in `/etc/cni/net.d`. Kubernetes CNI runtime uses the alphabetically first file in the directory. (`"NOTE1"`, `"NOTE2"` are just comments, you can remove them at your configuration)
 
 Execute following commands at all Kubernetes nodes (i.e. master and minions)
 
-```
+```bash
 mkdir -p /etc/cni/net.d
 cat >/etc/cni/net.d/00-multus.conf <<EOF
 {
@@ -62,7 +70,7 @@ EOF
 
 For the detail, please take a look into [Configuration Reference](configuration.md)
 
-**NOTE: You can use "clusterNetwork"/"defaultNetworks" instead of "delegates", see []() for the detail**
+**NOTE: You can use "clusterNetwork"/"defaultNetworks" instead of "delegates"
 
 As above config, you need to set `"kubeconfig"` in the config file for NetworkAttachmentDefinition(CRD).
 
@@ -74,7 +82,7 @@ In case of "delegates", the first delegates network will be used for "Pod IP". O
 
 Create resources for multus to access CRD objects as following command:
 
-```
+```bash
 # Execute following commands at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -121,7 +129,7 @@ EOF
 
 Create kubeconfig at master node as following commands:
 
-```
+```bash
 # Execute following command at Kubernetes master
 mkdir -p /etc/cni/net.d/multus.d
 SERVICEACCOUNT_CA=$(kubectl get secrets -n=kube-system -o json | jq -r '.items[]|select(.metadata.annotations."kubernetes.io/service-account.name"=="multus")| .data."ca.crt"')
@@ -154,17 +162,17 @@ EOF
 Copy `/etc/cni/net.d/multus.d/multus.kubeconfig` into other Kubernetes nodes
 **NOTE: Recommend to exec 'chmod 600 /etc/cni/net.d/multus.d/multus.kubeconfig' to keep secure**
 
-```
+```bash
 scp /etc/cni/net.d/multus.d/multus.kubeconfig ...
 ```
 
 ### Setup CRDs (daemonset automatically does)
 
-**If you use daemonset to install multus, skip this section and go to "Create network attachment"**
+#### If you use daemonset to install multus, skip this section and go to "Create network attachment"**
 
 Create CRD definition in Kubernetes as following command at master node:
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: apiextensions.k8s.io/v1beta1
@@ -195,14 +203,14 @@ EOF
 
 The 'NetworkAttachmentDefinition' is used to setup the network attachment, i.e. secondary interface for the pod, There are two ways to configure the 'NetworkAttachmentDefinition' as following:
 
-- NetworkAttachmentDefinition with json CNI config
-- NetworkAttachmentDefinition with CNI config file
+* NetworkAttachmentDefinition with json CNI config
+* NetworkAttachmentDefinition with CNI config file
 
-#### NetworkAttachmentDefinition with json CNI config:
+#### NetworkAttachmentDefinition with json CNI config
 
 Following command creates NetworkAttachmentDefinition. CNI config is in `config:` field.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -230,11 +238,11 @@ spec:
 EOF
 ```
 
-#### NetworkAttachmentDefinition with CNI config file:
+#### NetworkAttachmentDefinition with CNI config file
 
 If NetworkAttachmentDefinition has no spec, multus find a file in defaultConfDir ('/etc/cni/multus/net.d', with same name in the 'name' field of CNI config.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -244,7 +252,7 @@ metadata:
 EOF
 ```
 
-```
+```bash
 # Execute following commands at all Kubernetes nodes (i.e. master and minions)
 cat <<EOF > /etc/cni/multus/net.d/macvlan2.conf
 {
@@ -271,7 +279,7 @@ EOF
 
 #### Launch pod with text annotation
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -293,7 +301,7 @@ EOF
 
 You can also specify NetworkAttachmentDefinition with its namespace as adding `<namespace>/`
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -339,7 +347,7 @@ EOF
 
 You can also specify interface name as adding `@<ifname>`.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -359,7 +367,7 @@ EOF
 
 #### Launch pod with json annotation
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -384,7 +392,7 @@ EOF
 
 You can also specify NetworkAttachmentDefinition with its namespace as adding `"namespace": "<namespace>"`.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -409,7 +417,7 @@ EOF
 
 You can also specify interface name as adding `"interface": "<ifname>"`.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: v1
@@ -435,7 +443,7 @@ EOF
 
 Following the example of `ip -d address` output of above pod, "pod-case-06":
 
-```
+```bash
 # Execute following command at Kubernetes master
 kubectl exec -it pod-case-06 -- ip -d address
 
@@ -485,7 +493,7 @@ You can achieve this by using the JSON formatted annotation and specifying a `de
 
 For example, we have a this configuration for macvlan:
 
-```
+```bash
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
@@ -513,7 +521,7 @@ EOF
 
 We can then create a pod which uses the `default-route` key in the JSON formatted `k8s.v1.cni.cncf.io/networks` annotation.
 
-```
+```bash
 cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
@@ -534,7 +542,7 @@ EOF
 
 This will set `192.168.2.1` as the default route over the `net1` interface, such as:
 
-```
+```bash
 kubectl exec -it samplepod -- ip route
 
 default via 192.168.2.1 dev net1
@@ -550,7 +558,7 @@ Typically, you'd modified the daemonset YAML itself to specify these parameters.
 
 For example, the `command` and `args` parameters in the `containers` section of the DaemonSet may look something like:
 
-```
+```bash
   command: ["/thin_entrypoint"]
   args:
   - "--multus-conf-file=auto"
@@ -564,27 +572,39 @@ Note that some of the defaults have directories inside the root directory named 
 
 Each parameter is shown with the default as the value.
 
+```bash
     --cni-conf-dir=/host/etc/cni/net.d
+```
 
 This is the configuration directory where Multus will write its configuration file.
 
+```bash
     --cni-bin-dir=/host/opt/cni/bin
+```
 
 This the directory in which the Multus binary will be installed.
 
+```bash
     --namespace-isolation=false
+```
 
-Setting this option to true enables the Namespace isolation feature, which insists that custom resources must be created in the same namespace as the pods, otherwise it will refuse to attach those definitions as additional interfaces. See (the configuration guide for more information)[configuration.md].
+Setting this option to true enables the Namespace isolation feature, which insists that custom resources must be created in the same namespace as the pods, otherwise it will refuse to attach those definitions as additional interfaces. See [the configuration guide for more information](configuration.md).
 
+```bash
     --global-namespaces=default,foo,bar
+```
 
-The `--global-namespaces` works only when `--namespace-isolation=true`. This takes a comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled. See (the configuration guide for more information)[configuration.md].
+The `--global-namespaces` works only when `--namespace-isolation=true`. This takes a comma-separated list of namespaces which can be referred to globally when namespace isolation is enabled. See [the configuration guide for more information](configuration.md).
 
+```bash
     --multus-bin-file=/usr/src/multus-cni/bin/multus
+```
 
 This option lets you set which binary executable to copy from the container onto the host (into the directory specified by `--cni-bin-dir`), allowing one to copy an alternate version or build of Multus CNI.
 
+```bash
     --multus-conf-file=/usr/src/multus-cni/images/70-multus.conf
+```
 
 The `--multus-conf-file` is one of two options; it can be set to a source file to be copied into the location specified by `--cni-conf-dir`. Or, to a value of `auto`, that is: `--multus-conf-file=auto`.
 
@@ -592,32 +612,44 @@ The automatic configuration option is used to automatically generate Multus conf
 
 In the case that `--multus-conf-file=auto` -- The entrypoint script will look at the `--multus-autoconfig-dir` (by default, the same as the `--cni-conf-dir`). Multus will take the alphabetically first configuration there and wrap that into a Multus configuration.
 
+```bash
     --multus-autoconfig-dir=/host/etc/cni/net.d
+```
 
 Used only with `--multus-conf-file=auto`. This option allows one to set which directory will be used to generate configuration files.
 
 This can be used if you have your CNI configuration stored in an alternate location, or, you have constraints on race conditions where you'd like to generate your default network configuration first, and then only have Multus write its configuration when it finds that configuration -- allowing only Multus to write the CNI configuration in the `--cni-conf-dir`, therefore notifying the Kubelet that the node is in a ready state.
 
+```bash
     --multus-kubeconfig-file-host=/etc/cni/net.d/multus.d/multus.kubeconfig
+```
 
 Used only with `--multus-conf-file=auto`. Allows you to specify an alternate path to the Kubeconfig.
 
+```bash
     --multus-master-cni-file-name=
+```
 
 The `--multus-master-cni-file-name` can be used to select the cni file as the master cni, rather than the first file in cni-conf-dir. For example, `--multus-master-cni-file-name=10-calico.conflist`.
 
+```bash
     --multus-log-level=
     --multus-log-file=
+```
 
 Used only with `--multus-conf-file=auto`. See the [documentation for logging](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#logging) for which values are permitted.
 
 Used only with `--multus-conf-file=auto`. Allows you to specify CNI spec version. Please set if you need to specify CNI spec version.
 
+```bash
     --cni-version=
+```
 
 In some cases, the original CNI configuration that the Multus configuration was generated from (using `--multus-conf-file=auto`) may be used as a sort of semaphor for network readiness -- as this model is used by the Kubelet itself. If you need to disable Multus' availability, you may wish to clean out the generated configuration file when the source file for autogeneration of the config file is no longer present. You can use this functionality by setting:
 
+```bash
     --cleanup-config-on-exit=true
+```
 
 When specifying `--cleanup-config-on-exit=true` the entrypoint script will delete any generated/copied Multus configuration files when entrypoint script
 exits (upon Pod termination). This allows Multus to be safely removed from the cluster when its no longer needed.
@@ -625,23 +657,33 @@ exits (upon Pod termination). This allows Multus to be safely removed from the c
 In addition, when both `--cleanup-config-on-exit=true` and `--multus-conf-file=auto` are specified, the entrypoint script will watch for changes of the
 master CNI configuration and kubeconfig. when such change detected, the script will re-genereate Multus configuration. Watch can be skipped by setting:
 
+```bash
     --skip-config-watch
+```
 
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 
+```bash
     --rename-conf-file=true
+```
 
 When using `--multus-conf-file=auto` you may also care to specify a `binDir` in the configuration, this can be accomplished using the `--additional-bin-dir` option.
 
+```bash
     --additional-bin-dir=/opt/multus/bin
+```
 
 Sometimes, you may wish to not have the entrypoint copy the binary file onto the host. Potentially, you have another way to copy in a specific version of Multus, for example. By default, it's always copied, but you may disable the copy with:
 
+```bash
     --skip-multus-binary-copy=true
+```
 
 If you wish to have auto configuration use the `readinessindicatorfile` in the configuration, you can use the `--readiness-indicator-file` to express which file should be used as the readiness indicator.
 
+```bash
     --readiness-indicator-file=/path/to/file
+```
 
 ### Run pod with network annotation and Dynamic Resource Allocation driver
 
@@ -674,7 +716,7 @@ this DRA driver is available at [dra-example-driver](https://github.com/kubernet
 
 The `ResourceClass` defines the resource pool of `sf-pool-1`.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: resource.k8s.io/v1alpha2
@@ -692,11 +734,11 @@ In this example it is `sf-pool-1`. Multus query the K8s PodResource API to fetch
 query the NetworkAttachmentDefinition `k8s.v1.cni.cncf.io/resourceName`. If both has the same name multus send the
 CDI device name in the DeviceID argument.
 
-##### NetworkAttachmentDefinition for ovn-kubernetes example:
+##### NetworkAttachmentDefinition for ovn-kubernetes example
 
 Following command creates NetworkAttachmentDefinition. CNI config is in `config:` field.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: "k8s.cni.cncf.io/v1"
@@ -725,7 +767,7 @@ EOF
 
 Following command creates `ResourceClaim` `sf` which request resource from  `ResourceClass` `sf-pool-1`.
 
-```
+```bash
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
 apiVersion: resource.k8s.io/v1alpha2
@@ -743,7 +785,7 @@ EOF
 
 Following command Launch a Pod with primiry network `default` and `ResourceClaim` `sf`.
 
-```
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
