@@ -77,6 +77,7 @@ type ControllerNetConf struct {
 	LogLevel           string              `json:"logLevel"`
 	LogToStderr        bool                `json:"logToStderr,omitempty"`
 	PerNodeCertificate *PerNodeCertificate `json:"perNodeCertificate,omitempty"`
+	ConcurrentExecs    *int                `json:"concurrentExecs,omitempty"`
 
 	MetricsPort *int `json:"metricsPort,omitempty"`
 
