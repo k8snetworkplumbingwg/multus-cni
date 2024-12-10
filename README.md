@@ -26,7 +26,7 @@ The quickstart installation method for Multus requires that you have first insta
 
 To use latest features try command below which applies a daemonset and installs thick Multus using `kubectl`:
 
-```
+```bash
 kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
 ```
 
@@ -38,7 +38,7 @@ With the multus 4.0 release, we introduce a new client/server-style plugin deplo
 
 We recommend using the thick plugin in most environments, but if you wish to run the thin plugin, or are in a resource-constrained environment, you may do so with:
 
-```
+```bash
 kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
 ```
 
