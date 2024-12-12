@@ -53,6 +53,22 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:latest-amd64-thick
           file: images/Dockerfile.thick
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest-amd64-thick
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
   build-origin:
     name: Image build/origin
     runs-on: ubuntu-latest
