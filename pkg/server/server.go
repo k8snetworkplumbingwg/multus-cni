@@ -158,10 +158,10 @@ func informerObjectTrim(obj interface{}) (interface{}, error) {
 	return obj, nil
 }
 
-func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
+func newNetDefInformer(netWatchClient netdefclient.Interface) (netdefinformer.SharedInformerFactory, cache.SharedIndexInformer) {
 	const resyncInterval time.Duration = 1 * time.Second
 
-	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netdefClient, resyncInterval)
+	informerFactory := netdefinformer.NewSharedInformerFactoryWithOptions(netWatchClient, resyncInterval)
 	netdefInformer := informerFactory.InformerFor(&netdefv1.NetworkAttachmentDefinition{}, func(client netdefclient.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return netdefinformerv1.NewNetworkAttachmentDefinitionInformer(
 			client,
@@ -173,7 +173,7 @@ func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.Shar
 	return informerFactory, netdefInformer
 }
 
-func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
+func newPodInformer(watchClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
 	var tweakFunc internalinterfaces.TweakListOptionsFunc
 	if nodeName != "" {
 		logging.Verbosef("Filtering pod watch for node %q", nodeName)
@@ -185,7 +185,7 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 
 	const resyncInterval time.Duration = 1 * time.Second
 
-	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(kubeClient, resyncInterval, informerfactory.WithTransform(informerObjectTrim))
+	informerFactory := informerfactory.NewSharedInformerFactoryWithOptions(watchClient, resyncInterval, informerfactory.WithTransform(informerObjectTrim))
 	podInformer := informerFactory.InformerFor(&kapi.Pod{}, func(c kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
 		return v1coreinformers.NewFilteredPodInformer(
 			c,
@@ -194,7 +194,6 @@ func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internali
 			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			tweakFunc)
 	})
-
 	return informerFactory, podInformer
 }
 
@@ -255,8 +254,8 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
-	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
-	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
+	podInformerFactory, podInformer := newPodInformer(kubeClient.WatchClient, os.Getenv("MULTUS_NODE_NAME"))
+	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetWatchClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
 	router := http.NewServeMux()
@@ -277,7 +276,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 				[]string{"handler", "code", "method"},
 			),
 		},
-		informerFactory:          informerFactory,
+		podInformerFactory:       podInformerFactory,
 		podInformer:              podInformer,
 		netdefInformerFactory:    netdefInformerFactory,
 		netdefInformer:           netdefInformer,
@@ -356,7 +355,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 // Start starts the server and begins serving on the given listener
 func (s *Server) Start(ctx context.Context, l net.Listener) {
-	s.informerFactory.Start(ctx.Done())
+	s.podInformerFactory.Start(ctx.Done())
 	s.netdefInformerFactory.Start(ctx.Done())
 
 	// Give the initial sync some time to complete in large clusters, but
