@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -1225,5 +1226,155 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 
 		err = conflistDel(rt, rawnetconflist, &fakeMultusNetConf, fExec)
 		Expect(err).To(HaveOccurred())
+	})
+})
+
+var _ = Describe("multus operations cniVersion 1.1.0 config", func() {
+	var testNS ns.NetNS
+	var tmpDir string
+	configPath := "/tmp/foo.multus.conf"
+	var cancel context.CancelFunc
+
+	BeforeEach(func() {
+		// Create a new NetNS so we don't modify the host
+		var err error
+		testNS, err = testutils.NewNS()
+		Expect(err).NotTo(HaveOccurred())
+		os.Setenv("CNI_NETNS", testNS.Path())
+		os.Setenv("CNI_PATH", "/some/path")
+
+		tmpDir, err = os.MkdirTemp("", "multus_tmp")
+		Expect(err).NotTo(HaveOccurred())
+
+		// Touch the default network file.
+		os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+		_, cancel = context.WithCancel(context.TODO())
+	})
+
+	AfterEach(func() {
+		cancel()
+
+		// Cleanup default network file.
+		if _, errStat := os.Stat(configPath); errStat == nil {
+			errRemove := os.Remove(configPath)
+			Expect(errRemove).NotTo(HaveOccurred())
+		}
+
+		Expect(testNS.Close()).To(Succeed())
+		os.Unsetenv("CNI_PATH")
+		os.Unsetenv("CNI_ARGS")
+		err := os.RemoveAll(tmpDir)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("executes delegates with CNI Check", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "weave-net"
+	        }]
+	    },{
+	        "name": "other1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "other-plugin"
+		}]
+	    }]
+	}`),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedConf1 := `{
+	    "name": "weave1",
+	    "cniVersion": "1.1.0",
+	    "type": "weave-net"
+	}`
+		fExec.addPlugin100(nil, "", expectedConf1, nil, nil)
+
+		err := CmdStatus(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		// we only execute once for cluster network, not additional one
+		Expect(fExec.statusIndex).To(Equal(1))
+	})
+
+	It("executes delegates with CNI GC", func() {
+		tmpCNIDir := tmpDir + "/cniData"
+		err := os.Mkdir(tmpCNIDir, 0777)
+		Expect(err).NotTo(HaveOccurred())
+
+		cniCacheDir := filepath.Join(tmpCNIDir, "/results")
+		err = os.Mkdir(cniCacheDir, 0777)
+		Expect(err).NotTo(HaveOccurred())
+
+		//create fake cniResult file
+		err = os.WriteFile(filepath.Join(cniCacheDir, "cbr0-3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755-eth0"), []byte(`{"kind":"cniCacheV1","containerId":"3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755","config":"eyJjbmlWZXJzaW9uIjoiMC4zLjEiLCJuYW1lIjoiY2JyMCIsInBsdWdpbnMiOlt7ImNhcGFiaWxpdGllcyI6eyJpby5rdWJlcm5ldGVzLmNyaS5wb2QtYW5ub3RhdGlvbnMiOnRydWV9LCJkZWxlZ2F0ZSI6eyJoYWlycGluTW9kZSI6dHJ1ZSwiaXNEZWZhdWx0R2F0ZXdheSI6dHJ1ZX0sInR5cGUiOiJmbGFubmVsIn0seyJjYXBhYmlsaXRpZXMiOnsicG9ydE1hcHBpbmdzIjp0cnVlfSwidHlwZSI6InBvcnRtYXAifV19","ifName":"eth0","networkName":"cbr0","netns":"/var/run/netns/8b8677c8-8929-4746-8206-514069760f6e","cniArgs":[["IgnoreUnknown","true"],["K8S_POD_NAMESPACE","default"],["K8S_POD_NAME","macvlan"],["K8S_POD_INFRA_CONTAINER_ID","3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755"],["K8S_POD_UID","f0bfbd5b-096d-48ef-998c-da26743dd0cb"],["IgnoreUnknown","1"],["K8S_POD_NAMESPACE","default"],["K8S_POD_NAME","macvlan"],["K8S_POD_INFRA_CONTAINER_ID","3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755"],["K8S_POD_UID","f0bfbd5b-096d-48ef-998c-da26743dd0cb"]],"result":{"cniVersion":"0.3.1","dns":{},"interfaces":[{"mac":"ea:19:25:a2:a1:93","name":"cni0"},{"mac":"ba:76:61:2f:8b:ca","name":"vethc42d3d18"},{"mac":"7e:57:6a:9b:6b:b5","name":"eth0","sandbox":"/var/run/netns/8b8677c8-8929-4746-8206-514069760f6e"}],"ips":[{"address":"10.244.1.4/24","gateway":"10.244.1.1","interface":2,"version":"4"}],"routes":[{"dst":"10.244.0.0/16"},{"dst":"0.0.0.0/0","gw":"10.244.1.1"}]}}`), 0666)
+		Expect(err).NotTo(HaveOccurred())
+		err = os.WriteFile(filepath.Join(cniCacheDir, "macvlan-conf-1-3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755-net1"), []byte(`{"kind":"cniCacheV1","containerId":"3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755","config":"eyJjbmlWZXJzaW9uIjoiMC4zLjEiLCJpcGFtIjp7ImFkZHJlc3NlcyI6W3siYWRkcmVzcyI6IjEwLjEuMS4xMDEvMjQifV0sInR5cGUiOiJzdGF0aWMifSwibWFzdGVyIjoiZXRoMSIsIm1vZGUiOiJicmlkZ2UiLCJuYW1lIjoibWFjdmxhbi1jb25mLTEiLCJ0eXBlIjoibWFjdmxhbiJ9","ifName":"net1","networkName":"macvlan-conf-1","netns":"/var/run/netns/8b8677c8-8929-4746-8206-514069760f6e","cniArgs":[["IgnoreUnknown","true"],["K8S_POD_NAMESPACE","default"],["K8S_POD_NAME","macvlan"],["K8S_POD_INFRA_CONTAINER_ID","3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755"],["K8S_POD_UID","f0bfbd5b-096d-48ef-998c-da26743dd0cb"],["IgnoreUnknown","1"],["K8S_POD_NAMESPACE","default"],["K8S_POD_NAME","macvlan"],["K8S_POD_INFRA_CONTAINER_ID","3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755"],["K8S_POD_UID","f0bfbd5b-096d-48ef-998c-da26743dd0cb"]],"result":{"cniVersion":"0.3.1","dns":{},"interfaces":[{"mac":"36:b3:c5:29:ad:b8","name":"net1","sandbox":"/var/run/netns/8b8677c8-8929-4746-8206-514069760f6e"}],"ips":[{"address":"10.1.1.101/24","interface":0,"version":"4"}]}}`), 0666)
+		Expect(err).NotTo(HaveOccurred())
+
+		args := &skel.CmdArgs{
+			ContainerID: "123456789",
+			Netns:       testNS.Path(),
+			IfName:      "eth0",
+			StdinData: []byte(fmt.Sprintf(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "defaultnetworkfile": "/tmp/foo.multus.conf",
+	    "defaultnetworkwaitseconds": 3,
+	    "cniDir": "%s",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "weave-net"
+	        }]
+	    },{
+	        "name": "other1",
+	        "cniVersion": "1.1.0",
+		"plugins": [{
+	            "type": "other-plugin"
+		}]
+	    }]
+	}`, tmpCNIDir)),
+		}
+
+		logging.SetLogLevel("verbose")
+
+		fExec := newFakeExec()
+		expectedConf1 := `{
+			"cni.dev/valid-attachments": [
+			{
+				"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+				"ifname": "eth0"
+			},
+			{
+				"containerID": "3f6940ab5ab43bc522569d15b23f8c1bbde1d7678b080398506924fc01d72755",
+				"ifname": "net1"
+			}
+			],
+			"name": "weave1",
+			"cniVersion": "1.1.0",
+			"type": "weave-net"
+		}`
+		fExec.addPlugin100(nil, "", expectedConf1, nil, nil)
+
+		err = CmdGC(args, fExec, nil)
+		Expect(err).NotTo(HaveOccurred())
+		// we only execute once for cluster network, not additional one
+		Expect(fExec.gcIndex).To(Equal(1))
+		err = os.RemoveAll(tmpCNIDir)
+		Expect(err).NotTo(HaveOccurred())
 	})
 })

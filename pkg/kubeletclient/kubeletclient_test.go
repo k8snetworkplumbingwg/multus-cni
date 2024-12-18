@@ -81,7 +81,6 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 
 	dynamicResources := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "resource-claim",
 			ClaimNamespace: "dynamic-resource-pod-namespace",
 			ClaimResources: claimsResource,

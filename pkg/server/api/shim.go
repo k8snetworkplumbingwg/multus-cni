@@ -74,6 +74,24 @@ func CmdDel(args *skel.CmdArgs) error {
 	return nil
 }
 
+// CmdGC implements the CNI spec GC command handler
+func CmdGC(args *skel.CmdArgs) error {
+	_, _, err := postRequest(args, WaitUntilAPIReady)
+	if err != nil {
+		return logging.Errorf("CmdGC (shim): %v", err)
+	}
+	return nil
+}
+
+// CmdStatus implements the CNI spec STATUS command handler
+func CmdStatus(args *skel.CmdArgs) error {
+	_, _, err := postRequest(args, WaitUntilAPIReady)
+	if err != nil {
+		return logging.Errorf("CmdStatus (shim): %v", err)
+	}
+	return nil
+}
+
 func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, string, error) {
 	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {

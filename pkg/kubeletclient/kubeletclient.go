@@ -158,21 +158,21 @@ func (rc *kubeletClient) getDevicePluginResources(devices []*podresourcesapi.Con
 
 func (rc *kubeletClient) getDRAResources(dynamicResources []*podresourcesapi.DynamicResource, resourceMap map[string]*types.ResourceInfo) {
 	for _, dynamicResource := range dynamicResources {
-		var deviceIDs []string
 		for _, claimResource := range dynamicResource.ClaimResources {
 			for _, cdiDevice := range claimResource.CDIDevices {
 				res := strings.Split(cdiDevice.Name, "=")
 				if len(res) == 2 {
-					deviceIDs = append(deviceIDs, res[1])
+					className := res[0]
+					deviceId := res[1]
+					if rInfo, ok := resourceMap[className]; ok {
+						rInfo.DeviceIDs = append(rInfo.DeviceIDs, deviceId)
+					} else {
+						resourceMap[className] = &types.ResourceInfo{DeviceIDs: []string{deviceId}}
+					}
 				} else {
 					logging.Errorf("GetPodResourceMap: Invalid CDI format")
 				}
 			}
-		}
-		if rInfo, ok := resourceMap[dynamicResource.ClassName]; ok {
-			rInfo.DeviceIDs = append(rInfo.DeviceIDs, deviceIDs...)
-		} else {
-			resourceMap[dynamicResource.ClassName] = &types.ResourceInfo{DeviceIDs: deviceIDs}
 		}
 	}
 }
