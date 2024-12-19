@@ -542,7 +542,10 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, isDel bool) (*v1
 	var pod *v1.Pod
 	if err := wait.PollImmediate(pollDuration, shortPollTimeout, func() (bool, error) {
 		var getErr error
-		pod, getErr = kubeClient.GetPod(podNamespace, podName)
+		// Use context with a short timeout so the call to API server doesn't take too long.
+		ctx, cancel := context.WithTimeout(context.TODO(), pollDuration)
+		defer cancel()
+		pod, getErr = kubeClient.GetPodContext(ctx, podNamespace, podName)
 		if isCriticalRequestRetriable(getErr) || retryOnNotFound(getErr) {
 			return false, nil
 		}
@@ -555,7 +558,9 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, isDel bool) (*v1
 		// Try one more time to get the pod directly from the apiserver;
 		// TODO: figure out why static pods don't show up via the informer
 		// and always hit this case.
-		pod, err = kubeClient.GetPod(podNamespace, podName)
+		ctx, cancel := context.WithTimeout(context.TODO(), pollDuration)
+		defer cancel()
+		pod, err = kubeClient.GetPodContext(ctx, podNamespace, podName)
 		if err != nil {
 			return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
 		}
