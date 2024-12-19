@@ -22,7 +22,7 @@ It will then return the result of the operation back to the client.
 Please refer to the diagram below for a visual representation of the flow
 described above:
 
-```
+```txt
 ┌─────────┐             ┌───────┐           ┌────────┐             ┌──────────┐
 │         │ cni ADD/DEL │       │ REST POST │        │ cni ADD/DEL │          │
 │ runtime ├────────────►│ shim  │===========│ daemon ├────────────►│ delegate │
@@ -76,6 +76,7 @@ as well. By default, it is disabled.
 In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)
 
 Below you can see an example of the daemon configuration:
+
 ```json
 {
         "chrootDir": "/hostroot",

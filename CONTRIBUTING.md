@@ -20,7 +20,7 @@ used by the Linux kernel project.
 
 Beside the signed-off-by footer, we expect each patch to comply with the following format:
 
-```
+```bash
 Change summary
 
 More detailed explanation of your changes: Why and how.
@@ -35,15 +35,15 @@ Signed-off-by: <contributor@foo.com>
 
 For example:
 
-```
+```bash
 Fix poorly named identifiers
-  
+
 One identifier, fnname, in func.go was poorly named.  It has been renamed
 to fnName.  Another identifier retval was not needed and has been removed
 entirely.
 
 Fixes #1
-    
+
 Signed-off-by: Abc Xyz <abc.xyz@intel.com>
 ```
 
@@ -54,4 +54,5 @@ We accept github pull requests.
 ## Email and Chat
 
 The project uses the Slack chat:
+
 - Slack: #[Intel-Corp](https://intel-corp.herokuapp.com/) channel on slack
