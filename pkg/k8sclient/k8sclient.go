@@ -92,8 +92,8 @@ func (c *ClientInfo) GetPodContext(ctx context.Context, namespace, name string) 
 }
 
 // GetPodAPILiveQuery does a live API query for the pod, instead of using informers, for cases when a failure occurred, as to prevent a cache miss.
-func (c *ClientInfo) GetPodAPILiveQuery(namespace, name string) (*v1.Pod, error) {
-	return c.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+func (c *ClientInfo) GetPodAPILiveQuery(ctx context.Context, namespace, name string) (*v1.Pod, error) {
+	return c.Client.CoreV1().Pods(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // DeletePod deletes a pod from kubernetes
