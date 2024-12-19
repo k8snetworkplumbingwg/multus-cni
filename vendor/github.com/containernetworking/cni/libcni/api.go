@@ -23,6 +23,7 @@ package libcni
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -75,6 +76,7 @@ type NetworkConfigList struct {
 	Name         string
 	CNIVersion   string
 	DisableCheck bool
+	DisableGC    bool
 	Plugins      []*NetworkConfig
 	Bytes        []byte
 }
@@ -113,6 +115,8 @@ type CNI interface {
 	GetStatusNetworkList(ctx context.Context, net *NetworkConfigList) error
 
 	GetCachedAttachments(containerID string) ([]*NetworkAttachment, error)
+
+	GetVersionInfo(ctx context.Context, pluginType string) (version.PluginInfo, error)
 }
 
 type CNIConfig struct {
@@ -422,6 +426,9 @@ func (c *CNIConfig) GetCachedAttachments(containerID string) ([]*NetworkAttachme
 	dirPath := filepath.Join(c.getCacheDir(&RuntimeConf{}), "results")
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -595,9 +602,7 @@ func (c *CNIConfig) DelNetworkList(ctx context.Context, list *NetworkConfigList,
 		}
 	}
 
-	if cachedResult != nil {
-		_ = c.cacheDel(list.Name, rt)
-	}
+	_ = c.cacheDel(list.Name, rt)
 
 	return nil
 }
@@ -758,15 +763,23 @@ func (c *CNIConfig) GetVersionInfo(ctx context.Context, pluginType string) (vers
 // - dump the list of cached attachments, and issue deletes as necessary
 // - issue a GC to the underlying plugins (if the version is high enough)
 func (c *CNIConfig) GCNetworkList(ctx context.Context, list *NetworkConfigList, args *GCArgs) error {
+	// If DisableGC is set, then don't bother GCing at all.
+	if list.DisableGC {
+		return nil
+	}
+
 	// First, get the list of cached attachments
 	cachedAttachments, err := c.GetCachedAttachments("")
 	if err != nil {
 		return nil
 	}
 
-	validAttachments := make(map[types.GCAttachment]interface{}, len(args.ValidAttachments))
-	for _, a := range args.ValidAttachments {
-		validAttachments[a] = nil
+	var validAttachments map[types.GCAttachment]interface{}
+	if args != nil {
+		validAttachments = make(map[types.GCAttachment]interface{}, len(args.ValidAttachments))
+		for _, a := range args.ValidAttachments {
+			validAttachments[a] = nil
+		}
 	}
 
 	var errs []error
@@ -799,10 +812,15 @@ func (c *CNIConfig) GCNetworkList(ctx context.Context, list *NetworkConfigList, 
 	// now, if the version supports it, issue a GC
 	if gt, _ := version.GreaterThanOrEqualTo(list.CNIVersion, "1.1.0"); gt {
 		inject := map[string]interface{}{
-			"name":                      list.Name,
-			"cniVersion":                list.CNIVersion,
-			"cni.dev/valid-attachments": args.ValidAttachments,
+			"name":       list.Name,
+			"cniVersion": list.CNIVersion,
 		}
+		if args != nil {
+			inject["cni.dev/valid-attachments"] = args.ValidAttachments
+			// #1101: spec used incorrect variable name
+			inject["cni.dev/attachments"] = args.ValidAttachments
+		}
+
 		for _, plugin := range list.Plugins {
 			// build config here
 			pluginConfig, err := InjectConf(plugin, inject)
@@ -815,7 +833,7 @@ func (c *CNIConfig) GCNetworkList(ctx context.Context, list *NetworkConfigList, 
 		}
 	}
 
-	return joinErrors(errs...)
+	return errors.Join(errs...)
 }
 
 func (c *CNIConfig) gcNetwork(ctx context.Context, net *NetworkConfig) error {
