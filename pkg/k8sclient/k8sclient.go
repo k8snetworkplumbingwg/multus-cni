@@ -59,7 +59,9 @@ type NoK8sNetworkError struct {
 // ClientInfo contains information given from k8s client
 type ClientInfo struct {
 	Client           kubernetes.Interface
+	WatchClient      kubernetes.Interface
 	NetClient        netclient.Interface
+	NetWatchClient   netclient.Interface
 	EventBroadcaster record.EventBroadcaster
 	EventRecorder    record.EventRecorder
 
