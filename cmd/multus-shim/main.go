@@ -44,15 +44,23 @@ func main() {
 		return
 	}
 
-	skel.PluginMain(
-		func(args *skel.CmdArgs) error {
-			return api.CmdAdd(args)
-		},
-		func(args *skel.CmdArgs) error {
-			return api.CmdCheck(args)
-		},
-		func(args *skel.CmdArgs) error {
-			return api.CmdDel(args)
+	skel.PluginMainFuncs(
+		skel.CNIFuncs{
+			Add: func(args *skel.CmdArgs) error {
+				return api.CmdAdd(args)
+			},
+			Check: func(args *skel.CmdArgs) error {
+				return api.CmdCheck(args)
+			},
+			Del: func(args *skel.CmdArgs) error {
+				return api.CmdDel(args)
+			},
+			GC: func(args *skel.CmdArgs) error {
+				return api.CmdGC(args)
+			},
+			Status: func(args *skel.CmdArgs) error {
+				return api.CmdStatus(args)
+			},
 		},
 		cniversion.All, "meta-plugin that delegates to other CNI plugins")
 }
