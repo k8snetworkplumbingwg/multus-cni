@@ -202,6 +202,7 @@ spec:
           image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
           command:
             - "cp"
+            - "-f"
             - "/usr/src/multus-cni/bin/multus-shim"
             - "/host/opt/cni/bin/multus-shim"
           resources:
