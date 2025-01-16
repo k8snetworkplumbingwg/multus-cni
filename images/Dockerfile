@@ -18,4 +18,5 @@ COPY --from=build /usr/src/multus-cni/bin/install_multus /
 COPY --from=build /usr/src/multus-cni/bin/thin_entrypoint /
 COPY --from=build /usr/src/multus-cni/bin/kubeconfig_generator /
 COPY --from=build /usr/src/multus-cni/bin/cert-approver /
-CMD ["/thin_entrypoint"]
+
+ENTRYPOINT ["/thin_entrypoint"]
