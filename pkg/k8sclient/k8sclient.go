@@ -302,7 +302,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 	// Get resourceName annotation from NetworkAttachmentDefinition
 	deviceID := ""
 	resourceName, ok := customResource.GetAnnotations()[resourceNameAnnot]
-	if ok && pod.Name != "" && pod.Namespace != "" {
+	if ok && pod != nil && pod.Name != "" && pod.Namespace != "" {
 		// ResourceName annotation is found; try to get device info from resourceMap
 		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
 
@@ -589,7 +589,7 @@ func GetDefaultNetworks(pod *v1.Pod, conf *types.NetConf, kubeClient *ClientInfo
 	delegates = append(delegates, delegate)
 
 	// Pod in kube-system namespace does not have default network for now.
-	if !types.CheckSystemNamespaces(pod.ObjectMeta.Namespace, conf.SystemNamespaces) {
+	if pod != nil && !types.CheckSystemNamespaces(pod.ObjectMeta.Namespace, conf.SystemNamespaces) {
 		for _, netname := range conf.DefaultNetworks {
 			delegate, resourceMap, err := getNetDelegate(kubeClient, pod, netname, conf.ConfDir, conf.MultusNamespace, resourceMap)
 			if err != nil {
