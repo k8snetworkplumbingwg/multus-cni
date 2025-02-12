@@ -5,8 +5,7 @@ if [ ! -d bin ]; then
 	mkdir bin
 fi
 
-curl -Lo ./bin/kind "https://github.com/kubernetes-sigs/kind/releases/download/v0.22.0/kind-$(uname)-amd64"
-chmod +x ./bin/kind
+GOBIN=$(pwd)/bin go install sigs.k8s.io/kind@53ff1fb77a1e
 curl -Lo ./bin/kubectl https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
 chmod +x ./bin/kubectl
 curl -Lo ./bin/koko https://github.com/redhat-nfvpe/koko/releases/download/v0.83/koko_0.83_linux_amd64
