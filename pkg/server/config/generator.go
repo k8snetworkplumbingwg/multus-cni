@@ -59,6 +59,7 @@ type MultusConf struct {
 	MultusConfigFile         string              `json:"multusConfigFile,omitempty"`
 	MultusMasterCni          string              `json:"multusMasterCNI,omitempty"`
 	MultusAutoconfigDir      string              `json:"multusAutoconfigDir,omitempty"`
+	MultusKeepConfig 	     bool                `json:"multusKeepConfig,omitempty"`
 	ForceCNIVersion          bool                `json:"forceCNIVersion,omitempty"`
 	OverrideNetworkName      bool                `json:"overrideNetworkName,omitempty"`
 }

@@ -66,6 +66,7 @@ The server configuration is encoded in JSON, and allows the following keys:
 - `"socketDir"`: Specify the location where the unix domain socket used
 for client/server communication will be located. This is the location where the
 **Daemon** will read the configuration from. Defaults to `"/run/multus"`.
+- `multusKeepConfig`: Specify whether to keep the generated multus CNI config or not. Defaults to `false`, which means that the multus config file (e.g. `/etc/cni/net.d/00-multus.conf` will be deleted automatically when the multus-daemon is deleted).
 - `"metricsPort"`: Metrics port (of multus' metric exporter); by default, no port
 is provided.
 - `"logFile"`: the path to where the daemon logs will be persisted.
@@ -89,7 +90,8 @@ Below you can see an example of the daemon configuration:
         "cniVersion": "0.3.1",
         "cniConfigDir": "/host/etc/cni/net.d",
         "multusConfigFile": "auto",
-        "multusAutoconfigDir": "/host/etc/cni/net.d"
+        "multusAutoconfigDir": "/host/etc/cni/net.d",
+        "multusKeepConfig": true,
     }
 ```
 

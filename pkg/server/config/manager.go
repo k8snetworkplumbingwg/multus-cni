@@ -159,8 +159,11 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 			_ = logging.Errorf("error watching file: %v", err)
 		}
 		logging.Verbosef("ConfigWatcher done")
-		logging.Verbosef("Delete old config @ %v", multusConfigFile)
-		os.Remove(multusConfigFile)
+
+		if !m.multusConfig.MultusKeepConfig {
+			logging.Verbosef("Delete old config @ %v", multusConfigFile)
+			os.Remove(multusConfigFile)
+		}
 	}()
 
 	return nil
