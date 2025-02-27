@@ -127,15 +127,17 @@ func main() {
 		}
 	}()
 
-	var wg sync.WaitGroup
 	if configManager != nil {
+		var wg sync.WaitGroup
 		if err := configManager.Start(ctx, &wg); err != nil {
 			_ = logging.Errorf("failed to start config manager: %v", err)
 			os.Exit(3)
 		}
+		wg.Wait()
+	} else {
+		<-ctx.Done()
 	}
 
-	wg.Wait()
 	logging.Verbosef("multus daemon is exited")
 }
 
