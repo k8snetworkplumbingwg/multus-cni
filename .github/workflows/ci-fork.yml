@@ -1,0 +1,24 @@
+name: Fork Sync
+
+on:
+  push:
+    branches:
+      - network-operator-*
+    tags:
+      - network-operator-*
+
+jobs:
+  call-reusable-ci-fork-workflow:
+    uses: almaslennikov/reusable-release-workflows/.github/workflows/ci-fork.yml@main
+    with:
+      registry-internal: ghcr.io/almaslennikov
+      registry-public: ghcr.io/almaslennikov
+      service-account-username: almaslennikov
+      service-account-email: almaslennikov@nvidia.com
+      component-name: Multus
+      component-image: multus-cni
+      component-dockerfile: images/Dockerfile
+    secrets:
+      registry-username: ${{ github.repository_owner }}
+      registry-token: ${{ secrets.GITHUB_TOKEN }}
+      cicd-gh-token: ${{ secrets.CICD_TOKEN }}
