@@ -1,0 +1,15 @@
+name: Fork Sync
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # nightly
+  workflow_dispatch:   # enable manual trigger
+
+jobs:
+  call-reusable-sync-fork-workflow:
+    uses: almaslennikov/reusable-release-workflows/.github/workflows/sync-fork.yml@main
+    with:
+      upstream-owner: k8snetworkplumbingwg
+      default-branch: master
+    secrets:
+      gh_token: ${{ secrets.GITHUB_TOKEN }}
