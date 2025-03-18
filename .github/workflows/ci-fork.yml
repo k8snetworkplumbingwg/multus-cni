@@ -9,7 +9,7 @@ on:
 
 jobs:
   call-reusable-ci-fork-workflow:
-    uses: almaslennikov/reusable-release-workflows/.github/workflows/ci-fork.yml@dev
+    uses: almaslennikov/reusable-release-workflows/.github/workflows/fork-ci-reusable.yml@dev
     with:
       registry-internal: ghcr.io/almaslennikov
       registry-public: ghcr.io/almaslennikov
