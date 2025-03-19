@@ -34,14 +34,16 @@ nodes:
       nodeRegistration:
         kubeletExtraArgs:
           pod-manifest-path: "/etc/kubernetes/manifests/"
-          feature-gates: "DynamicResourceAllocation=true,KubeletPodResourcesDynamicResources=true"
+          feature-gates: "DynamicResourceAllocation=true,DRAResourceClaimDeviceStatus=true,KubeletPodResourcesDynamicResources=true"
   - role: worker
 # Required by DRA Integration
 ##
 featureGates:
   DynamicResourceAllocation: true
+  DRAResourceClaimDeviceStatus: true
+  KubeletPodResourcesDynamicResources: true
 runtimeConfig:
-  "api/alpha": "true"
+  "api/beta": "true"
 containerdConfigPatches:
 # Enable CDI as described in
 # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
