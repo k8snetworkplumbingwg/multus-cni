@@ -796,15 +796,17 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	// set the network status annotation in apiserver, only in case Multus as kubeconfig
+	// set the network status annotation in apiserver, only in case Multus has kubeconfig
 	if kubeClient != nil && kc != nil {
 		if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 			err = k8s.SetNetworkStatus(kubeClient, k8sArgs, netStatus, n)
 			if err != nil {
-				if strings.Contains(err.Error(), "failed to query the pod") {
-					return nil, cmdErr(k8sArgs, "error setting the networks status, pod was already deleted: %v", err)
+				if strings.Contains(err.Error(), `pod "`) && strings.Contains(err.Error(), `" not found`) {
+					// Tolerate issues with writing the status due to pod deletion, and log them.
+					logging.Verbosef("warning: tolerated failure writing network status (pod not found): %v", err)
+				} else {
+					return nil, cmdErr(k8sArgs, "error setting the networks status: %v", err)
 				}
-				return nil, cmdErr(k8sArgs, "error setting the networks status: %v", err)
 			}
 		}
 	}
