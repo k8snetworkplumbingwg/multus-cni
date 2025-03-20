@@ -93,7 +93,7 @@ jobs:
         if: always()
         run: |
           mkdir -p /tmp/kind/logs
-          kind export logs --loglevel=debug /tmp/kind/logs
+          kind export logs /tmp/kind/logs -v 2147483647
 
       - name: Upload kind logs
         if: always()

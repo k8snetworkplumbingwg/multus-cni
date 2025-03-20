@@ -39,13 +39,17 @@ cd multus-cni
 ./hack/build-go.sh
 ```
 
-## How do I run CI tests?
+## How do I run the unit tests?
 
 Multus has go unit tests (based on ginkgo framework).The following commands drive CI tests manually in your environment:
 
 ```
 sudo ./hack/test-go.sh
 ```
+
+## How do I run the e2e tests?
+
+Check the `README.md` in the `./e2e/` folder.
 
 ## What are the best practices for logging?
 
