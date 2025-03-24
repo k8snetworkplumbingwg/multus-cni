@@ -52,11 +52,12 @@ const (
 )
 
 var (
-	version       = "master@git"
-	commit        = "unknown commit"
-	date          = "unknown date"
-	gitTreeState  = ""
-	releaseStatus = ""
+	version        = "master@git"
+	commit         = "unknown commit"
+	date           = "unknown date"
+	gitTreeState   = ""
+	releaseStatus  = ""
+	errPodNotFound = fmt.Errorf("pod not found during Multus GetPod")
 )
 
 // PrintVersionString ...
@@ -133,9 +134,9 @@ func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetCo
 
 func getValidAttachmentFromCache(b []byte) (string, string, error) {
 	type simpleCacheV1 struct {
-		Kind           string                 `json:"kind"`
-		ContainerID    string                 `json:"containerId"`
-		IfName         string                 `json:"ifName"`
+		Kind        string `json:"kind"`
+		ContainerID string `json:"containerId"`
+		IfName      string `json:"ifName"`
 	}
 
 	cache := &simpleCacheV1{}
@@ -585,9 +586,12 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, isDel bool) (*v1
 		}
 		return pod != nil, getErr
 	}); err != nil {
-		if isDel && errors.IsNotFound(err) {
-			// On DEL pod may already be gone from apiserver/informer
-			return nil, nil
+		if errors.IsNotFound(err) {
+			// When pods are not found, this is "OK", it's a known condition for rapidly deleted pods, we'll just warn on it.
+			if !isDel {
+				logging.Verbosef("Warning: GetPod for [%s/%s] resulted in pod not found during CNI ADD (pod may have already been deleted): %v", podNamespace, podName, err)
+			}
+			return nil, errPodNotFound
 		}
 		// Try one more time to get the pod directly from the apiserver;
 		// TODO: figure out why static pods don't show up via the informer
@@ -596,6 +600,10 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, isDel bool) (*v1
 		defer cancel()
 		pod, err = kubeClient.GetPodAPILiveQuery(ctx, podNamespace, podName)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				logging.Verbosef("Warning: On live query retry, [%s/%s] pod not found during CNI ADD (pod may have already been deleted): %v", podNamespace, podName, err)
+				return nil, errPodNotFound
+			}
 			return nil, cmdErr(k8sArgs, "error waiting for pod: %v", err)
 		}
 	}
@@ -641,6 +649,12 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
+		if err == errPodNotFound {
+			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
+			return &cni100.Result{
+				CNIVersion: n.CNIVersion,
+			}, nil
+		}
 		return nil, err
 	}
 
