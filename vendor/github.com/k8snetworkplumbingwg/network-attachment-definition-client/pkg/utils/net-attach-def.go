@@ -207,6 +207,12 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 		}
 	}
 
+	var defaultNetworkStatus *v1.NetworkStatus
+	if len(networkStatuses) > 0 {
+		// Set the default network status to the last network status.
+		defaultNetworkStatus = networkStatuses[len(networkStatuses)-1]
+	}
+
 	// Map IPs to network interface based on index
 	for _, ipConfig := range result.IPs {
 		if ipConfig.Interface != nil {
@@ -214,6 +220,12 @@ func CreateNetworkStatuses(r cnitypes.Result, networkName string, defaultNetwork
 			if newIndex, ok := indexMap[originalIndex]; ok {
 				ns := networkStatuses[newIndex]
 				ns.IPs = append(ns.IPs, ipConfig.Address.IP.String())
+			}
+		} else {
+			// If the IPs don't specify the interface assign the IP to the default network status. This keeps the behaviour
+			// consistent with previous multus versions.
+			if defaultNetworkStatus != nil {
+				defaultNetworkStatus.IPs = append(defaultNetworkStatus.IPs, ipConfig.Address.IP.String())
 			}
 		}
 	}

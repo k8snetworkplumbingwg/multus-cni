@@ -7,7 +7,7 @@ require (
 	github.com/containernetworking/cni v1.2.0
 	github.com/containernetworking/plugins v1.1.0
 	github.com/fsnotify/fsnotify v1.6.0
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.5
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/prometheus/client_golang v1.16.0
