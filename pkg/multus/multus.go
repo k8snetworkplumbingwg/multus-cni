@@ -650,10 +650,9 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
 		if err == errPodNotFound {
-			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
-			return &cni100.Result{
-				CNIVersion: n.CNIVersion,
-			}, nil
+			emptyresult := emptyCNIResult(args, "1.0.0")
+			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyresult)
+			return emptyresult, nil
 		}
 		return nil, err
 	}
@@ -1080,4 +1079,25 @@ func CmdGC(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) err
 	}
 
 	return nil
+}
+
+func emptyCNIResult(args *skel.CmdArgs, cniVersion string) *cni100.Result {
+	return &cni100.Result{
+		CNIVersion: cniVersion,
+		Interfaces: []*cni100.Interface{
+			{
+				Name:    args.IfName,
+				Sandbox: args.Netns,
+			},
+		},
+		IPs: []*cni100.IPConfig{
+			{
+				Address: net.IPNet{
+					IP:   net.ParseIP("0.0.0.0"),
+					Mask: net.CIDRMask(0, 32),
+				},
+				Gateway: net.ParseIP("0.0.0.0"),
+			},
+		},
+	}
 }
