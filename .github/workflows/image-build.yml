@@ -55,7 +55,7 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
           sbom: false
           provenance: false
-          outputs: type=local,dest=./${{ github.repository }}-latest-thick.docker
+          outputs: type=docker,dest=./${{ github.repository }}-latest-thick.docker
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.29.0
