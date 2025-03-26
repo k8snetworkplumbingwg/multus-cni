@@ -26,8 +26,6 @@ import (
 	"k8s.io/klog/v2"
 
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
-
-	"sigs.k8s.io/dra-example-driver/pkg/consts"
 )
 
 var _ drapbv1.DRAPluginServer = &driver{}
@@ -54,7 +52,7 @@ func NewDriver(ctx context.Context, config *Config) (*driver, error) {
 		[]any{driver},
 		kubeletplugin.KubeClient(config.coreclient),
 		kubeletplugin.NodeName(config.flags.nodeName),
-		kubeletplugin.DriverName(consts.DriverName),
+		kubeletplugin.DriverName(DriverName),
 		kubeletplugin.RegistrarSocketPath(PluginRegistrationPath),
 		kubeletplugin.PluginSocketPath(DriverPluginSocketPath),
 		kubeletplugin.KubeletPluginSocketPath(DriverPluginSocketPath))
