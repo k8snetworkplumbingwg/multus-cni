@@ -57,6 +57,9 @@ jobs:
           provenance: false
           outputs: type=image,dest=./multus-cni-latest-thick.docker
 
+      - name: check content
+        run: ls -l .
+        
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.29.0
         with:
