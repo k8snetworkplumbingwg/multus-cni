@@ -1,4 +1,5 @@
 ---
+# I actually added this after the fact after running the stuff below.
 apiVersion: resource.k8s.io/v1beta1
 kind: DeviceClass
 metadata:
@@ -64,9 +65,9 @@ spec:
       serviceAccountName: dra-multus-driver
       containers:
       - name: plugin
-        image: dougbtv/dra-multus-driver:dev
+        image: quay.io/dosmith/multus-thick:draA
         imagePullPolicy: IfNotPresent
-        command: ["/dra-example-driver"]
+        command: ["/dra-multus-driver"]
         securityContext:
           privileged: true
         env:
