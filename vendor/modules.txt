@@ -208,8 +208,8 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# golang.org/x/net v0.24.0
-## explicit; go 1.18
+# golang.org/x/net v0.36.0
+## explicit; go 1.23.0
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -218,21 +218,22 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 # golang.org/x/oauth2 v0.10.0
 ## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.19.0
+# golang.org/x/sys v0.30.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.19.0
+# golang.org/x/term v0.29.0
 ## explicit; go 1.18
 golang.org/x/term
-# golang.org/x/text v0.14.0
+# golang.org/x/text v0.22.0
 ## explicit; go 1.18
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -257,8 +258,8 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.17.0
-## explicit; go 1.18
+# golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d
+## explicit; go 1.19
 golang.org/x/tools/cover
 golang.org/x/tools/go/ast/inspector
 # google.golang.org/appengine v1.6.7
