@@ -12,6 +12,7 @@ LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/mu
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
 COPY --from=build /usr/src/multus-cni/bin/cert-approver /
+COPY --from=build /usr/src/multus-cni/bin/dra-multus-driver /
 WORKDIR /
 
 ENTRYPOINT [ "/usr/src/multus-cni/bin/multus-daemon" ]

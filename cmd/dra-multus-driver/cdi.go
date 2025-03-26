@@ -29,7 +29,7 @@ const (
 	cdiVendor           = "k8s." + DriverName
 	cdiClass            = "gpu"
 	cdiKind             = cdiVendor + "/" + cdiClass
-	DriverName          = "gpu.example.com"
+	DriverName          = "gpu.multus-cni.io"
 	cdiCommonDeviceName = "common"
 )
 

@@ -1,0 +1,101 @@
+---
+apiVersion: resource.k8s.io/v1beta1
+kind: DeviceClass
+metadata:
+  name: gpu.multus-cni.io
+spec:
+  selectors:
+  - cel:
+      expression: "device.driver == 'gpu.multus-cni.io'"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dra-multus-driver
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dra-multus-driver-role
+rules:
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceclaims"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: ["resource.k8s.io"]
+  resources: ["resourceslices"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dra-multus-driver-role-binding
+subjects:
+- kind: ServiceAccount
+  name: dra-multus-driver
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: dra-multus-driver-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: dra-multus-driver
+  namespace: default
+  labels:
+    app: dra-multus-driver
+spec:
+  selector:
+    matchLabels:
+      app: dra-multus-driver
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: dra-multus-driver
+    spec:
+      priorityClassName: system-node-critical
+      serviceAccountName: dra-multus-driver
+      containers:
+      - name: plugin
+        image: dougbtv/dra-multus-driver:dev
+        imagePullPolicy: IfNotPresent
+        command: ["/dra-example-driver"]
+        securityContext:
+          privileged: true
+        env:
+        - name: CDI_ROOT
+          value: /var/run/cdi
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NUM_DEVICES
+          value: "8"
+        volumeMounts:
+        - name: plugins-registry
+          mountPath: /var/lib/kubelet/plugins_registry
+        - name: plugins
+          mountPath: /var/lib/kubelet/plugins
+        - name: cdi
+          mountPath: /var/run/cdi
+      volumes:
+      - name: plugins-registry
+        hostPath:
+          path: /var/lib/kubelet/plugins_registry
+      - name: plugins
+        hostPath:
+          path: /var/lib/kubelet/plugins
+      - name: cdi
+        hostPath:
+          path: /var/run/cdi

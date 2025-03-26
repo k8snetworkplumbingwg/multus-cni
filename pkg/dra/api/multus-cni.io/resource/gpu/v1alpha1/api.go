@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	GroupName = "gpu.resource.example.com"
+	GroupName = "gpu.resource.multus-cni.io"
 	Version   = "v1alpha1"
 
 	GpuConfigKind = "GpuConfig"

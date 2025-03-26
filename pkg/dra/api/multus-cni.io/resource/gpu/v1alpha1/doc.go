@@ -15,6 +15,6 @@
  */
 
 // +k8s:deepcopy-gen=package
-// +groupName=gpu.resource.example.com
+// +groupName=gpu.resource.multus-cni.io
 
 package v1alpha1
