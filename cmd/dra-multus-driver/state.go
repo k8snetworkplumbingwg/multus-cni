@@ -71,6 +71,27 @@ func NewDeviceState(config *Config) (*DeviceState, error) {
 		return nil, fmt.Errorf("unable to create NAD client: %v", err)
 	}
 
+	checkpoints, err := checkpointManager.ListCheckpoints()
+	if err != nil {
+		return nil, fmt.Errorf("unable to list checkpoints: %v", err)
+	}
+
+	for _, c := range checkpoints {
+		if c == DriverPluginCheckpointFile {
+			return &DeviceState{
+				cdi:               cdi,
+				checkpointManager: checkpointManager,
+				nadClient:         nadClient,
+			}, nil
+		}
+	}
+
+	// If checkpoint wasn't found, create a new one
+	checkpoint := newCheckpoint()
+	if err := checkpointManager.CreateCheckpoint(DriverPluginCheckpointFile, checkpoint); err != nil {
+		return nil, fmt.Errorf("unable to create initial checkpoint: %v", err)
+	}
+
 	return &DeviceState{
 		cdi:               cdi,
 		checkpointManager: checkpointManager,

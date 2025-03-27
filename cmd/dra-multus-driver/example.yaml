@@ -44,6 +44,8 @@ spec:
         - opaque:
             driver: multus-dra.k8s.cni.cncf.io
             parameters:
+              apiVersion: net.resource.multus-cni.io/v1alpha1
+              kind: NetConfig
               networks: bridge-net
 ---
 apiVersion: v1
