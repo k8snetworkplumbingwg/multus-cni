@@ -1,19 +1,3 @@
-/*
- * Copyright 2023 The Kubernetes Authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package v1alpha1
 
 import (
@@ -26,79 +10,68 @@ import (
 )
 
 const (
-	GroupName = "gpu.resource.multus-cni.io"
+	GroupName = "net.resource.multus-cni.io"
 	Version   = "v1alpha1"
 
-	GpuConfigKind = "GpuConfig"
+	NetConfigKind = "NetConfig"
 )
 
 // Decoder implements a decoder for objects in this API group.
 var Decoder runtime.Decoder
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// GpuConfig holds the set of parameters for configuring a GPU.
-type GpuConfig struct {
+// NetConfig holds the set of parameters for configuring Multus via DRA.
+type NetConfig struct {
 	metav1.TypeMeta `json:",inline"`
-	Sharing         *GpuSharing `json:"sharing,omitempty"`
+
+	// Networks is a string matching the format used in the Multus annotation,
+	// e.g. "default/macvlan-conf", "macvlan-conf", or JSON array.
+	Networks string `json:"networks"`
 }
 
-// DefaultGpuConfig provides the default GPU configuration.
-func DefaultGpuConfig() *GpuConfig {
-	return &GpuConfig{
+// DefaultNetConfig provides a default NetConfig object.
+func DefaultNetConfig() *NetConfig {
+	return &NetConfig{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: GroupName + "/" + Version,
-			Kind:       GpuConfigKind,
+			Kind:       NetConfigKind,
 		},
-		Sharing: &GpuSharing{
-			Strategy: TimeSlicingStrategy,
-			TimeSlicingConfig: &TimeSlicingConfig{
-				Interval: "Default",
-			},
-		},
+		Networks: "",
 	}
 }
 
-// Normalize updates a GpuConfig config with implied default values based on other settings.
-func (c *GpuConfig) Normalize() error {
+// Normalize updates a NetConfig with default values if needed.
+func (c *NetConfig) Normalize() error {
 	if c == nil {
-		return fmt.Errorf("config is 'nil'")
+		return fmt.Errorf("config is nil")
 	}
-	if c.Sharing == nil {
-		c.Sharing = &GpuSharing{
-			Strategy: TimeSlicingStrategy,
-		}
+	// You could normalize single-net formats here if needed.
+	return nil
+}
+
+// Validate performs basic validation on the NetConfig.
+func (c *NetConfig) Validate() error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
 	}
-	if c.Sharing.Strategy == TimeSlicingStrategy && c.Sharing.TimeSlicingConfig == nil {
-		c.Sharing.TimeSlicingConfig = &TimeSlicingConfig{
-			Interval: "Default",
-		}
-	}
-	if c.Sharing.Strategy == SpacePartitioningStrategy && c.Sharing.SpacePartitioningConfig == nil {
-		c.Sharing.SpacePartitioningConfig = &SpacePartitioningConfig{
-			PartitionCount: 1,
-		}
+	if c.Networks == "" {
+		return fmt.Errorf("networks must not be empty")
 	}
 	return nil
 }
 
 func init() {
-	// Create a new scheme and add our types to it. If at some point in the
-	// future a new version of the configuration API becomes necessary, then
-	// conversion functions can be generated and registered to continue
-	// supporting older versions.
 	scheme := runtime.NewScheme()
 	schemeGroupVersion := schema.GroupVersion{
 		Group:   GroupName,
 		Version: Version,
 	}
 	scheme.AddKnownTypes(schemeGroupVersion,
-		&GpuConfig{},
+		&NetConfig{},
 	)
 	metav1.AddToGroupVersion(scheme, schemeGroupVersion)
 
-	// Set up a json serializer to decode our types.
 	Decoder = json.NewSerializerWithOptions(
 		json.DefaultMetaFactory,
 		scheme,
