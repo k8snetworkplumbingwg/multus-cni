@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	coreclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/klog/v2"
-
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	"k8s.io/utils/ptr"
 )
 
 var _ drapbv1.DRAPluginServer = &driver{}
@@ -25,14 +26,14 @@ func NewDriver(ctx context.Context, config *Config) (*driver, error) {
 		client: config.coreclient,
 	}
 
-	// Initialize device state (we'll repurpose this to handle claim -> NAD resolution)
+	// Initialize device state
 	state, err := NewDeviceState(config)
 	if err != nil {
 		return nil, err
 	}
 	driver.state = state
 
-	// Start the plugin and register it with the kubelet
+	// Start the DRA plugin
 	plugin, err := kubeletplugin.Start(
 		ctx,
 		[]any{driver},
@@ -41,13 +42,34 @@ func NewDriver(ctx context.Context, config *Config) (*driver, error) {
 		kubeletplugin.DriverName(DriverName),
 		kubeletplugin.RegistrarSocketPath(PluginRegistrationPath),
 		kubeletplugin.PluginSocketPath(DriverPluginSocketPath),
-		kubeletplugin.KubeletPluginSocketPath(DriverPluginSocketPath))
+		kubeletplugin.KubeletPluginSocketPath(DriverPluginSocketPath),
+	)
 	if err != nil {
 		return nil, err
 	}
 	driver.plugin = plugin
 
-	// No need to call PublishResources — we're resolving dynamically via claims (gravestone)
+	// ✅ Publish one dummy allocatable device to advertise this driver
+	resources := kubeletplugin.Resources{
+		Devices: []resourceapi.Device{
+			{
+				Name: "net0",
+				Basic: &resourceapi.BasicDevice{
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"driver": {
+							StringValue: ptr.To(DriverName),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := plugin.PublishResources(ctx, resources); err != nil {
+		return nil, fmt.Errorf("failed to publish resources: %w", err)
+	}
+
+	klog.Infof("Successfully registered driver and published resources")
 	return driver, nil
 }
 
