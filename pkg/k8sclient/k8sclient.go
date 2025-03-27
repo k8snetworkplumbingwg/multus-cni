@@ -217,17 +217,18 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	return netNsName, networkName, netIfName, nil
 }
 
-func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
+// ParsePodNetworkAnnotation parses pod network annotation (the network selection element), as you'd wager.
+func ParsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.NetworkSelectionElement, error) {
 	var networks []*types.NetworkSelectionElement
 
-	logging.Debugf("parsePodNetworkAnnotation: %s, %s", podNetworks, defaultNamespace)
+	logging.Debugf("ParsePodNetworkAnnotation: %s, %s", podNetworks, defaultNamespace)
 	if podNetworks == "" {
-		return nil, logging.Errorf("parsePodNetworkAnnotation: pod annotation does not have \"network\" as key")
+		return nil, logging.Errorf("ParsePodNetworkAnnotation: pod annotation does not have \"network\" as key")
 	}
 
 	if strings.ContainsAny(podNetworks, "[{\"") {
 		if err := json.Unmarshal([]byte(podNetworks), &networks); err != nil {
-			return nil, logging.Errorf("parsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
+			return nil, logging.Errorf("ParsePodNetworkAnnotation: failed to parse pod Network Attachment Selection Annotation JSON format: %v", err)
 		}
 	} else {
 		// Comma-delimited list of network attachment object names
@@ -238,7 +239,7 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 			// Parse network name (i.e. <namespace>/<network name>@<ifname>)
 			netNsName, networkName, netIfName, err := parsePodNetworkObjectName(item)
 			if err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: %v", err)
+				return nil, logging.Errorf("ParsePodNetworkAnnotation: %v", err)
 			}
 
 			networks = append(networks, &types.NetworkSelectionElement{
@@ -256,13 +257,13 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 		if n.MacRequest != "" {
 			// validate MAC address
 			if _, err := net.ParseMAC(n.MacRequest); err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to mac: %v", err)
+				return nil, logging.Errorf("ParsePodNetworkAnnotation: failed to mac: %v", err)
 			}
 		}
 		if n.InfinibandGUIDRequest != "" {
 			// validate GUID address
 			if _, err := net.ParseMAC(n.InfinibandGUIDRequest); err != nil {
-				return nil, logging.Errorf("parsePodNetworkAnnotation: failed to validate infiniband GUID: %v", err)
+				return nil, logging.Errorf("ParsePodNetworkAnnotation: failed to validate infiniband GUID: %v", err)
 			}
 		}
 		if n.IPRequest != nil {
@@ -435,7 +436,7 @@ func GetPodNetwork(pod *v1.Pod) ([]*types.NetworkSelectionElement, error) {
 		return nil, &NoK8sNetworkError{"no kubernetes network found"}
 	}
 
-	networks, err := parsePodNetworkAnnotation(netAnnot, defaultNamespace)
+	networks, err := ParsePodNetworkAnnotation(netAnnot, defaultNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -618,7 +619,7 @@ func tryLoadK8sPodDefaultNetwork(kubeClient *ClientInfo, pod *v1.Pod, conf *type
 	}
 
 	// The CRD object of default network should only be defined in multusNamespace
-	networks, err := parsePodNetworkAnnotation(netAnnot, conf.MultusNamespace)
+	networks, err := ParsePodNetworkAnnotation(netAnnot, conf.MultusNamespace)
 	if err != nil {
 		return nil, logging.Errorf("tryLoadK8sPodDefaultNetwork: failed to parse CRD object: %v", err)
 	}

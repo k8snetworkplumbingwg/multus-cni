@@ -1,19 +1,3 @@
-/*
- * Copyright 2023 The Kubernetes Authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package main
 
 import (
@@ -24,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/urfave/cli/v2"
-
 	coreclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -32,6 +15,7 @@ import (
 )
 
 const (
+	DriverName                 = "multus-dra.k8s.cni.cncf.io"
 	PluginRegistrationPath     = "/var/lib/kubelet/plugins_registry/" + DriverName + ".sock"
 	DriverPluginPath           = "/var/lib/kubelet/plugins/" + DriverName
 	DriverPluginSocketPath     = DriverPluginPath + "/plugin.sock"
@@ -39,12 +23,11 @@ const (
 )
 
 type Flags struct {
-	kubeClientConfig flags.KubeClientConfig
-	loggingConfig    *flags.LoggingConfig
-
-	nodeName   string
-	cdiRoot    string
-	numDevices int
+	cdiRoot           string
+	kubeClientConfig  flags.KubeClientConfig
+	loggingConfig     *flags.LoggingConfig
+	nodeName          string
+	resolvedConfigDir string
 }
 
 type Config struct {
@@ -78,21 +61,13 @@ func newApp() *cli.App {
 			Destination: &flags.cdiRoot,
 			EnvVars:     []string{"CDI_ROOT"},
 		},
-		&cli.IntFlag{
-			Name:        "num-devices",
-			Usage:       "The number of devices to be generated.",
-			Value:       8,
-			Destination: &flags.numDevices,
-			EnvVars:     []string{"NUM_DEVICES"},
-		},
 	}
 	cliFlags = append(cliFlags, flags.kubeClientConfig.Flags()...)
 	cliFlags = append(cliFlags, flags.loggingConfig.Flags()...)
 
 	app := &cli.App{
-		Name:            "dra-example-kubeletplugin",
-		Usage:           "dra-example-kubeletplugin implements a DRA driver plugin.",
-		ArgsUsage:       " ",
+		Name:            "multus-dra-driver",
+		Usage:           "Multus-integrated DRA driver for resolving NetworkAttachmentDefinitions at scheduling time",
 		HideHelpCommand: true,
 		Flags:           cliFlags,
 		Before: func(c *cli.Context) error {
@@ -126,17 +101,9 @@ func StartPlugin(ctx context.Context, config *Config) error {
 		return err
 	}
 
-	info, err := os.Stat(config.flags.cdiRoot)
-	switch {
-	case err != nil && os.IsNotExist(err):
-		err := os.MkdirAll(config.flags.cdiRoot, 0750)
-		if err != nil {
-			return err
-		}
-	case err != nil:
+	err = os.MkdirAll(config.flags.resolvedConfigDir, 0750)
+	if err != nil {
 		return err
-	case !info.IsDir():
-		return fmt.Errorf("path for cdi file generation is not a directory: '%v'", err)
 	}
 
 	driver, err := NewDriver(ctx, config)
@@ -144,6 +111,7 @@ func StartPlugin(ctx context.Context, config *Config) error {
 		return err
 	}
 
+	// Watch for shutdown signals
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-sigc

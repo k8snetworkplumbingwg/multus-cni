@@ -1,0 +1,67 @@
+---
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: bridge-net
+  namespace: default
+spec:
+  config: '{
+    "cniVersion": "0.3.1",
+    "type": "bridge",
+    "bridge": "br0",
+    "ipam": {
+      "type": "static",
+      "addresses": [
+        {
+          "address": "10.10.0.2/24",
+          "gateway": "10.10.0.1"
+        }
+      ]
+    }
+  }'
+---
+apiVersion: resource.k8s.io/v1beta1
+kind: DeviceClass
+metadata:
+  name: multus-dra.k8s.cni.cncf.io
+spec:
+  selectors:
+  - cel:
+      expression: "device.driver == 'multus-dra.k8s.cni.cncf.io'"
+---
+apiVersion: resource.k8s.io/v1beta1
+kind: ResourceClaimTemplate
+metadata:
+  name: bridge-net
+  namespace: default
+spec:
+  spec:
+    devices:
+      requests:
+        - name: bridge-net
+          deviceClassName: multus-dra.k8s.cni.cncf.io
+      config:
+        name: netattachdef
+        parameters:
+          driver: multus-dra.k8s.cni.cncf.io
+          nadName: macvlan-conf
+          nadNamespace: default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bridge-test
+  namespace: default
+spec:
+  containers:
+  - name: app
+    image: ubuntu:22.04
+    command: ["bash", "-c"]
+    args: ["export; trap 'exit 0' TERM; sleep 9999 & wait"]
+    resources:
+      claims:
+      - name: net
+  resourceClaims:
+  - name: net
+    resourceClaimTemplateName: bridge-net
+

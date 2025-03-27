@@ -1,24 +1,7 @@
-/*
- * Copyright 2023 The Kubernetes Authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package main
 
 import (
 	"fmt"
-	"slices"
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -26,7 +9,9 @@ import (
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 
-	configapi "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/dra/api/multus-cni.io/resource/gpu/v1alpha1"
+	netclientset "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
+	configapi "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/dra/api/multus-cni.io/resource/net/v1alpha1"
+	multusk8sutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
@@ -58,24 +43,18 @@ func (pds PreparedDevices) GetDevices() []*drapbv1.Device {
 type DeviceState struct {
 	sync.Mutex
 	cdi               *CDIHandler
-	allocatable       AllocatableDevices
 	checkpointManager checkpointmanager.CheckpointManager
+	nadClient         netclientset.Interface
 }
 
 func NewDeviceState(config *Config) (*DeviceState, error) {
-	allocatable, err := enumerateAllPossibleDevices(config.flags.numDevices)
-	if err != nil {
-		return nil, fmt.Errorf("error enumerating all possible devices: %v", err)
-	}
 
 	cdi, err := NewCDIHandler(config)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create CDI handler: %v", err)
 	}
-
-	err = cdi.CreateCommonSpecFile()
-	if err != nil {
-		return nil, fmt.Errorf("unable to create CDI spec file for common edits: %v", err)
+	if err := cdi.CreateCommonSpecFile(); err != nil {
+		return nil, fmt.Errorf("unable to create CDI common spec file: %v", err)
 	}
 
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(DriverPluginPath)
@@ -83,29 +62,20 @@ func NewDeviceState(config *Config) (*DeviceState, error) {
 		return nil, fmt.Errorf("unable to create checkpoint manager: %v", err)
 	}
 
-	state := &DeviceState{
-		cdi:               cdi,
-		allocatable:       allocatable,
-		checkpointManager: checkpointManager,
-	}
-
-	checkpoints, err := state.checkpointManager.ListCheckpoints()
+	clientconfig, err := config.flags.kubeClientConfig.NewClientSetConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to list checkpoints: %v", err)
+		return nil, fmt.Errorf("unable to create clientset config: %v", err)
+	}
+	nadClient, err := netclientset.NewForConfig(clientconfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create NAD client: %v", err)
 	}
 
-	for _, c := range checkpoints {
-		if c == DriverPluginCheckpointFile {
-			return state, nil
-		}
-	}
-
-	checkpoint := newCheckpoint()
-	if err := state.checkpointManager.CreateCheckpoint(DriverPluginCheckpointFile, checkpoint); err != nil {
-		return nil, fmt.Errorf("unable to sync to checkpoint: %v", err)
-	}
-
-	return state, nil
+	return &DeviceState{
+		cdi:               cdi,
+		checkpointManager: checkpointManager,
+		nadClient:         nadClient,
+	}, nil
 }
 
 func (s *DeviceState) Prepare(claim *resourceapi.ResourceClaim) ([]*drapbv1.Device, error) {
@@ -177,131 +147,73 @@ func (s *DeviceState) prepareDevices(claim *resourceapi.ResourceClaim) (Prepared
 		return nil, fmt.Errorf("claim not yet allocated")
 	}
 
-	// Retrieve the full set of device configs for the driver.
-	configs, err := GetOpaqueDeviceConfigs(
-		configapi.Decoder,
-		DriverName,
-		claim.Status.Allocation.Devices.Config,
-	)
+	// Sanity: should only have one opaque config per claim
+	if len(claim.Status.Allocation.Devices.Config) == 0 {
+		return nil, fmt.Errorf("no config provided in claim allocation")
+	}
+
+	opaque := claim.Status.Allocation.Devices.Config[0].DeviceConfiguration.Opaque
+	if opaque == nil || opaque.Driver != DriverName {
+		return nil, fmt.Errorf("claim does not contain expected opaque config for driver %q", DriverName)
+	}
+
+	obj, err := runtime.Decode(configapi.Decoder, opaque.Parameters.Raw)
 	if err != nil {
-		return nil, fmt.Errorf("error getting opaque device configs: %v", err)
+		return nil, fmt.Errorf("failed to decode opaque config: %w", err)
 	}
 
-	// Add the default GPU Config to the front of the config list with the
-	// lowest precedence. This guarantees there will be at least one config in
-	// the list with len(Requests) == 0 for the lookup below.
-	configs = slices.Insert(configs, 0, &OpaqueDeviceConfig{
-		Requests: []string{},
-		Config:   configapi.DefaultGpuConfig(),
-	})
-
-	// Look through the configs and figure out which one will be applied to
-	// each device allocation result based on their order of precedence.
-	configResultsMap := make(map[runtime.Object][]*resourceapi.DeviceRequestAllocationResult)
-	for _, result := range claim.Status.Allocation.Devices.Results {
-		if _, exists := s.allocatable[result.Device]; !exists {
-			return nil, fmt.Errorf("requested GPU is not allocatable: %v", result.Device)
-		}
-		for _, c := range slices.Backward(configs) {
-			if len(c.Requests) == 0 || slices.Contains(c.Requests, result.Request) {
-				configResultsMap[c.Config] = append(configResultsMap[c.Config], &result)
-				break
-			}
-		}
+	netConfig, ok := obj.(*configapi.NetConfig)
+	if !ok {
+		return nil, fmt.Errorf("decoded opaque config is not a *NetConfig")
 	}
 
-	// Normalize, validate, and apply all configs associated with devices that
-	// need to be prepared. Track container edits generated from applying the
-	// config to the set of device allocation results.
-	perDeviceCDIContainerEdits := make(PerDeviceCDIContainerEdits)
-	for c, results := range configResultsMap {
-		// Cast the opaque config to a GpuConfig
-		var config *configapi.GpuConfig
-		switch castConfig := c.(type) {
-		case *configapi.GpuConfig:
-			config = castConfig
-		default:
-			return nil, fmt.Errorf("runtime object is not a regognized configuration")
-		}
-
-		// Normalize the config to set any implied defaults.
-		if err := config.Normalize(); err != nil {
-			return nil, fmt.Errorf("error normalizing GPU config: %w", err)
-		}
-
-		// Validate the config to ensure its integrity.
-		if err := config.Validate(); err != nil {
-			return nil, fmt.Errorf("error validating GPU config: %w", err)
-		}
-
-		// Apply the config to the list of results associated with it.
-		containerEdits, err := s.applyConfig(config, results)
-		if err != nil {
-			return nil, fmt.Errorf("error applying GPU config: %w", err)
-		}
-
-		// Merge any new container edits with the overall per device map.
-		for k, v := range containerEdits {
-			perDeviceCDIContainerEdits[k] = v
-		}
+	// Apply CDI edits to all results using this config
+	var results []*resourceapi.DeviceRequestAllocationResult
+	for i := range claim.Status.Allocation.Devices.Results {
+		results = append(results, &claim.Status.Allocation.Devices.Results[i])
 	}
 
-	// Walk through each config and its associated device allocation results
-	// and construct the list of prepared devices to return.
+	perDeviceCDIContainerEdits, err := s.applyConfig(netConfig, results, claim.Namespace)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply CDI container edits: %w", err)
+	}
+
 	var preparedDevices PreparedDevices
-	for _, results := range configResultsMap {
-		for _, result := range results {
-			device := &PreparedDevice{
-				Device: drapbv1.Device{
-					RequestNames: []string{result.Request},
-					PoolName:     result.Pool,
-					DeviceName:   result.Device,
-					CDIDeviceIDs: s.cdi.GetClaimDevices(string(claim.UID), []string{result.Device}),
-				},
-				ContainerEdits: perDeviceCDIContainerEdits[result.Device],
-			}
-			preparedDevices = append(preparedDevices, device)
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		device := &PreparedDevice{
+			Device: drapbv1.Device{
+				RequestNames: []string{result.Request},
+				PoolName:     result.Pool,
+				DeviceName:   result.Device,
+				CDIDeviceIDs: s.cdi.GetClaimDevices(string(claim.UID), []string{result.Device}),
+			},
+			ContainerEdits: perDeviceCDIContainerEdits[result.Device],
 		}
+		preparedDevices = append(preparedDevices, device)
 	}
 
 	return preparedDevices, nil
 }
 
-func (s *DeviceState) unprepareDevices(claimUID string, devices PreparedDevices) error {
-	return nil
-}
-
-// applyConfig applies a configuration to a set of device allocation results.
-//
-// In this example driver there is no actual configuration applied. We simply
-// define a set of environment variables to be injected into the containers
-// that include a given device. A real driver would likely need to do some sort
-// of hardware configuration as well, based on the config passed in.
-func (s *DeviceState) applyConfig(config *configapi.GpuConfig, results []*resourceapi.DeviceRequestAllocationResult) (PerDeviceCDIContainerEdits, error) {
+func (s *DeviceState) applyConfig(config *configapi.NetConfig, results []*resourceapi.DeviceRequestAllocationResult, podNamespace string) (PerDeviceCDIContainerEdits, error) {
 	perDeviceEdits := make(PerDeviceCDIContainerEdits)
+
+	parsedNets, err := multusk8sutils.ParsePodNetworkAnnotation(config.Networks, podNamespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse networks string: %w", err)
+	}
 
 	for _, result := range results {
 		envs := []string{
-			fmt.Sprintf("GPU_DEVICE_%s=%s", result.Device[4:], result.Device),
+			fmt.Sprintf("MULTUS_DRA_DEVICE_NAME=%s", result.Device),
+			fmt.Sprintf("MULTUS_DRA_NETWORKS=%s", config.Networks),
 		}
 
-		if config.Sharing != nil {
-			envs = append(envs, fmt.Sprintf("GPU_DEVICE_%s_SHARING_STRATEGY=%s", result.Device[4:], config.Sharing.Strategy))
-		}
-
-		switch {
-		case config.Sharing.IsTimeSlicing():
-			tsconfig, err := config.Sharing.GetTimeSlicingConfig()
-			if err != nil {
-				return nil, fmt.Errorf("unable to get time slicing config for device %v: %w", result.Device, err)
-			}
-			envs = append(envs, fmt.Sprintf("GPU_DEVICE_%s_TIMESLICE_INTERVAL=%v", result.Device[4:], tsconfig.Interval))
-		case config.Sharing.IsSpacePartitioning():
-			spconfig, err := config.Sharing.GetSpacePartitioningConfig()
-			if err != nil {
-				return nil, fmt.Errorf("unable to get space partitioning config for device %v: %w", result.Device, err)
-			}
-			envs = append(envs, fmt.Sprintf("GPU_DEVICE_%s_PARTITION_COUNT=%v", result.Device[4:], spconfig.PartitionCount))
+		for i, net := range parsedNets {
+			envs = append(envs, fmt.Sprintf("MULTUS_DRA_NET_%d_NAME=%s", i, net.Name))
+			envs = append(envs, fmt.Sprintf("MULTUS_DRA_NET_%d_NAMESPACE=%s", i, net.Namespace))
+			envs = append(envs, fmt.Sprintf("MULTUS_DRA_NET_%d_IFNAME=%s", i, net.InterfaceRequest))
 		}
 
 		edits := &cdispec.ContainerEdits{
@@ -314,68 +226,31 @@ func (s *DeviceState) applyConfig(config *configapi.GpuConfig, results []*resour
 	return perDeviceEdits, nil
 }
 
-// GetOpaqueDeviceConfigs returns an ordered list of the configs contained in possibleConfigs for this driver.
-//
-// Configs can either come from the resource claim itself or from the device
-// class associated with the request. Configs coming directly from the resource
-// claim take precedence over configs coming from the device class. Moreover,
-// configs found later in the list of configs attached to its source take
-// precedence over configs found earlier in the list for that source.
-//
-// All of the configs relevant to the driver from the list of possibleConfigs
-// will be returned in order of precedence (from lowest to highest). If no
-// configs are found, nil is returned.
-func GetOpaqueDeviceConfigs(
+func GetOpaqueDeviceConfig(
 	decoder runtime.Decoder,
 	driverName string,
 	possibleConfigs []resourceapi.DeviceAllocationConfiguration,
-) ([]*OpaqueDeviceConfig, error) {
-	// Collect all configs in order of reverse precedence.
-	var classConfigs []resourceapi.DeviceAllocationConfiguration
-	var claimConfigs []resourceapi.DeviceAllocationConfiguration
-	var candidateConfigs []resourceapi.DeviceAllocationConfiguration
+) (*configapi.NetConfig, error) {
 	for _, config := range possibleConfigs {
-		switch config.Source {
-		case resourceapi.AllocationConfigSourceClass:
-			classConfigs = append(classConfigs, config)
-		case resourceapi.AllocationConfigSourceClaim:
-			claimConfigs = append(claimConfigs, config)
-		default:
-			return nil, fmt.Errorf("invalid config source: %v", config.Source)
-		}
-	}
-	candidateConfigs = append(candidateConfigs, classConfigs...)
-	candidateConfigs = append(candidateConfigs, claimConfigs...)
-
-	// Decode all configs that are relevant for the driver.
-	var resultConfigs []*OpaqueDeviceConfig
-	for _, config := range candidateConfigs {
-		// If this is nil, the driver doesn't support some future API extension
-		// and needs to be updated.
 		if config.DeviceConfiguration.Opaque == nil {
-			return nil, fmt.Errorf("only opaque parameters are supported by this driver")
+			continue
 		}
-
-		// Configs for different drivers may have been specified because a
-		// single request can be satisfied by different drivers. This is not
-		// an error -- drivers must skip over other driver's configs in order
-		// to support this.
 		if config.DeviceConfiguration.Opaque.Driver != driverName {
 			continue
 		}
-
-		decodedConfig, err := runtime.Decode(decoder, config.DeviceConfiguration.Opaque.Parameters.Raw)
+		decoded, err := runtime.Decode(decoder, config.DeviceConfiguration.Opaque.Parameters.Raw)
 		if err != nil {
-			return nil, fmt.Errorf("error decoding config parameters: %w", err)
+			return nil, fmt.Errorf("error decoding opaque config: %w", err)
 		}
-
-		resultConfig := &OpaqueDeviceConfig{
-			Requests: config.Requests,
-			Config:   decodedConfig,
+		netConfig, ok := decoded.(*configapi.NetConfig)
+		if !ok {
+			return nil, fmt.Errorf("decoded config is not of type *NetConfig")
 		}
-
-		resultConfigs = append(resultConfigs, resultConfig)
+		return netConfig, nil
 	}
+	return nil, fmt.Errorf("no matching opaque config found for driver %q", driverName)
+}
 
-	return resultConfigs, nil
+func (s *DeviceState) unprepareDevices(claimUID string, devices PreparedDevices) error {
+	return nil
 }
