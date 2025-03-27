@@ -96,16 +96,27 @@ func newApp() *cli.App {
 }
 
 func StartPlugin(ctx context.Context, config *Config) error {
+	klog.Infof("Creating driver plugin directory: %s", DriverPluginPath)
 	err := os.MkdirAll(DriverPluginPath, 0750)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll(config.flags.resolvedConfigDir, 0750)
-	if err != nil {
+	klog.Infof("Checking CDI root: %s", config.flags.cdiRoot)
+	info, err := os.Stat(config.flags.cdiRoot)
+	switch {
+	case err != nil && os.IsNotExist(err):
+		err := os.MkdirAll(config.flags.cdiRoot, 0750)
+		if err != nil {
+			return err
+		}
+	case err != nil:
 		return err
+	case !info.IsDir():
+		return fmt.Errorf("path for cdi file generation is not a directory: '%v'", err)
 	}
 
+	klog.Infof("Starting %s", DriverName)
 	driver, err := NewDriver(ctx, config)
 	if err != nil {
 		return err
