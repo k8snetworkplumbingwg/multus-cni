@@ -1,0 +1,25 @@
+# This Dockerfile is used to build the image available on DockerHub
+FROM golang:1.23 AS build
+
+# Add everything
+ADD LICENSE /usr/src/multus-cni/LICENSE
+ADD go.mod /usr/src/multus-cni/go.mod
+ADD go.sum /usr/src/multus-cni/go.sum
+ADD vendor /usr/src/multus-cni/vendor
+ADD hack /usr/src/multus-cni/hack
+ADD .git /usr/src/multus-cni/.git
+ADD cmd /usr/src/multus-cni/cmd
+ADD pkg /usr/src/multus-cni/pkg
+
+RUN  cd /usr/src/multus-cni && \
+     ./hack/build-go.sh
+
+FROM debian:stable-slim
+LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/multus-cni
+COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
+COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
+COPY --from=build /usr/src/multus-cni/bin/cert-approver /
+COPY --from=build /usr/src/multus-cni/bin/dra-multus-driver /
+WORKDIR /
+
+ENTRYPOINT [ "/usr/src/multus-cni/bin/multus-daemon" ]
