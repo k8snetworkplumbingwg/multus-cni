@@ -49,7 +49,7 @@ func NewDriver(ctx context.Context, config *Config) (*driver, error) {
 	}
 	driver.plugin = plugin
 
-	// ✅ Publish one dummy allocatable device to advertise this driver
+	// Publish one dummy allocatable device to advertise this driver
 	resources := kubeletplugin.Resources{
 		Devices: []resourceapi.Device{
 			{

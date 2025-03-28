@@ -21,6 +21,8 @@ import (
 
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
+
+	"k8s.io/klog/v2"
 )
 
 type AllocatableDevices map[string]resourceapi.Device
@@ -244,9 +246,13 @@ func (s *DeviceState) applyConfig(
 			return nil, fmt.Errorf("failed to fetch NAD %s/%s: %w", net.Namespace, net.Name, err)
 		}
 
-		delegate := &types.DelegateNetConf{}
-		if err := json.Unmarshal([]byte(nad.Spec.Config), delegate); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal NAD config: %w", err)
+		klog.Infof("!bang: Whole net-attach-def: %+v", nad)
+
+		delegate := &types.DelegateNetConf{
+			Name: net.Name,
+		}
+		if err := json.Unmarshal([]byte(nad.Spec.Config), &delegate.Conf); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal NAD config into Conf: %w", err)
 		}
 
 		// Preserve ifname from network selection
