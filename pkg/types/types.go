@@ -110,9 +110,9 @@ type DelegateNetConf struct {
 	IsFilterV4Gateway     bool
 	IsFilterV6Gateway     bool
 	// MasterPlugin is only used internal housekeeping
-	MasterPlugin bool `json:"-"`
+	MasterPlugin bool `json:"masterPlugin"`
 	// Conflist plugin is only used internal housekeeping
-	ConfListPlugin bool `json:"-"`
+	ConfListPlugin bool `json:"confListPlugin"`
 	// DeviceID is only used internal housekeeping
 	DeviceID string `json:"deviceID,omitempty"`
 	// ResourceName is only used internal housekeeping

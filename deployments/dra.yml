@@ -97,6 +97,8 @@ spec:
           mountPath: /var/run/cdi
         - name: host-run-k8s-cni-cncf-io
           mountPath: /run/k8s.cni.cncf.io
+        - name: cni
+          mountPath: /host/etc/cni/net.d
       volumes:
       - name: plugins-registry
         hostPath:
@@ -110,4 +112,7 @@ spec:
       - name: host-run-k8s-cni-cncf-io
         hostPath:
           path: /run/k8s.cni.cncf.io
+      - name: cni
+        hostPath:
+          path: /etc/cni/net.d
 

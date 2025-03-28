@@ -57,8 +57,8 @@ metadata:
 spec:
   containers:
   - name: app
-    image: ubuntu:22.04
-    command: ["bash", "-c"]
+    image: alpine
+    command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
     args: ["export; trap 'exit 0' TERM; sleep 9999 & wait"]
     resources:
       claims:

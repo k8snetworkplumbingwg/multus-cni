@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/containernetworking/cni/libcni"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,7 +20,6 @@ import (
 	configapi "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/dra/api/multus-cni.io/resource/net/v1alpha1"
 	multusk8sutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
-	multustypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
@@ -248,13 +249,60 @@ func (s *DeviceState) applyConfig(
 	claimUID string,
 ) (PerDeviceCDIContainerEdits, error) {
 	perDeviceEdits := make(PerDeviceCDIContainerEdits)
+	var delegates []*types.DelegateNetConf
 
+	// --- Add the cluster default network as the first delegate ---
+	multusConfPath := "/host/etc/cni/net.d/00-multus.conf"
+	multusConfBytes, err := os.ReadFile(multusConfPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read multus config from %s: %w", multusConfPath, err)
+	}
+
+	var multusConf struct {
+		ClusterNetwork string `json:"clusterNetwork"`
+	}
+	if err := json.Unmarshal(multusConfBytes, &multusConf); err != nil {
+		return nil, fmt.Errorf("failed to parse multus config json: %w", err)
+	}
+	if multusConf.ClusterNetwork == "" {
+		return nil, fmt.Errorf("no clusterNetwork field found in multus config")
+	}
+
+	// Load the default network CNI config
+	var defaultConfBytes []byte
+	isconflist := false
+	if strings.HasSuffix(multusConf.ClusterNetwork, ".conflist") {
+		confList, err := libcni.ConfListFromFile(multusConf.ClusterNetwork)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load CNI conflist from %s: %w", multusConf.ClusterNetwork, err)
+		}
+		isconflist = true
+		defaultConfBytes = confList.Bytes
+	} else {
+		conf, err := libcni.ConfFromFile(multusConf.ClusterNetwork)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load CNI config from %s: %w", multusConf.ClusterNetwork, err)
+		}
+		if conf.Network.Type == "" {
+			return nil, fmt.Errorf("CNI config in %s missing type field", multusConf.ClusterNetwork)
+		}
+		defaultConfBytes = conf.Bytes
+	}
+
+	// Create and append the default delegate
+	defaultDelegate, err := types.LoadDelegateNetConf(defaultConfBytes, nil, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load delegate from default CNI config: %w", err)
+	}
+	defaultDelegate.MasterPlugin = true
+	defaultDelegate.ConfListPlugin = isconflist
+	delegates = append(delegates, defaultDelegate)
+
+	// --- Add the user-defined network attachments ---
 	parsedNets, err := multusk8sutils.ParsePodNetworkAnnotation(config.Networks, podNamespace)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse networks string: %w", err)
 	}
-
-	var delegates []*types.DelegateNetConf
 
 	for _, net := range parsedNets {
 		nad, err := s.nadClient.K8sCniCncfIoV1().NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
@@ -262,21 +310,18 @@ func (s *DeviceState) applyConfig(
 			return nil, fmt.Errorf("failed to fetch NAD %s/%s: %w", net.Namespace, net.Name, err)
 		}
 
-		klog.Infof("!bang: Whole net-attach-def: %+v", nad)
-
-		delegate, err := multustypes.LoadDelegateNetConf([]byte(nad.Spec.Config), net, "", "")
+		delegate, err := types.LoadDelegateNetConf([]byte(nad.Spec.Config), net, "", "")
 		if err != nil {
-			// Handle error loading delegate
 			return nil, fmt.Errorf("failed to load delegate netconf from NAD %s/%s: %w", net.Namespace, net.Name, err)
 		}
 
-		// Preserve ifname from network selection
 		if net.InterfaceRequest != "" {
 			delegate.IfnameRequest = net.InterfaceRequest
 		}
-
 		delegates = append(delegates, delegate)
 	}
+
+	klog.Infof("Delegate information for pod %s/%s: %+v", podNamespace, podName, delegates)
 
 	// Save delegates to a file
 	delegatesPath := filepath.Join("/run/k8s.cni.cncf.io/dra", fmt.Sprintf("%s_%s.json", podNamespace, podName))

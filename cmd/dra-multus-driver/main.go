@@ -115,7 +115,7 @@ func StartPlugin(ctx context.Context, config *Config) error {
 		return fmt.Errorf("path for cdi file generation is not a directory: '%v'", err)
 	}
 
-	klog.Infof("Starting %s", DriverName)
+	klog.Infof("Starting %s (version 0.0.0)", DriverName)
 	driver, err := NewDriver(ctx, config)
 	if err != nil {
 		return err
