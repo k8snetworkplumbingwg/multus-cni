@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -12,6 +17,7 @@ import (
 	netclientset "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	configapi "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/dra/api/multus-cni.io/resource/net/v1alpha1"
 	multusk8sutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
@@ -194,7 +200,7 @@ func (s *DeviceState) prepareDevices(claim *resourceapi.ResourceClaim) (Prepared
 		results = append(results, &claim.Status.Allocation.Devices.Results[i])
 	}
 
-	perDeviceCDIContainerEdits, err := s.applyConfig(netConfig, results, claim.Namespace)
+	perDeviceCDIContainerEdits, err := s.applyConfig(netConfig, results, claim.Namespace, string(claim.UID))
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply CDI container edits: %w", err)
@@ -217,7 +223,12 @@ func (s *DeviceState) prepareDevices(claim *resourceapi.ResourceClaim) (Prepared
 	return preparedDevices, nil
 }
 
-func (s *DeviceState) applyConfig(config *configapi.NetConfig, results []*resourceapi.DeviceRequestAllocationResult, podNamespace string) (PerDeviceCDIContainerEdits, error) {
+func (s *DeviceState) applyConfig(
+	config *configapi.NetConfig,
+	results []*resourceapi.DeviceRequestAllocationResult,
+	podNamespace string,
+	claimUID string,
+) (PerDeviceCDIContainerEdits, error) {
 	perDeviceEdits := make(PerDeviceCDIContainerEdits)
 
 	parsedNets, err := multusk8sutils.ParsePodNetworkAnnotation(config.Networks, podNamespace)
@@ -225,10 +236,46 @@ func (s *DeviceState) applyConfig(config *configapi.NetConfig, results []*resour
 		return nil, fmt.Errorf("failed to parse networks string: %w", err)
 	}
 
+	var delegates []*types.DelegateNetConf
+
+	for _, net := range parsedNets {
+		nad, err := s.nadClient.K8sCniCncfIoV1().NetworkAttachmentDefinitions(net.Namespace).Get(context.TODO(), net.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch NAD %s/%s: %w", net.Namespace, net.Name, err)
+		}
+
+		delegate := &types.DelegateNetConf{}
+		if err := json.Unmarshal([]byte(nad.Spec.Config), delegate); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal NAD config: %w", err)
+		}
+
+		// Preserve ifname from network selection
+		if net.InterfaceRequest != "" {
+			delegate.IfnameRequest = net.InterfaceRequest
+		}
+
+		delegates = append(delegates, delegate)
+	}
+
+	// Save delegates to a file
+	delegatesPath := filepath.Join("/run/k8s.cni.cncf.io/dra", claimUID+".json")
+	if err := os.MkdirAll(filepath.Dir(delegatesPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to ensure delegate output dir: %w", err)
+	}
+	data, err := json.MarshalIndent(delegates, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal delegates: %w", err)
+	}
+	if err := os.WriteFile(delegatesPath, data, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write delegates file: %w", err)
+	}
+
+	// Add CDI env vars
 	for _, result := range results {
 		envs := []string{
 			fmt.Sprintf("MULTUS_DRA_DEVICE_NAME=%s", result.Device),
 			fmt.Sprintf("MULTUS_DRA_NETWORKS=%s", config.Networks),
+			fmt.Sprintf("MULTUS_DRA_CLAIM_UID=%s", claimUID),
 		}
 
 		for i, net := range parsedNets {
@@ -237,11 +284,9 @@ func (s *DeviceState) applyConfig(config *configapi.NetConfig, results []*resour
 			envs = append(envs, fmt.Sprintf("MULTUS_DRA_NET_%d_IFNAME=%s", i, net.InterfaceRequest))
 		}
 
-		edits := &cdispec.ContainerEdits{
-			Env: envs,
+		perDeviceEdits[result.Device] = &cdiapi.ContainerEdits{
+			ContainerEdits: &cdispec.ContainerEdits{Env: envs},
 		}
-
-		perDeviceEdits[result.Device] = &cdiapi.ContainerEdits{ContainerEdits: edits}
 	}
 
 	return perDeviceEdits, nil

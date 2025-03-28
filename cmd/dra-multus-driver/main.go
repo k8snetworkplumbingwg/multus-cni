@@ -23,11 +23,10 @@ const (
 )
 
 type Flags struct {
-	cdiRoot           string
-	kubeClientConfig  flags.KubeClientConfig
-	loggingConfig     *flags.LoggingConfig
-	nodeName          string
-	resolvedConfigDir string
+	cdiRoot          string
+	kubeClientConfig flags.KubeClientConfig
+	loggingConfig    *flags.LoggingConfig
+	nodeName         string
 }
 
 type Config struct {
