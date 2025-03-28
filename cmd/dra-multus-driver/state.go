@@ -18,6 +18,7 @@ import (
 	configapi "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/dra/api/multus-cni.io/resource/net/v1alpha1"
 	multusk8sutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
+	multustypes "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
 
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 	cdispec "tags.cncf.io/container-device-interface/specs-go"
@@ -202,7 +203,21 @@ func (s *DeviceState) prepareDevices(claim *resourceapi.ResourceClaim) (Prepared
 		results = append(results, &claim.Status.Allocation.Devices.Results[i])
 	}
 
-	perDeviceCDIContainerEdits, err := s.applyConfig(netConfig, results, claim.Namespace, string(claim.UID))
+	var podName, podNamespace string
+
+	for _, owner := range claim.OwnerReferences {
+		if owner.Kind == "Pod" && owner.Name != "" {
+			podName = owner.Name
+			podNamespace = claim.Namespace
+			break
+		}
+	}
+
+	if podName == "" {
+		return nil, fmt.Errorf("could not determine owning pod from claim metadata")
+	}
+
+	perDeviceCDIContainerEdits, err := s.applyConfig(netConfig, results, podName, podNamespace, string(claim.UID))
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply CDI container edits: %w", err)
@@ -228,6 +243,7 @@ func (s *DeviceState) prepareDevices(claim *resourceapi.ResourceClaim) (Prepared
 func (s *DeviceState) applyConfig(
 	config *configapi.NetConfig,
 	results []*resourceapi.DeviceRequestAllocationResult,
+	podName string,
 	podNamespace string,
 	claimUID string,
 ) (PerDeviceCDIContainerEdits, error) {
@@ -248,11 +264,10 @@ func (s *DeviceState) applyConfig(
 
 		klog.Infof("!bang: Whole net-attach-def: %+v", nad)
 
-		delegate := &types.DelegateNetConf{
-			Name: net.Name,
-		}
-		if err := json.Unmarshal([]byte(nad.Spec.Config), &delegate.Conf); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal NAD config into Conf: %w", err)
+		delegate, err := multustypes.LoadDelegateNetConf([]byte(nad.Spec.Config), net, "", "")
+		if err != nil {
+			// Handle error loading delegate
+			return nil, fmt.Errorf("failed to load delegate netconf from NAD %s/%s: %w", net.Namespace, net.Name, err)
 		}
 
 		// Preserve ifname from network selection
@@ -264,7 +279,7 @@ func (s *DeviceState) applyConfig(
 	}
 
 	// Save delegates to a file
-	delegatesPath := filepath.Join("/run/k8s.cni.cncf.io/dra", claimUID+".json")
+	delegatesPath := filepath.Join("/run/k8s.cni.cncf.io/dra", fmt.Sprintf("%s_%s.json", podNamespace, podName))
 	if err := os.MkdirAll(filepath.Dir(delegatesPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to ensure delegate output dir: %w", err)
 	}
@@ -281,6 +296,8 @@ func (s *DeviceState) applyConfig(
 		envs := []string{
 			fmt.Sprintf("MULTUS_DRA_DEVICE_NAME=%s", result.Device),
 			fmt.Sprintf("MULTUS_DRA_NETWORKS=%s", config.Networks),
+			fmt.Sprintf("MULTUS_DRA_POD_NAMESPACE=%s", podNamespace),
+			fmt.Sprintf("MULTUS_DRA_POD_NAME=%s", podName),
 			fmt.Sprintf("MULTUS_DRA_CLAIM_UID=%s", claimUID),
 		}
 

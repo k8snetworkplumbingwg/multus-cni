@@ -6,6 +6,7 @@ metadata:
   namespace: default
 spec:
   config: '{
+    "name":  "bridge-net",
     "cniVersion": "0.4.0",
     "type": "bridge",
     "bridge": "cni0",

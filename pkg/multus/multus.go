@@ -39,6 +39,7 @@ import (
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/drahelpers"
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/netutils"
@@ -647,34 +648,61 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 	}
 
-	pod, err := GetPod(kubeClient, k8sArgs, false)
-	if err != nil {
-		if err == errPodNotFound {
-			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
-			return &cni100.Result{
-				CNIVersion: n.CNIVersion,
-			}, nil
-		}
-		return nil, err
-	}
+	// !bang. This is where we're going to enter the netns and get the env variables.
+
+	var pod *v1.Pod
 
 	// resourceMap holds Pod device allocation information; only initizized if CRD contains 'resourceName' annotation.
 	// This will only be initialized once and all delegate objects can reference this to look up device info.
 	var resourceMap map[string]*types.ResourceInfo
 
-	if n.ClusterNetwork != "" {
-		resourceMap, err = k8s.GetDefaultNetworks(pod, n, kubeClient, resourceMap)
+	// !bang here we're probably going to have to get the delegates another way if we have the env vars.
+	// then we conditionally do this.
+
+	// Load from env-based file
+	var kc *k8s.ClientInfo
+	useddra := false
+	delegates, err := drahelpers.LoadDelegatesFromDRAFile(string(k8sArgs.K8S_POD_NAME), string(k8sArgs.K8S_POD_NAMESPACE))
+	if err != nil {
+		// Fall back to usual kube-based logic
+		logging.Errorf("CmdAdd: No DRA delegates from env in netns: %v", err)
+
+		pod, err = GetPod(kubeClient, k8sArgs, false)
 		if err != nil {
-			return nil, cmdErr(k8sArgs, "failed to get clusterNetwork/defaultNetworks: %v", err)
+			if err == errPodNotFound {
+				logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
+				return &cni100.Result{
+					CNIVersion: n.CNIVersion,
+				}, nil
+			}
+			return nil, err
 		}
-		// First delegate is always the master plugin
-		n.Delegates[0].MasterPlugin = true
+
+		if n.ClusterNetwork != "" {
+			resourceMap, err = k8s.GetDefaultNetworks(pod, n, kubeClient, resourceMap)
+			if err != nil {
+				return nil, cmdErr(k8sArgs, "failed to get clusterNetwork/defaultNetworks: %v", err)
+			}
+			// First delegate is always the master plugin
+			n.Delegates[0].MasterPlugin = true
+		}
+
+		_, kc, err = k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
+		if err != nil {
+			return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
+		}
+
+	} else if len(delegates) > 0 {
+		// Successfully loaded delegates from env, use them
+		logging.Verbosef("CmdAdd: Successfully loaded %d DRA delegates from env in netns for pod [%s/%s]", len(delegates), k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME)
+		n.Delegates = delegates
+		useddra = true
+	} else {
+		// I think this is just like there's no additional delegates?
 	}
 
-	_, kc, err := k8s.TryLoadPodDelegates(pod, n, kubeClient, resourceMap)
-	if err != nil {
-		return nil, cmdErr(k8sArgs, "error loading k8s delegates k8s args: %v", err)
-	}
+	// if we have the  env var -- then here we'd load the delegates from file.
+	// then lets put them in n.Delegates so we can use the following logic.
 
 	// cache the multus config
 	if err := saveDelegates(args.ContainerID, n.CNIDir, n.Delegates); err != nil {
@@ -792,7 +820,8 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		}
 
 		// Create the network statuses, only in case Multus has kubeconfig
-		if kubeClient != nil && kc != nil {
+		// !bang TODO: importantly, we're skipping this when using DRA for now, because we just want to "not use k8s at CNI time" with this pattern.
+		if kubeClient != nil && kc != nil && !useddra {
 			if !types.CheckSystemNamespaces(string(k8sArgs.K8S_POD_NAME), n.SystemNamespaces) {
 				delegateNetStatuses, err := nadutils.CreateNetworkStatuses(tmpResult, delegate.Name, delegate.MasterPlugin, devinfo)
 				if err != nil {
