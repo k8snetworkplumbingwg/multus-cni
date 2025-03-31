@@ -1,11 +1,23 @@
-# This Dockerfile is used to build the image available on DockerHub
-FROM golang:1.23 AS build
+# Image that provides cross compilation tooling.
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.6.1 AS xx
 
+# This Dockerfile is used to build the image available on DockerHub
+FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS build
+# copy xx scripts to your build stage
+COPY --from=xx / /
+# # ARG TARGETPLATFORM
+# # RUN set -x && \
+#     xx-apt --no-cache get musl-dev gcc lld 
 # Add everything
 ADD . /usr/src/multus-cni
-
+RUN cd /usr/src/multus-cni && \
+     go mod download
+# cross-compilation setup
+ARG TARGETARCH
 RUN  cd /usr/src/multus-cni && \
+     xx-go --wrap && \
      ./hack/build-go.sh
+RUN xx-verify --static /usr/src/multus-cni/bin/multus-daemon
 
 FROM debian:stable-slim
 LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/multus-cni
