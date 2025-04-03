@@ -1,0 +1,21 @@
+name: Fork Release CI
+
+on:
+  push:
+    branches:
+      - network-operator-*
+    tags:
+      - network-operator-*
+
+jobs:
+  call-reusable-ci-fork-workflow:
+    uses: Mellanox/cloud-orchestration-reusable-workflows/.github/workflows/fork-ci-reusable.yml@main
+    with:
+      registry-internal: nvcr.io/nvstaging/mellanox
+      service-account-username: nvidia-cicd
+      service-account-email: svc-cloud-orch-gh@nvidia.com
+      components: '[{"name": "Multus", "imageName": "multus-cni", "Dockerfile": "images/Dockerfile"}]'
+    secrets:
+      registry-username: ${{ github.repository_owner }}
+      registry-token: ${{ secrets.GITHUB_TOKEN }}
+      cicd-gh-token: ${{ secrets.GH_TOKEN_NVIDIA_CI_CD }}
