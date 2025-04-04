@@ -1,19 +1,3 @@
-/*
-Copyright 2025 The Kubernetes Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package main
 
 import (
@@ -22,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/urfave/cli/v2"
 
@@ -35,7 +18,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/flags"
-	configapi "sigs.k8s.io/dra-example-driver/api/example.com/resource/gpu/v1alpha1"
 )
 
 const (
@@ -142,7 +124,7 @@ func newMux() *http.ServeMux {
 }
 
 func serveResourceClaim(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitResourceClaimParameters)
+	serve(w, r, admitOrMutatePod)
 }
 
 // serve handles the http portion of a request prior to handing to an admit
@@ -214,94 +196,51 @@ func readAdmissionReview(data []byte) (*admissionv1.AdmissionReview, error) {
 	return requestedAdmissionReview, nil
 }
 
-// admitResourceClaimParameters accepts both ResourceClaims and ResourceClaimTemplates and validates their
-// opaque device configuration parameters for this driver.
-func admitResourceClaimParameters(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
-	klog.V(2).Info("admitting resource claim parameters")
+func admitOrMutatePod(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
+	if ar.Request.Kind.Kind != "Pod" {
+		return &admissionv1.AdmissionResponse{Allowed: true}
+	}
 
-	var deviceConfigs []resourceapi.DeviceClaimConfiguration
-	var specPath string
+	var pod corev1.Pod
+	if err := json.Unmarshal(ar.Request.Object.Raw, &pod); err != nil {
+		klog.Error(err)
+		return toAdmissionError(err)
+	}
 
-	raw := ar.Request.Object.Raw
-	deserializer := codecs.UniversalDeserializer()
-
-	switch ar.Request.Resource {
-	case resourceClaimResource:
-		claim := resourceapi.ResourceClaim{}
-		if _, _, err := deserializer.Decode(raw, nil, &claim); err != nil {
-			klog.Error(err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-					Reason:  metav1.StatusReasonBadRequest,
-				},
-			}
-		}
-		deviceConfigs = claim.Spec.Devices.Config
-		specPath = "spec"
-	case resourceClaimTemplateResource:
-		claimTemplate := resourceapi.ResourceClaimTemplate{}
-		if _, _, err := deserializer.Decode(raw, nil, &claimTemplate); err != nil {
-			klog.Error(err)
-			return &admissionv1.AdmissionResponse{
-				Result: &metav1.Status{
-					Message: err.Error(),
-					Reason:  metav1.StatusReasonBadRequest,
-				},
-			}
-		}
-		deviceConfigs = claimTemplate.Spec.Spec.Devices.Config
-		specPath = "spec.spec"
-	default:
-		msg := fmt.Sprintf("expected resource to be %s or %s, got %s", resourceClaimResource, resourceClaimTemplateResource, ar.Request.Resource)
-		klog.Error(msg)
-		return &admissionv1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: msg,
-				Reason:  metav1.StatusReasonBadRequest,
-			},
+	// Bail early if pod has DRA-style claims (skip mutation)
+	for _, claim := range pod.Spec.ResourceClaims {
+		if claim.Source.ResourceClaimTemplateName != nil {
+			klog.Infof("Pod %s/%s uses DRA, skipping", pod.Namespace, pod.Name)
+			return &admissionv1.AdmissionResponse{Allowed: true}
 		}
 	}
 
-	var errs []error
-	for configIndex, config := range deviceConfigs {
-		if config.Opaque == nil || config.Opaque.Driver != DriverName {
-			continue
-		}
-
-		fieldPath := fmt.Sprintf("%s.devices.config[%d].opaque.parameters", specPath, configIndex)
-		decodedConfig, err := runtime.Decode(configapi.Decoder, config.DeviceConfiguration.Opaque.Parameters.Raw)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("error decoding object at %s: %w", fieldPath, err))
-			continue
-		}
-		gpuConfig, ok := decodedConfig.(*configapi.GpuConfig)
-		if !ok {
-			errs = append(errs, fmt.Errorf("expected v1alpha1.GpuConfig at %s but got: %T", fieldPath, decodedConfig))
-			continue
-		}
-		err = gpuConfig.Validate()
-		if err != nil {
-			errs = append(errs, fmt.Errorf("object at %s is invalid: %w", fieldPath, err))
-		}
+	// Parse NADs from annotations
+	nadSelector := pod.Annotations["k8s.v1.cni.cncf.io/networks"]
+	if nadSelector == "" {
+		klog.Infof("No NAD annotation found for pod %s/%s", pod.Namespace, pod.Name)
+		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
 
-	if len(errs) > 0 {
-		var errMsgs []string
-		for _, err := range errs {
-			errMsgs = append(errMsgs, err.Error())
-		}
-		msg := fmt.Sprintf("%d configs failed to validate: %s", len(errs), strings.Join(errMsgs, "; "))
-		klog.Error(msg)
-		return &admissionv1.AdmissionResponse{
-			Result: &metav1.Status{
-				Message: msg,
-				Reason:  metav1.StatusReason(metav1.StatusReasonInvalid),
-			},
-		}
+	// TODO: resolve NADs into delegate configs (e.g. using your existing logic)
+	// TODO: generate network-status JSON
+
+	// Create a patch to mutate the pod
+	patch := []map[string]interface{}{
+		{
+			"op":    "add",
+			"path":  "/metadata/annotations/k8s.v1.cni.cncf.io~1network-status",
+			"value": `<computed-network-status-json>`,
+		},
 	}
 
+	patchBytes, _ := json.Marshal(patch)
 	return &admissionv1.AdmissionResponse{
 		Allowed: true,
+		Patch:   patchBytes,
+		PatchType: func() *admissionv1.PatchType {
+			pt := admissionv1.PatchTypeJSONPatch
+			return &pt
+		}(),
 	}
 }

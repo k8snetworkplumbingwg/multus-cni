@@ -177,6 +177,7 @@ func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.Shar
 	return informerFactory, netdefInformer
 }
 
+// !bang
 func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
 	var tweakFunc internalinterfaces.TweakListOptionsFunc
 	if nodeName != "" {
