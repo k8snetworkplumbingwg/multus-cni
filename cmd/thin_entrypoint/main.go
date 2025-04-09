@@ -59,6 +59,7 @@ type Options struct {
 	ForceCNIVersion          bool
 	SkipTLSVerify            bool
 	SkipMultusConfWatch      bool
+	WatchTimer               time.Duration
 }
 
 const (
@@ -93,6 +94,7 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.AdditionalBinDir, "additional-bin-dir", "", "adds binDir option to configuration (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.SkipTLSVerify, "skip-tls-verify", false, "skip TLS verify")
 	fs.BoolVar(&o.ForceCNIVersion, "force-cni-version", false, "force cni version to '--cni-version' (only for e2e-kind testing)")
+	fs.DurationVar(&o.WatchTimer, "multus-config-watch-timer", 1*time.Second, "how long to wait before reconciling multus config")
 	fs.MarkHidden("force-cni-version")
 	fs.MarkHidden("skip-tls-verify")
 }
@@ -618,13 +620,16 @@ func main() {
 		defer cleanupMultusConf(&opt)
 	}
 
+	watcher := time.NewTicker(opt.WatchTimer)
+	defer watcher.Stop()
+
 	watchChanges := opt.CleanupConfigOnExit && opt.MultusConfFile == "auto" && !opt.SkipMultusConfWatch
 	if watchChanges {
 		fmt.Printf("Entering watch loop...\n")
 		masterConfigExists := true
 
 	outer:
-		for range time.Tick(1 * time.Second) {
+		for range watcher.C {
 			select {
 			case <-ctx.Done():
 				// signal received break from loop
