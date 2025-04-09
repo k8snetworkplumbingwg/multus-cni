@@ -1,0 +1,26 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-daemon-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+data:
+  daemon-config.json: |
+    {
+        "confDir": "/host/etc/cni/net.d",
+        "logToStderr": true,
+        "logLevel": "debug",
+        "logFile": "/tmp/multus.log",
+        "binDir": "/host/opt/cni/bin",
+        "cniDir": "/var/lib/cni/multus",
+        "socketDir": "/host/run/multus",
+        "cniVersion": "{{ CNI_VERSION }}",
+        "cniConfigDir": "/host/etc/cni/net.d",
+        "multusConfigFile": "auto",
+        "forceCNIVersion": true,
+        "multusAutoconfigDir": "/host/etc/cni/net.d",
+        "auxiliaryCNIChainName": "vendor-cni-chain"
+    }

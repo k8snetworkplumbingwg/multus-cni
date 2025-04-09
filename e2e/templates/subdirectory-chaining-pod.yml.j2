@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sysctl-modified
+spec:
+  containers:
+  - name: sysctl
+    image: quay.io/dosmith/fedora-procps
+    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
+    securityContext:
+      privileged: true
