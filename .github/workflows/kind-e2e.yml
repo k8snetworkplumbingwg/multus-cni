@@ -9,15 +9,23 @@ jobs:
           - docker-file: images/Dockerfile.thick
             cni-version: "0.3.1"
             multus-manifest: multus-daemonset-thick.yml
+            expected-binaries: "/opt/cni/bin/multus-shim"
+            init-container-name: "install-multus-shim"
           - docker-file: images/Dockerfile
             cni-version: "0.3.1"
             multus-manifest: multus-daemonset.yml
+            expected-binaries: "/opt/cni/bin/multus"
+            init-container-name: "install-multus-binary"
           - docker-file: images/Dockerfile.thick
             cni-version: "0.4.0"
             multus-manifest: multus-daemonset-thick.yml
+            expected-binaries: "/opt/cni/bin/multus-shim"
+            init-container-name: "install-multus-shim"
           - docker-file: images/Dockerfile
             cni-version: "0.4.0"
             multus-manifest: multus-daemonset.yml
+            expected-binaries: "/opt/cni/bin/multus"
+            init-container-name: "install-multus-binary"
           # need to wait kind to support CNI 1.0.0 (now kind 0.11 supports up to 0.4.0)
 #          - docker-file: images/Dockerfile.thick
 #            cni-version: "1.0.0"
@@ -94,6 +102,20 @@ jobs:
         run: |
           mkdir -p /tmp/kind/logs
           kind export logs /tmp/kind/logs -v 2147483647
+
+      - name: Test reboot node
+        working-directory: ./e2e
+        env:
+          EXPECTED_BINARIES: ${{ matrix.expected-binaries }}
+          INSTALL_INIT_CONTAINER: ${{ matrix.init-container-name }}
+        run: ./test-reboot.sh
+
+      - name: Test upgrade simulation
+        working-directory: ./e2e
+        env:
+          EXPECTED_BINARIES: ${{ matrix.expected-binaries }}
+          INSTALL_INIT_CONTAINER: ${{ matrix.init-container-name }}
+        run: ./test-upgrade.sh
 
       - name: Upload kind logs
         if: always()
