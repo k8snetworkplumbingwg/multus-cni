@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // CopyFileAtomic does file copy atomically
@@ -35,10 +36,10 @@ func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) err
 
 	// create temp file
 	f, err := os.CreateTemp(destDir, tempFileName)
-	defer f.Close()
 	if err != nil {
 		return fmt.Errorf("cannot create temp file %q in %q: %v", tempFileName, destDir, err)
 	}
+	defer f.Close()
 
 	srcFile, err := os.Open(srcFilePath)
 	if err != nil {
@@ -78,6 +79,12 @@ func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) err
 	// replace file with tempfile
 	if err := os.Rename(f.Name(), destFilePath); err != nil {
 		return fmt.Errorf("cannot replace %q with temp file %q: %v", destFilePath, tempFilePath, err)
+	}
+
+	// touch the file
+	now := time.Now()
+	if err := os.Chtimes(destFilePath, now, now); err != nil {
+		return fmt.Errorf("failed to update timestamp on %q: %v", destFilePath, err)
 	}
 
 	return nil
