@@ -53,4 +53,15 @@ func main() {
 	}
 
 	fmt.Printf("multus %s copy succeeded!\n", multusFileName)
+
+	// Copy the passthru CNI
+	passthruPath := "/usr/src/multus-cni/bin/passthru"
+	err = cmdutils.CopyFileAtomic(passthruPath, *destDir, fmt.Sprintf("%s.temp", "passthru"), "passthru")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to copy file %s: %v\n", multusFileName, err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("passthru cni %s copy succeeded!\n", passthruPath)
+
 }

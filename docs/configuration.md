@@ -37,6 +37,7 @@ Example configuration using `clusterNetwork` (see also [using delegates](#using-
     "defaultNetworks": ["sidecarCRD", "exampleNetwork"],
     "systemNamespaces": ["kube-system", "admin"],
     "multusNamespace": "kube-system",
+    "auxiliaryCNIChainName": "cni-chain-config",
     allowTryDeleteOnErr: false
 }
 ```
@@ -63,6 +64,7 @@ message to next when some missing error. Defaults to false.
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
 * `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
+* [`auxiliaryCNIChainName`](#auxiliaryCNIChainName) (string, optional): Enable loading CNI configurations from disk as chained plugins in an auxiliary CNI chain
 
 ### Using `clusterNetwork`
 
@@ -380,3 +382,47 @@ annotations:
  v1.multus-cni.io/default-network: calico-conf
 ...
 ```
+
+### `auxiliaryCNIChainName`
+
+`auxiliaryCNIChainName` (of value string) is used to express the name of an additional auxiliary CNI chain that will execute in order to composably execute chained CNI plugins from configurations on the host's disk in a subdirectory of the CNI configuration directory.
+
+**NOTE**: The path used to determine the base for the subdirectory is the pathname of the `clusterNetwork` value, which must be set to a file in order to use this functionality.
+
+When this string is set, Multus will execute an additional CNI chain, outside of the default network, on its own independent CNI chain (as to not interfere with default network functionality that might be hampered by CNI chaining and to otherwise isolate this execution) and will load CNI configurations from a subdirectory of the same name in the CNI configuration directory.
+
+This feature is based on [improvements made to libcni for "safe subdirectory-based plugin conf loading"](https://github.com/containernetworking/cni/pull/1052). 
+
+`auxiliaryCNIChainName` is meant to be set as a CNI configuration name, this name is arbitrary but must match the subdirectory name.
+
+Consider this [daemon configuration](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/deployments/multus-daemonset-thick.yml#L113):
+
+```
+{
+  "cniConfigDir": "/host/etc/cni/net.d",
+  "multusAutoconfigDir": "/host/etc/cni/net.d",
+  "multusConfigFile": "auto",
+  "socketDir": "/host/run/multus/",
+  "auxiliaryCNIChainName": "cni-chain-config"
+}
+```
+
+Here we have set `"auxiliaryCNIChainName": "cni-chain-config"`, and we have expressed that our CNI configurations are on `/etc/cni/net.d/` on the host.
+
+In this case, we would also have a directory named in `/etc/cni/net.d/cni-chain-config`
+
+One could add any number of CNI configurations to be used as part of this chain, consider this example if we added a tuning CNI configuration called `/etc/cni/net.d/cni-chain-config/mytuning.conf` with these contents:
+
+```
+{
+  "name": "mytuning",
+  "type": "tuning",
+  "sysctl": {
+    "net.ipv4.conf.IFNAME.arp_filter": "1"
+  }
+}
+```
+
+With the given configuration, plus this configuration, this would be executed for every pod launched by Multus CNI.
+
+If this is unset, no auxiliary chain will be executed. However, if the default network CNI configuration is loaded from disk and is a conflist format, the libcni functionality for loading from a subdirectory will still apply.

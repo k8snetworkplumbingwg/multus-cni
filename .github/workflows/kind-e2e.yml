@@ -89,6 +89,16 @@ jobs:
 #        working-directory: ./e2e
 #        run: ./test-dra-integration.sh
 
+      - name: Test subdirectory CNI chaining
+        if: ${{ matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        working-directory: ./e2e
+        run: ./test-subdirectory-chaining.sh
+
+      - name: Test subdirectory CNI chaining with passthru CNI / auxiliaryCNIChainName
+        if: ${{ matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        working-directory: ./e2e
+        run: ./test-subdirectory-chaining-passthru.sh
+
       - name: Export kind logs
         if: always()
         run: |

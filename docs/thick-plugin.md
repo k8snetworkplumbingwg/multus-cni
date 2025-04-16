@@ -72,6 +72,7 @@ is provided.
 - `"logLevel"`: the logging level for the multus daemon logs.
 - `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
 as well. By default, it is disabled.
+- `"auxiliaryCNIChainName"`: set a value to execute chained cni configurations from disk in an auxiliary CNI chain (see details in [configuration.md](configuration.md))
 
 In addition, you can add any configuration which is in [configuration reference](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/configuration.md#multus-cni-configuration-reference). Server configuration override multus CNI configuration (e.g. `/etc/cni/net.d/00-multus.conf`)
 

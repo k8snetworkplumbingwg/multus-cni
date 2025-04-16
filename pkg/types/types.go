@@ -18,10 +18,10 @@ package types
 import (
 	"net"
 
-	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
-
+	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -57,6 +57,7 @@ type NetConf struct {
 	NamespaceIsolation       bool     `json:"namespaceIsolation"`
 	RawNonIsolatedNamespaces string   `json:"globalNamespaces"`
 	NonIsolatedNamespaces    []string `json:"-"`
+	AuxiliaryCNIChainName    string   `json:"auxiliaryCNIChainName,omitempty"`
 
 	// Option to set system namespaces (to avoid to add defaultNetworks)
 	SystemNamespaces []string `json:"systemNamespaces"`
@@ -99,6 +100,7 @@ type BandwidthEntry struct {
 type DelegateNetConf struct {
 	Conf                  types.NetConf
 	ConfList              types.NetConfList
+	CNINetworkConfigList  libcni.NetworkConfigList
 	Name                  string
 	IfnameRequest         string          `json:"ifnameRequest,omitempty"`
 	MacRequest            string          `json:"macRequest,omitempty"`

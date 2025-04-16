@@ -26,6 +26,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
+	"github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
@@ -60,6 +61,112 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 	delegateConf.ConfListPlugin = true
 	delegateConf.Name = delegateConf.ConfList.Name
 	return nil
+}
+
+// ConvertNetworkConfigListToNetConfList converts a libcni.NetworkConfigList to a NetConfList
+func ConvertNetworkConfigListToNetConfList(ncList *libcni.NetworkConfigList) (*types.NetConfList, error) {
+	// Convert Plugins from []*libcni.PluginConfig to []*types.PluginConf
+	var plugins []*types.PluginConf
+	for _, plugin := range ncList.Plugins {
+		plugins = append(plugins, plugin.Network)
+	}
+
+	// Create NetConfList
+	netConfList := &types.NetConfList{
+		CNIVersion:   ncList.CNIVersion,
+		Name:         ncList.Name,
+		DisableCheck: ncList.DisableCheck,
+		DisableGC:    ncList.DisableGC,
+		Plugins:      plugins,
+	}
+
+	return netConfList, nil
+}
+
+// LoadDelegateNetConfFromConfList converts a libcni.NetworkConfigList into a DelegateNetConf structure
+func LoadDelegateNetConfFromConfList(confList *libcni.NetworkConfigList, netElement *NetworkSelectionElement, deviceID string, resourceName string) (*DelegateNetConf, error) {
+	var err error
+	logging.Debugf("LoadDelegateNetConfFromConfList: %v, %v, %s", confList, netElement, deviceID)
+
+	// Convert libcni.NetworkConfigList to NetConfList
+	netConfList, err := ConvertNetworkConfigListToNetConfList(confList)
+	if err != nil {
+		return nil, err
+	}
+
+	delegateConf := &DelegateNetConf{
+		Name:                 netConfList.Name,
+		ConfList:             *netConfList,
+		CNINetworkConfigList: *confList,
+		ConfListPlugin:       true,
+	}
+
+	// Convert the plugins back to bytes for consistency
+	pluginsBytes, err := json.Marshal(netConfList)
+	if err != nil {
+		return nil, logging.Errorf("LoadDelegateNetConfFromConfList: error marshaling netConfList: %v", err)
+	}
+	delegateConf.Bytes = pluginsBytes
+
+	if deviceID != "" {
+		pluginsBytes, err = addDeviceIDInConfList(pluginsBytes, deviceID)
+		if err != nil {
+			return nil, logging.Errorf("LoadDelegateNetConfFromConfList: failed to add deviceID in NetConfList bytes: %v", err)
+		}
+		delegateConf.ResourceName = resourceName
+		delegateConf.DeviceID = deviceID
+	}
+
+	if netElement != nil && netElement.CNIArgs != nil {
+		pluginsBytes, err = addCNIArgsInConfList(pluginsBytes, netElement.CNIArgs)
+		if err != nil {
+			return nil, logging.Errorf("LoadDelegateNetConfFromConfList: failed to add cni-args in NetConfList bytes: %v", err)
+		}
+		delegateConf.Bytes = pluginsBytes
+	}
+
+	if netElement != nil {
+		if netElement.Name != "" {
+			// Overwrite CNI config name with net-attach-def name
+			delegateConf.Name = fmt.Sprintf("%s/%s", netElement.Namespace, netElement.Name)
+		}
+		if netElement.InterfaceRequest != "" {
+			delegateConf.IfnameRequest = netElement.InterfaceRequest
+		}
+		if netElement.MacRequest != "" {
+			delegateConf.MacRequest = netElement.MacRequest
+		}
+		if netElement.IPRequest != nil {
+			delegateConf.IPRequest = netElement.IPRequest
+		}
+		if netElement.BandwidthRequest != nil {
+			delegateConf.BandwidthRequest = netElement.BandwidthRequest
+		}
+		if netElement.PortMappingsRequest != nil {
+			delegateConf.PortMappingsRequest = netElement.PortMappingsRequest
+		}
+		if netElement.GatewayRequest != nil {
+			var list []net.IP
+			if delegateConf.GatewayRequest != nil {
+				list = append(*delegateConf.GatewayRequest, *netElement.GatewayRequest...)
+			} else {
+				list = *netElement.GatewayRequest
+			}
+			delegateConf.GatewayRequest = &list
+		}
+		if netElement.InfinibandGUIDRequest != "" {
+			delegateConf.InfinibandGUIDRequest = netElement.InfinibandGUIDRequest
+		}
+		if netElement.DeviceID != "" {
+			if deviceID != "" {
+				logging.Debugf("Warning: Both RuntimeConfig and ResourceMap provide deviceID. Ignoring RuntimeConfig")
+			} else {
+				delegateConf.DeviceID = netElement.DeviceID
+			}
+		}
+	}
+
+	return delegateConf, nil
 }
 
 // LoadDelegateNetConf converts raw CNI JSON into a DelegateNetConf structure

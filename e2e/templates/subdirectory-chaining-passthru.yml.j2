@@ -1,0 +1,94 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cni-setup-script
+  namespace: default
+data:
+  setup.sh: |
+    #!/bin/bash
+    set -euxo pipefail
+
+    DEFAULT_NETWORK_CNI_NAME="vendor-cni-chain"
+
+    cleanup() {
+      echo "Cleaning up..."
+      rm -f /host/etc/cni/net.d/${DEFAULT_NETWORK_CNI_NAME}/sysctltwiddle.conf
+      if [ $? -ne 0 ]; then
+        echo "Failed to remove sysctltwiddle.conf" >&2
+        exit 1
+      fi
+      echo "Cleanup completed successfully"
+    }
+    trap cleanup EXIT
+
+    # Create the chained CNI directory if it doesn't exist
+    mkdir -p /host/etc/cni/net.d/${DEFAULT_NETWORK_CNI_NAME}
+    if [ $? -ne 0 ]; then
+      echo "Failed to create directory /host/etc/cni/net.d/${DEFAULT_NETWORK_CNI_NAME}" >&2
+      exit 1
+    fi
+
+    # Write the chained tuning CNI config
+    cat <<EOF > /host/etc/cni/net.d/${DEFAULT_NETWORK_CNI_NAME}/sysctltwiddle.conf
+    {
+      "cniVersion": "{{ CNI_VERSION }}",
+      "name": "sysctltwiddle",
+      "type": "tuning",
+      "sysctl": {
+        "net.ipv4.conf.eth0.arp_filter": "1"
+      }
+    }
+    EOF
+
+    if [ $? -ne 0 ]; then
+      echo "Failed to create chained CNI config" >&2
+      exit 1
+    fi
+
+    echo "CNI chained setup completed successfully."
+    sleep infinity
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cni-setup-daemonset
+  namespace: default
+  labels:
+    app: cni-setup
+spec:
+  selector:
+    matchLabels:
+      app: cni-setup
+  template:
+    metadata:
+      labels:
+        app: cni-setup
+    spec:
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+      containers:
+      - name: setup
+        image: quay.io/fedora/fedora:40
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: cni-config
+          mountPath: /host/etc/cni/net.d
+        - name: script-volume
+          mountPath: /scripts
+        command: ["/bin/bash", "/scripts/setup.sh"]
+      volumes:
+      - name: cni-config
+        hostPath:
+          path: /etc/cni/net.d
+          type: Directory
+      - name: script-volume
+        configMap:
+          name: cni-setup-script
+          items:
+          - key: setup.sh
+            path: setup.sh

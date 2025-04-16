@@ -18,9 +18,11 @@ package k8sclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -538,29 +540,117 @@ func getNetDelegate(client *ClientInfo, pod *v1.Pod, netname, confdir, namespace
 		} else {
 			// option4) if file path (absolute), then load it directly
 			if strings.HasSuffix(netname, ".conflist") {
-				confList, err := libcni.ConfListFromFile(netname)
+				confList, err := LoadChainedPluginsFromFile(netname)
 				if err != nil {
 					return nil, resourceMap, logging.Errorf("error loading CNI conflist file %s: %v", netname, err)
 				}
-				configBytes = confList.Bytes
-			} else {
-				conf, err := libcni.ConfFromFile(netname)
+
+				delegate, err := types.LoadDelegateNetConfFromConfList(confList, nil, "", "")
 				if err != nil {
-					return nil, resourceMap, logging.Errorf("error loading CNI config file %s: %v", netname, err)
+					return nil, resourceMap, err
 				}
-				if conf.Network.Type == "" {
-					return nil, resourceMap, logging.Errorf("error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", netname)
-				}
-				configBytes = conf.Bytes
+				return delegate, resourceMap, nil
+
 			}
-			delegate, err := types.LoadDelegateNetConf(configBytes, nil, "", "")
+
+			// Or it's not a conflist...
+			// after libcni v1.2.3 there's no support support this old-school method with non-conflists.
+			// this method doesn't check if there's a 0 length plugins field, that is.
+			conf, err := libcni.ConfFromFile(netname)
+			if err != nil {
+				return nil, resourceMap, logging.Errorf("error loading CNI config file %s: %v", netname, err)
+			}
+			if conf.Network.Type == "" {
+				return nil, resourceMap, logging.Errorf("error loading CNI config file %s: no 'type'; perhaps this is supposed to be a .conflist?", netname)
+			}
+
+			delegate, err := types.LoadDelegateNetConf(conf.Bytes, nil, "", "")
 			if err != nil {
 				return nil, resourceMap, err
 			}
 			return delegate, resourceMap, nil
 		}
+
 	}
 	return nil, resourceMap, logging.Errorf("getNetDelegate: cannot find network: %v", netname)
+}
+
+func loadSubdirectoryChain(bytes []byte, cniconfdir string) (*libcni.NetworkConfigList, error) {
+	// Load the network configuration from the byte array
+	conf, err := libcni.NetworkConfFromBytes(bytes)
+	if err != nil {
+		return nil, fmt.Errorf("error loading network config from bytes: %v", err)
+	}
+
+	// Check if plugins need to be loaded from files
+	if !conf.LoadOnlyInlinedPlugins && cniconfdir != "" {
+		// Let's validate that conf.Name
+		// From the CNI spec:
+		// > Must start with an alphanumeric character, optionally followed by any combination of one or more alphanumeric characters,
+		// > underscore, dot (.) or hyphen (-). Must not contain characters disallowed in file paths.
+		if !regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`).MatchString(conf.Name) {
+			return nil, fmt.Errorf("invalid network config name: %s", conf.Name)
+		}
+
+		plugins, err := libcni.NetworkPluginConfsFromFiles(cniconfdir, conf.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error loading plugin configs: %v", err)
+		}
+		conf.Plugins = append(conf.Plugins, plugins...)
+	}
+
+	if len(conf.Plugins) == 0 {
+		return nil, fmt.Errorf("no plugin configs found")
+	}
+
+	return conf, nil
+}
+
+// LoadChainedDelegatesFromBytes loads a CNI configuration byte array and returns a DelegateNetConf with the chain added.
+func LoadChainedDelegatesFromBytes(bytes []byte, cniconfdir string) *types.DelegateNetConf {
+	conf, err := loadSubdirectoryChain(bytes, cniconfdir)
+	if err != nil {
+		logging.Errorf("LoadChainedDelegatesFromBytes: %v", err)
+		return nil
+	}
+
+	// Create and return a DelegateNetConf from the configuration list
+	delegate, err := types.LoadDelegateNetConfFromConfList(conf, nil, "", "")
+	if err != nil {
+		logging.Errorf("LoadChainedDelegatesFromBytes: error loading delegate network config: %v", err)
+		return nil
+	}
+
+	return delegate
+}
+
+// LoadChainedPluginsFromFile loads a CNI configuration file and returns the NetworkConfigList
+func LoadChainedPluginsFromFile(filename string) (*libcni.NetworkConfigList, error) {
+	cleanPath := filepath.Clean(filename)
+
+	// stat the file to make sure it's a normal file.
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("CNI configuration path is not a regular file")
+	}
+
+	bytes, err := os.ReadFile(cleanPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", filename, err)
+	}
+	logging.Debugf("LoadChainedPluginsFromFile: %s", filename)
+
+	conf, err := loadSubdirectoryChain(bytes, filepath.Dir(filename))
+	if err != nil {
+		return nil, err
+	}
+	logging.Debugf("Loaded SubdirectoryChain: %+v", conf)
+
+	return conf, nil
 }
 
 // GetDefaultNetworks parses 'defaultNetwork' config, gets network json and put it into netconf.Delegates.
