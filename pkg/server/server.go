@@ -25,6 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blang/semver"
+	corev1 "k8s.io/api/core/v1"
+
 	"github.com/containernetworking/cni/pkg/invoke"
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
@@ -32,6 +35,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"k8s.io/apimachinery/pkg/version"
 
 	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -151,13 +155,18 @@ func informerObjectTrim(obj interface{}) (interface{}, error) {
 		accessor.SetManagedFields(nil)
 	}
 	if pod, ok := obj.(*kapi.Pod); ok {
-		pod.Spec.Volumes = []kapi.Volume{}
-		for i := range pod.Spec.Containers {
-			pod.Spec.Containers[i].Command = nil
-			pod.Spec.Containers[i].Args = nil
-			pod.Spec.Containers[i].Env = nil
-			pod.Spec.Containers[i].VolumeMounts = nil
-		}
+		return &corev1.Pod{
+			// cni only care about metadata
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              pod.Name,
+				Namespace:         pod.Namespace,
+				Labels:            pod.Labels,
+				Annotations:       pod.Annotations,
+				DeletionTimestamp: pod.DeletionTimestamp,
+			},
+			Spec:   corev1.PodSpec{},
+			Status: corev1.PodStatus{},
+		}, nil
 	}
 	return obj, nil
 }
@@ -177,13 +186,21 @@ func newNetDefInformer(netdefClient netdefclient.Interface) (netdefinformer.Shar
 	return informerFactory, netdefInformer
 }
 
-func newPodInformer(kubeClient kubernetes.Interface, nodeName string) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
+func newPodInformer(kubeClient kubernetes.Interface, nodeName string, serverVersion *version.Info) (internalinterfaces.SharedInformerFactory, cache.SharedIndexInformer) {
 	var tweakFunc internalinterfaces.TweakListOptionsFunc
 	if nodeName != "" {
 		logging.Verbosef("Filtering pod watch for node %q", nodeName)
-		// Only watch for local pods
+		// Only watch for local pod network pods
 		tweakFunc = func(opts *metav1.ListOptions) {
-			opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", nodeName).String()
+			v := semver.MustParse(strings.TrimPrefix(serverVersion.String(), "v"))
+			// https://github.com/kubernetes/kubernetes/pull/110477 1.28.0 introduce hostNetwork field selector
+			if v.GTE(semver.MustParse("1.28.0")) {
+				opts.FieldSelector = fields.AndSelectors(
+					fields.OneTermEqualSelector("spec.nodeName", nodeName),
+					fields.OneTermEqualSelector("spec.hostNetwork", "false")).String()
+			} else {
+				opts.FieldSelector = fields.OneTermEqualSelector("spec.nodeName", nodeName).String()
+			}
 		}
 	}
 
@@ -259,7 +276,11 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 }
 
 func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
-	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
+	serverVersion, err := kubeClient.Client.Discovery().ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"), serverVersion)
 	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
