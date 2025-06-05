@@ -1,18 +1,21 @@
 ---
-apiVersion: resource.k8s.io/v1alpha2
+apiVersion: resource.k8s.io/v1beta1
 kind: ResourceClaimTemplate
 metadata:
-  name: gpu.example.com
+  name: single-gpu
 spec:
   spec:
-    resourceClassName: gpu.example.com
+    devices:
+      requests:
+      - name: gpu
+        deviceClassName: gpu.example.com
 ---
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
-  name: dra-net 
+  name: dra-net
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: gpu.example.com
+    k8s.v1.cni.cncf.io/resourceName: single-gpu
 spec:
   config: '{
         "cniVersion": "{{ CNI_VERSION }}",
@@ -45,5 +48,4 @@ spec:
       - name: gpu
   resourceClaims:
   - name: gpu
-    source:
-      resourceClaimTemplateName: gpu.example.com
+    resourceClaimTemplateName: single-gpu

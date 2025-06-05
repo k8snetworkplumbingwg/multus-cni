@@ -25,6 +25,7 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
@@ -82,7 +83,12 @@ func SetDefaultGW(netnsPath string, ifName string, gateways []net.IP) error {
 			// Perform the creation of the default route....
 			err = netlink.RouteAdd(&newDefaultRoute)
 			if err != nil {
-				logging.Errorf("SetDefaultGW: Error adding route: %v", err)
+				if os.IsExist(err) || err == unix.EEXIST {
+					logging.Debugf("SetDefaultGW: Route already exists, ignoring: %v", err)
+					err = nil
+				} else {
+					logging.Errorf("SetDefaultGW: Error adding route: %v", err)
+				}
 			}
 		}
 		return err

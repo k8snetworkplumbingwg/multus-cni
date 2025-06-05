@@ -191,9 +191,9 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 		opt.Fsc.Set(fm1/8, fd, fm2/8)
 		um1, ud, um2 := hfsc.Usc.Attrs()
 		opt.Usc.Set(um1/8, ud, um2/8)
-		nl.NewRtAttrChild(options, nl.TCA_HFSC_RSC, nl.SerializeHfscCurve(&opt.Rsc))
-		nl.NewRtAttrChild(options, nl.TCA_HFSC_FSC, nl.SerializeHfscCurve(&opt.Fsc))
-		nl.NewRtAttrChild(options, nl.TCA_HFSC_USC, nl.SerializeHfscCurve(&opt.Usc))
+		options.AddRtAttr(nl.TCA_HFSC_RSC, nl.SerializeHfscCurve(&opt.Rsc))
+		options.AddRtAttr(nl.TCA_HFSC_FSC, nl.SerializeHfscCurve(&opt.Fsc))
+		options.AddRtAttr(nl.TCA_HFSC_USC, nl.SerializeHfscCurve(&opt.Usc))
 	}
 	req.AddData(options)
 	return nil
@@ -201,14 +201,20 @@ func classPayload(req *nl.NetlinkRequest, class Class) error {
 
 // ClassList gets a list of classes in the system.
 // Equivalent to: `tc class show`.
+//
 // Generally returns nothing if link and parent are not specified.
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func ClassList(link Link, parent uint32) ([]Class, error) {
 	return pkgHandle.ClassList(link, parent)
 }
 
 // ClassList gets a list of classes in the system.
 // Equivalent to: `tc class show`.
+//
 // Generally returns nothing if link and parent are not specified.
+// If the returned error is [ErrDumpInterrupted], results may be inconsistent
+// or incomplete.
 func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 	req := h.newNetlinkRequest(unix.RTM_GETTCLASS, unix.NLM_F_DUMP)
 	msg := &nl.TcMsg{
@@ -222,9 +228,9 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 	}
 	req.AddData(msg)
 
-	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTCLASS)
-	if err != nil {
-		return nil, err
+	msgs, executeErr := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWTCLASS)
+	if executeErr != nil && !errors.Is(executeErr, ErrDumpInterrupted) {
+		return nil, executeErr
 	}
 
 	var res []Class
@@ -295,7 +301,7 @@ func (h *Handle) ClassList(link Link, parent uint32) ([]Class, error) {
 		res = append(res, class)
 	}
 
-	return res, nil
+	return res, executeErr
 }
 
 func parseHtbClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, error) {
@@ -341,7 +347,6 @@ func parseHfscClassData(class Class, data []syscall.NetlinkRouteAttr) (bool, err
 func parseTcStats(data []byte) (*ClassStatistics, error) {
 	buf := &bytes.Buffer{}
 	buf.Write(data)
-	native := nl.NativeEndian()
 	tcStats := &tcStats{}
 	if err := binary.Read(buf, native, tcStats); err != nil {
 		return nil, err
@@ -363,7 +368,6 @@ func parseTcStats(data []byte) (*ClassStatistics, error) {
 func parseGnetStats(data []byte, gnetStats interface{}) error {
 	buf := &bytes.Buffer{}
 	buf.Write(data)
-	native := nl.NativeEndian()
 	return binary.Read(buf, native, gnetStats)
 }
 
@@ -388,6 +392,11 @@ func parseTcStats2(data []byte) (*ClassStatistics, error) {
 		case nl.TCA_STATS_RATE_EST:
 			if err := parseGnetStats(datum.Value, stats.RateEst); err != nil {
 				return nil, fmt.Errorf("Failed to parse ClassStatistics.RateEst with: %v\n%s",
+					err, hex.Dump(datum.Value))
+			}
+		case nl.TCA_STATS_BASIC_HW:
+			if err := parseGnetStats(datum.Value, stats.BasicHw); err != nil {
+				return nil, fmt.Errorf("Failed to parse ClassStatistics.BasicHw with: %v\n%s",
 					err, hex.Dump(datum.Value))
 			}
 		}

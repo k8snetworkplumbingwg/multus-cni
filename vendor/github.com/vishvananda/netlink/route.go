@@ -11,6 +11,24 @@ type Scope uint8
 
 type NextHopFlag int
 
+const (
+	RT_FILTER_PROTOCOL uint64 = 1 << (1 + iota)
+	RT_FILTER_SCOPE
+	RT_FILTER_TYPE
+	RT_FILTER_TOS
+	RT_FILTER_IIF
+	RT_FILTER_OIF
+	RT_FILTER_DST
+	RT_FILTER_SRC
+	RT_FILTER_GW
+	RT_FILTER_TABLE
+	RT_FILTER_HOPLIMIT
+	RT_FILTER_PRIORITY
+	RT_FILTER_MARK
+	RT_FILTER_MASK
+	RT_FILTER_REALM
+)
+
 type Destination interface {
 	Family() int
 	Decode([]byte) error
@@ -27,7 +45,7 @@ type Encap interface {
 	Equal(Encap) bool
 }
 
-//Protocol describe what was the originator of the route
+// Protocol describe what was the originator of the route
 type RouteProtocol int
 
 // Route represents a netlink route.
@@ -41,6 +59,7 @@ type Route struct {
 	MultiPath        []*NexthopInfo
 	Protocol         RouteProtocol
 	Priority         int
+	Family           int
 	Table            int
 	Type             int
 	Tos              int
@@ -49,7 +68,9 @@ type Route struct {
 	NewDst           Destination
 	Encap            Encap
 	Via              Destination
+	Realm            int
 	MTU              int
+	MTULock          bool
 	Window           int
 	Rtt              int
 	RttVar           int
@@ -61,6 +82,7 @@ type Route struct {
 	InitCwnd         int
 	Features         int
 	RtoMin           int
+	RtoMinLock       bool
 	InitRwnd         int
 	QuickACK         int
 	Congctl          string
@@ -94,6 +116,7 @@ func (r Route) String() string {
 	}
 	elems = append(elems, fmt.Sprintf("Flags: %s", r.ListFlags()))
 	elems = append(elems, fmt.Sprintf("Table: %d", r.Table))
+	elems = append(elems, fmt.Sprintf("Realm: %d", r.Realm))
 	return fmt.Sprintf("{%s}", strings.Join(elems, " "))
 }
 
@@ -107,6 +130,7 @@ func (r Route) Equal(x Route) bool {
 		nexthopInfoSlice(r.MultiPath).Equal(x.MultiPath) &&
 		r.Protocol == x.Protocol &&
 		r.Priority == x.Priority &&
+		r.Realm == x.Realm &&
 		r.Table == x.Table &&
 		r.Type == x.Type &&
 		r.Tos == x.Tos &&
@@ -132,8 +156,15 @@ type flagString struct {
 }
 
 // RouteUpdate is sent when a route changes - type is RTM_NEWROUTE or RTM_DELROUTE
+
+// NlFlags is only non-zero for RTM_NEWROUTE, the following flags can be set:
+//   - unix.NLM_F_REPLACE - Replace existing matching config object with this request
+//   - unix.NLM_F_EXCL - Don't replace the config object if it already exists
+//   - unix.NLM_F_CREATE - Create config object if it doesn't already exist
+//   - unix.NLM_F_APPEND - Add to the end of the object list
 type RouteUpdate struct {
-	Type uint16
+	Type    uint16
+	NlFlags uint16
 	Route
 }
 
