@@ -1,0 +1,2 @@
+# Hide generated files by default in the Github diff UXAdd commentMore actions
+vendor/ linguist-generated=true
