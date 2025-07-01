@@ -27,6 +27,23 @@ kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
   - role: control-plane
+    kubeadmConfigPatches:
+    - |
+      kind: ClusterConfiguration
+      apiServer:
+        extraArgs:
+          runtime-config: "resource.k8s.io/v1beta1=true"
+      scheduler:
+        extraArgs:
+          v: "1"
+      controllerManager:
+        extraArgs:
+          v: "1"
+    - |
+      kind: InitConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          v: "1"
   - role: worker
     kubeadmConfigPatches:
     - |
@@ -35,7 +52,24 @@ nodes:
         kubeletExtraArgs:
           pod-manifest-path: "/etc/kubernetes/manifests/"
           feature-gates: "DynamicResourceAllocation=true,DRAResourceClaimDeviceStatus=true,KubeletPodResourcesDynamicResources=true"
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          v: "1"
   - role: worker
+    kubeadmConfigPatches:
+    - |
+      kind: InitConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          pod-manifest-path: "/etc/kubernetes/manifests/"
+          feature-gates: "DynamicResourceAllocation=true,DRAResourceClaimDeviceStatus=true,KubeletPodResourcesDynamicResources=true"
+    - |
+      kind: JoinConfiguration
+      nodeRegistration:
+        kubeletExtraArgs:
+          v: "1"
 # Required by DRA Integration
 ##
 featureGates:

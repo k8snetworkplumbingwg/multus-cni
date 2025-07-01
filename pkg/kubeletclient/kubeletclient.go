@@ -169,10 +169,10 @@ func (rc *kubeletClient) getDRAResources(dynamicResources []*podresourcesapi.Dyn
 				}
 			}
 		}
-		if rInfo, ok := resourceMap[dynamicResource.ClassName]; ok {
+		if rInfo, ok := resourceMap[dynamicResource.ClaimName]; ok {
 			rInfo.DeviceIDs = append(rInfo.DeviceIDs, deviceIDs...)
 		} else {
-			resourceMap[dynamicResource.ClassName] = &types.ResourceInfo{DeviceIDs: deviceIDs}
+			resourceMap[dynamicResource.ClaimName] = &types.ResourceInfo{DeviceIDs: deviceIDs}
 		}
 	}
 }
