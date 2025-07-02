@@ -96,7 +96,7 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 		if err != nil {
 			logging.Errorf("failed to read kubeconfig from cert manager: %v", err)
 		} else {
-			_, err := tempClient.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+			_, err := tempClient.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
 			// tls unknown authority error is unrecoverable error with retry
 			if err != nil {
 				if strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
