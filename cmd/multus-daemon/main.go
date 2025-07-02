@@ -61,6 +61,7 @@ func main() {
 
 	daemonConf, err := cniServerConfig(*configFilePath)
 	if err != nil {
+		fmt.Printf("%s: %s\n", *configFilePath, err)
 		os.Exit(1)
 	}
 
