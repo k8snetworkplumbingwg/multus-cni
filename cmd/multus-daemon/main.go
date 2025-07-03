@@ -61,6 +61,7 @@ func main() {
 
 	daemonConf, err := cniServerConfig(*configFilePath)
 	if err != nil {
+		logging.Panicf("startMultusDaemon failed to load the CNI server configuration: %v", err)
 		os.Exit(1)
 	}
 
