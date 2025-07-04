@@ -70,13 +70,14 @@ type NetConf struct {
 
 // RuntimeConfig specifies CNI RuntimeConfig
 type RuntimeConfig struct {
-	PortMaps          []*PortMapEntry `json:"portMappings,omitempty"`
-	Bandwidth         *BandwidthEntry `json:"bandwidth,omitempty"`
-	IPs               []string        `json:"ips,omitempty"`
-	Mac               string          `json:"mac,omitempty"`
-	InfinibandGUID    string          `json:"infinibandGUID,omitempty"`
-	DeviceID          string          `json:"deviceID,omitempty"`
-	CNIDeviceInfoFile string          `json:"CNIDeviceInfoFile,omitempty"`
+	PortMaps          []*PortMapEntry    `json:"portMappings,omitempty"`
+	Bandwidth         *BandwidthEntry    `json:"bandwidth,omitempty"`
+	IPs               []string           `json:"ips,omitempty"`
+	Mac               string             `json:"mac,omitempty"`
+	InfinibandGUID    string             `json:"infinibandGUID,omitempty"`
+	DeviceID          string             `json:"deviceID,omitempty"`
+	CNIDeviceInfoFile string             `json:"CNIDeviceInfoFile,omitempty"`
+	PodAnnotations    *map[string]string `json:"io.kubernetes.cri.pod-annotations,omitempty"`
 }
 
 // PortMapEntry for CNI PortMapEntry
