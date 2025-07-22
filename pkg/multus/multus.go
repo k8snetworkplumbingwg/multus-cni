@@ -933,6 +933,11 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 		logging.Errorf("Multus: GetPod failed: %v, but continue to delete", err)
 	}
 
+	// Release RDMA (roce) NAD allocations, if any. This must occur before delegate delete
+	// so that subsequent pod creations can re-use freed indices even if delegate cleanup
+	// fails later.
+	k8s.ReleaseRdmaNADs(in, pod)
+
 	// Read the cache to get delegates json for the pod
 	netconfBytes, path, err := consumeScratchNetConf(args.ContainerID, in.CNIDir)
 	useCacheConf := false

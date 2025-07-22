@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -51,6 +52,7 @@ const (
 	resourceNameAnnot      = "k8s.v1.cni.cncf.io/resourceName"
 	defaultNetAnnot        = "v1.multus-cni.io/default-network"
 	networkAttachmentAnnot = "k8s.v1.cni.cncf.io/networks"
+	roceIfNumAnnot         = "networking.openai.com/roce-ifnum"
 )
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -385,45 +387,67 @@ func TryLoadPodDelegates(pod *v1.Pod, conf *types.NetConf, clientInfo *ClientInf
 		conf.Delegates[0] = delegate
 	}
 
-	networks, err := GetPodNetwork(pod)
-	if networks != nil {
-		delegates, err := GetNetworkDelegates(clientInfo, pod, networks, conf, resourceMap)
+	// Get networks from existing annotation (may be absent)
+	networks, getNetErr := GetPodNetwork(pod)
+	if networks == nil {
+		networks = []*types.NetworkSelectionElement{}
+	}
 
-		if err != nil {
-			if _, ok := err.(*NoK8sNetworkError); ok {
-				return 0, clientInfo, nil
+	// Handle RDMA (roce) automatic network attachment allocation based on annotation.
+	// Annotation value represents the desired number (1-8) of rdma<N> NADs to attach.
+	// When absent or zero, no rdma networks are added.
+	ifNumStr := pod.Annotations[roceIfNumAnnot]
+	if ifNumStr != "" {
+		ifNum, convErr := strconv.Atoi(strings.TrimSpace(ifNumStr))
+		if convErr == nil && ifNum > 0 {
+			if ifNum > 8 {
+				ifNum = 8
 			}
-			return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network for pod: %v", err)
+			indices, allocErr := allocateRdmaNADs(conf, pod, ifNum)
+			if allocErr != nil {
+				return 0, clientInfo, logging.Errorf("TryLoadPodDelegates: failed rdma allocation: %v", allocErr)
+			}
+			for _, idx := range indices {
+				name := fmt.Sprintf("rdma%d", idx)
+				networks = append(networks, &types.NetworkSelectionElement{Name: name, Namespace: pod.ObjectMeta.Namespace})
+			}
 		}
+	}
 
-		if err = conf.AddDelegates(delegates); err != nil {
+	// If there are no networks (neither existing annotation nor rdma), honor original semantics.
+	if len(networks) == 0 {
+		if _, ok := getNetErr.(*NoK8sNetworkError); ok {
+			return 0, clientInfo, nil
+		}
+		return 0, clientInfo, getNetErr
+	}
+
+	delegates, err := GetNetworkDelegates(clientInfo, pod, networks, conf, resourceMap)
+	if err != nil {
+		return 0, nil, logging.Errorf("TryLoadPodDelegates: error in getting k8s network for pod: %v", err)
+	}
+
+	if err = conf.AddDelegates(delegates); err != nil {
+		return 0, nil, err
+	}
+
+	// Check gatewayRequest is configured in delegates and mark config if gateway filter is required
+	isGatewayConfigured := false
+	for _, delegate := range conf.Delegates {
+		if delegate.GatewayRequest != nil {
+			isGatewayConfigured = true
+			break
+		}
+	}
+
+	if isGatewayConfigured {
+		err = types.CheckGatewayConfig(conf.Delegates)
+		if err != nil {
 			return 0, nil, err
 		}
-
-		// Check gatewayRequest is configured in delegates
-		// and mark its config if gateway filter is required
-		isGatewayConfigured := false
-		for _, delegate := range conf.Delegates {
-			if delegate.GatewayRequest != nil {
-				isGatewayConfigured = true
-				break
-			}
-		}
-
-		if isGatewayConfigured {
-			err = types.CheckGatewayConfig(conf.Delegates)
-			if err != nil {
-				return 0, nil, err
-			}
-		}
-
-		return len(delegates), clientInfo, err
 	}
 
-	if _, ok := err.(*NoK8sNetworkError); ok {
-		return 0, clientInfo, nil
-	}
-	return 0, clientInfo, err
+	return len(delegates), clientInfo, nil
 }
 
 // GetPodNetwork gets net-attach-def annotation from pod

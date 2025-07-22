@@ -765,3 +765,17 @@ spec:
     source:
       resourceClaimName: sf
 ```
+
+### Automatic RDMA (RoCE) network attachments (experimental)
+
+Multus can automatically attach a configurable number of RDMA NetworkAttachmentDefinitions to a pod by using the annotation:
+
+```
+  networking.openai.com/roce-ifnum: "<N>"
+```
+
+Where N is an integer from 1 to 8. When set, Multus allocates up to N RDMA attachments on the node and adds the corresponding `rdma0 .. rdma7` NetworkAttachmentDefinitions to the pod, without requiring them to be listed in the standard `k8s.v1.cni.cncf.io/networks` annotation.
+
+The 8 RDMA NetworkAttachmentDefinitions (`rdma0` through `rdma7`) are treated as a shared, host-level pool. Each allocation consumes one index from the host pool until the pod is deleted (on CNI DEL the indices are released). Concurrency is protected with a file lock around the local allocation state file to avoid race conditions when multiple pods are created simultaneously.
+
+If the annotation is omitted or set to 0, no RDMA networks are added. Allocation state is tracked locally on each node (similar in spirit to host-local IPAM) so that RDMA indices are re-used once pods are deleted.
