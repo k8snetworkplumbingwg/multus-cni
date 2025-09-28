@@ -102,4 +102,4 @@ sleep 1
 kubectl -n kube-system wait --for=condition=ready -l name=multus pod --timeout=300s
 kubectl create -f yamls/cni-install.yml
 sleep 1
-kubectl -n kube-system wait --for=condition=ready -l name=cni-plugins pod --timeout=300s
+kubectl -n kube-system wait --for=condition=ready -l name=cni-plugins pod --timeout=400s
