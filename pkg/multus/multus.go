@@ -516,7 +516,7 @@ func delPlugins(exec invoke.Exec, pod *v1.Pod, args *skel.CmdArgs, k8sArgs *type
 
 	// Check if we had any errors, and send them all back.
 	if len(errorstrings) > 0 {
-		return fmt.Errorf(strings.Join(errorstrings, " / "))
+		return fmt.Errorf("%s", strings.Join(errorstrings, " / "))
 	}
 
 	return nil

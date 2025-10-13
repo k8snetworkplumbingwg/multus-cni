@@ -205,13 +205,13 @@ func parsePodNetworkObjectName(podnetwork string) (string, string, string, error
 	for i := range allItems {
 		matched := expr.MatchString(allItems[i])
 		if !matched && len([]rune(allItems[i])) > 0 {
-			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i]))
+			return "", "", "", logging.Errorf("parsePodNetworkObjectName: Failed to parse: one or more items did not match comma-delimited format (must consist of lower case alphanumeric characters). Must start and end with an alphanumeric character), mismatch @ '%v'", allItems[i])
 		}
 	}
 
 	if len(netIfName) > 0 {
 		if len(netIfName) > (syscall.IFNAMSIZ-1) || strings.ContainsAny(netIfName, " \t\n\v\f\r/") {
-			return "", "", "", logging.Errorf(fmt.Sprintf("parsePodNetworkObjectName: Failed to parse interface name: must be less than 15 chars and not contain '/' or spaces. interface name '%s'", netIfName))
+			return "", "", "", logging.Errorf("parsePodNetworkObjectName: Failed to parse interface name: must be less than 15 chars and not contain '/' or spaces. interface name '%s'", netIfName)
 		}
 	}
 
@@ -298,7 +298,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		if client != nil {
 			client.Eventf(pod, v1.EventTypeWarning, "NoNetworkFound", errMsg)
 		}
-		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: " + errMsg)
+		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
 	}
 
 	// Get resourceName annotation from NetworkAttachmentDefinition
