@@ -606,7 +606,7 @@ func GetPod(kubeClient *k8s.ClientInfo, k8sArgs *types.K8sArgs, isDel bool) (*v1
 		// Try one more time to get the pod directly from the apiserver;
 		// TODO: figure out why static pods don't show up via the informer
 		// and always hit this case.
-		ctx, cancel := context.WithTimeout(context.TODO(), pollDuration)
+		ctx, cancel := context.WithTimeout(context.TODO(), shortPollTimeout)
 		defer cancel()
 		pod, err = kubeClient.GetPodAPILiveQuery(ctx, podNamespace, podName)
 		if err != nil {
