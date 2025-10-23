@@ -79,6 +79,44 @@ rules:
       - create
       - patch
       - update
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: multus
+rules:
+  - apiGroups: ["k8s.cni.cncf.io"]
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/status
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups: 
+    - "resource.k8s.io"
+    resources:
+    - resourceclaims
+    - resourceclaims/status
+    - resourceslices
+    verbs:
+    - get
+    - list
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1

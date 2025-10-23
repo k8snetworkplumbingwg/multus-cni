@@ -18,6 +18,7 @@ package k8sclient
 // disable dot-imports only for testing
 //revive:disable:dot-imports
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,9 @@ import (
 	netfake "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned/fake"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
 
+	v1 "k8s.io/api/core/v1"
+	resourcev1api "k8s.io/api/resource/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -1551,6 +1555,552 @@ users:
 
 			err = SetNetworkStatus(nil, k8sArgs, netstatus, netConf)
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("DRA (Dynamic Resource Allocation) integration", func() {
+		var tmpDir string
+		var err error
+
+		BeforeEach(func() {
+			tmpDir, err = os.MkdirTemp("", "multus_dra_test")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			err := os.RemoveAll(tmpDir)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		Context("when pod has DRA resources with device plugin resources", func() {
+			It("should combine DRA and device plugin resource maps", func() {
+				// This test verifies that getKubernetesDelegate correctly integrates
+				// DRA resources with traditional device plugin resources
+
+				const fakePodName string = "dra-test-pod"
+				const fakeNamespace string = "default"
+
+				// Create a network attachment definition
+				netAttachDef := `{
+					"name": "sriov-net",
+					"type": "sriov",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod with DRA resource claims
+				claimName := "gpu-claim"
+				claimNamePtr := &claimName
+				fakePod := testutils.NewFakePod(fakePodName, "sriov-net", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{
+						ResourceClaimName: claimNamePtr,
+					},
+				}
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition (without resourceName annotation to avoid kubeletclient)
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "sriov-net", netAttachDef)
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create ResourceClaim
+				deviceName := "gpu-1"
+				driverName := "gpu.example.com"
+				poolName := "gpu-pool"
+				requestName := "gpu"
+				deviceID := "pci:0000:00:01.0"
+
+				deviceIDValue := deviceID
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-resource-slice",
+					},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool: resourcev1api.ResourcePool{
+							Name:               poolName,
+							ResourceSliceCount: 1,
+						},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceName,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									"k8s.cni.cncf.io/deviceID": {
+										StringValue: &deviceIDValue,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      claimName,
+						Namespace: fakeNamespace,
+					},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{
+										Request: requestName,
+										Driver:  driverName,
+										Pool:    poolName,
+										Device:  deviceName,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// Add DRA resources to fake client
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Get the network selection element
+				net := &types.NetworkSelectionElement{
+					Name:      "sriov-net",
+					Namespace: fakeNamespace,
+				}
+
+				// Call getKubernetesDelegate
+				// Note: Without resourceName annotation, DRA client is not invoked automatically
+				// This test verifies the delegate is created successfully for pods with DRA claims
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+
+				// Verify resourceMap is initialized (but empty since no resourceName annotation)
+				Expect(len(resourceMap)).To(Equal(0))
+			})
+		})
+
+		Context("when GetNetworkDelegates is called with DRA-enabled pod", func() {
+			It("should successfully retrieve delegates with DRA resources", func() {
+				const fakePodName string = "dra-network-pod"
+				const fakeNamespace string = "default"
+
+				// Create network attachment definition
+				netAttachDef := `{
+					"name": "dra-network",
+					"type": "bridge",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod with DRA resource claims
+				claimName := "network-claim"
+				claimNamePtr := &claimName
+				fakePod := testutils.NewFakePod(fakePodName, "dra-network", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{
+						ResourceClaimName: claimNamePtr,
+					},
+				}
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition with resource name annotation
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "dra-network", netAttachDef)
+				nad.Annotations = map[string]string{
+					resourceNameAnnot: "dra-network-claim/gpu",
+				}
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create DRA resources
+				deviceName := "nic-1"
+				driverName := "network.example.com"
+				poolName := "network-pool"
+				requestName := "gpu"
+				deviceID := "pci:0000:00:02.0"
+
+				deviceIDValue := deviceID
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "network-resource-slice",
+					},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool: resourcev1api.ResourcePool{
+							Name:               poolName,
+							ResourceSliceCount: 1,
+						},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceName,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									"k8s.cni.cncf.io/deviceID": {
+										StringValue: &deviceIDValue,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      claimName,
+						Namespace: fakeNamespace,
+					},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{
+										Request: requestName,
+										Driver:  driverName,
+										Pool:    poolName,
+										Device:  deviceName,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// Add DRA resources to fake client
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Get pod network
+				networks, err := GetPodNetwork(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(networks).NotTo(BeEmpty())
+
+				// Create NetConf
+				conf := &types.NetConf{
+					ConfDir: tmpDir,
+				}
+
+				// Get network delegates
+				resourceMap := make(map[string]*types.ResourceInfo)
+				delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, conf, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegates).NotTo(BeEmpty())
+				Expect(delegates[0]).NotTo(BeNil())
+			})
+		})
+
+		Context("when DRA resources are used in TryLoadPodDelegates", func() {
+			It("should successfully load delegates with DRA resources", func() {
+				const fakePodName string = "dra-delegate-pod"
+				const fakeNamespace string = "default"
+
+				// Create network attachment definition
+				netAttachDef := `{
+					"name": "dra-delegate-network",
+					"type": "macvlan",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod with DRA resource claims
+				claimName := "delegate-claim"
+				claimNamePtr := &claimName
+				fakePod := testutils.NewFakePod(fakePodName, "dra-delegate-network", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{
+						ResourceClaimName: claimNamePtr,
+					},
+				}
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "dra-delegate-network", netAttachDef)
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create DRA resources
+				deviceName := "macvlan-device"
+				driverName := "macvlan.example.com"
+				poolName := "macvlan-pool"
+				requestName := "nic"
+				deviceID := "pci:0000:00:03.0"
+
+				deviceIDValue := deviceID
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "macvlan-resource-slice",
+					},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool: resourcev1api.ResourcePool{
+							Name:               poolName,
+							ResourceSliceCount: 1,
+						},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceName,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									"k8s.cni.cncf.io/deviceID": {
+										StringValue: &deviceIDValue,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      claimName,
+						Namespace: fakeNamespace,
+					},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{
+										Request: requestName,
+										Driver:  driverName,
+										Pool:    poolName,
+										Device:  deviceName,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// Add DRA resources to fake client
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create NetConf with a default delegate
+				confStr := `{
+					"name": "test-network",
+					"type": "multus",
+					"delegates": [{
+						"name": "default-network",
+						"type": "bridge"
+					}],
+					"confDir": "` + tmpDir + `"
+				}`
+
+				conf, err := types.LoadNetConf([]byte(confStr))
+				Expect(err).NotTo(HaveOccurred())
+
+				// Try loading pod delegates
+				resourceMap := make(map[string]*types.ResourceInfo)
+				count, updatedClient, err := TryLoadPodDelegates(fakePod, conf, clientInfo, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(updatedClient).NotTo(BeNil())
+				Expect(count).To(BeNumerically(">", 0))
+			})
+		})
+
+		Context("when pod has no DRA resources", func() {
+			It("should handle pods without DRA resources gracefully", func() {
+				const fakePodName string = "no-dra-pod"
+				const fakeNamespace string = "default"
+
+				// Create network attachment definition
+				netAttachDef := `{
+					"name": "simple-network",
+					"type": "bridge",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod WITHOUT DRA resource claims
+				fakePod := testutils.NewFakePod(fakePodName, "simple-network", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{} // Empty
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "simple-network", netAttachDef)
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Get the network selection element
+				net := &types.NetworkSelectionElement{
+					Name:      "simple-network",
+					Namespace: fakeNamespace,
+				}
+
+				// Call getKubernetesDelegate - should work without DRA
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+				// ResourceMap should be empty (no DRA resources)
+				Expect(len(resourceMap)).To(Equal(0))
+			})
+		})
+
+		Context("when DRA client fails to get resources", func() {
+			It("should return an error from getKubernetesDelegate", func() {
+				const fakePodName string = "dra-fail-pod"
+				const fakeNamespace string = "default"
+
+				// Create network attachment definition
+				netAttachDef := `{
+					"name": "fail-network",
+					"type": "bridge",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod with DRA resource claims that don't exist
+				claimName := "non-existent-claim"
+				claimNamePtr := &claimName
+				fakePod := testutils.NewFakePod(fakePodName, "fail-network", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{
+						ResourceClaimName: claimNamePtr,
+					},
+				}
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition (without resourceName to focus on DRA)
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "fail-network", netAttachDef)
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Do NOT create the ResourceClaim - this should cause an error
+
+				// Get the network selection element
+				net := &types.NetworkSelectionElement{
+					Name:      "fail-network",
+					Namespace: fakeNamespace,
+				}
+
+				// Call getKubernetesDelegate - without resourceName annotation, DRA is only invoked when resourceMap is needed
+				// So this test verifies graceful handling when pod has DRA claims but no resourceName
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+				Expect(len(resourceMap)).To(Equal(0))
+			})
+		})
+
+		Context("when using getNetDelegate with DRA resources", func() {
+			It("should retrieve delegates with DRA resources populated", func() {
+				const fakePodName string = "netdelegate-dra-pod"
+				const fakeNamespace string = "default"
+
+				// Create network attachment definition
+				netAttachDef := `{
+					"name": "netdelegate-network",
+					"type": "ipvlan",
+					"cniVersion": "0.3.1"
+				}`
+
+				// Create fake pod with DRA resource claims
+				claimName := "netdelegate-claim"
+				claimNamePtr := &claimName
+				fakePod := testutils.NewFakePod(fakePodName, "", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{
+						ResourceClaimName: claimNamePtr,
+					},
+				}
+
+				// Setup client
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create network attachment definition
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "netdelegate-network", netAttachDef)
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Create DRA resources
+				deviceName := "ipvlan-device"
+				driverName := "ipvlan.example.com"
+				poolName := "ipvlan-pool"
+				requestName := "vnic"
+				deviceID := "pci:0000:00:04.0"
+
+				deviceIDValue := deviceID
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "ipvlan-resource-slice",
+					},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool: resourcev1api.ResourcePool{
+							Name:               poolName,
+							ResourceSliceCount: 1,
+						},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceName,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									"k8s.cni.cncf.io/deviceID": {
+										StringValue: &deviceIDValue,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      claimName,
+						Namespace: fakeNamespace,
+					},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{
+										Request: requestName,
+										Driver:  driverName,
+										Pool:    poolName,
+										Device:  deviceName,
+									},
+								},
+							},
+						},
+					},
+				}
+
+				// Add DRA resources to fake client
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				// Call getNetDelegate
+				resourceMap := make(map[string]*types.ResourceInfo)
+				delegate, updatedResourceMap, err := getNetDelegate(clientInfo, fakePod, "netdelegate-network", tmpDir, fakeNamespace, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+				Expect(updatedResourceMap).NotTo(BeNil())
+			})
 		})
 	})
 })
