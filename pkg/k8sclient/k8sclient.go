@@ -42,6 +42,7 @@ import (
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	netlister "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/draclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
@@ -317,6 +318,13 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from ResourceClient: %v", err)
 			}
+
+			dc := draclient.NewClient(client.Client.ResourceV1())
+			err = dc.GetPodResourceMap(pod, resourceMap)
+			if err != nil {
+				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from DRA client: %v", err)
+			}
+
 			logging.Debugf("getKubernetesDelegate: resourceMap instance: %+v", resourceMap)
 		}
 

@@ -645,112 +645,132 @@ If you wish to have auto configuration use the `readinessindicatorfile` in the c
 
 ### Run pod with network annotation and Dynamic Resource Allocation driver
 
-> :warning: Dynamic Resource Allocation (DRA) is [currently an alpha](https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/),
-> and is subject to change. Please consider this functionality as a preview. The architecture and usage of DRA in
-> Multus CNI may change in the future as this technology matures.
->
-> The current DRA integration is based on the DRA API for Kubernetes 1.26 to 1.30. With Kubernetes 1.31, the DRA API
-> will change and multus doesn't integrate with the new API yet.
 
-Dynamic Resource Allocation is alternative mechanism to device plugin which allows to requests pod and container
-resources.
+Dynamic Resource Allocation is an alternative mechanism to device plugin which allows pods to request pod and container
+resources dynamically.
 
-The following sections describe how to use DRA with multus and NVIDIA DRA driver. Other DRA networking driver vendors
-should follow similar concepts to make use of multus DRA support.
+The following sections describe how to use DRA with Multus. DRA networking driver vendors should follow similar 
+concepts to make use of Multus DRA support.
 
 #### Prerequisite
 
-1. Kubernetes 1.27
-2. Container Runtime with CDI support enabled
-3. Kubernetes runtime-config=resource.k8s.io/v1alpha2
-4. Kubernetes feature-gates=DynamicResourceAllocation=True,KubeletPodResourcesDynamicResources=true
+1. Kubernetes 1.34+
 
 #### Install DRA driver
 
-The current example uses NVIDIA DRA driver for networking. This DRA driver is not publicly available. An alternative to
-this DRA driver is available at [dra-example-driver](https://github.com/kubernetes-sigs/dra-example-driver).
+You need to install a DRA driver that provides network devices. For example, you can use the SR-IOV DRA driver or 
+other DRA networking drivers. Refer to your DRA driver documentation for installation instructions.
 
-#### Create dynamic resource class with NVIDIA network DRA driver
-
-The `ResourceClass` defines the resource pool of `sf-pool-1`.
-
-```
-# Execute following command at Kubernetes master
-cat <<EOF | kubectl create -f -
-apiVersion: resource.k8s.io/v1alpha2
-kind: ResourceClass
-metadata:
-  name: sf-pool-1
-driverName: net.resource.nvidia.com
-EOF
-```
+The DRA drive MUST expose the following attribute `k8s.cni.cncf.io/deviceID` containing the device ID 
+that multus will pass to the CNI 
 
 #### Create network attachment definition with resource name
 
-The `k8s.v1.cni.cncf.io/resourceName` should match the `ResourceClass` name defined in the section above.
-In this example it is `sf-pool-1`. Multus query the K8s PodResource API to fetch the `resourceClass` name and also
-query the NetworkAttachmentDefinition `k8s.v1.cni.cncf.io/resourceName`. If both has the same name multus send the
-CDI device name in the DeviceID argument.
+The `k8s.v1.cni.cncf.io/resourceName` annotation is used to associate a NetworkAttachmentDefinition with DRA resources.
+The format is: `<pod-resource-name>/<result-name>` where:
+- `pod-resource-name`: The name of the resource claim in the pod's `spec.resourceClaims`
+- `result-name`: The name of the device request in the ResourceClaimTemplate's `spec.devices.requests`
 
-##### NetworkAttachmentDefinition for ovn-kubernetes example:
+Multus queries the ResourceClaim and ResourceSlices APIs to fetch information about allocated DRA devices. When a 
+NetworkAttachmentDefinition has a `resourceName` annotation that matches a pod's resource claim and result name, 
+Multus will pass the `k8s.cni.cncf.io/deviceID` to the CNI plugin in the DeviceID field.
 
-Following command creates NetworkAttachmentDefinition. CNI config is in `config:` field.
+##### NetworkAttachmentDefinition for SR-IOV example:
+
+Following command creates a NetworkAttachmentDefinition for SR-IOV. The `resourceName` annotation `sriov/vf` indicates:
+- `sriov`: matches the pod's resourceClaim name
+- `vf`: matches the device request name in the ResourceClaimTemplate
 
 ```
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
-apiVersion: "k8s.cni.cncf.io/v1"
+apiVersion: k8s.cni.cncf.io/v1
 kind: NetworkAttachmentDefinition
 metadata:
-  name: default
+  name: sriov-net
+  namespace: default
   annotations:
-    k8s.v1.cni.cncf.io/resourceName: sf-pool-1
+    k8s.v1.cni.cncf.io/resourceName: sriov/vf
 spec:
-  config: '{
-      "cniVersion": "0.4.0",
-      "dns": {},
-      "ipam": {},
-      "logFile": "/var/log/ovn-kubernetes/ovn-k8s-cni-overlay.log",
-      "logLevel": "4",
-      "logfile-maxage": 5,
-      "logfile-maxbackups": 5,
-      "logfile-maxsize": 100,
-      "name": "ovn-kubernetes",
-      "type": "ovn-k8s-cni-overlay"
-    }'
+  config: |-
+    {
+        "cniVersion": "1.0.0",
+        "name": "sriov-net",
+        "type": "sriov",
+        "vlan": 0,
+        "spoofchk": "on",
+        "trust": "on",
+        "vlanQoS": 0,
+        "logLevel": "info",
+        "ipam": {
+            "type": "host-local",
+            "ranges": [
+                [
+                    {
+                        "subnet": "10.0.2.0/24"
+                    }
+                ]
+            ]
+        }
+    }
 EOF
 ```
 
-#### Create DRA Resource Claim
+#### Create Device Class
 
-Following command creates `ResourceClaim` `sf` which request resource from  `ResourceClass` `sf-pool-1`.
+Following command creates a `DeviceClass` for the `ResourceClaimTemplate` to request devices from.
 
 ```
 # Execute following command at Kubernetes master
 cat <<EOF | kubectl create -f -
-apiVersion: resource.k8s.io/v1alpha2
-kind: ResourceClaim
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: sriovnetwork.openshift.io
+spec:
+  selectors:
+  - cel:
+      expression: device.driver == sriovnetwork.openshift.io
+EOF
+```
+
+#### Create DRA Resource Claim Template
+
+Following command creates a `ResourceClaimTemplate` that requests a VF device from the SR-IOV device class.
+Note the `name: vf` in the requests section, which corresponds to the second part of the resourceName annotation.
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
 metadata:
   namespace: default
-  name: sf
+  name: sriov-template
 spec:
   spec:
-    resourceClassName: sf-pool-1
+    devices:
+      requests:
+      - name: vf
+        deviceClassName: sriovnetwork.openshift.io
 EOF
 ```
 
 #### Launch pod with DRA Resource Claim
 
-Following command Launch a Pod with primiry network `default` and `ResourceClaim` `sf`.
+Following command launches a Pod with the secondary network `sriov-net` and a DRA resource claim named `sriov`.
+The resourceClaim name `sriov` matches the first part of the NetworkAttachmentDefinition's resourceName annotation.
 
 ```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
 apiVersion: v1
 kind: Pod
 metadata:
   namespace: default
-  name: test-sf-claim
+  name: sriov-pod
   annotations:
-    v1.multus-cni.io/default-network: default
+    k8s.v1.cni.cncf.io/networks: sriov-net
 spec:
   restartPolicy: Always
   containers:
@@ -759,9 +779,15 @@ spec:
     command: ["/bin/sh", "-ec", "while :; do echo '.'; sleep 5 ; done"]
     resources:
       claims:
-      - name: resource
+      - name: sriov
   resourceClaims:
-  - name: resource
-    source:
-      resourceClaimName: sf
+  - name: sriov
+    resourceClaimTemplateName: sriov-template
+EOF
 ```
+
+In this example:
+- The pod has a resourceClaim named `sriov` that uses the `sriov-template`
+- The ResourceClaimTemplate has a device request named `vf`
+- The NetworkAttachmentDefinition has `resourceName: sriov/vf` which combines both names
+- Multus will match these and provide the allocated deviceID to the SR-IOV CNI plugin
