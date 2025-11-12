@@ -47,6 +47,7 @@ var (
 
 type fakeResourceServer struct {
 	server *grpc.Server
+	podresourcesapi.UnimplementedPodResourcesListerServer
 }
 
 // TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
@@ -78,7 +79,7 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 
 	claimsResource := []*podresourcesapi.ClaimResource{
 		{
-			CDIDevices: cdiDevices,
+			CdiDevices: cdiDevices,
 			DriverName: draDriverName,
 			PoolName: poolName,
 			DeviceName: deviceName,
