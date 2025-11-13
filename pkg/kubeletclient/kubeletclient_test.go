@@ -81,7 +81,7 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 		{
 			CdiDevices: cdiDevices,
 			DriverName: draDriverName,
-			PoolName: poolName,
+			PoolName:   poolName,
 			DeviceName: deviceName,
 		},
 	}

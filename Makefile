@@ -12,3 +12,4 @@ build:
 
 test:
 	sudo ./hack/test-go.sh
+	
