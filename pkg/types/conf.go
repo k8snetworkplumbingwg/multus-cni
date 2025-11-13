@@ -138,6 +138,12 @@ func LoadDelegateNetConfFromConfList(confList *libcni.NetworkConfigList, netElem
 		}
 		if netElement.IPRequest != nil {
 			delegateConf.IPRequest = netElement.IPRequest
+			// Inject IPs into the network config's runtimeConfig section
+			pluginsBytes, err = addRuntimeConfigIPsInConfList(pluginsBytes, netElement.IPRequest)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConfFromConfList: failed to add IPs in runtimeConfig: %v", err)
+			}
+			delegateConf.Bytes = pluginsBytes
 		}
 		if netElement.BandwidthRequest != nil {
 			delegateConf.BandwidthRequest = netElement.BandwidthRequest
@@ -230,6 +236,11 @@ func LoadDelegateNetConf(bytes []byte, netElement *NetworkSelectionElement, devi
 		}
 		if netElement.IPRequest != nil {
 			delegateConf.IPRequest = netElement.IPRequest
+			// Inject IPs into the network config's runtimeConfig section
+			bytes, err = addRuntimeConfigIPsInConfig(bytes, netElement.IPRequest)
+			if err != nil {
+				return nil, logging.Errorf("LoadDelegateNetConf(): failed to add IPs in runtimeConfig: %v", err)
+			}
 		}
 		if netElement.BandwidthRequest != nil {
 			delegateConf.BandwidthRequest = netElement.BandwidthRequest
@@ -661,6 +672,79 @@ func addCNIArgsInConfList(inBytes []byte, cniArgs *map[string]interface{}) ([]by
 	configBytes, err := json.Marshal(rawConfig)
 	if err != nil {
 		return nil, logging.Errorf("addCNIArgsInConfList(): failed to re-marshal: %v", err)
+	}
+	return configBytes, nil
+}
+
+// addRuntimeConfigIPsInConfList injects runtime IPs into the network configuration's runtimeConfig section
+func addRuntimeConfigIPsInConfList(inBytes []byte, ips []string) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfList(): failed to unmarshal inBytes: %v", err)
+	}
+
+	pList, ok := rawConfig["plugins"]
+	if !ok {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfList(): unable to get plugin list")
+	}
+
+	pMap, ok := pList.([]interface{})
+	if !ok {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfList(): unable to typecast plugin list")
+	}
+
+	// Add runtimeConfig to the first plugin (the network plugin that will call IPAM)
+	if len(pMap) > 0 {
+		valMap := pMap[0].(map[string]interface{})
+		
+		// Get or create runtimeConfig
+		var runtimeConfig map[string]interface{}
+		if existing, ok := valMap["runtimeConfig"]; ok {
+			runtimeConfig = existing.(map[string]interface{})
+		} else {
+			runtimeConfig = make(map[string]interface{})
+			valMap["runtimeConfig"] = runtimeConfig
+		}
+		
+		// Add IPs array to runtimeConfig
+		runtimeConfig["ips"] = ips
+	}
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfList(): failed to re-marshal: %v", err)
+	}
+	return configBytes, nil
+}
+
+// addRuntimeConfigIPsInConfig injects runtime IPs into a single plugin config's runtimeConfig section
+func addRuntimeConfigIPsInConfig(inBytes []byte, ips []string) ([]byte, error) {
+	var rawConfig map[string]interface{}
+	var err error
+
+	err = json.Unmarshal(inBytes, &rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfig(): failed to unmarshal inBytes: %v", err)
+	}
+
+	// Get or create runtimeConfig
+	var runtimeConfig map[string]interface{}
+	if existing, ok := rawConfig["runtimeConfig"]; ok {
+		runtimeConfig = existing.(map[string]interface{})
+	} else {
+		runtimeConfig = make(map[string]interface{})
+		rawConfig["runtimeConfig"] = runtimeConfig
+	}
+
+	// Add IPs array to runtimeConfig
+	runtimeConfig["ips"] = ips
+
+	configBytes, err := json.Marshal(rawConfig)
+	if err != nil {
+		return nil, logging.Errorf("addRuntimeConfigIPsInConfig(): failed to re-marshal: %v", err)
 	}
 	return configBytes, nil
 }
