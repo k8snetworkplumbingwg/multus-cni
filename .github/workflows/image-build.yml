@@ -13,7 +13,7 @@ jobs:
 
       # note: disable sbom/provenance for now (gchr.io does not managed well yet)
       - name: Build container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -25,7 +25,7 @@ jobs:
 
       # note: disable sbom/provenance for now (gchr.io does not managed well yet)
       - name: Build container debug image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -46,7 +46,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -55,6 +55,22 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v8,linux/ppc64le,linux/s390x
           sbom: false
           provenance: false
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest-thick
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   build-origin:
     name: Image build/origin

@@ -18,16 +18,17 @@ limitations under the License.
 
 package v1
 
-// EnvVarSourceApplyConfiguration represents an declarative configuration of the EnvVarSource type for use
+// EnvVarSourceApplyConfiguration represents a declarative configuration of the EnvVarSource type for use
 // with apply.
 type EnvVarSourceApplyConfiguration struct {
 	FieldRef         *ObjectFieldSelectorApplyConfiguration   `json:"fieldRef,omitempty"`
 	ResourceFieldRef *ResourceFieldSelectorApplyConfiguration `json:"resourceFieldRef,omitempty"`
 	ConfigMapKeyRef  *ConfigMapKeySelectorApplyConfiguration  `json:"configMapKeyRef,omitempty"`
 	SecretKeyRef     *SecretKeySelectorApplyConfiguration     `json:"secretKeyRef,omitempty"`
+	FileKeyRef       *FileKeySelectorApplyConfiguration       `json:"fileKeyRef,omitempty"`
 }
 
-// EnvVarSourceApplyConfiguration constructs an declarative configuration of the EnvVarSource type for use with
+// EnvVarSourceApplyConfiguration constructs a declarative configuration of the EnvVarSource type for use with
 // apply.
 func EnvVarSource() *EnvVarSourceApplyConfiguration {
 	return &EnvVarSourceApplyConfiguration{}
@@ -62,5 +63,13 @@ func (b *EnvVarSourceApplyConfiguration) WithConfigMapKeyRef(value *ConfigMapKey
 // If called multiple times, the SecretKeyRef field is set to the value of the last call.
 func (b *EnvVarSourceApplyConfiguration) WithSecretKeyRef(value *SecretKeySelectorApplyConfiguration) *EnvVarSourceApplyConfiguration {
 	b.SecretKeyRef = value
+	return b
+}
+
+// WithFileKeyRef sets the FileKeyRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FileKeyRef field is set to the value of the last call.
+func (b *EnvVarSourceApplyConfiguration) WithFileKeyRef(value *FileKeySelectorApplyConfiguration) *EnvVarSourceApplyConfiguration {
+	b.FileKeyRef = value
 	return b
 }

@@ -18,14 +18,14 @@ limitations under the License.
 
 package v1
 
-// TypeMetaApplyConfiguration represents an declarative configuration of the TypeMeta type for use
+// TypeMetaApplyConfiguration represents a declarative configuration of the TypeMeta type for use
 // with apply.
 type TypeMetaApplyConfiguration struct {
 	Kind       *string `json:"kind,omitempty"`
 	APIVersion *string `json:"apiVersion,omitempty"`
 }
 
-// TypeMetaApplyConfiguration constructs an declarative configuration of the TypeMeta type for use with
+// TypeMetaApplyConfiguration constructs a declarative configuration of the TypeMeta type for use with
 // apply.
 func TypeMeta() *TypeMetaApplyConfiguration {
 	return &TypeMetaApplyConfiguration{}
@@ -45,4 +45,14 @@ func (b *TypeMetaApplyConfiguration) WithKind(value string) *TypeMetaApplyConfig
 func (b *TypeMetaApplyConfiguration) WithAPIVersion(value string) *TypeMetaApplyConfiguration {
 	b.APIVersion = &value
 	return b
+}
+
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *TypeMetaApplyConfiguration) GetKind() *string {
+	return b.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *TypeMetaApplyConfiguration) GetAPIVersion() *string {
+	return b.APIVersion
 }
