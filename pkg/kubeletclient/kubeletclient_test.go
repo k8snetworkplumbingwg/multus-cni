@@ -47,6 +47,7 @@ var (
 
 type fakeResourceServer struct {
 	server *grpc.Server
+	podresourcesapi.UnimplementedPodResourcesListerServer
 }
 
 // TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
@@ -72,16 +73,21 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 			Name: "cdi-kind=cdi-resource",
 		},
 	}
+	draDriverName := "dra.example.com"
+	poolName := "worker-1-pool"
+	deviceName := "gpu-1"
 
 	claimsResource := []*podresourcesapi.ClaimResource{
 		{
-			CDIDevices: cdiDevices,
+			CdiDevices: cdiDevices,
+			DriverName: draDriverName,
+			PoolName:   poolName,
+			DeviceName: deviceName,
 		},
 	}
 
 	dynamicResources := []*podresourcesapi.DynamicResource{
 		{
-			ClassName:      "resource-class",
 			ClaimName:      "resource-claim",
 			ClaimNamespace: "dynamic-resource-pod-namespace",
 			ClaimResources: claimsResource,
@@ -263,7 +269,7 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			outputRMap := map[string]*mtypes.ResourceInfo{
-				"resource-class": {DeviceIDs: []string{"cdi-resource"}},
+				"resource-claim": {DeviceIDs: []string{"cdi-resource"}},
 			}
 			resourceMap, err := client.GetPodResourceMap(fakePod)
 			Expect(err).NotTo(HaveOccurred())

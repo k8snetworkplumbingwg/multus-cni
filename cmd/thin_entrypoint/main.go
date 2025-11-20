@@ -21,6 +21,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -225,7 +226,7 @@ func (o *Options) createKubeConfig(prevCAHash, prevSATokenHash []byte) ([]byte, 
 		return nil, nil, fmt.Errorf("template parse error: %v", err)
 	}
 	templateData := map[string]string{
-		"KubeConfigHost":          fmt.Sprintf("%s://[%s]:%s", kubeProtocol, kubeHost, kubePort),
+		"KubeConfigHost":          fmt.Sprintf("%s://%s", kubeProtocol, net.JoinHostPort(kubeHost, kubePort)),
 		"KubeServerTLS":           tlsConfig,
 		"KubeServiceAccountToken": string(saTokenByte),
 	}

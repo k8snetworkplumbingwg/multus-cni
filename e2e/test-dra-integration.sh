@@ -15,9 +15,12 @@ echo "installing dra-example-driver"
 repo_path="repos/dra-example-driver"
 
 rm -rf $repo_path || true
-git clone --branch classic-dra https://github.com/kubernetes-sigs/dra-example-driver.git ${repo_path}
-${repo_path}/demo/build-driver.sh
-KIND_CLUSTER_NAME=kind ${repo_path}/demo/scripts/load-driver-image-into-kind.sh
+git clone --branch main https://github.com/kubernetes-sigs/dra-example-driver.git ${repo_path}
+MULTUS_DIR=$(pwd)
+cd ${repo_path}
+./demo/build-driver.sh
+KIND_CLUSTER_NAME=kind ./demo/scripts/load-driver-image-into-kind.sh
+cd "$MULTUS_DIR"
 chart_path=${repo_path}/deployments/helm/dra-example-driver/
 overriden_values_path=${chart_path}/overriden_values.yaml
 
@@ -47,7 +50,7 @@ echo "check dra-integration pod for DRA injected environment variable"
 # We can validate that the resource is correctly injected by checking an environment variable this dra driver is injecting
 # in the Pod.
 # https://github.com/kubernetes-sigs/dra-example-driver/blob/be2b8b1db47b8c757440e955ce5ced88c23bfe86/cmd/dra-example-kubeletplugin/cdi.go#L71C20-L71C44
-env_variable=$(kubectl exec dra-integration -- bash -c "echo \$DRA_RESOURCE_DRIVER_NAME | grep gpu.resource.example.com")
+env_variable=$(kubectl exec dra-integration -- bash -c "echo \$DRA_RESOURCE_DRIVER_NAME | grep gpu.example.com")
 if [ $? -eq 0 ];then
 	echo "dra-integration pod has DRA injected environment variable"
 else
