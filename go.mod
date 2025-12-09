@@ -1,6 +1,6 @@
 module gopkg.in/k8snetworkplumbingwg/multus-cni.v4
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -17,9 +17,9 @@ require (
 	golang.org/x/sys v0.33.0
 	google.golang.org/grpc v1.73.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	k8s.io/api v0.34.1
-	k8s.io/apimachinery v0.34.1
-	k8s.io/client-go v0.34.1
+	k8s.io/api v0.34.2
+	k8s.io/apimachinery v0.34.2
+	k8s.io/client-go v0.34.2
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.34.1
