@@ -336,35 +336,34 @@ func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	}
 
 	// Deprecated in ver 3.5.
-	if delegate.MacRequest != "" || delegate.IPRequest != nil {
-		if delegate.MacRequest != "" {
-			// validate Mac address
-			_, err := net.ParseMAC(delegate.MacRequest)
-			if err != nil {
-				return nil, logging.Errorf("DelegateAdd: failed to parse mac address %q", delegate.MacRequest)
-			}
-
-			logging.Debugf("DelegateAdd: set MAC address %q to %q", delegate.MacRequest, rt.IfName)
-			rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
+	// MAC handling via Args is kept for backward compatibility with older plugins
+	// IP handling is removed as it conflicts with RuntimeConfig capabilities
+	if delegate.MacRequest != "" {
+		// validate Mac address
+		_, err := net.ParseMAC(delegate.MacRequest)
+		if err != nil {
+			return nil, logging.Errorf("DelegateAdd: failed to parse mac address %q", delegate.MacRequest)
 		}
 
-		if delegate.IPRequest != nil {
-			// validate IP address
-			for _, ip := range delegate.IPRequest {
-				if strings.Contains(ip, "/") {
-					_, _, err := net.ParseCIDR(ip)
-					if err != nil {
-						return nil, logging.Errorf("DelegateAdd: failed to parse IP address %q", ip)
-					}
-				} else if net.ParseIP(ip) == nil {
+		logging.Debugf("DelegateAdd: set MAC address %q to %q", delegate.MacRequest, rt.IfName)
+		rt.Args = append(rt.Args, [2]string{"MAC", delegate.MacRequest})
+	}
+
+	// IP validation still needed for RuntimeConfig path
+	if delegate.IPRequest != nil {
+		// validate IP address
+		for _, ip := range delegate.IPRequest {
+			if strings.Contains(ip, "/") {
+				_, _, err := net.ParseCIDR(ip)
+				if err != nil {
 					return nil, logging.Errorf("DelegateAdd: failed to parse IP address %q", ip)
 				}
+			} else if net.ParseIP(ip) == nil {
+				return nil, logging.Errorf("DelegateAdd: failed to parse IP address %q", ip)
 			}
-
-			ips := strings.Join(delegate.IPRequest, ",")
-			logging.Debugf("DelegateAdd: set IP address %q to %q", ips, rt.IfName)
-			rt.Args = append(rt.Args, [2]string{"IP", ips})
 		}
+		logging.Debugf("DelegateAdd: set IP addresses %v to %q via RuntimeConfig", delegate.IPRequest, rt.IfName)
+		// IP addresses are passed via RuntimeConfig capabilities, not via Args
 	}
 
 	var result cnitypes.Result
