@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Aside from setting options for Multus, one of the goals of configuration is to set the configuration for your *default network*. The default network is also sometimes referred as the "primary CNI plugin", the "primary network", or a "default CNI plugin" and is the CNI plugin that is used to implement [the Kubernetes networking model](https://kubernetes.io/docs/concepts/services-networking/#the-kubernetes-network-model) in your cluster. Common examples include Flannel, Weave, Calico, Cillium, and OVN-Kubernetes, among others.
+Aside from setting options for Multus, one of the goals of configuration is to set the configuration for your *default network*. The default network is also sometimes referred as the "primary CNI plugin", the "primary network", or a "default CNI plugin" and is the CNI plugin that is used to implement [the Kubernetes networking model](https://kubernetes.io/docs/concepts/services-networking/#the-kubernetes-network-model) in your cluster. Common examples include Flannel, Weave, Calico, Cilium, and OVN-Kubernetes, among others.
 
 Here we will refer to this as your default CNI plugin or default network.
 
