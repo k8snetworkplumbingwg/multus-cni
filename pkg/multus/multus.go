@@ -287,16 +287,25 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *lib
 	return result, nil
 }
 
-func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) error {
 	logging.Debugf("conflistCheck: %v, %s", rt, string(rawnetconflist))
 
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.ConfListFromBytes(rawnetconflist)
-	if err != nil {
-		return logging.Errorf("conflistCheck: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return logging.Errorf("conflistCheck: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	err = cniNet.CheckNetworkList(context.Background(), confList, rt)
@@ -307,16 +316,25 @@ func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf 
 	return err
 }
 
-func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) error {
 	logging.Debugf("conflistDel: %v, %s", rt, string(rawnetconflist))
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.ConfListFromBytes(rawnetconflist)
-	if err != nil {
-		return logging.Errorf("conflistDel: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return logging.Errorf("conflistDel: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	err = cniNet.DelNetworkList(context.Background(), confList, rt)
@@ -442,7 +460,7 @@ func DelegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *li
 
 	var err error
 	if delegateConf.ConfListPlugin {
-		err = conflistCheck(rt, delegateConf.Bytes, multusNetconf, exec)
+		err = conflistCheck(rt, delegateConf.Bytes, &delegateConf.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return logging.Errorf("DelegateCheck: error invoking ConflistCheck - %q: %v", delegateConf.ConfList.Name, err)
 		}
@@ -476,7 +494,7 @@ func DelegateDel(exec invoke.Exec, pod *v1.Pod, delegateConf *types.DelegateNetC
 
 	var err error
 	if delegateConf.ConfListPlugin {
-		err = conflistDel(rt, delegateConf.Bytes, multusNetconf, exec)
+		err = conflistDel(rt, delegateConf.Bytes, &delegateConf.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return logging.Errorf("DelegateDel: error invoking ConflistDel - %q: %v", delegateConf.ConfList.Name, err)
 		}
