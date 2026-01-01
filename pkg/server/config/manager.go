@@ -117,6 +117,11 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", config.MultusAutoconfigDir, multusConfigFileName)
 	}
 
+	cleanupOnExit := true
+	if config.CleanupConfigOnExit != nil {
+		cleanupOnExit = *config.CleanupConfigOnExit
+	}
+
 	configManager := &Manager{
 		configWatcher:              watcher,
 		multusConfig:               &config,
@@ -124,7 +129,7 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		multusConfigFilePath:       filepath.Join(config.CniConfigDir, multusConfigFileName),
 		primaryCNIConfigPath:       filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName),
 		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
-		cleanupConfigOnExit:        *config.CleanupConfigOnExit,
+		cleanupConfigOnExit:        cleanupOnExit,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
