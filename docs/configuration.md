@@ -151,7 +151,7 @@ Default: `true`
 
 When set to `true`, removes the Multus CNI config file from the `cniDir` on exit. This ensures that the K8s cluster will not try to use Multus as CNI while it is not running.
 
-You may want to se this to `false` if your primary CNI is starting before Multus after a node reboot, causing some of your pods to not be processed by the Multus CNI and thus have some of their network interfaces missing.
+You may want to set this to `false` if your primary CNI is starting before Multus after a node reboot, causing some of your pods to not be processed by the Multus CNI and thus have some of their network interfaces missing.
 
 Note that setting this to `false` may cause your pods to crash-loop until Multus starts.
 
