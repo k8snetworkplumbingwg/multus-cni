@@ -52,6 +52,7 @@ type MultusConf struct {
 	NamespaceIsolation       bool                `json:"namespaceIsolation,omitempty"`
 	RawNonIsolatedNamespaces string              `json:"globalNamespaces,omitempty"`
 	ReadinessIndicatorFile   string              `json:"readinessindicatorfile,omitempty"`
+	CleanupConfigOnExit      *bool               `json:"cleanupConfigOnExit,omitempty"`
 	Type                     string              `json:"type"`
 	CniDir                   string              `json:"cniDir,omitempty"`
 	CniConfigDir             string              `json:"cniConfigDir,omitempty"`
@@ -71,11 +72,15 @@ func ParseMultusConfig(configPath string) (*MultusConf, error) {
 		return nil, fmt.Errorf("ParseMultusConfig failed to read the config file's contents: %w", err)
 	}
 
+	// Clean config by default. This matches the behaviour of older versions
+	CleanupConfigOnExit := true
+
 	multusconf := MultusConf{
-		MultusConfigFile: "auto",
-		Type:             multusPluginName,
-		Capabilities:     map[string]bool{},
-		CniConfigDir:     "/etc/cni/net.d",
+		MultusConfigFile:    "auto",
+		Type:                multusPluginName,
+		Capabilities:        map[string]bool{},
+		CniConfigDir:        "/etc/cni/net.d",
+		CleanupConfigOnExit: &CleanupConfigOnExit,
 	}
 
 	if err := json.Unmarshal(config, &multusconf); err != nil {
