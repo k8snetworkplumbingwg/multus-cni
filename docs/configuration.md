@@ -61,7 +61,7 @@ This is a general index of options, however note that you must set either the `c
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
 * [`readinessindicatorfile`](#Default-Network-Readiness-Indicator): The path to a file whose existence denotes that the default network is ready
 message to next when some missing error. Defaults to false.
-* [`cleanupConfigOnExit`](#Cleanup-Config-On-Exit): Whether to remove the Multus CNI config file from the `cniDir` on exit. Default `true`
+* [`cleanupConfigOnExit`](#cleanup-config-on-exit): Whether to remove the Multus CNI config file from the `cniDir` on exit. Default `true`
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
 * `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
