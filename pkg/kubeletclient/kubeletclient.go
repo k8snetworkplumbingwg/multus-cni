@@ -26,7 +26,9 @@ import (
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/checkpoint"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -41,6 +43,11 @@ const (
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	unixProtocol               = "unix"
+	// Retry configuration for rate limiting
+	maxRetries         = 5
+	initialRetryDelay  = 100 * time.Millisecond
+	maxRetryDelay      = 2 * time.Second
+	retryBackoffFactor = 2
 )
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
@@ -111,17 +118,43 @@ type kubeletClient struct {
 }
 
 func (rc *kubeletClient) getPodResources(client podresourcesapi.PodResourcesListerClient) error {
+	var resp *podresourcesapi.ListPodResourcesResponse
+	var err error
+	retryDelay := initialRetryDelay
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-	resp, err := client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
-	if err != nil {
+		resp, err = client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+		cancel()
+
+		if err == nil {
+			rc.resources = resp.PodResources
+			return nil
+		}
+
+		// Check if this is a rate limit error
+		if st, ok := status.FromError(err); ok && st.Code() == codes.ResourceExhausted {
+			if attempt < maxRetries {
+				logging.Debugf("getPodResources: rate limit hit (attempt %d/%d), retrying after %v: %v",
+					attempt+1, maxRetries+1, retryDelay, err)
+				time.Sleep(retryDelay)
+
+				// Exponential backoff with cap
+				retryDelay *= retryBackoffFactor
+				if retryDelay > maxRetryDelay {
+					retryDelay = maxRetryDelay
+				}
+				continue
+			}
+			logging.Errorf("getPodResources: rate limit exceeded after %d attempts", maxRetries+1)
+		}
+
+		// For non-rate-limit errors or final retry attempt, return the error
 		return logging.Errorf("getPodResources: failed to list pod resources, %v.Get(_) = _, %v", client, err)
 	}
 
-	rc.resources = resp.PodResources
-	return nil
+	return logging.Errorf("getPodResources: failed to list pod resources, %v.Get(_) = _, %v", client, err)
 }
 
 // GetPodResourceMap returns an instance of a map of Pod ResourceInfo given a (Pod name, namespace) tuple

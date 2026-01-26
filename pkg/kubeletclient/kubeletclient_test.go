@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -31,6 +32,8 @@ import (
 
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
@@ -340,4 +343,140 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			Expect(resourceMap).To(Equal(emptyRMap))
 		})
 	})
+
+	Context("Rate limit handling with retries", func() {
+		var (
+			rateLimitSocketDir  string
+			rateLimitSocketName string
+			rateLimitSocket     *url.URL
+			rateLimitServer     *rateLimitResourceServer
+		)
+
+		BeforeEach(func() {
+			tempSocketDir, err := os.MkdirTemp("", "kubelet-rate-limit-test")
+			Expect(err).NotTo(HaveOccurred())
+			testingPodResourcesPath := filepath.Join(tempSocketDir, defaultPodResourcesPath)
+
+			err = os.MkdirAll(testingPodResourcesPath, os.ModeDir)
+			Expect(err).NotTo(HaveOccurred())
+
+			rateLimitSocketDir = testingPodResourcesPath
+			rateLimitSocketName = filepath.Join(rateLimitSocketDir, "kubelet-ratelimit.sock")
+			rateLimitSocket = localEndpoint(filepath.Join(rateLimitSocketDir, "kubelet-ratelimit"))
+
+			rateLimitServer = &rateLimitResourceServer{
+				server:       grpc.NewServer(),
+				failCount:    3,
+				currentCount: 0,
+			}
+			podresourcesapi.RegisterPodResourcesListerServer(rateLimitServer.server, rateLimitServer)
+			lis, err := CreateListener(rateLimitSocketName)
+			Expect(err).NotTo(HaveOccurred())
+			go rateLimitServer.server.Serve(lis)
+		})
+
+		AfterEach(func() {
+			if rateLimitServer != nil {
+				rateLimitServer.server.Stop()
+			}
+			os.RemoveAll(rateLimitSocketDir)
+		})
+
+		It("should retry and succeed after rate limit errors", func() {
+			client, err := getKubeletClient(rateLimitSocket)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(client).NotTo(BeNil())
+
+			// Verify that retries occurred
+			finalCount := atomic.LoadInt32(&rateLimitServer.currentCount)
+			Expect(finalCount).To(BeNumerically(">", rateLimitServer.failCount))
+		})
+
+		It("should fail after max retries with continuous rate limiting", func() {
+			// Create a server that always fails
+			alwaysFailServer := &rateLimitResourceServer{
+				server:       grpc.NewServer(),
+				failCount:    100, // Always fail
+				currentCount: 0,
+			}
+
+			tempSocketDir, err := os.MkdirTemp("", "kubelet-always-fail-test")
+			Expect(err).NotTo(HaveOccurred())
+			defer os.RemoveAll(tempSocketDir)
+
+			testingPodResourcesPath := filepath.Join(tempSocketDir, defaultPodResourcesPath)
+			err = os.MkdirAll(testingPodResourcesPath, os.ModeDir)
+			Expect(err).NotTo(HaveOccurred())
+
+			alwaysFailSocketName := filepath.Join(testingPodResourcesPath, "kubelet-always-fail.sock")
+			alwaysFailSocket := localEndpoint(filepath.Join(testingPodResourcesPath, "kubelet-always-fail"))
+
+			podresourcesapi.RegisterPodResourcesListerServer(alwaysFailServer.server, alwaysFailServer)
+			lis, err := CreateListener(alwaysFailSocketName)
+			Expect(err).NotTo(HaveOccurred())
+			go alwaysFailServer.server.Serve(lis)
+			defer alwaysFailServer.server.Stop()
+
+			_, err = getKubeletClient(alwaysFailSocket)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to list pod resources"))
+
+			// Verify that max retries were attempted
+			finalCount := atomic.LoadInt32(&alwaysFailServer.currentCount)
+			Expect(finalCount).To(Equal(int32(maxRetries + 1)))
+		})
+	})
 })
+
+// rateLimitResourceServer simulates a kubelet server that returns rate limit errors
+// for the first N calls, then succeeds
+type rateLimitResourceServer struct {
+	server       *grpc.Server
+	failCount    int32
+	currentCount int32
+}
+
+func (m *rateLimitResourceServer) GetAllocatableResources(_ context.Context, _ *podresourcesapi.AllocatableResourcesRequest) (*podresourcesapi.AllocatableResourcesResponse, error) {
+	return &podresourcesapi.AllocatableResourcesResponse{}, nil
+}
+
+func (m *rateLimitResourceServer) Get(_ context.Context, _ *podresourcesapi.GetPodResourcesRequest) (*podresourcesapi.GetPodResourcesResponse, error) {
+	return &podresourcesapi.GetPodResourcesResponse{}, nil
+}
+
+func (m *rateLimitResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodResourcesRequest) (*podresourcesapi.ListPodResourcesResponse, error) {
+	count := atomic.AddInt32(&m.currentCount, 1)
+
+	// Fail for the first N calls with ResourceExhausted error
+	if count <= m.failCount {
+		return nil, status.Error(codes.ResourceExhausted, "rejected by rate limit")
+	}
+
+	// After N failures, succeed
+	podName := "pod-name"
+	podNamespace := "pod-namespace"
+	containerName := "container-name"
+
+	devs := []*podresourcesapi.ContainerDevices{
+		{
+			ResourceName: "resource",
+			DeviceIds:    []string{"dev0", "dev1"},
+		},
+	}
+
+	resp := &podresourcesapi.ListPodResourcesResponse{
+		PodResources: []*podresourcesapi.PodResources{
+			{
+				Name:      podName,
+				Namespace: podNamespace,
+				Containers: []*podresourcesapi.ContainerResources{
+					{
+						Name:    containerName,
+						Devices: devs,
+					},
+				},
+			},
+		},
+	}
+	return resp, nil
+}
