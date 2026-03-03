@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	cnitypes "github.com/containernetworking/cni/pkg/types"
+
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -74,6 +76,10 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		cniErr := &cnitypes.Error{}
+		if err := json.Unmarshal(body, cniErr); err == nil && cniErr.Msg != "" {
+			return nil, cniErr
+		}
 		return nil, fmt.Errorf("CNI request failed with status %v: '%s'", resp.StatusCode, string(body))
 	}
 

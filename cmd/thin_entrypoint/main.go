@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/containernetworking/cni/libcni"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/spf13/pflag"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
@@ -497,14 +498,14 @@ func (o *Options) createMultusConfig(prevMasterConfigFileHash []byte) (string, [
 		return "", nil, fmt.Errorf("cannot create multus cni temp file: %v", err)
 	}
 
-	// use conflist template if cniVersionConfig == "1.0.0"
+	// use conflist template if cniVersionConfig >= "1.0.0"
 	multusConfFilePath := fmt.Sprintf("%s/00-multus.conf", o.CNIConfDir)
 	templateMultusConfig, err := template.New("multusCNIConfig").Parse(multusConfTemplate)
 	if err != nil {
 		return "", nil, fmt.Errorf("template parse error: %v", err)
 	}
 
-	if o.CNIVersion == "1.0.0" { //Check 1.0.0 or above!
+	if gt, err := cniversion.GreaterThanOrEqualTo(o.CNIVersion, "1.0.0"); err == nil && gt {
 		multusConfFilePath = fmt.Sprintf("%s/00-multus.conflist", o.CNIConfDir)
 		templateMultusConfig, err = template.New("multusCNIConfig").Parse(multusConflistTemplate)
 		if err != nil {

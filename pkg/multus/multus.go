@@ -18,6 +18,7 @@ package multus
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"net"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	cni100 "github.com/containernetworking/cni/pkg/types/100"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	nettypes "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	nadutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
@@ -258,6 +260,42 @@ func confDel(rt *libcni.RuntimeConf, rawNetconf []byte, multusNetconf *types.Net
 	return err
 }
 
+func confStatus(rt *libcni.RuntimeConf, rawNetconf []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+	logging.Debugf("confStatus: %v, %s", rt, string(rawNetconf))
+
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
+	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
+
+	conf, err := libcni.ConfFromBytes(rawNetconf)
+	if err != nil {
+		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	}
+
+	if gt, _ := cniversion.GreaterThanOrEqualTo(conf.Network.CNIVersion, "1.1.0"); !gt {
+		logging.Debugf("confStatus: skipping STATUS for network %q type %q cniVersion %q (< 1.1.0)",
+			conf.Network.Name, conf.Network.Type, conf.Network.CNIVersion)
+		return nil
+	}
+
+	confList := &libcni.NetworkConfigList{
+		Name:       conf.Network.Name,
+		CNIVersion: conf.Network.CNIVersion,
+		Plugins:    []*libcni.PluginConfig{conf},
+	}
+
+	err = cniNet.GetStatusNetworkList(context.Background(), confList)
+	if err != nil {
+		var cniErr *cnitypes.Error
+		if stderrors.As(err, &cniErr) {
+			return err
+		}
+		return logging.Errorf("error in getting result from StatusNetworkList: %v", err)
+	}
+
+	return err
+}
+
 func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) (cnitypes.Result, error) {
 	logging.Debugf("conflistAdd: %v, %s", rt, string(rawnetconflist))
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
@@ -322,6 +360,33 @@ func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	err = cniNet.DelNetworkList(context.Background(), confList, rt)
 	if err != nil {
 		return logging.Errorf("conflistDel: error in getting result from DelNetworkList: %v", err)
+	}
+
+	return err
+}
+
+func conflistStatus(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+	logging.Debugf("conflistStatus: %v, %s", rt, string(rawnetconflist))
+
+	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
+	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
+	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
+
+	confList, err := libcni.ConfListFromBytes(rawnetconflist)
+	if err != nil {
+		return logging.Errorf("conflistStatus: error converting the raw bytes into a conflist: %v", err)
+	}
+	if gt, _ := cniversion.GreaterThanOrEqualTo(confList.CNIVersion, "1.1.0"); !gt {
+		logging.Debugf("conflistStatus: skipping STATUS for network list %q cniVersion %q (< 1.1.0)", confList.Name, confList.CNIVersion)
+	}
+
+	err = cniNet.GetStatusNetworkList(context.Background(), confList)
+	if err != nil {
+		var cniErr *cnitypes.Error
+		if stderrors.As(err, &cniErr) {
+			return err
+		}
+		return logging.Errorf("conflistStatus: error in getting result from StatusNetworkList: %v", err)
 	}
 
 	return err
@@ -451,6 +516,46 @@ func DelegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *li
 		if err != nil {
 			return logging.Errorf("DelegateCheck: error invoking DelegateCheck - %q: %v", delegateConf.Conf.Type, err)
 		}
+	}
+
+	return err
+}
+
+// DelegateStatus ...
+func DelegateStatus(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *libcni.RuntimeConf, multusNetconf *types.NetConf) error {
+	logging.Debugf("DelegateStatus: %v, %v, %v", exec, delegateConf, rt)
+
+	isConfList := delegateConf.ConfListPlugin
+	if !isConfList && delegateConf.Conf.Type == "" && delegateConf.ConfList.Name != "" {
+		isConfList = true
+	}
+
+	if logging.GetLoggingLevel() >= logging.VerboseLevel {
+		var cniConfName string
+		if isConfList {
+			cniConfName = delegateConf.ConfList.Name
+		} else {
+			cniConfName = delegateConf.Conf.Name
+		}
+		logging.Verbosef("Status: %s:%s:%s(%s):%s %s", rt.Args[1][1], rt.Args[2][1], delegateConf.Name, cniConfName, rt.IfName, string(delegateConf.Bytes))
+	}
+
+	var err error
+	if isConfList {
+		err = conflistStatus(rt, delegateConf.Bytes, multusNetconf, exec)
+	} else {
+		err = confStatus(rt, delegateConf.Bytes, multusNetconf, exec)
+	}
+
+	if err != nil {
+		var cniErr *cnitypes.Error
+		if stderrors.As(err, &cniErr) {
+			return err
+		}
+		if isConfList {
+			return logging.Errorf("DelegateStatus: error invoking ConflistStatus - %q: %v", delegateConf.ConfList.Name, err)
+		}
+		return logging.Errorf("DelegateStatus: error invoking ConfStatus - %q: %v", delegateConf.Conf.Type, err)
 	}
 
 	return err
@@ -659,10 +764,10 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 
 	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
-		if err == errPodNotFound {
-			emptyresult := emptyCNIResult(args, "1.0.0")
-			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyresult)
-			return emptyresult, nil
+		if stderrors.Is(err, errPodNotFound) {
+			emptyResult := emptyCNIResult(args, n.CNIVersion)
+			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyResult)
+			return emptyResult, nil
 		}
 		return nil, err
 	}
@@ -1050,17 +1155,26 @@ func CmdStatus(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo)
 
 	// invoke delegate's STATUS command
 	// we only need to check cluster network status
+	delegate := n.Delegates[0]
+	if !delegate.ConfListPlugin {
+		return confStatus(&libcni.RuntimeConf{}, delegate.Bytes, n, exec)
+	}
+
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{n.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, n.CNIDir, exec)
 
-	conf, err := libcni.ConfListFromBytes(n.Delegates[0].Bytes)
+	conf, err := libcni.ConfListFromBytes(delegate.Bytes)
 	if err != nil {
 		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
 	}
 
-	err = cniNet.GetStatusNetworkList(context.TODO(), conf)
+	err = cniNet.GetStatusNetworkList(context.Background(), conf)
 	if err != nil {
+		var cniErr *cnitypes.Error
+		if stderrors.As(err, &cniErr) {
+			return err
+		}
 		return logging.Errorf("error in STATUS command: %v", err)
 	}
 
@@ -1101,9 +1215,28 @@ func CmdGC(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) err
 	binDirs = append([]string{n.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, n.CNIDir, exec)
 
-	conf, err := libcni.ConfListFromBytes(n.Delegates[0].Bytes)
-	if err != nil {
-		return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+	delegate := n.Delegates[0]
+	isConfList := delegate.ConfListPlugin
+	if !isConfList && delegate.Conf.Type == "" && delegate.ConfList.Name != "" {
+		isConfList = true
+	}
+
+	var confList *libcni.NetworkConfigList
+	if isConfList {
+		confList, err = libcni.ConfListFromBytes(delegate.Bytes)
+		if err != nil {
+			return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+		}
+	} else {
+		conf, err := libcni.ConfFromBytes(delegate.Bytes)
+		if err != nil {
+			return logging.Errorf("error in converting the raw bytes to conf: %v", err)
+		}
+		confList = &libcni.NetworkConfigList{
+			Name:       conf.Network.Name,
+			CNIVersion: conf.Network.CNIVersion,
+			Plugins:    []*libcni.PluginConfig{conf},
+		}
 	}
 
 	validAttachments, err := gatherValidAttachmentsFromCache(n.CNIDir)
@@ -1111,7 +1244,7 @@ func CmdGC(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) err
 		return logging.Errorf("error in gather valid attachments: %v", err)
 	}
 
-	err = cniNet.GCNetworkList(context.TODO(), conf, &libcni.GCArgs{
+	err = cniNet.GCNetworkList(context.TODO(), confList, &libcni.GCArgs{
 		ValidAttachments: validAttachments,
 	})
 	if err != nil {
