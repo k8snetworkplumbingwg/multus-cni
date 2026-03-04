@@ -27,7 +27,6 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -96,7 +95,7 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 		if err != nil {
 			logging.Errorf("failed to read kubeconfig from cert manager: %v", err)
 		} else {
-			_, err := tempClient.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+			_, err := tempClient.Discovery().ServerVersion()
 			// tls unknown authority error is unrecoverable error with retry
 			if err != nil {
 				if strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
@@ -105,7 +104,7 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 					newBootstrapKubeconfig, _ := clientcmd.BuildConfigFromFlags("", bootstrapKubeconfigFile)
 					cfg = newBootstrapKubeconfig
 				} else {
-					logging.Errorf("failed to list pods with new certs: %v", err)
+					logging.Errorf("failed to validate kubeconfig with new certs: %v", err)
 				}
 			}
 
