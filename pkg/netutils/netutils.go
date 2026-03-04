@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 
 	"github.com/containernetworking/cni/libcni"
+	cniversion "github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -183,7 +184,7 @@ func deleteDefaultGWResult(result map[string]interface{}, ipv4, ipv6 bool) (map[
 		return deleteDefaultGWResult020(result, ipv4, ipv6)
 	}
 
-	if cniVersion != "0.3.0" && cniVersion != "0.3.1" && cniVersion != "0.4.0" && cniVersion != "1.0.0" {
+	if !isSupportedGatewayResultVersion(cniVersion) {
 		return nil, fmt.Errorf("not supported version: %s", cniVersion)
 	}
 
@@ -340,7 +341,7 @@ func addDefaultGWResult(result map[string]interface{}, gw []net.IP) (map[string]
 		return addDefaultGWResult020(result, gw)
 	}
 
-	if cniVersion != "0.3.0" && cniVersion != "0.3.1" && cniVersion != "0.4.0" && cniVersion != "1.0.0" {
+	if !isSupportedGatewayResultVersion(cniVersion) {
 		return nil, fmt.Errorf("not supported version: %s", cniVersion)
 	}
 
@@ -366,6 +367,19 @@ func addDefaultGWResult(result map[string]interface{}, gw []net.IP) (map[string]
 	result["routes"] = routes
 
 	return result, nil
+}
+
+func isSupportedGatewayResultVersion(cniVersion string) bool {
+	switch cniVersion {
+	case "0.3.0", "0.3.1", "0.4.0":
+		return true
+	}
+
+	if gt, _ := cniversion.GreaterThanOrEqualTo(cniVersion, "1.0.0"); gt {
+		return true
+	}
+
+	return false
 }
 
 func addDefaultGWResult020(result map[string]interface{}, gw []net.IP) (map[string]interface{}, error) {

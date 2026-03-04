@@ -1508,4 +1508,34 @@ var _ = Describe("other function unit testing", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(routeJSON).Should(MatchJSON(`[{"dst":"10.1.1.0/24"}]`))
 	})
+
+	It("supports gateway result updates for cniVersion 1.1.0", func() {
+		deleteInput := map[string]interface{}{
+			"cniVersion": "1.1.0",
+			"routes": []interface{}{
+				map[string]interface{}{"dst": "0.0.0.0/0", "gw": "10.1.1.1"},
+			},
+		}
+		updatedDeleteResult, err := deleteDefaultGWResult(deleteInput, true, false)
+		Expect(err).NotTo(HaveOccurred())
+		_, hasRoutes := updatedDeleteResult["routes"]
+		Expect(hasRoutes).To(BeFalse())
+
+		addInput := map[string]interface{}{
+			"cniVersion": "1.1.0",
+		}
+		updatedAddResult, err := addDefaultGWResult(addInput, []net.IP{net.ParseIP("10.1.1.1")})
+		Expect(err).NotTo(HaveOccurred())
+		routes, ok := updatedAddResult["routes"].([]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(routes).To(HaveLen(1))
+	})
+
+	It("rejects unsupported pre-1.0.0 cniVersion", func() {
+		addInput := map[string]interface{}{
+			"cniVersion": "0.9.0",
+		}
+		_, err := addDefaultGWResult(addInput, []net.IP{net.ParseIP("10.1.1.1")})
+		Expect(err).To(MatchError("not supported version: 0.9.0"))
+	})
 })

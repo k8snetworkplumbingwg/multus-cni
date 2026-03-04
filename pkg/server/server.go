@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -125,6 +126,8 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 		err = s.cmdDelegateDel(cniCmdArgs, k8sArgs, multusConfig)
 	case "CHECK":
 		err = s.cmdDelegateCheck(cniCmdArgs, k8sArgs, multusConfig)
+	case "STATUS":
+		err = s.cmdDelegateStatus(cniCmdArgs, k8sArgs, multusConfig)
 	default:
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
@@ -302,7 +305,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 			result, err := s.handleCNIRequest(r)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+				s.writeCNIErrorResponse(w, err)
 				return
 			}
 
@@ -324,7 +327,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 			result, err := s.handleDelegateRequest(r)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+				s.writeCNIErrorResponse(w, err)
 				return
 			}
 
@@ -406,6 +409,34 @@ func (s *Server) Start(ctx context.Context, l net.Listener) {
 	}()
 }
 
+func (s *Server) writeCNIErrorResponse(w http.ResponseWriter, err error) {
+	var cniErr *cnitypes.Error
+	if errors.As(err, &cniErr) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		errBytes, marshalErr := json.Marshal(cniErr)
+		if marshalErr != nil {
+			http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+			return
+		}
+		if _, writeErr := w.Write(errBytes); writeErr != nil {
+			_ = logging.Errorf("Error writing HTTP response: %v", writeErr)
+		}
+		return
+	}
+	http.Error(w, fmt.Sprintf("%v", err), http.StatusBadRequest)
+}
+
+func (s *Server) wrapCNIRequestError(cmdArgs *skel.CmdArgs, err error) error {
+	var cniErr *cnitypes.Error
+	if errors.As(err, &cniErr) {
+		_ = logging.Errorf("%s ERRORED: %v", printCmdArgs(cmdArgs), err)
+		return err
+	}
+	// Prefix error with request information for easier debugging.
+	return fmt.Errorf("%s ERRORED: %v", printCmdArgs(cmdArgs), err)
+}
+
 func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	var cr api.Request
 	b, err := io.ReadAll(r.Body)
@@ -427,8 +458,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 
 	result, err := s.HandleCNIRequest(cmdType, k8sArgs, cniCmdArgs)
 	if err != nil {
-		// Prefix error with request information for easier debugging
-		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
+		return nil, s.wrapCNIRequestError(cniCmdArgs, err)
 	}
 	return result, nil
 }
@@ -454,8 +484,7 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 
 	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, cr.InterfaceAttributes)
 	if err != nil {
-		// Prefix error with request information for easier debugging
-		return nil, fmt.Errorf("%s ERRORED: %v", printCmdArgs(cniCmdArgs), err)
+		return nil, s.wrapCNIRequestError(cniCmdArgs, err)
 	}
 	return result, nil
 }
@@ -720,6 +749,15 @@ func (s *Server) cmdDelegateCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs,
 	delegateCNIConf.Bytes = cmdArgs.StdinData
 	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
 	return multus.DelegateCheck(s.exec, delegateCNIConf, rt, multusConfig)
+}
+
+func (s *Server) cmdDelegateStatus(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, multusConfig *types.NetConf) error {
+	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, nil, "", "")
+	if err != nil {
+		return err
+	}
+	rt, _ := types.CreateCNIRuntimeConf(cmdArgs, k8sArgs, cmdArgs.IfName, nil, delegateCNIConf)
+	return multus.DelegateStatus(s.exec, delegateCNIConf, rt, multusConfig)
 }
 
 // note: this function may send back error to the client. In cni spec, command DEL should NOT send any error

@@ -16,6 +16,7 @@ package api
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"os"
 	"strings"
@@ -111,6 +112,10 @@ func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, 
 	var body []byte
 	body, err = DoCNI("http://dummy/cni", cniRequest, SocketPath(multusShimConfig.MultusSocketDir))
 	if err != nil {
+		var cniErr *cnitypes.Error
+		if stderrors.As(err, &cniErr) {
+			return nil, multusShimConfig.CNIVersion, err
+		}
 		return nil, multusShimConfig.CNIVersion, fmt.Errorf("%s: StdinData: %s", err.Error(), string(args.StdinData))
 	}
 
