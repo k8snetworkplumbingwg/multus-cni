@@ -189,7 +189,7 @@ func validateIfName(nsname string, ifname string) error {
 	err = podNs.Do(func(_ ns.NetNS) error {
 		_, err := netlink.LinkByName(ifname)
 		if err != nil {
-			var lnf netlink.LinkNotFoundError
+			var lnf *netlink.LinkNotFoundError
 			if stderrors.As(err, &lnf) {
 				return nil
 			}
