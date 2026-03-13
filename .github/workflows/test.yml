@@ -29,7 +29,7 @@ jobs:
       run: go vet ./...
 
     - name: Test
-      run: sudo ./hack/test-go.sh
+      run: sudo -E env "PATH=$PATH" ./hack/test-go.sh
 
     - name: Send coverage
       uses: shogo82148/actions-goveralls@v1
