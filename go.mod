@@ -1,6 +1,6 @@
 module gopkg.in/k8snetworkplumbingwg/multus-cni.v4
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/blang/semver v3.5.1+incompatible

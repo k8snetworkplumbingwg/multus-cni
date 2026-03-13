@@ -64,11 +64,10 @@ func newPodInformer(ctx context.Context, kclient kubernetes.Interface) cache.Sha
 
 	informerFactory.Start(ctx.Done())
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 20*time.Second)
-	if !cache.WaitForCacheSync(waitCtx.Done(), podInformer.HasSynced) {
-		logging.Errorf("failed to sync pod informer cache")
-	}
-	waitCancel()
+	// Note: Do NOT call WaitForCacheSync here with fake clients in K8s 1.34+.
+	// WaitForCacheSync waits for bookmark events that fake clients don't send, causing 20s timeouts.
+	// Fake clients also don't properly populate informer caches via LIST/WATCH operations.
+	// Tests must manually populate informer caches using informer.GetStore().Add().
 
 	return podInformer
 }
@@ -86,11 +85,10 @@ func newNetDefInformer(ctx context.Context, client netdefclient.Interface) cache
 
 	informerFactory.Start(ctx.Done())
 
-	waitCtx, waitCancel := context.WithTimeout(ctx, 20*time.Second)
-	if !cache.WaitForCacheSync(waitCtx.Done(), netdefInformer.HasSynced) {
-		logging.Errorf("failed to sync pod informer cache")
-	}
-	waitCancel()
+	// Note: Do NOT call WaitForCacheSync here with fake clients in K8s 1.34+.
+	// WaitForCacheSync waits for bookmark events that fake clients don't send, causing 20s timeouts.
+	// Fake clients also don't properly populate informer caches via LIST/WATCH operations.
+	// Tests must manually populate informer caches using informer.GetStore().Add().
 
 	return netdefInformer
 }
@@ -939,13 +937,22 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		fExec.addPlugin100(nil, "eth0", net1, expectedResult1, nil)
 
 		fKubeClient := NewFakeClientInfo()
-		fKubeClient.AddPod(fakePod)
-		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
-		Expect(err).NotTo(HaveOccurred())
 
 		podInformer := newPodInformer(ctx, fKubeClient.Client)
 		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetClient)
 		fKubeClient.SetK8sClientInformers(podInformer, netdefInformer)
+
+		// In K8s 1.34+, fake clients don't properly populate informer caches via LIST/WATCH.
+		// Manually add objects to both the fake client AND the informer cache stores.
+		fKubeClient.AddPod(fakePod)
+		err := podInformer.GetStore().Add(fakePod)
+		Expect(err).NotTo(HaveOccurred())
+
+		netDef := testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1)
+		_, err = fKubeClient.AddNetAttachDef(netDef)
+		Expect(err).NotTo(HaveOccurred())
+		err = netdefInformer.GetStore().Add(netDef)
+		Expect(err).NotTo(HaveOccurred())
 
 		result, err := CmdAdd(args, fExec, fKubeClient)
 		Expect(err).NotTo(HaveOccurred())
@@ -990,19 +997,28 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		fExec.addPlugin100(nil, "eth0", net1, expectedResult1, nil)
 
 		fKubeClient := NewFakeClientInfo()
-		_, err := fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1))
-		Expect(err).NotTo(HaveOccurred())
 
 		podInformer := newPodInformer(ctx, fKubeClient.Client)
 		netdefInformer := newNetDefInformer(ctx, fKubeClient.NetClient)
 		fKubeClient.SetK8sClientInformers(podInformer, netdefInformer)
 
+		// In K8s 1.34+, fake clients don't properly populate informer caches via LIST/WATCH.
+		// Manually add NetAttachDef to both fake client AND informer cache.
+		netDef := testhelpers.NewFakeNetAttachDef("kube-system", "net1", net1)
+		_, err := fKubeClient.AddNetAttachDef(netDef)
+		Expect(err).NotTo(HaveOccurred())
+		err = netdefInformer.GetStore().Add(netDef)
+		Expect(err).NotTo(HaveOccurred())
+
+		// Add pod AFTER a delay to simulate "pod not immediately found" scenario.
+		// Add to both fake client and informer cache when it becomes available.
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			wg.Done()
 			time.Sleep(1 * time.Second)
 			fKubeClient.AddPod(fakePod)
+			podInformer.GetStore().Add(fakePod)
 		}()
 		wg.Wait()
 

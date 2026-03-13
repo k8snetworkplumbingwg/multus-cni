@@ -33,7 +33,7 @@ GOHOSTOS     ?= $(shell $(GO) env GOHOSTOS)
 GOHOSTARCH   ?= $(shell $(GO) env GOHOSTARCH)
 
 GO_VERSION        ?= $(shell $(GO) version)
-GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))Error Parsing File
+GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
 PROMU        := $(FIRST_GOPATH)/bin/promu
