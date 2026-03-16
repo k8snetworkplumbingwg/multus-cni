@@ -132,12 +132,13 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			Expect(len(resourceInfo.DeviceIDs)).To(BeEquivalentTo(2))
 		})
 
-		It("should have \"0000:03:02.3\" in deviceIDs[0]", func() {
-			Expect(resourceInfo.DeviceIDs[0]).To(BeEquivalentTo("0000:03:02.3"))
+		// DeviceIDs are sorted for deterministic order across callers
+		It("should have \"0000:03:02.0\" in deviceIDs[0] (sorted order)", func() {
+			Expect(resourceInfo.DeviceIDs[0]).To(BeEquivalentTo("0000:03:02.0"))
 		})
 
-		It("should have \"0000:03:02.0\" in deviceIDs[1]", func() {
-			Expect(resourceInfo.DeviceIDs[1]).To(BeEquivalentTo("0000:03:02.0"))
+		It("should have \"0000:03:02.3\" in deviceIDs[1] (sorted order)", func() {
+			Expect(resourceInfo.DeviceIDs[1]).To(BeEquivalentTo("0000:03:02.3"))
 		})
 	})
 
