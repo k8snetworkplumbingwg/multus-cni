@@ -105,7 +105,8 @@ var _ = Describe(suiteName, func() {
 			var err error
 			K8sClient = fakeK8sClient()
 			// Touch the default network file.
-			os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+			_, err = os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+			Expect(err).NotTo(HaveOccurred())
 
 			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
 

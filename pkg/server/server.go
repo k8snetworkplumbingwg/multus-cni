@@ -84,6 +84,7 @@ func printCmdArgs(args *skel.CmdArgs) string {
 
 // HandleCNIRequest is the CNI server handler function; it is invoked whenever
 // a CNI request is processed.
+// Note: k8sArgs may be nil for plugin-level commands (STATUS, GC) that have no pod context.
 func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs) ([]byte, error) {
 	var result []byte
 	var err error
@@ -664,12 +665,12 @@ func (s *Server) cmdCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
 	return multus.CmdCheck(cmdArgs, s.exec, s.kubeclient)
 }
 
-func (s *Server) cmdGC(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
+func (s *Server) cmdGC(cmdArgs *skel.CmdArgs, _ *types.K8sArgs) error {
 	logging.Debugf("CmdGC. CNI conf: %+v", *cmdArgs)
 	return multus.CmdGC(cmdArgs, s.exec, s.kubeclient)
 }
 
-func (s *Server) cmdStatus(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
+func (s *Server) cmdStatus(cmdArgs *skel.CmdArgs, _ *types.K8sArgs) error {
 	logging.Debugf("CmdStatus. CNI conf: %+v", *cmdArgs)
 	return multus.CmdStatus(cmdArgs, s.exec, s.kubeclient)
 }
