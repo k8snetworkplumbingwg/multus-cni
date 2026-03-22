@@ -70,7 +70,18 @@ rules:
       - pods/status
     verbs:
       - get
+      - list
       - update
+      - watch
+  - apiGroups:
+      - "resource.k8s.io"
+    resources:
+      - resourceclaims
+      - resourceclaims/status
+      - resourceslices
+    verbs:
+      - get
+      - list
   - apiGroups:
       - ""
       - events.k8s.io

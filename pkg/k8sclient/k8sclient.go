@@ -42,6 +42,7 @@ import (
 	netclient "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/clientset/versioned"
 	netlister "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
 	netutils "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/utils"
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/draclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/kubeletclient"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/types"
@@ -52,6 +53,10 @@ const (
 	defaultNetAnnot        = "v1.multus-cni.io/default-network"
 	networkAttachmentAnnot = "k8s.v1.cni.cncf.io/networks"
 )
+
+// getResourceClientFunc returns kubelet / device-plugin resource info for a pod.
+// It defaults to kubeletclient.GetResourceClient; unit tests may replace it to avoid a real kubelet checkpoint/socket.
+var getResourceClientFunc = kubeletclient.GetResourceClient
 
 // NoK8sNetworkError indicates error, no network in kubernetes
 type NoK8sNetworkError struct {
@@ -309,7 +314,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
 
 		if resourceMap == nil {
-			ck, err := kubeletclient.GetResourceClient("")
+			ck, err := getResourceClientFunc("")
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get a ResourceClient instance: %v", err)
 			}
@@ -317,6 +322,13 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from ResourceClient: %v", err)
 			}
+
+			dc := draclient.NewClient(client.Client.ResourceV1())
+			err = dc.GetPodResourceMap(pod, resourceMap)
+			if err != nil {
+				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from DRA client: %v", err)
+			}
+
 			logging.Debugf("getKubernetesDelegate: resourceMap instance: %+v", resourceMap)
 		}
 
