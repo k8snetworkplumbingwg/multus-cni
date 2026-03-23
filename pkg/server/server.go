@@ -84,6 +84,7 @@ func printCmdArgs(args *skel.CmdArgs) string {
 
 // HandleCNIRequest is the CNI server handler function; it is invoked whenever
 // a CNI request is processed.
+// Note: k8sArgs may be nil for plugin-level commands (STATUS, GC) that have no pod context.
 func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs) ([]byte, error) {
 	var result []byte
 	var err error
@@ -434,9 +435,14 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
 
-	k8sArgs, err := kubernetesRuntimeArgs(cr.Env, s.kubeclient)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
+	// STATUS and GC are plugin-level commands with no pod context,
+	// so they don't have K8S_POD_NAME/K8S_POD_NAMESPACE in CNI_ARGS.
+	var k8sArgs *types.K8sArgs
+	if cmdType != "STATUS" && cmdType != "GC" {
+		k8sArgs, err = kubernetesRuntimeArgs(cr.Env, s.kubeclient)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
+		}
 	}
 
 	result, err := s.HandleCNIRequest(cmdType, k8sArgs, cniCmdArgs)
@@ -514,6 +520,18 @@ func (s *Server) extractCniData(cniRequest *api.Request, overrideConf []byte) (s
 	}
 
 	cniCmdArgs := &skel.CmdArgs{}
+
+	// STATUS and GC are plugin-level commands with no pod context;
+	// they don't require CNI_CONTAINERID, CNI_NETNS, or CNI_ARGS.
+	if cmd == "STATUS" || cmd == "GC" {
+		var err error
+		cniCmdArgs.StdinData, err = overrideCNIConfigWithServerConfig(cniRequest.Config, overrideConf, s.ignoreReadinessIndicator)
+		if err != nil {
+			return "", nil, err
+		}
+		return cmd, cniCmdArgs, nil
+	}
+
 	cniCmdArgs.ContainerID, ok = cniRequest.Env["CNI_CONTAINERID"]
 	if !ok {
 		return "", nil, fmt.Errorf("missing CNI_CONTAINERID")
@@ -647,25 +665,13 @@ func (s *Server) cmdCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
 	return multus.CmdCheck(cmdArgs, s.exec, s.kubeclient)
 }
 
-func (s *Server) cmdGC(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
-	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
-	podName := string(k8sArgs.K8S_POD_NAME)
-	if namespace == "" || podName == "" {
-		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
-	}
-
-	logging.Debugf("CmdGC for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
+func (s *Server) cmdGC(cmdArgs *skel.CmdArgs, _ *types.K8sArgs) error {
+	logging.Debugf("CmdGC. CNI conf: %+v", *cmdArgs)
 	return multus.CmdGC(cmdArgs, s.exec, s.kubeclient)
 }
 
-func (s *Server) cmdStatus(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
-	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
-	podName := string(k8sArgs.K8S_POD_NAME)
-	if namespace == "" || podName == "" {
-		return fmt.Errorf("required CNI variable missing. pod name: %s; pod namespace: %s", podName, namespace)
-	}
-
-	logging.Debugf("CmdStatus for [%s/%s]. CNI conf: %+v", namespace, podName, *cmdArgs)
+func (s *Server) cmdStatus(cmdArgs *skel.CmdArgs, _ *types.K8sArgs) error {
+	logging.Debugf("CmdStatus. CNI conf: %+v", *cmdArgs)
 	return multus.CmdStatus(cmdArgs, s.exec, s.kubeclient)
 }
 

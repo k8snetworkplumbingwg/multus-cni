@@ -91,6 +91,70 @@ var _ = Describe(suiteName, func() {
 		})
 	})
 
+	Context("STATUS and GC commands without pod context", func() {
+		const configPath = "/tmp/foo.multus.conf"
+
+		var (
+			cniServer *Server
+			K8sClient *k8s.ClientInfo
+			ctx       context.Context
+			cancel    context.CancelFunc
+		)
+
+		BeforeEach(func() {
+			var err error
+			K8sClient = fakeK8sClient()
+			// Touch the default network file.
+			_, err = os.OpenFile(configPath, os.O_RDONLY|os.O_CREATE, 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(FilesystemPreRequirements(thickPluginRunDir)).To(Succeed())
+
+			ctx, cancel = context.WithCancel(context.TODO())
+			cniServer, err = startCNIServer(ctx, thickPluginRunDir, K8sClient, nil)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Only set CNI_COMMAND — no CNI_CONTAINERID, CNI_NETNS, or CNI_ARGS
+			// to simulate how kubelet invokes STATUS/GC (plugin-level, no pod context).
+			os.Unsetenv("CNI_CONTAINERID")
+			os.Unsetenv("CNI_NETNS")
+			os.Unsetenv("CNI_ARGS")
+		})
+
+		AfterEach(func() {
+			cancel()
+			if _, errStat := os.Stat(configPath); errStat == nil {
+				Expect(os.Remove(configPath)).To(Succeed())
+			}
+			unregisterMetrics(cniServer)
+			Expect(cniServer.Close()).To(Succeed())
+			os.Unsetenv("CNI_COMMAND")
+			os.Unsetenv("CNI_ARGS")
+		})
+
+		It("STATUS succeeds with CNI_ARGS unset", func() {
+			Expect(os.Setenv("CNI_COMMAND", "STATUS")).NotTo(HaveOccurred())
+			Expect(api.CmdStatus(cniCmdArgs("", "", "", referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+
+		It("GC succeeds with CNI_ARGS unset", func() {
+			Expect(os.Setenv("CNI_COMMAND", "GC")).NotTo(HaveOccurred())
+			Expect(api.CmdGC(cniCmdArgs("", "", "", referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+
+		It("STATUS succeeds with CNI_ARGS empty", func() {
+			Expect(os.Setenv("CNI_COMMAND", "STATUS")).NotTo(HaveOccurred())
+			Expect(os.Setenv("CNI_ARGS", "")).NotTo(HaveOccurred())
+			Expect(api.CmdStatus(cniCmdArgs("", "", "", referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+
+		It("GC succeeds with CNI_ARGS empty", func() {
+			Expect(os.Setenv("CNI_COMMAND", "GC")).NotTo(HaveOccurred())
+			Expect(os.Setenv("CNI_ARGS", "")).NotTo(HaveOccurred())
+			Expect(api.CmdGC(cniCmdArgs("", "", "", referenceConfig(thickPluginRunDir)))).To(Succeed())
+		})
+	})
+
 	Context("CNI operations started from the shim", func() {
 		const (
 			containerID = "123456789"

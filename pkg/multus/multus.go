@@ -378,6 +378,7 @@ func conflistStatus(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf
 	}
 	if gt, _ := cniversion.GreaterThanOrEqualTo(confList.CNIVersion, "1.1.0"); !gt {
 		logging.Debugf("conflistStatus: skipping STATUS for network list %q cniVersion %q (< 1.1.0)", confList.Name, confList.CNIVersion)
+		return nil
 	}
 
 	err = cniNet.GetStatusNetworkList(context.Background(), confList)
