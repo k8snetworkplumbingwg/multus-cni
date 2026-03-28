@@ -3,6 +3,7 @@
 ![multus-cni Logo](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/docs/images/Multus.png)
 
 [![Build](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/build.yml)[![Test](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml/badge.svg)](https://github.com/k8snetworkplumbingwg/multus-cni/actions/workflows/test.yml)[![Go Report Card](https://goreportcard.com/badge/github.com/k8snetworkplumbingwg/multus-cni)](https://goreportcard.com/report/github.com/k8snetworkplumbingwg/multus-cni)[![Coverage Status](https://coveralls.io/repos/github/k8snetworkplumbingwg/multus-cni/badge.svg)](https://coveralls.io/github/k8snetworkplumbingwg/multus-cni)
+[![gitcgr](https://gitcgr.com/badge/k8snetworkplumbingwg/multus-cni.svg)](https://gitcgr.com/k8snetworkplumbingwg/multus-cni)
 
 Multus CNI enables attaching multiple network interfaces to pods in Kubernetes.
 
