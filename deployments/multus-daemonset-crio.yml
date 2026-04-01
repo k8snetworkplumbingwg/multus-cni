@@ -19,7 +19,8 @@ spec:
     singular: network-attachment-definition
     kind: NetworkAttachmentDefinition
     shortNames:
-    - net-attach-def
+      - nad
+      - net-attach-def
   versions:
     - name: v1
       served: true
