@@ -16,6 +16,7 @@ package draclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,6 +33,11 @@ const (
 	multusDeviceIDAttr     = "k8s.cni.cncf.io/deviceID"
 	multusResourceNameAttr = "k8s.cni.cncf.io/resourceName"
 )
+
+// errDeviceNotInAnySlice is returned when allocation names a device that does not appear
+// in any ResourceSlice for that driver/pool (wrapped in getDeviceInfo). Callers may skip
+// individual results so multi-device claims (e.g. SR-IOV + GPU) still succeed for CNI.
+var errDeviceNotInAnySlice = errors.New("device not in any matching resource slice")
 
 // namespacedClaimCacheKey avoids cache collisions: ResourceClaim is namespaced.
 func namespacedClaimCacheKey(namespace, claimName string) string {
@@ -99,20 +105,29 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 			return fmt.Errorf("claim %s has no device allocation", claimName)
 		}
 
-		for _, result := range resourceClaim.Status.Allocation.Devices.Results {
+		results := resourceClaim.Status.Allocation.Devices.Results
+		resolvedCount := 0
+		for _, result := range results {
 			logging.Debugf("GetPodResourceMap: processing device allocation - driver: %s, pool: %s, device: %s, request: %s",
 				result.Driver, result.Pool, result.Device, result.Request)
 
 			info, err := d.getDeviceInfo(ctx, result)
 			if err != nil {
+				if errors.Is(err, errDeviceNotInAnySlice) {
+					logging.Warningf(
+						"GetPodResourceMap: skipping allocation result for claim %s (driver=%s pool=%s device=%s): %v",
+						claimName, result.Driver, result.Pool, result.Device, err)
+					continue
+				}
 				logging.Errorf("GetPodResourceMap: failed to get device info for claim %s: %v", claimName, err)
 				return err
 			}
 
 			if info.ResourceName == "" {
-				resErr := fmt.Errorf("device %s missing required attribute %s (must match NAD k8s.v1.cni.cncf.io/resourceName)", result.Device, multusResourceNameAttr)
-				logging.Errorf("GetPodResourceMap: %v", resErr)
-				return resErr
+				logging.Warningf(
+					"GetPodResourceMap: skipping allocation result for claim %s (driver=%s pool=%s device=%s): no %q (only devices published for CNI are mapped)",
+					claimName, result.Driver, result.Pool, result.Device, multusResourceNameAttr)
+				continue
 			}
 
 			resourceMapKey := info.ResourceName
@@ -123,6 +138,14 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 				resourceMap[resourceMapKey] = &types.ResourceInfo{DeviceIDs: []string{info.DeviceID}}
 				logging.Debugf("GetPodResourceMap: created new resource map entry %s with device ID %s", resourceMapKey, info.DeviceID)
 			}
+			resolvedCount++
+		}
+		if resolvedCount == 0 && len(results) > 0 {
+			logging.Warningf(
+				"GetPodResourceMap: claim %s had no allocation results mapped for Multus (skipping this claim; existing kubelet/device-plugin map entries are kept). "+
+					"Fix DRA ResourceSlices or Multus attributes if this claim should contribute to CNI.",
+				claimName)
+			continue
 		}
 		logging.Debugf("GetPodResourceMap: successfully processed resource claim %s", claimName)
 	}
@@ -259,16 +282,18 @@ func (d *draClient) getDeviceInfo(ctx context.Context, result resourcev1api.Devi
 			devIDAttr, exists := device.Attributes[multusDeviceIDAttr]
 			if !exists {
 				logging.Warningf(
-					"getDeviceInfo: allocated device %q (driver %q, pool %q) has no %q attribute; DRA drivers must publish this for Multus; skipping device",
+					"getDeviceInfo: device %q (driver %q, pool %q) has no %q in ResourceSlice; skipping allocation result",
 					device.Name, result.Driver, result.Pool, multusDeviceIDAttr)
-				continue
+				return nil, fmt.Errorf("%w: device %q present in slice but missing %q",
+					errDeviceNotInAnySlice, device.Name, multusDeviceIDAttr)
 			}
 
 			if devIDAttr.StringValue == nil {
 				logging.Warningf(
-					"getDeviceInfo: allocated device %q (driver %q, pool %q) has %q with nil StringValue; skipping device",
+					"getDeviceInfo: device %q (driver %q, pool %q) has %q with nil StringValue; skipping allocation result",
 					device.Name, result.Driver, result.Pool, multusDeviceIDAttr)
-				continue
+				return nil, fmt.Errorf("%w: device %q has nil StringValue for %q",
+					errDeviceNotInAnySlice, device.Name, multusDeviceIDAttr)
 			}
 			info := &deviceInfo{DeviceID: *devIDAttr.StringValue}
 
@@ -283,7 +308,8 @@ func (d *draClient) getDeviceInfo(ctx context.Context, result resourcev1api.Devi
 		}
 	}
 
-	notFoundErr := fmt.Errorf("device %s not found for claim resource %s/%s in any matching resource slice", result.Device, result.Driver, result.Pool)
+	notFoundErr := fmt.Errorf("%w: device %s not found for claim resource %s/%s in any matching resource slice",
+		errDeviceNotInAnySlice, result.Device, result.Driver, result.Pool)
 	logging.Errorf("getDeviceInfo: %v", notFoundErr)
 	return nil, notFoundErr
 }
