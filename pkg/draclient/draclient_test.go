@@ -705,7 +705,7 @@ var _ = Describe("DRA Client operations", func() {
 		})
 
 		Context("when device does not have deviceID attribute", func() {
-			It("should return an error", func() {
+			It("should warn and skip the claim without failing", func() {
 				claimName := "test-claim"
 				deviceName := "device-1"
 				driverName := "test-driver.example.com"
@@ -785,13 +785,13 @@ var _ = Describe("DRA Client operations", func() {
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
 				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not found for claim resource"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap).To(BeEmpty())
 			})
 		})
 
 		Context("when device has deviceID but missing resourceName attribute", func() {
-			It("should return an error", func() {
+			It("should warn and skip without failing when nothing maps to a resource name", func() {
 				claimName := "test-claim"
 				deviceName := "device-1"
 				driverName := "test-driver.example.com"
@@ -846,13 +846,13 @@ var _ = Describe("DRA Client operations", func() {
 
 				resourceMap := make(map[string]*types.ResourceInfo)
 				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring(multusResourceNameAttr))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap).To(BeEmpty())
 			})
 		})
 
 		Context("when device name in allocation does not match any device in slice", func() {
-			It("should return an error", func() {
+			It("should warn and skip the claim without failing", func() {
 				claimName := "test-claim"
 				deviceName := "device-1"
 				wrongDeviceName := "wrong-device"
@@ -934,8 +934,145 @@ var _ = Describe("DRA Client operations", func() {
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
 				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not found for claim resource"))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap).To(BeEmpty())
+			})
+
+			It("should preserve existing kubelet map entries when the claim maps nothing", func() {
+				claimName := "test-claim"
+				deviceName := "device-1"
+				wrongDeviceName := "wrong-device"
+				driverName := "test-driver.example.com"
+				poolName := "test-pool"
+				requestName := "gpu"
+				deviceID := "pci:0000:00:01.0"
+				legacyKey := "example.com/legacy-vf"
+				legacyPCI := "0000:8d:00.4"
+
+				deviceIDValue := deviceID
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-resource-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceName,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									multusDeviceIDAttr: {StringValue: &deviceIDValue},
+								},
+							},
+						},
+					},
+				}
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claimName, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{Request: requestName, Driver: driverName, Pool: poolName, Device: wrongDeviceName},
+								},
+							},
+						},
+					},
+				}
+				claimNamePtr := claimName
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "hybrid-pod", Namespace: "default", UID: k8sTypes.UID("uid-hybrid")},
+					Status: v1.PodStatus{
+						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+							{Name: claimName, ResourceClaimName: &claimNamePtr},
+						},
+					},
+				}
+				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap := map[string]*types.ResourceInfo{
+					legacyKey: {DeviceIDs: []string{legacyPCI}},
+				}
+				err = draClient.GetPodResourceMap(pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap[legacyKey].DeviceIDs).To(Equal([]string{legacyPCI}))
+			})
+
+			It("should succeed when one allocation result is missing from slices but another resolves", func() {
+				claimName := "multi-claim"
+				driverSRIOV := "sriovnetwork.k8snetworkplumbingwg.io"
+				driverGPU := "gpu.nvidia.com"
+				poolName := "orch-dev-a100-002"
+				deviceVF := "0000-8d-00-4"
+				deviceGPU := "gpu-4"
+				deviceIDVF := "pci:0000:8d:00.4"
+				mapKey := "nvidia.com/port2"
+				deviceIDVFVal := deviceIDVF
+				mapKeyVal := mapKey
+
+				// SR-IOV slice has the VF; empty GPU slice exists so List() finds gpu.nvidia.com/pool (real clusters
+				// always publish a slice per driver/pool). Allocation still references gpu-4, which is not listed here.
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "sriov-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverSRIOV,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{
+								Name: deviceVF,
+								Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+									multusDeviceIDAttr:     {StringValue: &deviceIDVFVal},
+									multusResourceNameAttr: {StringValue: &mapKeyVal},
+								},
+							},
+						},
+					},
+				}
+				gpuSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "gpu-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver:  driverGPU,
+						Pool:    resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{},
+					},
+				}
+
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claimName, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{
+						Allocation: &resourcev1api.AllocationResult{
+							Devices: resourcev1api.DeviceAllocationResult{
+								Results: []resourcev1api.DeviceRequestAllocationResult{
+									{Request: "vf", Driver: driverSRIOV, Pool: poolName, Device: deviceVF},
+									{Request: "gpu", Driver: driverGPU, Pool: poolName, Device: deviceGPU},
+								},
+							},
+						},
+					},
+				}
+
+				claimNamePtr := claimName
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "mixed-pod", Namespace: "default", UID: k8sTypes.UID("uid-mixed")},
+					Status: v1.PodStatus{
+						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+							{Name: claimName, ResourceClaimName: &claimNamePtr},
+						},
+					},
+				}
+
+				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), gpuSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceIDVF}))
 			})
 		})
 
