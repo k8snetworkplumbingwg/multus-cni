@@ -1060,33 +1060,19 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	}
 
 	if !useCacheConf {
-		// Fetch delegates again if cache is not exist and pod info can be read
-		if os.IsNotExist(err) && pod != nil {
-			if in.ClusterNetwork != "" {
-				_, err = k8s.GetDefaultNetworks(pod, in, kubeClient, nil)
-				if err != nil {
-					return cmdErr(k8sArgs, "failed to get clusterNetwork/defaultNetworks: %v", err)
-				}
-				// First delegate is always the master plugin
-				in.Delegates[0].MasterPlugin = true
-			}
-
-			// Get pod annotation and so on
-			_, _, err := k8s.TryLoadPodDelegates(pod, in, kubeClient, nil)
-			if err != nil {
-				if len(in.Delegates) == 0 {
-					// No delegate available so send error
-					return cmdErr(k8sArgs, "failed to get delegates: %v", err)
-				}
-				// Get clusterNetwork before, so continue to delete
-				logging.Errorf("Multus: failed to get delegates: %v, but continue to delete clusterNetwork", err)
-			}
-		} else {
-			// The options to continue with a delete have been exhausted (cachefile + API query didn't work)
-			// We cannot exit with an error as this may cause a sandbox to never get deleted.
-			logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
+		// If cache does not exist, ADD was never completed for this sandbox.
+		// Attempting DEL with a config reconstructed from the API will fail because
+		// delegate plugins (e.g. kube-ovn) require runtime state that only exists
+		// after a successful ADD (socket paths, cached results, etc.).
+		// Return success to allow containerd to release the sandbox name reservation.
+		if os.IsNotExist(err) {
+			logging.Verbosef("Multus: no cache found for container %s (ADD was never completed), skip DEL", args.ContainerID)
 			return nil
 		}
+		// The options to continue with a delete have been exhausted
+		// We cannot exit with an error as this may cause a sandbox to never get deleted.
+		logging.Errorf("Multus: failed to get the cached delegates file: %v, cannot properly delete", err)
+		return nil
 	}
 
 	// set CNIVersion in delegate CNI config if there is no CNIVersion and multus conf have CNIVersion.
