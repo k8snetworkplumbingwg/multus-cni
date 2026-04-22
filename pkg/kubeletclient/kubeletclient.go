@@ -152,7 +152,14 @@ func (rc *kubeletClient) getDevicePluginResources(devices []*podresourcesapi.Con
 		if rInfo, ok := resourceMap[dev.ResourceName]; ok {
 			rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
 		} else {
-			resourceMap[dev.ResourceName] = &types.ResourceInfo{DeviceIDs: dev.DeviceIds}
+			// Copy dev.DeviceIds into a fresh slice. Storing the
+			// kubelet-owned slice directly lets SortDeviceIDs'
+			// in-place sort mutate the cached rc.resources backing
+			// array, which is a data race under concurrent
+			// GetPodResourceMap calls (#1495).
+			resourceMap[dev.ResourceName] = &types.ResourceInfo{
+				DeviceIDs: append([]string(nil), dev.DeviceIds...),
+			}
 		}
 	}
 }
