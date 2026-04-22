@@ -149,11 +149,17 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 
 func (rc *kubeletClient) getDevicePluginResources(devices []*podresourcesapi.ContainerDevices, resourceMap map[string]*types.ResourceInfo) {
 	for _, dev := range devices {
-		if rInfo, ok := resourceMap[dev.ResourceName]; ok {
-			rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
-		} else {
-			resourceMap[dev.ResourceName] = &types.ResourceInfo{DeviceIDs: dev.DeviceIds}
+		rInfo, ok := resourceMap[dev.ResourceName]
+		if !ok {
+			rInfo = &types.ResourceInfo{}
+			resourceMap[dev.ResourceName] = rInfo
 		}
+		// Append into a map-owned slice rather than aliasing
+		// dev.DeviceIds directly: append from an empty destination
+		// produces a fresh backing array, so SortDeviceIDs' in-place
+		// sort can't bleed back into the kubelet response / cached
+		// rc.resources backing array (#1495).
+		rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
 	}
 }
 
