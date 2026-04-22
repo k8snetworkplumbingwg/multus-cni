@@ -51,4 +51,12 @@ func TestGetDevicePluginResourcesDoesNotAliasDeviceIds(t *testing.T) {
 	if len(stored) != len(original) {
 		t.Fatalf("resourceMap slice length changed: got %d want %d", len(stored), len(original))
 	}
+	// SortDeviceIDs should have sorted the map-owned copy.
+	expectedSorted := []string{"dev-a", "dev-b", "dev-c"}
+	for i := range expectedSorted {
+		if stored[i] != expectedSorted[i] {
+			t.Fatalf("resourceMap slice not sorted at index %d: got %q want %q (full: %v)",
+				i, stored[i], expectedSorted[i], stored)
+		}
+	}
 }
