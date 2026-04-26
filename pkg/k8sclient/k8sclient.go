@@ -324,7 +324,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 			}
 
 			dc := draclient.NewClient(client.Client.ResourceV1())
-			err = dc.GetPodResourceMap(pod, resourceMap)
+			err = dc.GetPodResourceMap(context.TODO(), pod, resourceMap)
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from DRA client: %v", err)
 			}

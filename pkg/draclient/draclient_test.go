@@ -67,7 +67,7 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err := draClient.GetPodResourceMap(pod, resourceMap)
+				err := draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -160,7 +160,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(mapKey))
@@ -270,7 +270,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(mapKey))
@@ -346,7 +346,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(keyA))
@@ -458,7 +458,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey("example.com/sriov-port1"))
@@ -545,7 +545,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey("nvidia.com/sriov-port1"))
@@ -611,7 +611,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(multusResourceNameAttr))
 				Expect(err.Error()).To(ContainSubstring("expected.example.com/port"))
@@ -639,14 +639,14 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err := draClient.GetPodResourceMap(pod, resourceMap)
+				err := draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
 		})
 
 		Context("when resource slice does not exist", func() {
-			It("should return an error", func() {
+			It("should skip the claim and return empty resource map without error", func() {
 				claimName := "test-claim"
 				deviceName := "device-1"
 				driverName := "test-driver.example.com"
@@ -696,11 +696,12 @@ var _ = Describe("DRA Client operations", func() {
 				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
-				// Execute
+				// Execute — no slice means List returns empty; device misses cache → errDeviceNotInAnySlice
+				// → skipped silently (non-CNI claim graceful handling). No error, empty map.
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no resource slice found for driver/pool"))
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap).To(BeEmpty())
 			})
 		})
 
@@ -784,7 +785,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -845,7 +846,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -933,7 +934,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -994,7 +995,7 @@ var _ = Describe("DRA Client operations", func() {
 				resourceMap := map[string]*types.ResourceInfo{
 					legacyKey: {DeviceIDs: []string{legacyPCI}},
 				}
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap[legacyKey].DeviceIDs).To(Equal([]string{legacyPCI}))
 			})
@@ -1070,7 +1071,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceIDVF}))
 			})
@@ -1160,7 +1161,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// First call - should populate cache
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				expectedKey := mapKey
@@ -1175,10 +1176,97 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Second call - should use cache and succeed even though objects are deleted
 				resourceMap2 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap2)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap2)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap2).To(HaveKey(expectedKey))
 				Expect(resourceMap2[expectedKey].DeviceIDs).To(Equal([]string{deviceID}))
+			})
+		})
+
+		Context("when two claims share the same driver", func() {
+			It("should populate the driver cache only once and resolve both devices", func() {
+				driverName := "sriovnetwork.k8snetworkplumbingwg.io"
+				poolName := "test-pool"
+				device1Name := "dev-a"
+				device2Name := "dev-b"
+				deviceID1 := "pci:0000:01:00.0"
+				deviceID2 := "pci:0000:02:00.0"
+				mapKey1 := "sriov.example.com/net-a"
+				mapKey2 := "sriov.example.com/net-b"
+				claim1Name := "claim-a"
+				claim2Name := "claim-b"
+
+				dv1, dv2, mk1, mk2 := deviceID1, deviceID2, mapKey1, mapKey2
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "sriov-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{Name: device1Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &dv1}, multusResourceNameAttr: {StringValue: &mk1},
+							}},
+							{Name: device2Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &dv2}, multusResourceNameAttr: {StringValue: &mk2},
+							}},
+						},
+					},
+				}
+
+				c1ptr, c2ptr := claim1Name, claim2Name
+				resourceClaim1 := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claim1Name, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "req-a", Driver: driverName, Pool: poolName, Device: device1Name},
+						}},
+					}},
+				}
+				resourceClaim2 := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claim2Name, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "req-b", Driver: driverName, Pool: poolName, Device: device2Name},
+						}},
+					}},
+				}
+
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "two-claim-pod", Namespace: "default", UID: k8sTypes.UID("uid-two")},
+					Status: v1.PodStatus{
+						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+							{Name: claim1Name, ResourceClaimName: &c1ptr},
+							{Name: claim2Name, ResourceClaimName: &c2ptr},
+						},
+					},
+				}
+
+				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim1, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim2, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resourceMap).To(HaveKey(mapKey1))
+				Expect(resourceMap[mapKey1].DeviceIDs).To(Equal([]string{deviceID1}))
+				Expect(resourceMap).To(HaveKey(mapKey2))
+				Expect(resourceMap[mapKey2].DeviceIDs).To(Equal([]string{deviceID2}))
+
+				// Verify the driver cache was populated after the first call: delete the slice from
+				// the API server and call again — if cache is working, it must still resolve correctly.
+				err = fakeClient.ResourceV1().ResourceSlices().Delete(context.TODO(), resourceSlice.Name, metav1.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap2 := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap2)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap2[mapKey1].DeviceIDs).To(Equal([]string{deviceID1}))
+				Expect(resourceMap2[mapKey2].DeviceIDs).To(Equal([]string{deviceID2}))
 			})
 		})
 
@@ -1271,12 +1359,12 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				m1 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(podA, m1)
+				err = draClient.GetPodResourceMap(context.TODO(), podA, m1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(m1[mapKey].DeviceIDs).To(Equal([]string{pciA}))
 
 				m2 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(podB, m2)
+				err = draClient.GetPodResourceMap(context.TODO(), podB, m2)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(m2[mapKey].DeviceIDs).To(Equal([]string{pciB}))
 			})
@@ -1368,7 +1456,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Test first claim
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod1, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod1, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(mapKey1))
@@ -1458,7 +1546,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Test second claim
 				resourceMap2 := make(map[string]*types.ResourceInfo)
-				err = draClient2.GetPodResourceMap(pod2, resourceMap2)
+				err = draClient2.GetPodResourceMap(context.TODO(), pod2, resourceMap2)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap2).To(HaveKey(mapKey2))
@@ -1557,7 +1645,7 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				// Execute
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify device ID was appended
@@ -1679,7 +1767,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient2.GetPodResourceMap(pod, resourceMap)
+				err = draClient2.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(HaveKey(mapKey))
 				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceID}))
