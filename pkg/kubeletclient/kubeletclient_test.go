@@ -68,32 +68,6 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 		},
 	}
 
-	cdiDevices := []*podresourcesapi.CDIDevice{
-		{
-			Name: "cdi-kind=cdi-resource",
-		},
-	}
-	draDriverName := "dra.example.com"
-	poolName := "worker-1-pool"
-	deviceName := "gpu-1"
-
-	claimsResource := []*podresourcesapi.ClaimResource{
-		{
-			CdiDevices: cdiDevices,
-			DriverName: draDriverName,
-			PoolName:   poolName,
-			DeviceName: deviceName,
-		},
-	}
-
-	dynamicResources := []*podresourcesapi.DynamicResource{
-		{
-			ClaimName:      "resource-claim",
-			ClaimNamespace: "dynamic-resource-pod-namespace",
-			ClaimResources: claimsResource,
-		},
-	}
-
 	resp := &podresourcesapi.ListPodResourcesResponse{
 		PodResources: []*podresourcesapi.PodResources{
 			{
@@ -103,16 +77,6 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 					{
 						Name:    "container-name",
 						Devices: devs,
-					},
-				},
-			},
-			{
-				Name:      "dynamic-resource-pod-name",
-				Namespace: "dynamic-resource-pod-namespace",
-				Containers: []*podresourcesapi.ContainerResources{
-					{
-						Name:             "dynamic-resource-container-name",
-						DynamicResources: dynamicResources,
 					},
 				},
 			},

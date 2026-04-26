@@ -63,6 +63,21 @@ func (*fakeEmptyResourceClient) GetPodResourceMap(*v1.Pod) (map[string]*types.Re
 	return make(map[string]*types.ResourceInfo), nil
 }
 
+// fakeResourceClient implements types.ResourceClient with a pre-seeded device-plugin resource map,
+// simulating what the kubelet returns for device-plugin (non-DRA) allocations.
+type fakeResourceClient struct {
+	resourceMap map[string]*types.ResourceInfo
+}
+
+func (f *fakeResourceClient) GetPodResourceMap(*v1.Pod) (map[string]*types.ResourceInfo, error) {
+	result := make(map[string]*types.ResourceInfo)
+	for k, v := range f.resourceMap {
+		cp := &types.ResourceInfo{DeviceIDs: append([]string(nil), v.DeviceIDs...)}
+		result[k] = cp
+	}
+	return result, nil
+}
+
 var _ = Describe("k8sclient operations", func() {
 	var tmpDir string
 	var err error
@@ -1616,10 +1631,10 @@ users:
 				Expect(err).NotTo(HaveOccurred())
 
 				// Create ResourceClaim
-				deviceName := "gpu-1"
-				driverName := "gpu.example.com"
-				poolName := "gpu-pool"
-				requestName := "gpu"
+				deviceName := "vf-1"
+				driverName := "sriovnetwork.k8snetworkplumbingwg.io"
+				poolName := "sriov-pool"
+				requestName := "sriov"
 				deviceID := "pci:0000:00:01.0"
 
 				deviceIDValue := deviceID
@@ -2129,6 +2144,161 @@ users:
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 				Expect(updatedResourceMap).NotTo(BeNil())
+			})
+		})
+
+		Context("when pod has both device-plugin resources and a DRA ResourceClaim", func() {
+			// Both tests override getResourceClientFunc so the kubelet stub returns a pre-seeded
+			// SR-IOV device-plugin allocation, letting us exercise the combined kubelet+DRA path.
+			const sriovResourceName = "openshift/sriov"
+			const sriovDeviceIDKubelet = "0000:01:00.4"
+			var origGetResourceClient func(string) (types.ResourceClient, error)
+
+			BeforeEach(func() {
+				origGetResourceClient = getResourceClientFunc
+				getResourceClientFunc = func(string) (types.ResourceClient, error) {
+					return &fakeResourceClient{
+						resourceMap: map[string]*types.ResourceInfo{
+							sriovResourceName: {DeviceIDs: []string{sriovDeviceIDKubelet}},
+						},
+					}, nil
+				}
+			})
+
+			AfterEach(func() {
+				getResourceClientFunc = origGetResourceClient
+			})
+
+			It("should merge kubelet device-plugin entry with DRA SR-IOV claim that has full CNI attributes", func() {
+				const fakePodName = "hybrid-sriov-pod"
+				const fakeNamespace = "default"
+				const sriovDeviceIDDRA = "0000:02:00.4"
+
+				netAttachDef := `{"name":"sriov-net","type":"sriov","cniVersion":"0.3.1"}`
+				claimName := "sriov-dra-claim"
+				driverName := "sriovnetwork.k8snetworkplumbingwg.io"
+				poolName := "sriov-pool"
+				deviceName := "vf-0"
+
+				claimNamePtr := claimName
+				fakePod := testutils.NewFakePod(fakePodName, "sriov-net", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: claimName, ResourceClaimName: &claimNamePtr},
+				}
+
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				// NAD carries the resourceName annotation → triggers both kubelet and DRA paths
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "sriov-net", netAttachDef)
+				nad.Annotations = map[string]string{resourceNameAnnot: sriovResourceName}
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// DRA device has both CNI attributes → appended to kubelet entry in resourceMap
+				draDeviceID := sriovDeviceIDDRA
+				draResName := sriovResourceName
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "sriov-dra-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{Name: deviceName, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								"k8s.cni.cncf.io/deviceID":     {StringValue: &draDeviceID},
+								"k8s.cni.cncf.io/resourceName": {StringValue: &draResName},
+							}},
+						},
+					},
+				}
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claimName, Namespace: fakeNamespace},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "sriov", Driver: driverName, Pool: poolName, Device: deviceName},
+						}},
+					}},
+				}
+
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				net := &types.NetworkSelectionElement{Name: "sriov-net", Namespace: fakeNamespace}
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+
+				// Both kubelet and DRA device IDs must be present under the same resource name key
+				Expect(resourceMap).To(HaveKey(sriovResourceName))
+				Expect(resourceMap[sriovResourceName].DeviceIDs).To(ConsistOf(sriovDeviceIDKubelet, sriovDeviceIDDRA))
+			})
+
+			It("should silently skip a GPU DRA claim that has no CNI attributes and still resolve the device-plugin SR-IOV entry", func() {
+				const fakePodName = "hybrid-gpu-pod"
+				const fakeNamespace = "default"
+
+				netAttachDef := `{"name":"sriov-net","type":"sriov","cniVersion":"0.3.1"}`
+				claimName := "gpu-dra-claim"
+				driverName := "gpu.nvidia.com"
+				poolName := "gpu-pool"
+				deviceName := "gpu-0"
+
+				claimNamePtr := claimName
+				fakePod := testutils.NewFakePod(fakePodName, "sriov-net", "")
+				fakePod.Namespace = fakeNamespace
+				fakePod.Status.ResourceClaimStatuses = []v1.PodResourceClaimStatus{
+					{Name: claimName, ResourceClaimName: &claimNamePtr},
+				}
+
+				clientInfo := NewFakeClientInfo()
+				_, err = clientInfo.AddPod(fakePod)
+				Expect(err).NotTo(HaveOccurred())
+
+				nad := testutils.NewFakeNetAttachDef(fakeNamespace, "sriov-net", netAttachDef)
+				nad.Annotations = map[string]string{resourceNameAnnot: sriovResourceName}
+				_, err = clientInfo.AddNetAttachDef(nad)
+				Expect(err).NotTo(HaveOccurred())
+
+				// GPU ResourceSlice intentionally has no k8s.cni.cncf.io/deviceID attribute
+				gpuAttrVal := "gpu-model-a100"
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "gpu-dra-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{Name: deviceName, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								"gpu.nvidia.com/model": {StringValue: &gpuAttrVal},
+							}},
+						},
+					},
+				}
+				resourceClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claimName, Namespace: fakeNamespace},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "gpu", Driver: driverName, Pool: poolName, Device: deviceName},
+						}},
+					}},
+				}
+
+				_, err = clientInfo.Client.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = clientInfo.Client.ResourceV1().ResourceClaims(fakeNamespace).Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				net := &types.NetworkSelectionElement{Name: "sriov-net", Namespace: fakeNamespace}
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(delegate).NotTo(BeNil())
+
+				// GPU claim contributed nothing; only the kubelet device-plugin entry is present
+				Expect(resourceMap).To(HaveKey(sriovResourceName))
+				Expect(resourceMap[sriovResourceName].DeviceIDs).To(Equal([]string{sriovDeviceIDKubelet}))
 			})
 		})
 	})

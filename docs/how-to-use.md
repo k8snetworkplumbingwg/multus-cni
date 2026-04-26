@@ -658,7 +658,7 @@ concepts to make use of Multus DRA support.
 
 #### Install DRA driver
 
-You need to install a DRA driver that provides network devices. For example, you can use the SR-IOV DRA driver or 
+You need to install a DRA driver that provides network devices. For example, you can use the [SR-IOV DRA](https://github.com/k8snetworkplumbingwg/dra-driver-sriov) driver or 
 other DRA networking drivers. Refer to your DRA driver documentation for installation instructions.
 
 The DRA driver MUST expose the following attributes on each allocated **device** in `ResourceSlice`:
