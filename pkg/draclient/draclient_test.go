@@ -36,7 +36,7 @@ var _ = Describe("DRA Client operations", func() {
 
 	Describe("NewClient", func() {
 		It("should create a new DRA client successfully", func() {
-			fakeClient := fake.NewSimpleClientset()
+			fakeClient := fake.NewClientset()
 			client := NewClient(fakeClient.ResourceV1())
 			Expect(client).NotTo(BeNil())
 		})
@@ -49,7 +49,7 @@ var _ = Describe("DRA Client operations", func() {
 		)
 
 		BeforeEach(func() {
-			fakeClient = fake.NewSimpleClientset()
+			fakeClient = fake.NewClientset()
 			draClient = NewClient(fakeClient.ResourceV1())
 		})
 
@@ -67,7 +67,7 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err := draClient.GetPodResourceMap(pod, resourceMap)
+				err := draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -134,39 +134,136 @@ var _ = Describe("DRA Client operations", func() {
 					},
 				}
 
-				// Create pod with resource claim status
-				claimNamePtr := claimName
-				pod := &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-pod",
-						Namespace: "default",
-						UID:       k8sTypes.UID("test-uid"),
-					},
-					Status: v1.PodStatus{
-						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
-							{
-								Name:              claimName, // spec ref name (pod.spec.resourceClaims[].name)
-								ResourceClaimName: &claimNamePtr,
-							},
+			// Create pod with resource claim status.
+			// Spec.NodeName is set so ensureDriverCachePopulated takes the
+			// node-scoped selector branch (spec.nodeName + spec.driver).
+			claimNamePtr := claimName
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "default",
+					UID:       k8sTypes.UID("test-uid"),
+				},
+				Spec: v1.PodSpec{
+					NodeName: "test-node",
+				},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{
+							Name:              claimName, // spec ref name (pod.spec.resourceClaims[].name)
+							ResourceClaimName: &claimNamePtr,
 						},
 					},
-				}
+				},
+			}
 
-				// Add objects to fake client
-				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
-				Expect(err).NotTo(HaveOccurred())
-				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
-				Expect(err).NotTo(HaveOccurred())
+			// Add objects to fake client
+			_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
 
-				// Execute
-				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).NotTo(HaveOccurred())
+			// Execute
+			resourceMap := make(map[string]*types.ResourceInfo)
+			err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
 
-				Expect(resourceMap).To(HaveKey(mapKey))
-				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceID}))
-			})
+			Expect(resourceMap).To(HaveKey(mapKey))
+			Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceID}))
 		})
+
+		It("should not include devices from a different node when the pod has a nodeName set", func() {
+			// This test verifies node-scoping: when nodeName is non-empty the code
+			// uses a spec.nodeName/spec.driver field selector. The fake API server
+			// does not enforce server-side field selectors, but we can still confirm
+			// that only the device actually allocated to the pod's claim appears in
+			// the result — devices from a slice that is on a different node but
+			// shares the same driver are a no-op because the claim does not reference
+			// their device/pool.
+			claimName := "node-scoped-claim"
+			driverName := "test-driver.example.com"
+			poolName := "test-pool"
+			deviceName := "device-1"
+			deviceID := "pci:0000:00:01.0"
+			mapKey := "intel.com/sriov-vf"
+
+			deviceIDValue := deviceID
+			mapKeyValue := mapKey
+			podNodeName := "test-node"
+			otherNodeNameVal := "other-node"
+			// Slice for the pod's node.
+			sliceOnPodNode := &resourcev1api.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-test-node"},
+				Spec: resourcev1api.ResourceSliceSpec{
+					Driver:   driverName,
+					NodeName: &podNodeName,
+					Pool:     resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+					Devices: []resourcev1api.Device{
+						{Name: deviceName, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+							multusDeviceIDAttr:     {StringValue: &deviceIDValue},
+							multusResourceNameAttr: {StringValue: &mapKeyValue},
+						}},
+					},
+				},
+			}
+
+			otherDeviceID := "pci:0000:00:99.0"
+			otherDeviceIDValue := otherDeviceID
+			otherMapKeyValue := mapKey
+			// Slice for a different node — should not produce entries for this pod's claim.
+			sliceOnOtherNode := &resourcev1api.ResourceSlice{
+				ObjectMeta: metav1.ObjectMeta{Name: "slice-other-node"},
+				Spec: resourcev1api.ResourceSliceSpec{
+					Driver:   driverName,
+					NodeName: &otherNodeNameVal,
+					Pool:     resourcev1api.ResourcePool{Name: "other-pool", ResourceSliceCount: 1},
+					Devices: []resourcev1api.Device{
+						{Name: "other-device", Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+							multusDeviceIDAttr:     {StringValue: &otherDeviceIDValue},
+							multusResourceNameAttr: {StringValue: &otherMapKeyValue},
+						}},
+					},
+				},
+			}
+
+			claimNamePtr := claimName
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "scoped-pod", Namespace: "default"},
+				Spec:       v1.PodSpec{NodeName: "test-node"},
+				Status: v1.PodStatus{
+					ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+						{Name: claimName, ResourceClaimName: &claimNamePtr},
+					},
+				},
+			}
+
+			resourceClaim := &resourcev1api.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: claimName, Namespace: "default"},
+				Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+					Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+						{Request: "sriov", Driver: driverName, Pool: poolName, Device: deviceName},
+					}},
+				}},
+			}
+
+			_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), sliceOnPodNode, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), sliceOnOtherNode, metav1.CreateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			resourceMap := make(map[string]*types.ResourceInfo)
+			err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Only the device allocated by the claim (on "test-node") must appear.
+			Expect(resourceMap).To(HaveKey(mapKey))
+			Expect(resourceMap[mapKey].DeviceIDs).To(ConsistOf(deviceID))
+			// The other-node device ID must not be present.
+			Expect(resourceMap[mapKey].DeviceIDs).NotTo(ContainElement(otherDeviceID))
+		})
+	})
 
 		Context("when multiple devices are allocated to the same claim/request", func() {
 			It("should append all device IDs to the resource map", func() {
@@ -270,7 +367,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(mapKey))
@@ -346,7 +443,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(keyA))
@@ -458,7 +555,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey("example.com/sriov-port1"))
@@ -545,7 +642,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey("nvidia.com/sriov-port1"))
@@ -611,7 +708,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring(multusResourceNameAttr))
 				Expect(err.Error()).To(ContainSubstring("expected.example.com/port"))
@@ -639,14 +736,14 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err := draClient.GetPodResourceMap(pod, resourceMap)
+				err := draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
 		})
 
 		Context("when resource slice does not exist", func() {
-			It("should return an error", func() {
+			It("should skip the claim and return empty resource map without error", func() {
 				claimName := "test-claim"
 				deviceName := "device-1"
 				driverName := "test-driver.example.com"
@@ -696,11 +793,12 @@ var _ = Describe("DRA Client operations", func() {
 				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
-				// Execute
+				// Execute — no slice means List returns empty; device misses cache → errDeviceNotInAnySlice
+				// → skipped silently (non-CNI claim graceful handling). No error, empty map.
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("no resource slice found for driver/pool"))
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap).To(BeEmpty())
 			})
 		})
 
@@ -784,7 +882,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -845,7 +943,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -933,7 +1031,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Execute
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(BeEmpty())
 			})
@@ -994,7 +1092,7 @@ var _ = Describe("DRA Client operations", func() {
 				resourceMap := map[string]*types.ResourceInfo{
 					legacyKey: {DeviceIDs: []string{legacyPCI}},
 				}
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap[legacyKey].DeviceIDs).To(Equal([]string{legacyPCI}))
 			})
@@ -1070,7 +1168,7 @@ var _ = Describe("DRA Client operations", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceIDVF}))
 			})
@@ -1160,7 +1258,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// First call - should populate cache
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				expectedKey := mapKey
@@ -1175,10 +1273,97 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Second call - should use cache and succeed even though objects are deleted
 				resourceMap2 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod, resourceMap2)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap2)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap2).To(HaveKey(expectedKey))
 				Expect(resourceMap2[expectedKey].DeviceIDs).To(Equal([]string{deviceID}))
+			})
+		})
+
+		Context("when two claims share the same driver", func() {
+			It("should populate the driver cache only once and resolve both devices", func() {
+				driverName := "sriovnetwork.k8snetworkplumbingwg.io"
+				poolName := "test-pool"
+				device1Name := "dev-a"
+				device2Name := "dev-b"
+				deviceID1 := "pci:0000:01:00.0"
+				deviceID2 := "pci:0000:02:00.0"
+				mapKey1 := "sriov.example.com/net-a"
+				mapKey2 := "sriov.example.com/net-b"
+				claim1Name := "claim-a"
+				claim2Name := "claim-b"
+
+				dv1, dv2, mk1, mk2 := deviceID1, deviceID2, mapKey1, mapKey2
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "sriov-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{Name: device1Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &dv1}, multusResourceNameAttr: {StringValue: &mk1},
+							}},
+							{Name: device2Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &dv2}, multusResourceNameAttr: {StringValue: &mk2},
+							}},
+						},
+					},
+				}
+
+				c1ptr, c2ptr := claim1Name, claim2Name
+				resourceClaim1 := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claim1Name, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "req-a", Driver: driverName, Pool: poolName, Device: device1Name},
+						}},
+					}},
+				}
+				resourceClaim2 := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: claim2Name, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "req-b", Driver: driverName, Pool: poolName, Device: device2Name},
+						}},
+					}},
+				}
+
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "two-claim-pod", Namespace: "default", UID: k8sTypes.UID("uid-two")},
+					Status: v1.PodStatus{
+						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+							{Name: claim1Name, ResourceClaimName: &c1ptr},
+							{Name: claim2Name, ResourceClaimName: &c2ptr},
+						},
+					},
+				}
+
+				_, err := fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim1, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim2, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(resourceMap).To(HaveKey(mapKey1))
+				Expect(resourceMap[mapKey1].DeviceIDs).To(Equal([]string{deviceID1}))
+				Expect(resourceMap).To(HaveKey(mapKey2))
+				Expect(resourceMap[mapKey2].DeviceIDs).To(Equal([]string{deviceID2}))
+
+				// Verify the driver cache was populated after the first call: delete the slice from
+				// the API server and call again — if cache is working, it must still resolve correctly.
+				err = fakeClient.ResourceV1().ResourceSlices().Delete(context.TODO(), resourceSlice.Name, metav1.DeleteOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap2 := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap2)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resourceMap2[mapKey1].DeviceIDs).To(Equal([]string{deviceID1}))
+				Expect(resourceMap2[mapKey2].DeviceIDs).To(Equal([]string{deviceID2}))
 			})
 		})
 
@@ -1271,12 +1456,12 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				m1 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(podA, m1)
+				err = draClient.GetPodResourceMap(context.TODO(), podA, m1)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(m1[mapKey].DeviceIDs).To(Equal([]string{pciA}))
 
 				m2 := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(podB, m2)
+				err = draClient.GetPodResourceMap(context.TODO(), podB, m2)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(m2[mapKey].DeviceIDs).To(Equal([]string{pciB}))
 			})
@@ -1368,7 +1553,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Test first claim
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient.GetPodResourceMap(pod1, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod1, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap).To(HaveKey(mapKey1))
@@ -1383,7 +1568,7 @@ var _ = Describe("DRA Client operations", func() {
 				deviceID2 := "pci:0000:00:02.0"
 				mapKey2 := "driver2.example.com/nic-net"
 
-				fakeClient2 := fake.NewSimpleClientset()
+				fakeClient2 := fake.NewClientset()
 				draClient2 := NewClient(fakeClient2.ResourceV1())
 
 				deviceID2Value := deviceID2
@@ -1458,7 +1643,7 @@ var _ = Describe("DRA Client operations", func() {
 
 				// Test second claim
 				resourceMap2 := make(map[string]*types.ResourceInfo)
-				err = draClient2.GetPodResourceMap(pod2, resourceMap2)
+				err = draClient2.GetPodResourceMap(context.TODO(), pod2, resourceMap2)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(resourceMap2).To(HaveKey(mapKey2))
@@ -1557,7 +1742,7 @@ var _ = Describe("DRA Client operations", func() {
 				}
 
 				// Execute
-				err = draClient.GetPodResourceMap(pod, resourceMap)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Verify device ID was appended
@@ -1672,17 +1857,122 @@ var _ = Describe("DRA Client operations", func() {
 
 				var objects []runtime.Object
 				objects = append(objects, resourceSlice1, resourceSlice2)
-				fakeClient2 := fake.NewSimpleClientset(objects...)
+				fakeClient2 := fake.NewClientset(objects...)
 				draClient2 := NewClient(fakeClient2.ResourceV1())
 
 				_, err = fakeClient2.ResourceV1().ResourceClaims("default").Create(context.TODO(), resourceClaim, metav1.CreateOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				resourceMap := make(map[string]*types.ResourceInfo)
-				err = draClient2.GetPodResourceMap(pod, resourceMap)
+				err = draClient2.GetPodResourceMap(context.TODO(), pod, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resourceMap).To(HaveKey(mapKey))
 				Expect(resourceMap[mapKey].DeviceIDs).To(Equal([]string{deviceID}))
+			})
+		})
+
+		Context("when pod has both regular ResourceClaimStatuses and ExtendedResourceClaimStatus", func() {
+			It("should populate resource map from both paths independently", func() {
+				driverName := "sriovnetwork.k8snetworkplumbingwg.io"
+				poolName := "test-pool"
+
+				// Regular claim: one VF mapped via ResourceClaimStatuses
+				regularClaimName := "regular-claim"
+				regularDeviceName := "vf-0"
+				regularDeviceID := "pci:0000:01:00.0"
+				regularMapKey := "sriov.example.com/vf-net"
+
+				// Extended claim: two ports mapped via ExtendedResourceClaimStatus
+				extClaimName := "extended-claim"
+				extDevice1Name := "vf-1"
+				extDevice2Name := "vf-2"
+				extDeviceID1 := "pci:0000:02:00.0"
+				extDeviceID2 := "pci:0000:03:00.0"
+				extMapKey1 := "sriov.example.com/port-a"
+				extMapKey2 := "sriov.example.com/port-b"
+
+				rdID, rmk := regularDeviceID, regularMapKey
+				ed1, ed2 := extDeviceID1, extDeviceID2
+				emk1, emk2 := extMapKey1, extMapKey2
+
+				// One ResourceSlice covers all devices for the driver
+				resourceSlice := &resourcev1api.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{Name: "sriov-slice"},
+					Spec: resourcev1api.ResourceSliceSpec{
+						Driver: driverName,
+						Pool:   resourcev1api.ResourcePool{Name: poolName, ResourceSliceCount: 1},
+						Devices: []resourcev1api.Device{
+							{Name: regularDeviceName, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &rdID}, multusResourceNameAttr: {StringValue: &rmk},
+							}},
+							{Name: extDevice1Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &ed1}, multusResourceNameAttr: {StringValue: &emk1},
+							}},
+							{Name: extDevice2Name, Attributes: map[resourcev1api.QualifiedName]resourcev1api.DeviceAttribute{
+								multusDeviceIDAttr: {StringValue: &ed2}, multusResourceNameAttr: {StringValue: &emk2},
+							}},
+						},
+					},
+				}
+
+				regularClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: regularClaimName, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "vf", Driver: driverName, Pool: poolName, Device: regularDeviceName},
+						}},
+					}},
+				}
+
+				extClaim := &resourcev1api.ResourceClaim{
+					ObjectMeta: metav1.ObjectMeta{Name: extClaimName, Namespace: "default"},
+					Status: resourcev1api.ResourceClaimStatus{Allocation: &resourcev1api.AllocationResult{
+						Devices: resourcev1api.DeviceAllocationResult{Results: []resourcev1api.DeviceRequestAllocationResult{
+							{Request: "req-port-a", Driver: driverName, Pool: poolName, Device: extDevice1Name},
+							{Request: "req-port-b", Driver: driverName, Pool: poolName, Device: extDevice2Name},
+						}},
+					}},
+				}
+
+				regularClaimPtr := regularClaimName
+				pod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "combo-pod", Namespace: "default", UID: k8sTypes.UID("uid-combo")},
+					Status: v1.PodStatus{
+						ResourceClaimStatuses: []v1.PodResourceClaimStatus{
+							{Name: regularClaimName, ResourceClaimName: &regularClaimPtr},
+						},
+						ExtendedResourceClaimStatus: &v1.PodExtendedResourceClaimStatus{
+							ResourceClaimName: extClaimName,
+							RequestMappings: []v1.ContainerExtendedResourceRequest{
+								{ContainerName: "c", ResourceName: extMapKey1, RequestName: "req-port-a"},
+								{ContainerName: "c", ResourceName: extMapKey2, RequestName: "req-port-b"},
+							},
+						},
+					},
+				}
+
+				_, err := fakeClient.ResourceV1().ResourceSlices().Create(context.TODO(), resourceSlice, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), regularClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				_, err = fakeClient.ResourceV1().ResourceClaims("default").Create(context.TODO(), extClaim, metav1.CreateOptions{})
+				Expect(err).NotTo(HaveOccurred())
+
+				resourceMap := make(map[string]*types.ResourceInfo)
+				err = draClient.GetPodResourceMap(context.TODO(), pod, resourceMap)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Regular claim path
+				Expect(resourceMap).To(HaveKey(regularMapKey))
+				Expect(resourceMap[regularMapKey].DeviceIDs).To(Equal([]string{regularDeviceID}))
+
+				// Extended resource claim path
+				Expect(resourceMap).To(HaveKey(extMapKey1))
+				Expect(resourceMap[extMapKey1].DeviceIDs).To(Equal([]string{extDeviceID1}))
+				Expect(resourceMap).To(HaveKey(extMapKey2))
+				Expect(resourceMap[extMapKey2].DeviceIDs).To(Equal([]string{extDeviceID2}))
+
+				Expect(resourceMap).To(HaveLen(3))
 			})
 		})
 	})

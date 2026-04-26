@@ -49,32 +49,83 @@ type deviceInfo struct {
 	ResourceName string
 }
 
+// deviceInfoCacheKey uniquely identifies a device within a driver/pool combination.
+type deviceInfoCacheKey struct {
+	driverPool string // "driver/pool"
+	deviceName string
+}
+
 type ClientInterface interface {
-	GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error
+	GetPodResourceMap(ctx context.Context, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error
 }
 
 type draClient struct {
 	client resourcev1.ResourceV1Interface
-	// One driver/pool may span multiple ResourceSlice objects (e.g. per NUMA zone).
-	resourceSliceCache map[string][]*resourcev1api.ResourceSlice
+	// deviceInfoCache stores lightweight device attributes extracted from ResourceSlices.
+	// Keys are (driver/pool, deviceName); only the two attributes Multus reads are kept,
+	// so full ResourceSlice objects (~400KB each) are GC'd immediately after listing.
+	deviceInfoCache map[deviceInfoCacheKey]*deviceInfo
+	// populatedDrivers tracks which "nodeName/driverName" combinations have already been
+	// fetched from the API, preventing redundant List calls within a client's lifetime.
+	populatedDrivers map[string]bool
 	// Keys are namespace/claimName (ResourceClaim is namespaced).
 	resourceClaimCache map[string]*resourcev1api.ResourceClaim
+}
+
+// getOrFetchResourceClaim returns the ResourceClaim for the given namespace/name,
+// fetching it from the API server on the first call and caching it for subsequent calls.
+func (d *draClient) getOrFetchResourceClaim(ctx context.Context, namespace, claimName string) (*resourcev1api.ResourceClaim, error) {
+	cacheKey := namespacedClaimCacheKey(namespace, claimName)
+	if rc, ok := d.resourceClaimCache[cacheKey]; ok {
+		logging.Debugf("getOrFetchResourceClaim: using cached ResourceClaim %s", cacheKey)
+		return rc, nil
+	}
+	logging.Debugf("getOrFetchResourceClaim: ResourceClaim %s not in cache, fetching from API", cacheKey)
+	rc, err := d.client.ResourceClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	d.resourceClaimCache[cacheKey] = rc
+	logging.Debugf("getOrFetchResourceClaim: cached ResourceClaim %s", cacheKey)
+	return rc, nil
 }
 
 func NewClient(client resourcev1.ResourceV1Interface) ClientInterface {
 	logging.Debugf("NewClient: creating new DRA client")
 	return &draClient{
 		client:             client,
-		resourceSliceCache: make(map[string][]*resourcev1api.ResourceSlice),
+		deviceInfoCache:    make(map[deviceInfoCacheKey]*deviceInfo),
+		populatedDrivers:   make(map[string]bool),
 		resourceClaimCache: make(map[string]*resourcev1api.ResourceClaim),
 	}
 }
 
-func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error {
+// GetPodResourceMap populates resourceMap with device IDs for all DRA-allocated devices
+// that Multus needs to configure networking for the given pod.
+//
+// It walks pod.Status.ResourceClaimStatuses and, for each claim, fetches the
+// ResourceClaim (cached after the first fetch) to discover which devices were allocated.
+// For each allocated device it calls getDeviceInfo, which lazily lists ResourceSlices
+// for that driver scoped to pod.Spec.NodeName via server-side field selectors
+// (spec.nodeName + spec.driver) and extracts only the two attributes Multus reads
+// (k8s.cni.cncf.io/deviceID and k8s.cni.cncf.io/resourceName). Full ResourceSlice
+// objects are discarded immediately after extraction to keep memory usage minimal.
+//
+// Devices that lack k8s.cni.cncf.io/deviceID (e.g. GPU allocations not intended for
+// CNI) are silently skipped, allowing mixed SR-IOV + GPU claims to succeed. Devices
+// missing k8s.cni.cncf.io/resourceName are also skipped since there is no NAD to map
+// them to. If pod.Status.ExtendedResourceClaimStatus is set, it is processed with the
+// same logic but strict validation: device resourceName must match the extended
+// resource mapping exactly or an error is returned.
+//
+// ctx is respected for cancellation; a 20-second safety timeout is applied on top.
+func (d *draClient) GetPodResourceMap(ctx context.Context, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error {
 	logging.Verbosef("GetPodResourceMap: processing DRA resources for pod %s/%s", pod.Namespace, pod.Name)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
+
+	nodeName := pod.Spec.NodeName
 
 	for _, claimResource := range pod.Status.ResourceClaimStatuses {
 		if claimResource.ResourceClaimName == nil {
@@ -82,22 +133,15 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 			continue
 		}
 		claimName := *claimResource.ResourceClaimName
-		claimCacheKey := namespacedClaimCacheKey(pod.Namespace, claimName)
-		logging.Debugf("GetPodResourceMap: processing resource claim: %s (ref name: %s)", claimName, claimResource.Name)
+		// claimResource.Name is the pod-local reference name (pod.spec.resourceClaims[].name);
+		// claimName is the actual ResourceClaim object name in the API — the two differ when
+		// the scheduler generates a per-pod ResourceClaim from a ResourceClaimTemplate.
+		logging.Debugf("GetPodResourceMap: processing ResourceClaim %q (pod-local ref: %q)", claimName, claimResource.Name)
 
-		resourceClaim, ok := d.resourceClaimCache[claimCacheKey]
-		if !ok {
-			logging.Debugf("GetPodResourceMap: resource claim %s/%s not in cache, fetching from API", pod.Namespace, claimName)
-			fetched, err := d.client.ResourceClaims(pod.Namespace).Get(ctx, *claimResource.ResourceClaimName, metav1.GetOptions{})
-			if err != nil {
-				logging.Errorf("GetPodResourceMap: failed to get resource claim %s: %v", claimName, err)
-				return err
-			}
-			resourceClaim = fetched
-			d.resourceClaimCache[claimCacheKey] = resourceClaim
-			logging.Debugf("GetPodResourceMap: cached resource claim %s", claimCacheKey)
-		} else {
-			logging.Debugf("GetPodResourceMap: using cached resource claim %s", claimCacheKey)
+		resourceClaim, err := d.getOrFetchResourceClaim(ctx, pod.Namespace, claimName)
+		if err != nil {
+			logging.Errorf("GetPodResourceMap: failed to get resource claim %s: %v", claimName, err)
+			return err
 		}
 
 		if resourceClaim.Status.Allocation == nil || resourceClaim.Status.Allocation.Devices.Results == nil {
@@ -111,7 +155,7 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 			logging.Debugf("GetPodResourceMap: processing device allocation - driver: %s, pool: %s, device: %s, request: %s",
 				result.Driver, result.Pool, result.Device, result.Request)
 
-			info, err := d.getDeviceInfo(ctx, result)
+			info, err := d.getDeviceInfo(ctx, nodeName, result)
 			if err != nil {
 				if errors.Is(err, errDeviceNotInAnySlice) {
 					logging.Warningf(
@@ -151,11 +195,12 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 	}
 
 	if pod.Status.ExtendedResourceClaimStatus != nil {
-		if err := d.processExtendedResourceClaimStatus(ctx, pod, resourceMap); err != nil {
+		if err := d.processExtendedResourceClaimStatus(ctx, nodeName, pod, resourceMap); err != nil {
 			return err
 		}
 	}
 
+	types.SortDeviceIDs(resourceMap)
 	logging.Verbosef("GetPodResourceMap: successfully processed all DRA resources for pod %s/%s, total resources: %d",
 		pod.Namespace, pod.Name, len(resourceMap))
 	return nil
@@ -164,22 +209,15 @@ func (d *draClient) GetPodResourceMap(pod *v1.Pod, resourceMap map[string]*types
 // processExtendedResourceClaimStatus fills the resource map for pods that use
 // the extended resource feature gate (pod.Status.ExtendedResourceClaimStatus).
 // Keys come from requestMappings[].resourceName (same as NAD annotation).
-func (d *draClient) processExtendedResourceClaimStatus(ctx context.Context, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error {
+func (d *draClient) processExtendedResourceClaimStatus(ctx context.Context, nodeName string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error {
 	extStatus := pod.Status.ExtendedResourceClaimStatus
 	claimName := extStatus.ResourceClaimName
-	claimCacheKey := namespacedClaimCacheKey(pod.Namespace, claimName)
 	logging.Debugf("GetPodResourceMap: processing extended resource claim: %s/%s", pod.Namespace, claimName)
 
-	resourceClaim, ok := d.resourceClaimCache[claimCacheKey]
-	if !ok {
-		fetched, err := d.client.ResourceClaims(pod.Namespace).Get(ctx, claimName, metav1.GetOptions{})
-		if err != nil {
-			logging.Errorf("GetPodResourceMap: failed to get extended resource claim %s/%s: %v", pod.Namespace, claimName, err)
-			return err
-		}
-		resourceClaim = fetched
-		d.resourceClaimCache[claimCacheKey] = resourceClaim
-		logging.Debugf("GetPodResourceMap: cached extended resource claim %s", claimCacheKey)
+	resourceClaim, err := d.getOrFetchResourceClaim(ctx, pod.Namespace, claimName)
+	if err != nil {
+		logging.Errorf("GetPodResourceMap: failed to get extended resource claim %s/%s: %v", pod.Namespace, claimName, err)
+		return err
 	}
 
 	if resourceClaim.Status.Allocation == nil || resourceClaim.Status.Allocation.Devices.Results == nil {
@@ -201,7 +239,7 @@ func (d *draClient) processExtendedResourceClaimStatus(ctx context.Context, pod 
 
 		resourceMapKey := mapping.ResourceName
 		for _, result := range results {
-			info, err := d.getDeviceInfo(ctx, result)
+			info, err := d.getDeviceInfo(ctx, nodeName, result)
 			if err != nil {
 				logging.Errorf("GetPodResourceMap: failed to get device info for extended resource claim %s request %s: %v", claimName, mapping.RequestName, err)
 				return err
@@ -234,82 +272,92 @@ func (d *draClient) processExtendedResourceClaimStatus(ctx context.Context, pod 
 	return nil
 }
 
-func (d *draClient) getDeviceInfo(ctx context.Context, result resourcev1api.DeviceRequestAllocationResult) (*deviceInfo, error) {
-	key := fmt.Sprintf("%s/%s", result.Driver, result.Pool)
-	logging.Debugf("getDeviceInfo: looking up device for driver/pool: %s, device: %s", key, result.Device)
+// ensureDriverCachePopulated lists ResourceSlices for the given node and driver (using server-side
+// field selectors) and extracts only the two attributes Multus needs into deviceInfoCache.
+// Full ResourceSlice objects are discarded after extraction, keeping memory usage minimal.
+// Subsequent calls for the same node/driver combination are no-ops.
+func (d *draClient) ensureDriverCachePopulated(ctx context.Context, nodeName, driverName string) error {
+	populatedKey := nodeName + "/" + driverName
+	if d.populatedDrivers[populatedKey] {
+		return nil
+	}
 
-	resourceSlices, ok := d.resourceSliceCache[key]
+	// driverName is always non-empty (Driver is +required in DeviceRequestAllocationResult).
+	// Always filter by driver to avoid loading unrelated slices into the cache.
+	// Also filter by node when available to further scope the list.
+	listOptions := metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("%s=%s", resourcev1api.ResourceSliceSelectorDriver, driverName),
+	}
+	if nodeName != "" {
+		listOptions.FieldSelector = fmt.Sprintf("%s=%s,%s=%s",
+			resourcev1api.ResourceSliceSelectorNodeName, nodeName,
+			resourcev1api.ResourceSliceSelectorDriver, driverName)
+	}
+
+	logging.Debugf("ensureDriverCachePopulated: listing ResourceSlices (fieldSelector=%q)", listOptions.FieldSelector)
+	slices, err := d.client.ResourceSlices().List(ctx, listOptions)
+	if err != nil {
+		logging.Errorf("ensureDriverCachePopulated: failed to list resource slices: %v", err)
+		return err
+	}
+	logging.Debugf("ensureDriverCachePopulated: listed %d ResourceSlice(s) for node=%q driver=%q", len(slices.Items), nodeName, driverName)
+
+	for i := range slices.Items {
+		slice := &slices.Items[i]
+		driverPool := fmt.Sprintf("%s/%s", slice.Spec.Driver, slice.Spec.Pool.Name)
+		for _, device := range slice.Spec.Devices {
+			key := deviceInfoCacheKey{driverPool: driverPool, deviceName: device.Name}
+			info := &deviceInfo{}
+			if attr, ok := device.Attributes[multusDeviceIDAttr]; ok && attr.StringValue != nil {
+				info.DeviceID = *attr.StringValue
+			}
+			if attr, ok := device.Attributes[multusResourceNameAttr]; ok && attr.StringValue != nil {
+				info.ResourceName = *attr.StringValue
+			}
+			if info.DeviceID != "" {
+				d.deviceInfoCache[key] = info
+			}
+		}
+	}
+
+	d.populatedDrivers[populatedKey] = true
+	return nil
+}
+
+// getDeviceInfo returns the cached deviceInfo for the device named in result.
+// On the first call for a given driver it triggers ensureDriverCachePopulated,
+// which lists ResourceSlices scoped to nodeName and result.Driver via server-side
+// field selectors and extracts only the two attributes Multus needs. Subsequent
+// calls for the same driver are O(1) map lookups with no API traffic.
+// Returns errDeviceNotInAnySlice (wrapped) if the device is absent from the cache
+// or lacks a deviceID attribute; callers in the normal claims path treat this as
+// a skip, while the extended-resource path treats it as a hard error.
+func (d *draClient) getDeviceInfo(ctx context.Context, nodeName string, result resourcev1api.DeviceRequestAllocationResult) (*deviceInfo, error) {
+	driverPool := fmt.Sprintf("%s/%s", result.Driver, result.Pool)
+	logging.Debugf("getDeviceInfo: looking up device for driver/pool: %s, device: %s", driverPool, result.Device)
+
+	if err := d.ensureDriverCachePopulated(ctx, nodeName, result.Driver); err != nil {
+		return nil, err
+	}
+
+	key := deviceInfoCacheKey{driverPool: driverPool, deviceName: result.Device}
+	info, ok := d.deviceInfoCache[key]
 	if !ok {
-		logging.Debugf("getDeviceInfo: resource slices for %s not in cache, fetching from API", key)
-		// TODO: Use server-side field selector once spec.driver is supported by the API.
-		// Currently, ResourceSlice does not support field selection on spec.driver,
-		// requiring client-side filtering which may impact performance in very large clusters.
-		listOptions := metav1.ListOptions{}
-		allResourceSlices, err := d.client.ResourceSlices().List(ctx, listOptions)
-		if err != nil {
-			logging.Errorf("getDeviceInfo: failed to list resource slices: %v", err)
-			return nil, err
-		}
-
-		var matchingSlices []*resourcev1api.ResourceSlice
-		for i := range allResourceSlices.Items {
-			slice := &allResourceSlices.Items[i]
-			if slice.Spec.Driver == result.Driver && slice.Spec.Pool.Name == result.Pool {
-				matchingSlices = append(matchingSlices, slice)
-			}
-		}
-
-		if len(matchingSlices) == 0 {
-			listErr := fmt.Errorf("no resource slice found for driver/pool %s", key)
-			logging.Errorf("getDeviceInfo: %v", listErr)
-			return nil, listErr
-		}
-		resourceSlices = matchingSlices
-		d.resourceSliceCache[key] = resourceSlices
-		logging.Debugf("getDeviceInfo: cached %d resource slices for %s", len(resourceSlices), key)
-	} else {
-		logging.Debugf("getDeviceInfo: using cached %d resource slices for %s", len(resourceSlices), key)
+		notFoundErr := fmt.Errorf("%w: device %s not found for claim resource %s/%s in any matching resource slice",
+			errDeviceNotInAnySlice, result.Device, result.Driver, result.Pool)
+		logging.Errorf("getDeviceInfo: %v", notFoundErr)
+		return nil, notFoundErr
 	}
 
-	for _, resourceSlice := range resourceSlices {
-		logging.Debugf("getDeviceInfo: searching for device %s in slice %s with %d devices", result.Device, resourceSlice.Name, len(resourceSlice.Spec.Devices))
-		for _, device := range resourceSlice.Spec.Devices {
-			if device.Name != result.Device {
-				continue
-			}
-			logging.Debugf("getDeviceInfo: found device %s, checking attributes", device.Name)
-
-			devIDAttr, exists := device.Attributes[multusDeviceIDAttr]
-			if !exists {
-				logging.Warningf(
-					"getDeviceInfo: device %q (driver %q, pool %q) has no %q in ResourceSlice; skipping allocation result",
-					device.Name, result.Driver, result.Pool, multusDeviceIDAttr)
-				return nil, fmt.Errorf("%w: device %q present in slice but missing %q",
-					errDeviceNotInAnySlice, device.Name, multusDeviceIDAttr)
-			}
-
-			if devIDAttr.StringValue == nil {
-				logging.Warningf(
-					"getDeviceInfo: device %q (driver %q, pool %q) has %q with nil StringValue; skipping allocation result",
-					device.Name, result.Driver, result.Pool, multusDeviceIDAttr)
-				return nil, fmt.Errorf("%w: device %q has nil StringValue for %q",
-					errDeviceNotInAnySlice, device.Name, multusDeviceIDAttr)
-			}
-			info := &deviceInfo{DeviceID: *devIDAttr.StringValue}
-
-			if resNameAttr, ok := device.Attributes[multusResourceNameAttr]; ok && resNameAttr.StringValue != nil {
-				info.ResourceName = *resNameAttr.StringValue
-				logging.Debugf("getDeviceInfo: device %s has %s %s", device.Name, multusResourceNameAttr, info.ResourceName)
-			}
-
-			logging.Verbosef("getDeviceInfo: successfully retrieved info for device %s (driver/pool: %s): deviceID=%s, resourceName=%s",
-				result.Device, key, info.DeviceID, info.ResourceName)
-			return info, nil
-		}
+	if info.DeviceID == "" {
+		logging.Warningf(
+			"getDeviceInfo: device %q (driver %q, pool %q) has no %q in ResourceSlice; skipping allocation result",
+			result.Device, result.Driver, result.Pool, multusDeviceIDAttr)
+		return nil, fmt.Errorf("%w: device %q present in slice but missing %q",
+			errDeviceNotInAnySlice, result.Device, multusDeviceIDAttr)
 	}
 
-	notFoundErr := fmt.Errorf("%w: device %s not found for claim resource %s/%s in any matching resource slice",
-		errDeviceNotInAnySlice, result.Device, result.Driver, result.Pool)
-	logging.Errorf("getDeviceInfo: %v", notFoundErr)
-	return nil, notFoundErr
+	logging.Verbosef("getDeviceInfo: successfully retrieved info for device %s (driver/pool: %s): deviceID=%s, resourceName=%s",
+		result.Device, driverPool, info.DeviceID, info.ResourceName)
+	return info, nil
 }

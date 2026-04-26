@@ -658,19 +658,24 @@ concepts to make use of Multus DRA support.
 
 #### Install DRA driver
 
-You need to install a DRA driver that provides network devices. For example, you can use the SR-IOV DRA driver or 
+You need to install a DRA driver that provides network devices. For example, you can use the [SR-IOV DRA](https://github.com/k8snetworkplumbingwg/dra-driver-sriov) driver or 
 other DRA networking drivers. Refer to your DRA driver documentation for installation instructions.
 
-The DRA driver MUST expose the following attributes on each allocated **device** in `ResourceSlice`:
+The DRA driver MUST expose the following attributes on each allocated **network** device in `ResourceSlice`:
 - `k8s.cni.cncf.io/deviceID`: device ID that Multus passes to the CNI plugin.
 - `k8s.cni.cncf.io/resourceName`: **must exactly match** the value you put on the NetworkAttachmentDefinition
   `k8s.v1.cni.cncf.io/resourceName` annotation (same style as classic extended resources, e.g. `intel.com/sriov_vf`).
-  If `k8s.cni.cncf.io/resourceName` is missing on the device, allocation processing fails.
+
+Devices that lack `k8s.cni.cncf.io/deviceID` or `k8s.cni.cncf.io/resourceName` are **silently skipped** in the
+normal claims path — this is intentional so that mixed pods with both network and non-network DRA claims (e.g. a
+GPU claim alongside an SR-IOV claim) work correctly. The existing kubelet / device-plugin resource-map entries for
+such pods are preserved unchanged.
 
 For pods that use the **extended resource** feature gate, Multus uses `pod.status.extendedResourceClaimStatus`
-request mappings: the NAD `resourceName` matches `requestMappings[].resourceName`. The device attribute
-`k8s.cni.cncf.io/resourceName` must be set and must **equal** that same `requestMappings[].resourceName` value
-(Multus rejects a mismatch). Device lookup uses the same `ResourceClaim` / `ResourceSlice` flow.
+request mappings: the NAD `resourceName` matches `requestMappings[].resourceName`. In this path the device
+attribute `k8s.cni.cncf.io/resourceName` **must** be present and **equal** `requestMappings[].resourceName`
+exactly — a missing or mismatched value is treated as an error, because the extended-resource mapping explicitly
+names the expected device. Device lookup uses the same `ResourceClaim` / `ResourceSlice` flow as the normal path.
 
 #### Create network attachment definition with resource name
 
@@ -732,11 +737,11 @@ cat <<EOF | kubectl create -f -
 apiVersion: resource.k8s.io/v1
 kind: DeviceClass
 metadata:
-  name: sriovnetwork.openshift.io
+  name: sriovnetwork.k8snetworkplumbingwg.io
 spec:
   selectors:
   - cel:
-      expression: device.driver == sriovnetwork.openshift.io
+      expression: device.driver == 'sriovnetwork.k8snetworkplumbingwg.io'
 EOF
 ```
 
@@ -759,7 +764,7 @@ spec:
     devices:
       requests:
       - name: vf
-        deviceClassName: sriovnetwork.openshift.io
+        deviceClassName: sriovnetwork.k8snetworkplumbingwg.io
 EOF
 ```
 

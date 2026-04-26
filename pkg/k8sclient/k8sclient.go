@@ -55,7 +55,7 @@ const (
 )
 
 // getResourceClientFunc returns kubelet / device-plugin resource info for a pod.
-// It defaults to kubeletclient.GetResourceClient; unit tests may replace it to avoid a real kubelet checkpoint/socket.
+// It defaults to kubeletclient.GetResourceClient; unit tests replace it to avoid a real kubelet checkpoint/socket.
 var getResourceClientFunc = kubeletclient.GetResourceClient
 
 // NoK8sNetworkError indicates error, no network in kubernetes
@@ -324,7 +324,7 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 			}
 
 			dc := draclient.NewClient(client.Client.ResourceV1())
-			err = dc.GetPodResourceMap(pod, resourceMap)
+			err = dc.GetPodResourceMap(context.TODO(), pod, resourceMap)
 			if err != nil {
 				return nil, resourceMap, logging.Errorf("getKubernetesDelegate: failed to get resourceMap from DRA client: %v", err)
 			}
