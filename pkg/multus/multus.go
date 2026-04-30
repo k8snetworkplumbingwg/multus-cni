@@ -768,6 +768,19 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 		if stderrors.Is(err, errPodNotFound) {
 			emptyResult := emptyCNIResult(args, n.CNIVersion)
 			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyResult)
+			// emptyCNIResult already returns a *cni100.Result, so 1.x
+			// configs don't need conversion. For older cniVersions
+			// (0.3.x / 0.4.0) we must downcast so skel's response
+			// conversion path calls the right convertFrom*/To* converter;
+			// otherwise convertFrom04x's type assertion to *types040.Result
+			// panics (#1497).
+			if n.CNIVersion != "" && !strings.HasPrefix(n.CNIVersion, "1.") {
+				versioned, convErr := emptyResult.GetAsVersion(n.CNIVersion)
+				if convErr != nil {
+					return nil, cmdErr(k8sArgs, "failed to downcast empty CNI result to cniVersion %q: %v", n.CNIVersion, convErr)
+				}
+				return versioned, nil
+			}
 			return emptyResult, nil
 		}
 		return nil, err
