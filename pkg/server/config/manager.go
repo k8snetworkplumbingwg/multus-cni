@@ -43,6 +43,7 @@ type Manager struct {
 	multusConfigDir            string
 	multusConfigFilePath       string
 	readinessIndicatorFilePath string
+	cleanupConfigOnExit        bool
 	primaryCNIConfigPath       string
 }
 
@@ -116,6 +117,11 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", config.MultusAutoconfigDir, multusConfigFileName)
 	}
 
+	cleanupOnExit := true
+	if config.CleanupConfigOnExit != nil {
+		cleanupOnExit = *config.CleanupConfigOnExit
+	}
+
 	configManager := &Manager{
 		configWatcher:              watcher,
 		multusConfig:               &config,
@@ -123,6 +129,7 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		multusConfigFilePath:       filepath.Join(config.CniConfigDir, multusConfigFileName),
 		primaryCNIConfigPath:       filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName),
 		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
+		cleanupConfigOnExit:        cleanupOnExit,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -159,8 +166,10 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 			_ = logging.Errorf("error watching file: %v", err)
 		}
 		logging.Verbosef("ConfigWatcher done")
-		logging.Verbosef("Delete old config @ %v", multusConfigFile)
-		os.Remove(multusConfigFile)
+		if m.cleanupConfigOnExit {
+			logging.Verbosef("Delete old config @ %v", multusConfigFile)
+			os.Remove(multusConfigFile)
+		}
 	}()
 
 	return nil
