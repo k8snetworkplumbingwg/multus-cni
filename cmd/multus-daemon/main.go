@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"os/user"
 	"path/filepath"
 	"sync"
 	"syscall"
+	"time"
 
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
@@ -155,11 +157,31 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 	}
 
 	if daemonConfig.MetricsPort != nil {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		if daemonConfig.EnablePprof != nil && *daemonConfig.EnablePprof {
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			logging.Verbosef("pprof endpoints enabled on metrics port %d", *daemonConfig.MetricsPort)
+		}
+		metricsSrv := &http.Server{
+			Addr:              fmt.Sprintf(":%d", *daemonConfig.MetricsPort),
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
 		go utilwait.UntilWithContext(ctx, func(_ context.Context) {
-			http.Handle("/metrics", promhttp.Handler())
-			logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
-			logging.Debugf("metrics: %s", http.ListenAndServe(fmt.Sprintf(":%d", *daemonConfig.MetricsPort), nil))
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logging.Debugf("metrics server error: %v", err)
+			}
 		}, 0)
+		go func() {
+			<-ctx.Done()
+			metricsSrv.Shutdown(context.Background())
+		}()
 	}
 
 	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
