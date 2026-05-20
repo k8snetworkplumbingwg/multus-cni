@@ -19,9 +19,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -63,27 +61,16 @@ func isTransientCertError(err error) bool {
 	if err == nil {
 		return false
 	}
-
-	// NoCertKeyError is expected when cert doesn't exist yet, not transient
-	var noCertErr *certificate.NoCertKeyError
-	if errors.As(err, &noCertErr) {
+	errMsg := err.Error()
+	// NoCertKeyError means cert does not exist yet, not transient
+	if strings.Contains(errMsg, "no cert/key files read at") {
 		return false
 	}
-
-	// PathError (file not found, permission denied) could be transient during rotation
-	var pathErr *fs.PathError
-	if errors.As(err, &pathErr) {
+	if strings.Contains(errMsg, "no such file or directory") ||
+		strings.Contains(errMsg, "failed to find any PEM data") ||
+		strings.Contains(errMsg, "invalid PEM") {
 		return true
 	}
-
-	// PEM parsing errors indicate empty/corrupted file during rotation
-	errMsg := err.Error()
-	if strings.Contains(errMsg, "failed to find any PEM data") ||
-		strings.Contains(errMsg, "invalid PEM") ||
-		strings.Contains(errMsg, "certificate signed by unknown authority") {
-		return true
-	}
-
 	return false
 }
 
@@ -181,47 +168,15 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 	var storeErr error
 	err = wait.PollWithContext(context.TODO(), time.Second, 2*time.Minute, func(_ context.Context) (bool, error) {
 		var currentCert *tls.Certificate
-
-		// Retry transient cert errors with exponential backoff to handle
-		// certificate rotation race conditions where the symlink is temporarily
-		// removed or the file is empty during rotation.
-		backoff := wait.Backoff{
-			Duration: 100 * time.Millisecond,
-			Factor:   2.0,
-			Steps:    5,
-		}
-
-		var retryCount int
-		var firstTransientErr error
-
-		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			currentCert, storeErr = certificateStore.Current()
-
-			if storeErr != nil {
-				if isTransientCertError(storeErr) {
-					if firstTransientErr == nil {
-						firstTransientErr = storeErr
-					}
-					retryCount++
-					return false, nil
-				}
-				return false, storeErr
+		currentCert, storeErr = certificateStore.Current()
+		if storeErr != nil {
+			if isTransientCertError(storeErr) {
+				logging.Verbosef("Transient cert error (likely rotation in progress), will retry: %v", storeErr)
+				return false, nil
 			}
-
-			if currentCert != nil {
-				if retryCount > 0 {
-					logging.Verbosef("Certificate loaded successfully after %d retries (likely cert rotation in progress)", retryCount)
-				}
-				return true, nil
-			}
-			return false, nil
-		})
-
-		if err == nil && retryCount > 0 && currentCert == nil {
-			logging.Debugf("Exhausted %d retries for transient cert error, will retry poll: %v", retryCount, firstTransientErr)
+			return false, storeErr
 		}
-
-		return currentCert != nil && err == nil, nil
+		return currentCert != nil, nil
 	})
 	if err != nil {
 		return nil, logging.Errorf("certificate was not signed, last cert store err: %v err: %v", storeErr, err)
