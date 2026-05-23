@@ -1,16 +1,4 @@
 # This dockerfile is specific to building Multus for OpenShift
-# rhel10 golang builders don't exist yet, so use rhel9 for now
-# replace with rhel10 golang builder when it is released
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS rhel10
-ADD . /usr/src/multus-cni
-WORKDIR /usr/src/multus-cni
-ENV CGO_ENABLED=1
-ENV GO111MODULE=off
-ENV VERSION=rhel10 COMMIT=unset
-RUN ./hack/build-go.sh && \
-       cd /usr/src/multus-cni/bin
-WORKDIR /
-
 FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS rhel9
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
@@ -21,29 +9,11 @@ RUN ./hack/build-go.sh && \
        cd /usr/src/multus-cni/bin
 WORKDIR /
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.25-openshift-4.22 AS rhel8
-ADD . /usr/src/multus-cni
-WORKDIR /usr/src/multus-cni
-ENV CGO_ENABLED=1
-ENV GO111MODULE=off
-ENV VERSION=rhel8 COMMIT=unset
-RUN ./hack/build-go.sh && \
-       cd /usr/src/multus-cni/bin
-WORKDIR /
-
 FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
 RUN dnf install -y util-linux && dnf clean all && \
        mkdir -p /usr/src/multus-cni/images && \
-       mkdir -p /usr/src/multus-cni/bin && \
-       mkdir -p /usr/src/multus-cni/rhel10/bin && \
-       mkdir -p /usr/src/multus-cni/rhel9/bin && \
-       mkdir -p /usr/src/multus-cni/rhel8/bin
-COPY --from=rhel10 /usr/src/multus-cni/bin /usr/src/multus-cni/rhel10/bin
-COPY --from=rhel9 /usr/src/multus-cni/bin /usr/src/multus-cni/rhel9/bin
-COPY --from=rhel8 /usr/src/multus-cni/bin /usr/src/multus-cni/rhel8/bin
-# copy container base image binary to /usr/src/multus-cni/bin
-RUN bash -c '. /etc/os-release; \
-	cp /usr/src/multus-cni/rhel$(echo "${VERSION_ID}" | cut -f 1 -d .)/bin/* /usr/src/multus-cni/bin'
+       mkdir -p /usr/src/multus-cni/bin
+COPY --from=rhel9 /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 ADD ./images/entrypoint.sh /
 
 LABEL io.k8s.display-name="Multus CNI" \
