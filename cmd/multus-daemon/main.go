@@ -168,7 +168,10 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
 	}
 
-	if limit := daemonConfig.ConnectionLimit; limit != nil && *limit > 0 {
+	if limit := daemonConfig.ConnectionLimit; limit != nil {
+		if *limit <= 0 {
+			return fmt.Errorf("connection limit must be greater than 0, got %d", *limit)
+		}
 		logging.Debugf("connection limit: %d", *limit)
 		l = netutil.LimitListener(l, *limit)
 	}
