@@ -31,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/netutil"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -187,6 +188,14 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
 	if err != nil {
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
+	}
+
+	if limit := daemonConfig.ConnectionLimit; limit != nil {
+		if *limit <= 0 {
+			return fmt.Errorf("connection limit must be greater than 0, got %d", *limit)
+		}
+		logging.Debugf("connection limit: %d", *limit)
+		l = netutil.LimitListener(l, *limit)
 	}
 
 	server.Start(ctx, l)
