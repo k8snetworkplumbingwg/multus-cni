@@ -129,6 +129,8 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 		err = s.cmdDelegateCheck(cniCmdArgs, k8sArgs, multusConfig)
 	case "STATUS":
 		err = s.cmdDelegateStatus(cniCmdArgs, k8sArgs, multusConfig)
+	case "GC":
+		logging.Debugf("HandleDelegateRequest: GC is a no-op for the delegate endpoint")
 	default:
 		return []byte(""), fmt.Errorf("unknown cmd type: %s", cmd)
 	}
@@ -466,9 +468,14 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 		return nil, fmt.Errorf("could not extract the CNI command args: %w", err)
 	}
 
-	k8sArgs, err := kubernetesRuntimeArgs(cr.Env, s.kubeclient)
-	if err != nil {
-		return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
+	// STATUS and GC are plugin-level commands with no pod context,
+	// so they don't have K8S_POD_NAME/K8S_POD_NAMESPACE in CNI_ARGS.
+	var k8sArgs *types.K8sArgs
+	if cmdType != "STATUS" && cmdType != "GC" {
+		k8sArgs, err = kubernetesRuntimeArgs(cr.Env, s.kubeclient)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract the kubernetes runtime args: %w", err)
+		}
 	}
 
 	result, err := s.HandleDelegateRequest(cmdType, k8sArgs, cniCmdArgs, cr.InterfaceAttributes)
@@ -741,6 +748,11 @@ func (s *Server) cmdDelegateCheck(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs,
 }
 
 func (s *Server) cmdDelegateStatus(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, multusConfig *types.NetConf) error {
+	// STATUS is a plugin-level command per CNI 1.1.0; k8sArgs may be nil
+	// when invoked without pod context via the delegate endpoint.
+	if k8sArgs == nil {
+		k8sArgs = &types.K8sArgs{}
+	}
 	delegateCNIConf, err := types.LoadDelegateNetConf(cmdArgs.StdinData, nil, "", "")
 	if err != nil {
 		return err
