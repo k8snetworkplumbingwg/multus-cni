@@ -741,7 +741,7 @@ EOF
 
 #### Launch pod with DRA Resource Claim
 
-Following command Launch a Pod with primiry network `default` and `ResourceClaim` `sf`.
+Following command Launch a Pod with primary network `default` and `ResourceClaim` `sf`.
 
 ```
 apiVersion: v1
