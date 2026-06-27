@@ -476,7 +476,7 @@ func (o *Options) createMultusConfig(prevMasterConfigFileHash []byte) (string, [
 	// check MultusCNIConfDir
 	multusCNIConfDirConfig := ""
 	if o.MultusCNIConfDir != "" {
-		multusCNIConfDirConfig = fmt.Sprintf("\n        \"cniConf\": %q,", o.MultusCNIConfDir)
+		multusCNIConfDirConfig = fmt.Sprintf("\n        \"confDir\": %q,", o.MultusCNIConfDir)
 	}
 
 	// check ReadinessIndicatorFile
