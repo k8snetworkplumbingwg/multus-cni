@@ -86,7 +86,7 @@ func CmdGC(args *skel.CmdArgs) error {
 
 // CmdStatus implements the CNI spec STATUS command handler
 func CmdStatus(args *skel.CmdArgs) error {
-	_, _, err := postRequest(args, WaitUntilAPIReady)
+	_, _, err := postRequest(args, CheckAPIReadyNow)
 	if err != nil {
 		return logging.Errorf("CmdStatus (shim): %v", err)
 	}
