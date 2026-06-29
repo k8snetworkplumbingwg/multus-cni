@@ -999,6 +999,99 @@ users:
 			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("uses resourceName requested by the NetworkSelectionElement when it matches the NAD annotation", func() {
+			// NewFakeNetAttachDefAnnotation stamps the NAD with
+			// k8s.v1.cni.cncf.io/resourceName: intel.com/sriov
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"intel.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			// Pass a populated resourceMap so no kubelet ResourceClient is needed.
+			resourceMap := map[string]*types.ResourceInfo{
+				"intel.com/sriov": {DeviceIDs: []string{"0000:03:02.0"}},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(delegates[0].ResourceName).To(Equal("intel.com/sriov"))
+			Expect(delegates[0].DeviceID).To(Equal("0000:03:02.0"))
+		})
+
+		It("uses resourceName requested by the NetworkSelectionElement when the NAD has no annotation", func() {
+			// NewFakeNetAttachDef creates a NAD without the resourceName annotation,
+			// so the resourceName comes solely from the NetworkSelectionElement.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"intel.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			resourceMap := map[string]*types.ResourceInfo{
+				"intel.com/sriov": {DeviceIDs: []string{"0000:03:02.0"}},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(delegates[0].ResourceName).To(Equal("intel.com/sriov"))
+			Expect(delegates[0].DeviceID).To(Equal("0000:03:02.0"))
+		})
+
+		It("fails when the NetworkSelectionElement resourceName conflicts with the NAD annotation", func() {
+			// NAD annotation is intel.com/sriov; the NSE requests a different one.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"nvidia.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("conflicting resourceName")))
+		})
 	})
 
 	Context("parsePodNetworkObjectName", func() {
