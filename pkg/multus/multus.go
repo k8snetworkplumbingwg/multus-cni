@@ -1086,10 +1086,14 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 			// Inject cniVersion onto the raw bytes losslessly. Marshaling the
 			// structured ConfList (types.NetConfList) here would strip
 			// CNI-specific fields (e.g. calico's kubeconfig) and break DEL.
-			v.Bytes, err = types.InjectCNIVersionInConfList(v.Bytes, in.CNIVersion)
-			if err != nil {
-				// error happen but continue to delete
-				logging.Errorf("Multus: failed to inject cniVersion into delegate %q config: %v", v.Name, err)
+			updatedBytes, injectErr := types.InjectCNIVersionInConfList(v.Bytes, in.CNIVersion)
+			if injectErr != nil {
+				// error happen but continue to delete; keep the original bytes
+				// rather than clobbering them with nil, which would feed DEL
+				// worse input than before and risk leaking the IP.
+				logging.Errorf("Multus: failed to inject cniVersion into delegate %q config: %v", v.Name, injectErr)
+			} else {
+				v.Bytes = updatedBytes
 			}
 		}
 	}
