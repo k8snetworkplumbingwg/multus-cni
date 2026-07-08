@@ -92,7 +92,7 @@ var _ = Describe(suiteName, func() {
 	})
 
 	Context("STATUS and GC commands without pod context", func() {
-		const configPath = "/tmp/foo.multus.conf"
+		const configPath = "/tmp/foo.multus.server-test.conf"
 
 		var (
 			cniServer *Server
@@ -160,7 +160,7 @@ var _ = Describe(suiteName, func() {
 			containerID = "123456789"
 			ifaceName   = "eth0"
 			podName     = "my-little-pod"
-			configPath  = "/tmp/foo.multus.conf"
+			configPath  = "/tmp/foo.multus.server-test.conf"
 		)
 
 		var (
@@ -222,7 +222,7 @@ var _ = Describe(suiteName, func() {
 			containerID = "123456789"
 			ifaceName   = "eth0"
 			podName     = "my-little-pod"
-			configPath  = "/tmp/foo.multus.conf"
+			configPath  = "/tmp/foo.multus.server-test.conf"
 		)
 
 		var (
@@ -366,7 +366,7 @@ func referenceConfig(thickPluginSocketDir string) string {
         "name": "node-cni-network",
         "type": "multus",
         "daemonSocketDir": "%s",
-        "readinessindicatorfile": "/tmp/foo.multus.conf",
+        "readinessindicatorfile": "/tmp/foo.multus.server-test.conf",
         "defaultnetworkwaitseconds": 3,
         "delegates": [{
             "name": "weave1",
