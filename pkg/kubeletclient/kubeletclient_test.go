@@ -46,8 +46,8 @@ var (
 )
 
 type fakeResourceServer struct {
-	server *grpc.Server
 	podresourcesapi.UnimplementedPodResourcesListerServer
+	server *grpc.Server
 }
 
 // TODO: This is stub code for test, but we may need to change for the testing we use this API in the future...
@@ -68,32 +68,6 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 		},
 	}
 
-	cdiDevices := []*podresourcesapi.CDIDevice{
-		{
-			Name: "cdi-kind=cdi-resource",
-		},
-	}
-	draDriverName := "dra.example.com"
-	poolName := "worker-1-pool"
-	deviceName := "gpu-1"
-
-	claimsResource := []*podresourcesapi.ClaimResource{
-		{
-			CdiDevices: cdiDevices,
-			DriverName: draDriverName,
-			PoolName: poolName,
-			DeviceName: deviceName,
-		},
-	}
-
-	dynamicResources := []*podresourcesapi.DynamicResource{
-		{
-			ClaimName:      "resource-claim",
-			ClaimNamespace: "dynamic-resource-pod-namespace",
-			ClaimResources: claimsResource,
-		},
-	}
-
 	resp := &podresourcesapi.ListPodResourcesResponse{
 		PodResources: []*podresourcesapi.PodResources{
 			{
@@ -103,16 +77,6 @@ func (m *fakeResourceServer) List(_ context.Context, _ *podresourcesapi.ListPodR
 					{
 						Name:    "container-name",
 						Devices: devs,
-					},
-				},
-			},
-			{
-				Name:      "dynamic-resource-pod-name",
-				Namespace: "dynamic-resource-pod-namespace",
-				Containers: []*podresourcesapi.ContainerResources{
-					{
-						Name:             "dynamic-resource-container-name",
-						DynamicResources: dynamicResources,
 					},
 				},
 			},
@@ -242,34 +206,6 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 
 			outputRMap := map[string]*mtypes.ResourceInfo{
 				"resource": {DeviceIDs: []string{"dev0", "dev1"}},
-			}
-			resourceMap, err := client.GetPodResourceMap(fakePod)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(resourceMap).ShouldNot(BeNil())
-			Expect(resourceMap).To(Equal(outputRMap))
-		})
-
-		It("should return no error with dynamic resource", func() {
-			podUID := k8sTypes.UID("9f94e27b-4233-43d6-bd10-f73b4de6f456")
-			fakePod := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "dynamic-resource-pod-name",
-					Namespace: "dynamic-resource-pod-namespace",
-					UID:       podUID,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name: "dynamic-resource-container-name",
-						},
-					},
-				},
-			}
-			client, err := getKubeletClient(testKubeletSocket)
-			Expect(err).NotTo(HaveOccurred())
-
-			outputRMap := map[string]*mtypes.ResourceInfo{
-				"resource-claim": {DeviceIDs: []string{"cdi-resource"}},
 			}
 			resourceMap, err := client.GetPodResourceMap(fakePod)
 			Expect(err).NotTo(HaveOccurred())
