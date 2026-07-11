@@ -47,14 +47,18 @@ We'll apply a YAML file with `kubectl` from this repo, which installs the Multus
 Recommended installation:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thick.yml
 ```
 See the [thick plugin docs](./thick-plugin.md) for more information about this architecture.
 
 Alternatively, you may install the thin-plugin with:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thin.yml
 ```
 
 ### What the Multus daemonset does

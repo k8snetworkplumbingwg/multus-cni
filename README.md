@@ -27,7 +27,9 @@ The quickstart installation method for Multus requires that you have first insta
 To use latest features try command below which applies a daemonset and installs thick Multus using `kubectl`:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thick.yml
 ```
 
 This will configure your systems to be ready to use Multus CNI, but, to get started with adding additional interfaces to your pods, refer to our complete [quick-start guide](docs/quickstart.md)
@@ -39,7 +41,9 @@ With the multus 4.0 release, we introduce a new client/server-style plugin deplo
 We recommend using the thick plugin in most environments, but if you wish to run the thin plugin, or are in a resource-constrained environment, you may do so with:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thin.yml
 ```
 
 ## Additional Installation Options
