@@ -4,8 +4,8 @@ metadata:
   name: static-web
   annotations:
     k8s.v1.cni.cncf.io/networks: "bridge-nad"
-spec: 
-  containers: 
-    - name: web 
-      image: centos:8 
+spec:
+  containers:
+    - name: web
+      image: centos:8
       command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
