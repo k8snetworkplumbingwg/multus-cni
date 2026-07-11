@@ -8,35 +8,35 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-    - name: Install Go
-      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-      with:
-        go-version: ${{ matrix.go-version }}
+      - name: Install Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ matrix.go-version }}
 
-    - name: Checkout code
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-    - name: Run Revive Action by pulling pre-built image
-      uses: docker://morphy/revive-action:v2
-      with:
-        exclude: "./vendor/..."
+      - name: Run Revive Action by pulling pre-built image
+        uses: docker://morphy/revive-action:v2
+        with:
+          exclude: "./vendor/..."
 
-    - name: Run go fmt
-      run: go fmt ./...
-      #run: diff -u <(echo -n) <(gofmt -d -s .)
+      - name: Run go fmt
+        run: go fmt ./...
+        #run: diff -u <(echo -n) <(gofmt -d -s .)
 
-    - name: Run go vet
-      run: go vet ./...
+      - name: Run go vet
+        run: go vet ./...
 
-    - name: Test
-      run: sudo -E env "PATH=$PATH" ./hack/test-go.sh
+      - name: Test
+        run: sudo -E env "PATH=$PATH" ./hack/test-go.sh
 
-    - name: Send coverage
-      uses: shogo82148/actions-goveralls@25f5320d970fb565100cf1993ada29be1bb196a1 # v1
-      with:
-        path-to-profile: coverage.out
-        flag-name: Go-${{ matrix.go }}
-        parallel: true
+      - name: Send coverage
+        uses: shogo82148/actions-goveralls@25f5320d970fb565100cf1993ada29be1bb196a1 # v1
+        with:
+          path-to-profile: coverage.out
+          flag-name: Go-${{ matrix.go }}
+          parallel: true
 
   # notifies that all test jobs are finished.
   finish:

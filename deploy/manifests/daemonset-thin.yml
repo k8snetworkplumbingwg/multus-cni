@@ -1,0 +1,144 @@
+# Note:
+#   This deployment file is designed for 'quickstart' of multus, easy installation to test it,
+#   hence this deployment yaml does not care about following things intentionally.
+#     - various configuration options
+#     - minor deployment scenario
+#     - upgrade/update/uninstall scenario
+#   Multus team understand users deployment scenarios are diverse, hence we do not cover
+#   comprehensive deployment scenario. We expect that it is covered by each platform deployment.
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: multus-cni-config
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+data:
+  # NOTE: If you'd prefer to manually apply a configuration file, you may create one here.
+  # In the case you'd like to customize the Multus installation, you should change the arguments to the Multus pod
+  # change the "args" line below from
+  # - "--multus-conf-file=auto"
+  # to:
+  # "--multus-conf-file=/tmp/multus-conf/70-multus.conf"
+  # Additionally -- you should ensure that the name "70-multus.conf" is the alphabetically first name in the
+  # /etc/cni/net.d/ directory on each node, otherwise, it will not be used by the Kubelet.
+  cni-conf.json: |
+    {
+      "name": "multus-cni-network",
+      "type": "multus",
+      "capabilities": {
+        "portMappings": true
+      },
+      "delegates": [
+        {
+          "cniVersion": "0.3.1",
+          "name": "default-cni-network",
+          "plugins": [
+            {
+              "type": "flannel",
+              "name": "flannel.1",
+              "delegate": {
+                "isDefaultGateway": true,
+                "hairpinMode": true
+              }
+            },
+            {
+              "type": "portmap",
+              "capabilities": {
+                "portMappings": true
+              }
+            }
+          ]
+        }
+      ],
+      "kubeconfig": "/etc/cni/net.d/multus.d/multus.kubeconfig"
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-multus-ds
+  namespace: kube-system
+  labels:
+    tier: node
+    app: multus
+    name: multus
+spec:
+  selector:
+    matchLabels:
+      name: multus
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: multus
+        name: multus
+    spec:
+      hostNetwork: true
+      tolerations:
+        - operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+      serviceAccountName: multus
+      containers:
+        - name: kube-multus
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot
+          command: ["/thin_entrypoint"]
+          args:
+            - "--multus-conf-file=auto"
+            - "--multus-autoconfig-dir=/host/etc/cni/net.d"
+            - "--cni-conf-dir=/host/etc/cni/net.d"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "50Mi"
+            limits:
+              cpu: "100m"
+              memory: "50Mi"
+          securityContext:
+            privileged: true
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: cni
+              mountPath: /host/etc/cni/net.d
+            - name: cnibin
+              mountPath: /host/opt/cni/bin
+            - name: multus-cfg
+              mountPath: /tmp/multus-conf
+      initContainers:
+        - name: install-multus-binary
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot
+          command: ["/install_multus"]
+          args:
+            - "--type"
+            - "thin"
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "15Mi"
+          securityContext:
+            privileged: true
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: cnibin
+              mountPath: /host/opt/cni/bin
+              mountPropagation: Bidirectional
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: cnibin
+          hostPath:
+            path: /opt/cni/bin
+        - name: multus-cfg
+          configMap:
+            name: multus-cni-config
+            items:
+              - key: cni-conf.json
+                path: 70-multus.conf

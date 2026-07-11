@@ -25,7 +25,7 @@ More specifically, these examples show:
     - As in: `kubectl create -f multus-with-flannel.yml`
     - Optionally, verify that the `/etc/cni/net.d/*.conf` exists on each node.
 * Create the CRDs
-    - Create the CRD itself, `kubectl create -f crd.yml`
+    - Create the CRD itself, `kubectl create -f ../deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml`
     - Create the network attachment configurations (i.e. CNI configurations packed into CRD objects)
         + `kubectl create -f flannel-conf.yml`
         + `kubectl create -f macvlan-conf.yml`

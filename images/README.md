@@ -15,7 +15,9 @@ $ docker build -t dougbtv/multus -f images/Dockerfile .
 You may wish to deploy Multus as a daemonset, you can do so by starting with the example Daemonset shown here:
 
 ```
-$ kubectl create -f ./deployments/multus-daemonset.yml
+$ kubectl create -f ./deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+$ kubectl create -f ./deploy/manifests/rbac.yml
+$ kubectl create -f ./deploy/manifests/daemonset-thin.yml
 ```
 
 Note: The likely best practice here is to build your own image given the Dockerfile, and then push it to your preferred registry, and change the `image` fields in the Daemonset YAML to reference that image.
