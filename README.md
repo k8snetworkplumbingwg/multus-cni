@@ -50,6 +50,7 @@ kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-c
 
 In addition to the [quick-start guide](docs/quickstart.md), you may:
 
+- Install with Helm using the [multus-cni chart](deploy/charts/multus-cni/README.md)
 - Download binaries from [release page](https://github.com/k8snetworkplumbingwg/multus-cni/releases)
 - By Docker image from [GitHub Container Registry](https://github.com/orgs/k8snetworkplumbingwg/packages/container/package/multus-cni)
 - Or, roll-your-own and build from source

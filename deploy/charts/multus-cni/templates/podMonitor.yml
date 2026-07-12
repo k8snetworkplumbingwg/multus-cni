@@ -1,0 +1,26 @@
+---
+{{- if and .Values.metrics.enabled (eq .Values.pluginType "thick") }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: multus-cni
+  namespace: {{ include "multusCni.namespace" . }}
+  labels:
+    {{- include "multusCni.labels" . | nindent 4 }}
+    {{- with .Values.metrics.podMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "multusCni.selectorLabels" . | nindent 6 }}
+  podMetricsEndpoints:
+    - port: metrics
+      interval: {{ .Values.metrics.podMonitor.interval }}
+      scrapeTimeout: {{ .Values.metrics.podMonitor.scrapeTimeout }}
+  relabelings:
+    {{- toYaml .Values.metrics.podMonitor.relabelings | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "multusCni.namespace" . }}
+{{- end }}
