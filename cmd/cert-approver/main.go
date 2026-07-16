@@ -338,7 +338,7 @@ func (c *CertController) denyCSR(ctx context.Context, csr *certificatesv1.Certif
 		},
 	)
 
-	c.recorder.Eventf(csr, corev1.EventTypeWarning, "CSRDenied", "The CSR %q has been denied by: %s", csr.Name, ControllerName, message)
+	c.recorder.Eventf(csr, corev1.EventTypeWarning, "CSRDenied", "The CSR %q has been denied by %s: %s", csr.Name, ControllerName, message)
 	_, err := c.clientset.CertificatesV1().CertificateSigningRequests().Update(ctx, csr, metav1.UpdateOptions{})
 	return err
 }
