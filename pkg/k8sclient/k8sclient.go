@@ -306,12 +306,26 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
 	}
 
-	// Get resourceName annotation from NetworkAttachmentDefinition
+	// Get resourceName from the NetworkAttachmentDefinition annotation. It may
+	// also be set per-attachment by the NetworkSelectionElement, which lets
+	// different device pools attach to the same network without duplicating the
+	// NAD. If both are set and disagree, that is a misconfiguration.
 	deviceID := ""
-	resourceName, ok := customResource.GetAnnotations()[resourceNameAnnot]
-	if ok && pod != nil && pod.Name != "" && pod.Namespace != "" {
-		// ResourceName annotation is found; try to get device info from resourceMap
-		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
+	resourceName := customResource.GetAnnotations()[resourceNameAnnot]
+	if net.ResourceNameRequest != "" {
+		if resourceName != "" && resourceName != net.ResourceNameRequest {
+			errMsg := fmt.Sprintf("conflicting resourceName for network %s: NAD annotation %q does not match NetworkSelectionElement request %q",
+				net.Name, resourceName, net.ResourceNameRequest)
+			if client != nil {
+				client.Eventf(pod, v1.EventTypeWarning, "ResourceNameConflict", errMsg)
+			}
+			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
+		}
+		resourceName = net.ResourceNameRequest
+	}
+	if resourceName != "" && pod != nil && pod.Name != "" && pod.Namespace != "" {
+		// ResourceName is set; try to get device info from resourceMap
+		logging.Debugf("getKubernetesDelegate: using resourceName : %s", resourceName)
 
 		if resourceMap == nil {
 			ck, err := getResourceClientFunc("")

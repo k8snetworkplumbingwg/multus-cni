@@ -431,6 +431,40 @@ spec:
 EOF
 ```
 
+#### Launch pod with json annotation with resourceName
+
+The resource pool a network attachment should use is normally selected with the
+`k8s.v1.cni.cncf.io/resourceName` annotation on the NetworkAttachmentDefinition.
+The same selection can instead be set per attachment in the network selection
+element by adding `"resourceName": "<resource>"`. This lets attachments backed by
+different resource pools reference the same NetworkAttachmentDefinition, without
+creating a separate NetworkAttachmentDefinition per resource pool.
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-07
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name" : "sriov-net",
+              "resourceName": "intel.com/sriov" }
+    ]'
+spec:
+  containers:
+  - name: pod-case-07
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+EOF
+```
+
+If the NetworkAttachmentDefinition also carries a `k8s.v1.cni.cncf.io/resourceName`
+annotation and it differs from the `resourceName` set in the network selection
+element, Multus reports an error. Setting the same value in both places is allowed.
+
 ### Verifying pod network
 
 Following the example of `ip -d address` output of above pod, "pod-case-06":
