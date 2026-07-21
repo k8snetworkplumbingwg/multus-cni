@@ -20,7 +20,112 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// RootedFile is a validated file path split into an opened directory root and
+// a local file name for os.Root filesystem operations.
+type RootedFile struct {
+	Root     *os.Root
+	FileName string
+
+	path string
+}
+
+// NewRootedFile validates rawPath as an absolute file path and opens its parent
+// directory as a root.
+func NewRootedFile(rawPath string) (*RootedFile, error) {
+	path, err := cleanAbsolutePath(rawPath)
+	if err != nil {
+		return nil, err
+	}
+	fileName, err := cleanLocalFileName(filepath.Base(path))
+	if err != nil {
+		return nil, err
+	}
+	return openRootedFile(filepath.Dir(path), fileName)
+}
+
+// NewRootedFileInDir validates rootDir and fileName separately before opening
+// rootDir as a root.
+func NewRootedFileInDir(rootDir, fileName string) (*RootedFile, error) {
+	cleanRootDir, err := cleanAbsolutePath(rootDir)
+	if err != nil {
+		return nil, err
+	}
+	cleanFileName, err := cleanLocalFileName(fileName)
+	if err != nil {
+		return nil, err
+	}
+	return openRootedFile(cleanRootDir, cleanFileName)
+}
+
+// Path returns the cleaned absolute path for logging and error messages.
+func (r *RootedFile) Path() string {
+	return r.path
+}
+
+// Close closes the opened root directory.
+func (r *RootedFile) Close() error {
+	if r == nil || r.Root == nil {
+		return nil
+	}
+	return r.Root.Close()
+}
+
+func openRootedFile(rootDir, fileName string) (*RootedFile, error) {
+	root, err := os.OpenRoot(rootDir)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open root directory %q: %w", rootDir, err)
+	}
+	return &RootedFile{
+		Root:     root,
+		FileName: fileName,
+		path:     filepath.Join(rootDir, fileName),
+	}, nil
+}
+
+func cleanAbsolutePath(rawPath string) (string, error) {
+	if rawPath == "" {
+		return "", fmt.Errorf("path must not be empty")
+	}
+	if hasParentDirComponent(rawPath) {
+		return "", fmt.Errorf("path %q must not contain parent directory references", rawPath)
+	}
+	cleanPath := filepath.Clean(rawPath)
+	if !filepath.IsAbs(cleanPath) {
+		return "", fmt.Errorf("path %q must be absolute", rawPath)
+	}
+	return cleanPath, nil
+}
+
+func cleanLocalFileName(fileName string) (string, error) {
+	if fileName == "" {
+		return "", fmt.Errorf("file name must not be empty")
+	}
+	if hasParentDirComponent(fileName) {
+		return "", fmt.Errorf("file name %q must not contain parent directory references", fileName)
+	}
+	cleanFileName := filepath.Clean(fileName)
+	if cleanFileName == "." ||
+		cleanFileName == string(os.PathSeparator) ||
+		filepath.IsAbs(cleanFileName) ||
+		cleanFileName != filepath.Base(cleanFileName) {
+		return "", fmt.Errorf("file name %q must be local", fileName)
+	}
+	return cleanFileName, nil
+}
+
+func hasParentDirComponent(path string) bool {
+	for _, component := range strings.FieldsFunc(path, func(r rune) bool {
+		return r == '/' || r == '\\'
+	}) {
+		if component == ".." {
+			return true
+		}
+	}
+	return false
+}
 
 // CopyFileAtomic does file copy atomically
 func CopyFileAtomic(srcFilePath, destDir, tempFileName, destFileName string) error {
