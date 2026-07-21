@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"text/template"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,16 +63,17 @@ func main() {
 	certDurationString := pflag.StringP("cert-duration", "", "10m", "specify certificate duration")
 	helpFlag := pflag.BoolP("help", "h", false, "show help message and quit")
 
-	kubeconfigPath, err := filepath.Abs(*kubeconfigPathRaw)
-	if err != nil {
-		klog.Fatalf("illegal path %s in kubeconfigPath %s: %v", kubeconfigPath, *kubeconfigPathRaw, err)
-	}
-
 	pflag.Parse()
 	if *helpFlag {
 		pflag.PrintDefaults()
 		os.Exit(1)
 	}
+
+	kubeconfigPath, err := cmdutils.NewRootedFile(*kubeconfigPathRaw)
+	if err != nil {
+		klog.Fatalf("illegal path in kubeconfigPath %s: %v", *kubeconfigPathRaw, err)
+	}
+	defer kubeconfigPath.Close()
 
 	// check variables
 	if _, err := os.Stat(*bootstrapConfig); err != nil {
@@ -108,9 +109,9 @@ func main() {
 		klog.Fatalf("failed to start cert manager: %v", err)
 	}
 
-	fp, err := os.OpenFile(kubeconfigPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	fp, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		klog.Fatalf("cannot create kubeconfig file %q: %v", kubeconfigPath, err)
+		klog.Fatalf("cannot create kubeconfig file %q: %v", kubeconfigPath.Path(), err)
 	}
 
 	// render kubeconfig
@@ -131,15 +132,15 @@ func main() {
 		klog.Fatalf("cannot save kubeconfig: %v", err)
 	}
 
-	klog.Infof("kubeconfig %q is saved", kubeconfigPath)
+	klog.Infof("kubeconfig %q is saved", kubeconfigPath.Path())
 
 	// wait for signal
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 	<-sigterm
-	klog.Infof("signal received. remove kubeconfig %q and quit.", kubeconfigPath)
-	err = os.Remove(kubeconfigPath)
+	klog.Infof("signal received. remove kubeconfig %q and quit.", kubeconfigPath.Path())
+	err = kubeconfigPath.Root.Remove(kubeconfigPath.FileName)
 	if err != nil {
-		klog.Errorf("failed to remove kubeconfig %q: %v", kubeconfigPath, err)
+		klog.Errorf("failed to remove kubeconfig %q: %v", kubeconfigPath.Path(), err)
 	}
 }
