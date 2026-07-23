@@ -23,6 +23,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/skel"
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -1019,6 +1020,116 @@ var _ = Describe("config operations", func() {
 		Expect(*netconf.GatewayRequest).To(HaveLen(2))
 		Expect(netconf.IsFilterV4Gateway).To(BeFalse())
 		Expect(netconf.IsFilterV6Gateway).To(BeFalse())
+	})
+
+	It("LoadDelegateNetConfFromConfList preserves CNI-specific fields so DEL does not leak", func() {
+		// A calico-style conflist carries fields (kubeconfig, datastore_type,
+		// policy, ...) that the structured NetConfList would drop. If they are
+		// stripped, calico's DEL fails and the IP is never released.
+		conflist := `{
+			"name": "k8s-pod-network",
+			"cniVersion": "0.3.1",
+			"plugins": [
+				{
+					"type": "calico",
+					"datastore_type": "kubernetes",
+					"nodename": "node-1",
+					"mtu": 1500,
+					"policy": {"type": "k8s"},
+					"kubernetes": {"kubeconfig": "/etc/cni/net.d/calico-kubeconfig"},
+					"ipam": {"type": "calico-ipam"}
+				},
+				{
+					"type": "portmap",
+					"capabilities": {"portMappings": true}
+				}
+			]
+		}`
+
+		confList, err := libcni.NetworkConfFromBytes([]byte(conflist))
+		Expect(err).NotTo(HaveOccurred())
+
+		delegate, err := LoadDelegateNetConfFromConfList(confList, nil, "", "")
+		Expect(err).NotTo(HaveOccurred())
+
+		var parsed map[string]interface{}
+		Expect(json.Unmarshal(delegate.Bytes, &parsed)).To(Succeed())
+
+		plugins, ok := parsed["plugins"].([]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(plugins).To(HaveLen(2))
+
+		calico, ok := plugins[0].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(calico["datastore_type"]).To(Equal("kubernetes"))
+		Expect(calico["nodename"]).To(Equal("node-1"))
+		Expect(calico["mtu"]).To(BeEquivalentTo(1500))
+		Expect(calico["policy"]).NotTo(BeNil())
+
+		k8s, ok := calico["kubernetes"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(k8s["kubeconfig"]).To(Equal("/etc/cni/net.d/calico-kubeconfig"))
+
+		ipam, ok := calico["ipam"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(ipam["type"]).To(Equal("calico-ipam"))
+	})
+
+	It("LoadDelegateNetConfFromConfList keeps plugins appended from a subdirectory chain", func() {
+		// libcni appends subdirectory-chain plugins into confList.Plugins but
+		// does NOT update confList.Bytes. Rebuilding from confList.Bytes alone
+		// would drop them, so rawConfListBytes must use per-plugin Bytes.
+		base := `{
+			"name": "k8s-pod-network",
+			"cniVersion": "0.3.1",
+			"plugins": [
+				{"type": "calico", "kubernetes": {"kubeconfig": "/etc/cni/net.d/calico-kubeconfig"}}
+			]
+		}`
+
+		confList, err := libcni.NetworkConfFromBytes([]byte(base))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(confList.Plugins).To(HaveLen(1))
+
+		// Simulate a plugin appended from the subdirectory chain: present in
+		// Plugins, absent from the list-level Bytes.
+		appended, err := libcni.NetworkPluginConfFromBytes([]byte(`{"type": "bandwidth", "capabilities": {"bandwidth": true}}`))
+		Expect(err).NotTo(HaveOccurred())
+		confList.Plugins = append(confList.Plugins, appended)
+
+		delegate, err := LoadDelegateNetConfFromConfList(confList, nil, "", "")
+		Expect(err).NotTo(HaveOccurred())
+
+		var parsed map[string]interface{}
+		Expect(json.Unmarshal(delegate.Bytes, &parsed)).To(Succeed())
+		plugins, ok := parsed["plugins"].([]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(plugins).To(HaveLen(2))
+		Expect(plugins[1].(map[string]interface{})["type"]).To(Equal("bandwidth"))
+	})
+
+	It("InjectCNIVersionInConfList sets cniVersion without dropping fields", func() {
+		conflist := `{
+			"name": "k8s-pod-network",
+			"plugins": [
+				{"type": "calico", "kubernetes": {"kubeconfig": "/etc/cni/net.d/calico-kubeconfig"}}
+			]
+		}`
+
+		out, err := InjectCNIVersionInConfList([]byte(conflist), "0.3.1")
+		Expect(err).NotTo(HaveOccurred())
+
+		var parsed map[string]interface{}
+		Expect(json.Unmarshal(out, &parsed)).To(Succeed())
+		Expect(parsed["cniVersion"]).To(Equal("0.3.1"))
+
+		plugins, ok := parsed["plugins"].([]interface{})
+		Expect(ok).To(BeTrue())
+		calico, ok := plugins[0].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		k8s, ok := calico["kubernetes"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(k8s["kubeconfig"]).To(Equal("/etc/cni/net.d/calico-kubeconfig"))
 	})
 
 })
