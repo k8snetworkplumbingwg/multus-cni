@@ -51,7 +51,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	informerfactory "k8s.io/client-go/informers"
 	v1coreinformers "k8s.io/client-go/informers/core/v1"
@@ -217,7 +216,7 @@ func isPerNodeCertEnabled(config *PerNodeCertificate) (bool, error) {
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) (*Server, error) {
+func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
 	var kubeClient *k8s.ClientInfo
 	enabled, err := isPerNodeCertEnabled(daemonConfig.PerNodeCertificate)
 	if enabled {
@@ -259,10 +258,10 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 
-	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator, isInGracefulShutdownMode)
+	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator)
 }
 
-func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) (*Server, error) {
+func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
 	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
 	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
@@ -350,23 +349,6 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
-		})))
-
-	// handle for '/readyz'
-	router.HandleFunc(api.MultusReadyAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodGet && r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
-				return
-			}
-
-			if !isInGracefulShutdownMode() {
-				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json")
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Header().Set("Content-Type", "application/json")
-			}
 		})))
 
 	// this handle for the rest of above
@@ -496,8 +478,15 @@ func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 }
 
 func overrideCNIConfigWithServerConfig(cniConf []byte, overrideConf []byte, ignoreReadinessIndicator bool) ([]byte, error) {
-	if len(overrideConf) == 0 {
+	// If there is no server-side override config AND we don't need to strip any keys,
+	// return the client config unchanged.
+	if len(overrideConf) == 0 && !ignoreReadinessIndicator {
 		return cniConf, nil
+	}
+	// Treat a missing server config as an empty object so the key-stripping logic below
+	// still runs when ignoreReadinessIndicator is true.
+	if len(overrideConf) == 0 {
+		overrideConf = []byte("{}")
 	}
 
 	var cni map[string]interface{}
@@ -510,14 +499,13 @@ func overrideCNIConfigWithServerConfig(cniConf []byte, overrideConf []byte, igno
 		return nil, fmt.Errorf("failed to unmarshall CNI override config: %w", err)
 	}
 
-	// Copy each key of the override config into the CNI config except for
-	// a few specific keys
-	ignoreKeys := sets.NewString()
+	// Remove keys from the client config that the server wants to ignore, then
+	// overlay the server-side overrides (also skipping those same keys).
 	if ignoreReadinessIndicator {
-		ignoreKeys.Insert("readinessindicatorfile")
+		delete(cni, "readinessindicatorfile")
 	}
 	for overrideKey, overrideVal := range override {
-		if !ignoreKeys.Has(overrideKey) {
+		if !ignoreReadinessIndicator || overrideKey != "readinessindicatorfile" {
 			cni[overrideKey] = overrideVal
 		}
 	}
