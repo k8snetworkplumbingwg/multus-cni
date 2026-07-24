@@ -1,5 +1,5 @@
 # This dockerfile is specific to building Multus for MicroShift
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS rhel9
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 AS builder
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
@@ -8,10 +8,10 @@ ENV VERSION=rhel9 COMMIT=unset
 RUN ./hack/build-go.sh
 WORKDIR /
 
-FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
+FROM registry.ci.openshift.org/ocp/5.0:base-rhel9
 RUN dnf install -y util-linux && dnf clean all && \
     mkdir -p /usr/src/multus-cni/bin
-COPY --from=rhel9 \
+COPY --from=builder \
   /usr/src/multus-cni/bin/thin_entrypoint \
   /usr/src/multus-cni/bin/multus \
   /usr/src/multus-cni/bin
