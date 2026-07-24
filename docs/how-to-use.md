@@ -21,11 +21,15 @@ You may acquire the Multus binary via compilation (see the [developer guide](dev
 
 As a [quickstart](quickstart.md), you may apply these YAML files. Run this command (typically you would run this on the master, or wherever you have access to the `kubectl` command to manage your cluster).
 
-    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml  # thin deployment
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thin.yml  # thin deployment
 
 or
 
-    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml # thick (client/server) deployment
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/rbac.yml
+    kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deploy/manifests/daemonset-thick.yml # thick (client/server) deployment
 
 If you need more comprehensive detail, continue along with this guide, otherwise, you may wish to either [follow the quickstart guide]() or skip to the ['Create network attachment definition'](#create-network-attachment-definition) section.
 

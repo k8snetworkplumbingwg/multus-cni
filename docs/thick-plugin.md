@@ -35,7 +35,7 @@ described above:
 ### Configure Deployment
 
 If your delegate CNI plugin requires some files which is in container host, please update
-update `deployments/multus-daemonset-thick.yml` to add directory into multus-daemon pod.
+update `deploy/manifests/daemonset-thick.yml` to add directory into multus-daemon pod.
 For example, flannel requires `/run/flannel/subnet.env`, so you need to mount this directory
 into the multus-daemon pod.
 
@@ -48,7 +48,9 @@ this thick plugin variant. This reference deployment spec of multus can be
 deployed by following these commands:
 
 ```bash
-kubectl apply -f deployments/multus-daemonset-thick.yml
+kubectl apply -f deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl apply -f deploy/manifests/rbac.yml
+kubectl apply -f deploy/manifests/daemonset-thick.yml
 ```
 
 ### Command line parameters
@@ -111,4 +113,4 @@ It allows the following keys:
 
 In thick plugin case, delegate CNI plugin is executed by multus-daemon from Pod, hence if the delegate CNI requires resources in container host, for example unix socket or even file, then CNI plugin is failed to execute because multus-daemon runs in Pod. Multus-daemon supports "chrootDir" option which executes delegate CNI under chroot (to container host).
 
-This configuration is enabled in deployments/multus-daemonset-thick.yml as default.
+This configuration is enabled in deploy/manifests/daemonset-thick.yml as default.

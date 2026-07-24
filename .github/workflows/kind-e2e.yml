@@ -8,23 +8,23 @@ jobs:
         include:
           - docker-file: images/Dockerfile.thick
             cni-version: "0.3.1"
-            multus-manifest: multus-daemonset-thick.yml
+            multus-manifest: daemonset-thick.yml
           - docker-file: images/Dockerfile
             cni-version: "0.3.1"
-            multus-manifest: multus-daemonset.yml
+            multus-manifest: daemonset.yml
           - docker-file: images/Dockerfile.thick
             cni-version: "0.4.0"
-            multus-manifest: multus-daemonset-thick.yml
+            multus-manifest: daemonset-thick.yml
           - docker-file: images/Dockerfile
             cni-version: "0.4.0"
-            multus-manifest: multus-daemonset.yml
+            multus-manifest: daemonset.yml
           # need to wait kind to support CNI 1.0.0 (now kind 0.11 supports up to 0.4.0)
 #          - docker-file: images/Dockerfile.thick
 #            cni-version: "1.0.0"
 #            multus-manifest: multus-thick-daemonset.yml
 #          - docker-file: images/Dockerfile
 #            cni-version: "1.0.0"
-#            multus-manifest: multus-daemonset.yml
+#            multus-manifest: daemonset.yml
     env:
       JOB_NAME: "${{ matrix.cni-version }}-${{ matrix.multus-manifest }}"
 
@@ -95,12 +95,12 @@ jobs:
 #
 
       - name: Test subdirectory CNI chaining
-        if: ${{ matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        if: ${{ matrix.multus-manifest == 'daemonset-thick.yml' }}
         working-directory: ./e2e
         run: ./test-subdirectory-chaining.sh
 
       - name: Test subdirectory CNI chaining with passthru CNI / auxiliaryCNIChainName
-        if: ${{ matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        if: ${{ matrix.multus-manifest == 'daemonset-thick.yml' }}
         working-directory: ./e2e
         run: ./test-subdirectory-chaining-passthru.sh
 

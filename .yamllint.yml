@@ -1,0 +1,25 @@
+---
+extends: default
+
+ignore: |
+  vendor/
+  deploy/charts/multus/templates/
+
+rules:
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+  truthy:
+    ignore: |
+      .github/workflows/
+  comments:
+    ignore: |
+      .github/workflows/
+  comments-indentation:
+    ignore: |
+      .github/workflows/

@@ -1,0 +1,25 @@
+Multus CNI has been installed.
+
+Plugin type: {{ .Values.pluginType }}
+Namespace: {{ include "multusCni.namespace" . }}
+Image: {{ include "multusCni.image" . }}
+
+The NetworkAttachmentDefinition CRD is installed from the chart crds/ directory on first install.
+
+To verify the DaemonSet is running:
+
+  kubectl -n {{ include "multusCni.namespace" . }} get daemonset multus-cni
+  kubectl -n {{ include "multusCni.namespace" . }} get pods -l app=multus-cni
+
+To install with a different plugin type:
+
+  helm upgrade --install multus-cni ./deploy/charts/multus-cni --set pluginType=thin
+  helm upgrade --install multus-cni ./deploy/charts/multus-cni --set pluginType=thick
+
+{{- if and .Values.metrics.enabled (eq .Values.pluginType "thick") }}
+
+Metrics are enabled on port {{ .Values.metrics.port }}.
+A PodMonitor was created for Prometheus Operator scraping.
+{{- end }}
+
+See deploy/charts/multus-cni/README.md for full configuration options.

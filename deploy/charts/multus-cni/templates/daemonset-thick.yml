@@ -1,0 +1,156 @@
+---
+{{- if eq .Values.pluginType "thick" }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: multus-cni
+  namespace: {{ include "multusCni.namespace" . }}
+  labels:
+    {{- include "multusCni.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "multusCni.selectorLabels" . | nindent 6 }}
+  updateStrategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  template:
+    metadata:
+      labels:
+        {{- include "multusCni.labels" . | nindent 8 }}
+      annotations:
+        checksum/configmap: {{ (fromYaml (include (print $.Template.BasePath "/configmap-thick.yml") . )).data | toString | sha256sum }}
+    spec:
+      hostNetwork: true
+      hostPID: true
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+  {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+      containers:
+        - name: multus-cni
+          image: {{ include "multusCni.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - {{ quote .Values.thick.container.command }}
+  {{- if .Values.thick.container.args }}
+          args:
+    {{- range .Values.thick.container.args }}
+            - {{ quote (tpl . $) }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.metrics.enabled }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+              protocol: TCP
+  {{- end }}
+          env:
+            - name: MULTUS_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+  {{- with .Values.additionalEnv }}
+            {{- toYaml . | nindent 12 }}
+  {{- end }}
+          resources:
+            {{- toYaml .Values.thick.container.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: cni-config
+              mountPath: {{ .Values.cniConfig.mountPath }}
+            - name: cni-bin
+              mountPath: {{ .Values.cniBin.mountPath }}
+            - name: host-run
+              mountPath: /host/run
+            - name: host-var-lib-cni-multus
+              mountPath: /var/lib/cni/multus
+            - name: host-var-lib-kubelet
+              mountPath: /var/lib/kubelet
+              mountPropagation: HostToContainer
+            - name: host-run-k8s-cni-cncf-io
+              mountPath: /run/k8s.cni.cncf.io
+            - name: host-run-netns
+              mountPath: /run/netns
+              mountPropagation: HostToContainer
+            - name: multus-daemon-config
+              mountPath: /etc/cni/net.d/multus.d
+              readOnly: true
+            - name: hostroot
+              mountPath: /hostroot
+              mountPropagation: HostToContainer
+            - name: multus-conf-dir
+              mountPath: /etc/cni/multus/net.d
+  {{- with .Values.additionalVolumeMounts }} 
+            {{- toYaml . | nindent 12 }}
+  {{- end }}
+      initContainers:
+        - name: install-multus-cni-binary
+          image: {{ include "multusCni.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - {{ quote .Values.thick.initContainer.command }}
+  {{- if .Values.thick.initContainer.args }}
+          args:
+    {{- range .Values.thick.initContainer.args }}
+            - {{ quote (tpl . $) }}
+    {{- end }}
+  {{- end }}
+          resources:
+            {{- toYaml .Values.thick.initContainer.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: cni-bin
+              mountPath: {{ .Values.cniBin.mountPath }}
+              mountPropagation: Bidirectional
+      volumes:
+        - name: cni-config
+          hostPath:
+            path: {{ .Values.cniConfig.hostPath }}
+        - name: cni-bin
+          hostPath:
+            path: {{ .Values.cniBin.hostPath }}
+        - name: hostroot
+          hostPath:
+            path: /
+        - name: multus-daemon-config
+          configMap:
+            name: multus-daemon-config
+        - name: host-run
+          hostPath:
+            path: /run
+        - name: host-var-lib-cni-multus
+          hostPath:
+            path: /var/lib/cni/multus
+        - name: host-var-lib-kubelet
+          hostPath:
+            path: /var/lib/kubelet
+        - name: host-run-k8s-cni-cncf-io
+          hostPath:
+            path: /run/k8s.cni.cncf.io
+        - name: host-run-netns
+          hostPath:
+            path: /run/netns/
+        - name: multus-conf-dir
+          hostPath:
+            path: /etc/cni/multus/net.d
+  {{- with .Values.additionalVolumes }} 
+        {{- toYaml . | nindent 8 }}
+  {{- end }}
+      terminationGracePeriodSeconds: 10
+{{- end }}

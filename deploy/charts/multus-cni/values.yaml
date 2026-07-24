@@ -1,0 +1,144 @@
+image:
+  registry: ghcr.io
+  repository: k8snetworkplumbingwg/multus-cni
+  # Leave empty to use the default tag for the selected pluginType
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Plugin deployment mode: thin or thick
+pluginType: thin
+
+cniVersion: "0.3.1"
+
+logLevel: verbose
+
+thin:
+  container:
+    command: /thin_entrypoint
+    args:
+      - --multus-conf-file=auto
+      - --multus-cni-conf-dir={{ .Values.cniConfig.mountPath }}
+      - --cni-bin-dir={{ .Values.cniBin.mountPath }}
+      - --cni-conf-dir={{ .Values.cniConfig.mountPath }}
+      - --multus-log-level={{ .Values.logLevel }}
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 50Mi
+      limits:
+        cpu: 100m
+        memory: 50Mi
+
+  initContainer:
+    command: /install_multus
+    args:
+      - --type
+      - thin
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 15Mi
+      limits:
+        cpu: 100m
+        memory: 50Mi
+
+thick:
+  daemonConfig: |
+    {
+      "chrootDir": "/hostroot",
+      "cniVersion": "{{ .Values.cniVersion }}",
+      "logLevel": "{{ .Values.logLevel }}",
+      "logToStderr": true,
+      {{- if .Values.metrics.enabled }}
+      "metricsPort": {{ .Values.metrics.port }},
+      {{- end }}
+      "cniConfigDir": "{{ .Values.cniConfig.mountPath }}",
+      "cniVersion": "{{ .Values.cniVersion }}",
+      "multusAutoconfigDir": "{{ .Values.cniConfig.mountPath }}",
+      "multusConfigFile": "auto",
+      "socketDir": "{{ print .Values.cniConfig.mountPath "/run/multus/" }}"
+    }
+
+  container:
+    command: /usr/src/multus-cni/bin/multus-daemon
+    args: []
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 50Mi
+      limits:
+        cpu: 100m
+        memory: 50Mi
+
+  initContainer:
+    command: /usr/src/multus-cni/bin/install_multus
+    args:
+      - -d
+      - "{{ .Values.cniBin.mountPath }}"
+      - -t
+      - thick
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 15Mi
+      limits:
+        cpu: 100m
+        memory: 50Mi
+
+metrics:
+  enabled: false
+  port: 38080
+  podMonitor:
+    interval: 60s
+    scrapeTimeout: 10s
+    relabelings:
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    labels:
+      release: prom-stack
+
+cniConfig:
+  hostPath: /etc/cni/net.d
+  mountPath: /host/etc/cni/net.d
+cniBin:
+  hostPath: /opt/cni/bin
+  mountPath: /host/opt/cni/bin
+
+additionalEnv: []
+
+additionalVolumes: []
+additionalVolumeMounts: []
+
+namespaceOverride: ""
+
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: multus-cni
+
+updateStrategy:
+  type: RollingUpdate
+
+securityContext:
+  runAsGroup: 0
+  runAsUser: 0
+  runAsNonRoot: false
+  privileged: true
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: true
+
+tolerations:
+  - operator: Exists
+    effect: NoSchedule
+  - operator: Exists
+    effect: NoExecute
+
+nodeSelector: {}
+affinity: {}
+priorityClassName: ""
