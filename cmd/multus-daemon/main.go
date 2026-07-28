@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"os/user"
@@ -30,6 +31,7 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/net/netutil"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -169,16 +171,44 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 	}
 
 	if daemonConfig.MetricsPort != nil {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		if daemonConfig.EnablePprof != nil && *daemonConfig.EnablePprof {
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+			logging.Verbosef("pprof endpoints enabled on metrics port %d", *daemonConfig.MetricsPort)
+		}
+		metricsSrv := &http.Server{
+			Addr:              fmt.Sprintf(":%d", *daemonConfig.MetricsPort),
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
 		go utilwait.UntilWithContext(ctx, func(_ context.Context) {
-			http.Handle("/metrics", promhttp.Handler())
-			logging.Debugf("metrics port: %d", *daemonConfig.MetricsPort)
-			logging.Debugf("metrics: %s", http.ListenAndServe(fmt.Sprintf(":%d", *daemonConfig.MetricsPort), nil))
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logging.Debugf("metrics server error: %v", err)
+			}
 		}, 0)
+		go func() {
+			<-ctx.Done()
+			metricsSrv.Shutdown(context.Background())
+		}()
 	}
 
 	l, err := srv.GetListener(api.SocketPath(daemonConfig.SocketDir))
 	if err != nil {
 		return fmt.Errorf("failed to start the CNI server using socket %s. Reason: %+v", api.SocketPath(daemonConfig.SocketDir), err)
+	}
+
+	if limit := daemonConfig.ConnectionLimit; limit != nil {
+		if *limit <= 0 {
+			return fmt.Errorf("connection limit must be greater than 0, got %d", *limit)
+		}
+		logging.Debugf("connection limit: %d", *limit)
+		l = netutil.LimitListener(l, *limit)
 	}
 
 	server.Start(ctx, l)

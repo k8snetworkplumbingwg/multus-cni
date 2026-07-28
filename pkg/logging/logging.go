@@ -138,6 +138,11 @@ func Errorf(format string, a ...interface{}) error {
 	return fmt.Errorf(format, a...)
 }
 
+// Warningf prints a warning at the same visibility threshold as Errorf (prefix "warning:").
+func Warningf(format string, a ...interface{}) {
+	printf(ErrorLevel, "warning: "+format, a...)
+}
+
 // Panicf prints logging plus stack trace. This should be used only for unrecoverable error
 func Panicf(format string, a ...interface{}) {
 	printf(PanicLevel, format, a...)
