@@ -1,0 +1,19 @@
+---
+# whereabouts gives cluster-wide allocation on the shared eth1 L2 (koko).
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: density-macvlan
+spec:
+  config: '{
+    "cniVersion": "0.4.0",
+    "type": "macvlan",
+    "master": "eth1",
+    "mode": "bridge",
+    "ipam": {
+      "type": "whereabouts",
+      "range": "192.168.200.0/24",
+      "range_start": "192.168.200.10",
+      "range_end": "192.168.200.250"
+    }
+  }'

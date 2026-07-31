@@ -1,0 +1,30 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: webserver-{{.Replica}}-{{.Iteration}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: webserver-{{.Replica}}-{{.Iteration}}
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: webserver-{{.Replica}}-{{.Iteration}}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: density-macvlan
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+        - name: webserver
+          image: quay.io/cloud-bulldozer/sampleapp:latest
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: false
+      restartPolicy: Always
