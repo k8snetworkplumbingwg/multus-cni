@@ -169,7 +169,7 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 			logging.Verbosef("pprof endpoints enabled on metrics port %d", *daemonConfig.MetricsPort)
 		}
 		metricsSrv := &http.Server{
-			Addr:              fmt.Sprintf(":%d", *daemonConfig.MetricsPort),
+			Addr:              fmt.Sprintf("127.0.0.1:%d", *daemonConfig.MetricsPort),
 			Handler:           mux,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
