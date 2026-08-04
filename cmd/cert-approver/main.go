@@ -218,12 +218,22 @@ func (c *CertController) handleErr(err error, key interface{}) {
 func (c *CertController) processItem(key string) error {
 	startTime := time.Now()
 
-	obj, _, err := c.informer.GetIndexer().GetByKey(key)
+	obj, exists, err := c.informer.GetIndexer().GetByKey(key)
 	if err != nil {
 		return fmt.Errorf("Error fetching object with key %s from store: %v", key, err)
 	}
+	if !exists {
+		// The CSR was deleted between being enqueued and being processed;
+		// nothing to do. Returning nil (rather than dereferencing the nil
+		// object below) avoids crashing the controller on this benign race.
+		klog.V(5).Infof("CSR %s no longer exists, skipping", key)
+		return nil
+	}
 
-	req, _ := obj.(*certificatesv1.CertificateSigningRequest)
+	req, ok := obj.(*certificatesv1.CertificateSigningRequest)
+	if !ok {
+		return fmt.Errorf("object with key %s is not a CertificateSigningRequest", key)
+	}
 
 	nodeName := "unknown"
 	defer func() {
