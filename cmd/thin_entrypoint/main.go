@@ -55,6 +55,7 @@ type Options struct {
 	MultusLogFile            string
 	OverrideNetworkName      bool
 	CleanupConfigOnExit      bool
+	ForceConfigWatch         bool
 	RenameConfFile           bool
 	ReadinessIndicatorFile   string
 	AdditionalBinDir         string
@@ -89,6 +90,7 @@ func (o *Options) addFlags() {
 	fs.StringVar(&o.MultusLogFile, "multus-log-file", "", "multus log file")
 	fs.BoolVar(&o.OverrideNetworkName, "override-network-name", false, "override network name from master cni file (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.CleanupConfigOnExit, "cleanup-config-on-exit", false, "cleanup config file on exit")
+	fs.BoolVar(&o.ForceConfigWatch, "force-config-watch", false, "watch for config changes even when --cleanup-config-on-exit is false (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.SkipMultusConfWatch, "skip-config-watch", false, "dont watch for config (master cni and kubeconfig) changes (used only with --multus-conf-file=auto)")
 	fs.BoolVar(&o.RenameConfFile, "rename-conf-file", false, "rename master config file to invalidate (used only with --multus-conf-file=auto)")
 	fs.StringVar(&o.ReadinessIndicatorFile, "readiness-indicator-file", "", "readiness indicator file (used only with --multus-conf-file=auto)")
@@ -620,7 +622,7 @@ func main() {
 		defer cleanupMultusConf(&opt)
 	}
 
-	watchChanges := opt.CleanupConfigOnExit && opt.MultusConfFile == "auto" && !opt.SkipMultusConfWatch
+	watchChanges := (opt.CleanupConfigOnExit || opt.ForceConfigWatch) && opt.MultusConfFile == "auto" && !opt.SkipMultusConfWatch
 	if watchChanges {
 		fmt.Printf("Entering watch loop...\n")
 		masterConfigExists := true

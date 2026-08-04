@@ -627,6 +627,13 @@ master CNI configuration and kubeconfig. when such change detected, the script w
 
     --skip-config-watch
 
+You can also enable watching independently of `--cleanup-config-on-exit` using:
+
+    --force-config-watch
+
+When `--force-config-watch` is set (together with `--multus-conf-file=auto`), the entrypoint will watch and regenerate the Multus configuration on changes
+without deleting it on exit. This is useful when you want live config updates but do not need the cleanup-on-exit behavior.
+
 Additionally when using CRIO, you may wish to have the CNI config file that's used as the source for `--multus-conf-file=auto` renamed. This boolean option when set to true automatically renames the file with a `.old` suffix to the original filename.
 
     --rename-conf-file=true
