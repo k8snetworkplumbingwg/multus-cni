@@ -51,11 +51,11 @@ func LoadDelegateNetConfList(bytes []byte, delegateConf *DelegateNetConf) error 
 		return logging.Errorf("LoadDelegateNetConfList: error unmarshalling delegate conflist: %v", err)
 	}
 
-	if delegateConf.ConfList.Plugins == nil {
+	if len(delegateConf.ConfList.Plugins) == 0 {
 		return logging.Errorf("LoadDelegateNetConfList: delegate must have the 'type' or 'plugin' field")
 	}
 
-	if delegateConf.ConfList.Plugins[0].Type == "" {
+	if delegateConf.ConfList.Plugins[0] == nil || delegateConf.ConfList.Plugins[0].Type == "" {
 		return logging.Errorf("LoadDelegateNetConfList: a plugin delegate must have the 'type' field")
 	}
 	delegateConf.ConfListPlugin = true
@@ -639,9 +639,15 @@ func addDeviceIDInConfList(inBytes []byte, deviceID string) ([]byte, error) {
 // injectCNIArgs injects given args to cniConfig
 func injectCNIArgs(cniConfig *map[string]interface{}, args *map[string]interface{}) error {
 	if argsval, ok := (*cniConfig)["args"]; ok {
-		argsvalmap := argsval.(map[string]interface{})
+		argsvalmap, ok := argsval.(map[string]interface{})
+		if !ok {
+			return logging.Errorf("injectCNIArgs: 'args' field is not a JSON object")
+		}
 		if cnival, ok := argsvalmap["cni"]; ok {
-			cnivalmap := cnival.(map[string]interface{})
+			cnivalmap, ok := cnival.(map[string]interface{})
+			if !ok {
+				return logging.Errorf("injectCNIArgs: 'args.cni' field is not a JSON object")
+			}
 			// merge it if conf has args
 			for key, val := range *args {
 				cnivalmap[key] = val
@@ -667,7 +673,9 @@ func addCNIArgsInConfig(inBytes []byte, cniArgs *map[string]interface{}) ([]byte
 		return nil, logging.Errorf("addCNIArgsInConfig(): failed to unmarshal inBytes: %v", err)
 	}
 
-	injectCNIArgs(&rawConfig, cniArgs)
+	if err := injectCNIArgs(&rawConfig, cniArgs); err != nil {
+		return nil, logging.Errorf("addCNIArgsInConfig(): %w", err)
+	}
 
 	configBytes, err := json.Marshal(rawConfig)
 	if err != nil {
@@ -697,8 +705,13 @@ func addCNIArgsInConfList(inBytes []byte, cniArgs *map[string]interface{}) ([]by
 	}
 
 	for idx := range pMap {
-		valMap := pMap[idx].(map[string]interface{})
-		injectCNIArgs(&valMap, cniArgs)
+		valMap, ok := pMap[idx].(map[string]interface{})
+		if !ok {
+			return nil, logging.Errorf("addCNIArgsInConfList(): plugin #%d is not a JSON object", idx)
+		}
+		if err := injectCNIArgs(&valMap, cniArgs); err != nil {
+			return nil, logging.Errorf("addCNIArgsInConfList(): %w", err)
+		}
 	}
 
 	configBytes, err := json.Marshal(rawConfig)
