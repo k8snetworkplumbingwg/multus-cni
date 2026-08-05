@@ -62,11 +62,15 @@ func isTransientCertError(err error) bool {
 	if err == nil {
 		return false
 	}
-	errMsg := err.Error()
 	var noCertKeyErr *certificate.NoCertKeyError
 	if errors.As(err, &noCertKeyErr) {
-		return false
+		// No cert/key currently present (initial provisioning, or rotation
+		// briefly removing the symlink) - retry.
+		return true
 	}
+	// The certificate store wraps these errors with fmt.Errorf("%v", ...) rather than
+	// %w, so errors.Is/errors.As can't unwrap them - string matching is the only option.
+	errMsg := err.Error()
 	if strings.Contains(errMsg, "no such file or directory") ||
 		strings.Contains(errMsg, "failed to find any PEM data") ||
 		strings.Contains(errMsg, "invalid PEM") {
@@ -171,10 +175,6 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 		var currentCert *tls.Certificate
 		currentCert, storeErr = certificateStore.Current()
 		if storeErr != nil {
-			var noCertKeyErr *certificate.NoCertKeyError
-			if errors.As(storeErr, &noCertKeyErr) {
-				return false, nil
-			}
 			if isTransientCertError(storeErr) {
 				logging.Verbosef("Transient cert error (likely rotation in progress), will retry: %v", storeErr)
 				return false, nil

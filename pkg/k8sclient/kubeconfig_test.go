@@ -37,7 +37,7 @@ func TestIsTransientCertError(t *testing.T) {
 		{
 			name:     "NoCertKeyError",
 			err:      &noCertKeyErr,
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "file not found during rotation",
