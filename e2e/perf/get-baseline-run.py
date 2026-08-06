@@ -87,7 +87,7 @@ def find_baseline_run(owner: str, repo: str, workflow_id: str, event: str, token
 
     print(f"Searching for baseline run (event={event}, status=success)...", file=sys.stderr)
 
-    response = requests.get(url, headers=headers, params=params)
+    response = requests.get(url, headers=headers, params=params, timeout=30)
     response.raise_for_status()
 
     data = response.json()

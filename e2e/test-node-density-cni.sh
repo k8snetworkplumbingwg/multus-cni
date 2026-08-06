@@ -54,6 +54,11 @@ restore_nad() {
 trap restore_nad EXIT
 tmp=$(mktemp)
 sed "s/\"cniVersion\": \"[^\"]*\"/\"cniVersion\": \"${CNI_VERSION}\"/" "${NAD}" > "${tmp}"
+if ! grep -q "\"cniVersion\": \"${CNI_VERSION}\"" "${tmp}"; then
+	echo "error: cniVersion substitution failed; ${NAD} does not contain \"cniVersion\": \"${CNI_VERSION}\"" >&2
+	rm -f "${tmp}"
+	exit 1
+fi
 mv "${tmp}" "${NAD}"
 
 echo "Running Multus node-density-cni: workers=${WORKER_COUNT} pods_per_node=${PODS_PER_NODE} job_iterations=${JOB_ITERATIONS} cni_version=${CNI_VERSION} workload=${WORKLOAD}"

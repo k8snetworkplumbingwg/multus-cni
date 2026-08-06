@@ -42,14 +42,14 @@ jobs:
           e2e/perf/download-artifacts.py \
             --run-id ${{ github.event.workflow_run.id }} \
             --filter "performance-test-data" \
-            --output-dir . \
+            --output-dir artifact-downloads \
             --extract
 
       - name: Organize extracted artifacts and generate JSON data
         run: |
-          for dir in *performance-test-data*; do
+          for dir in artifact-downloads/*performance-test-data*; do
             if [ -d "$dir" ]; then
-              workload=$(echo "$dir" | sed 's/-performance-test-data-.*//')
+              workload=$(basename "$dir" | sed 's/-performance-test-data-.*//')
               mkdir -p "reports/${workload}"
 
               metrics_dir=""

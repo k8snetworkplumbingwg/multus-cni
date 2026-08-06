@@ -67,7 +67,7 @@ def list_artifacts(owner: str, repo: str, run_id: int, token: str) -> list[dict]
         'Accept': 'application/vnd.github.v3+json'
     }
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
 
     data = response.json()
@@ -84,7 +84,7 @@ def download_artifact(owner: str, repo: str, artifact_id: int, output_path: Path
 
     print(f"  Downloading artifact {artifact_id}...", file=sys.stderr)
 
-    response = requests.get(url, headers=headers, stream=True)
+    response = requests.get(url, headers=headers, stream=True, timeout=30)
     response.raise_for_status()
 
     with open(output_path, 'wb') as f:
@@ -95,12 +95,29 @@ def download_artifact(owner: str, repo: str, artifact_id: int, output_path: Path
 
 
 def extract_artifact(zip_path: Path, extract_to: Path) -> None:
-    """Extract a zip artifact."""
+    """Extract a zip artifact, rejecting path-traversal members."""
     print(f"  Extracting to {extract_to}...", file=sys.stderr)
+    extract_to = extract_to.resolve()
     extract_to.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(extract_to)
+        for member in zip_ref.infolist():
+            member_path = Path(member.filename)
+            # Reject absolute paths, drive letters, and ".." traversal.
+            if (
+                member_path.is_absolute()
+                or member_path.anchor
+                or '..' in member_path.parts
+            ):
+                raise ValueError(f"Unsafe ZIP member path: {member.filename!r}")
+
+            target = (extract_to / member_path).resolve()
+            if not target.is_relative_to(extract_to):
+                raise ValueError(
+                    f"ZIP member escapes extract dir: {member.filename!r}"
+                )
+
+            zip_ref.extract(member, extract_to)
 
 
 def main():

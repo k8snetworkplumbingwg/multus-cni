@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import argparse
 
@@ -170,7 +170,7 @@ class ReportGenerator:
         report_lines.append("# 📊 Kubernetes Workload Metrics Report")
         report_lines.append(f"## {self.workload} Performance Results")
         report_lines.append("")
-        report_lines.append(f"**Generated on:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        report_lines.append(f"**Generated on:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         report_lines.append("")
 
         # Main KPI: Pod Ready Latency
@@ -243,7 +243,7 @@ class ReportGenerator:
         try:
             # Use gh CLI to post comment
             cmd = ['gh', 'pr', 'comment', pr_number, '--body', report_content]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode == 0:
                 print(f"✓ Posted performance report as comment to PR #{pr_number}")
@@ -289,7 +289,7 @@ class ReportGenerator:
         # Build structured output
         output_data = {
             'workload': self.workload,
-            'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+            'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC'),
             'pod_latency': pod_latency['stats'] if pod_latency['stats'] else None,
             'cpu': cpu_summary,
             'memory': memory_summary
@@ -430,8 +430,6 @@ def main():
     print()
     print("🎉 Report generation complete!")
     print(f"📄 Report saved to: {args.output}")
-    if pr_number and args.github_comment:
-        print(f"💬 GitHub comment posted to PR #{pr_number}")
 
 
 if __name__ == "__main__":

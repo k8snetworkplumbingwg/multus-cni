@@ -187,7 +187,7 @@ def render_markdown(data: dict) -> str:
     # Baseline reference
     if data.get('has_baseline'):
         baseline_ref = f"[workflow]({data['baseline_url']})" if data.get('baseline_url') else 'N/A'
-        lines.append(f"> 📊 **Baseline:** Daily run from {baseline_ref}")
+        lines.append(f"> 📊 **Baseline:** Run from {baseline_ref}")
         lines.append("")
 
     # Pod Ready Latency

@@ -43,6 +43,46 @@ def get_repo_info() -> tuple[str, str]:
     sys.exit(1)
 
 
+def find_prs_by_head_branch(head_branch: str, head_owner: str | None = None) -> List[int]:
+    """Find open PRs for a head branch, optionally scoped to a fork/owner."""
+    if not head_branch:
+        return []
+
+    head_ref = f"{head_owner}:{head_branch}" if head_owner else head_branch
+    print(f"Searching for PRs by head: {head_ref}", file=sys.stderr)
+
+    try:
+        result = subprocess.run(
+            [
+                'gh', 'pr', 'list',
+                '--head', head_ref,
+                '--json', 'number,headRepositoryOwner',
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+
+        if not result.stdout.strip():
+            return []
+
+        prs = json.loads(result.stdout)
+        if head_owner:
+            prs = [
+                pr for pr in prs
+                if (pr.get('headRepositoryOwner') or {}).get('login') == head_owner
+            ]
+
+        pr_numbers = [int(pr['number']) for pr in prs]
+        if pr_numbers:
+            print(f"Found PR(s): {pr_numbers}", file=sys.stderr)
+        return pr_numbers
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        print(f"Warning: gh CLI failed: {e}", file=sys.stderr)
+        return []
+
+
 def get_prs_from_event_file(event_path: Path) -> List[int]:
     """
     Extract PR numbers from GitHub event file.
@@ -67,27 +107,11 @@ def get_prs_from_event_file(event_path: Path) -> List[int]:
     if not head_branch:
         return []
 
-    print(f"Searching for PRs by head_branch: {head_branch}", file=sys.stderr)
+    head_owner = (
+        (workflow_run.get('head_repository') or {}).get('owner') or {}
+    ).get('login')
 
-    # Use gh CLI to search for PRs by head branch
-    try:
-        result = subprocess.run(
-            ['gh', 'pr', 'list', '--head', head_branch, '--json', 'number', '--jq', '.[].number'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        if result.stdout.strip():
-            pr_numbers = [int(n) for n in result.stdout.strip().split('\n') if n]
-            if pr_numbers:
-                print(f"Found PR(s): {pr_numbers}", file=sys.stderr)
-            return pr_numbers
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Warning: gh CLI failed: {e}", file=sys.stderr)
-        return []
-
-    return []
+    return find_prs_by_head_branch(head_branch, head_owner)
 
 
 def get_prs_from_api(owner: str, repo: str, run_id: int, token: str) -> List[int]:
@@ -103,7 +127,7 @@ def get_prs_from_api(owner: str, repo: str, run_id: int, token: str) -> List[int
         'Accept': 'application/vnd.github.v3+json'
     }
 
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=30)
     response.raise_for_status()
 
     data = response.json()
@@ -116,27 +140,11 @@ def get_prs_from_api(owner: str, repo: str, run_id: int, token: str) -> List[int
     if not head_branch:
         return []
 
-    print(f"Searching for PRs by head_branch: {head_branch}", file=sys.stderr)
+    head_owner = (
+        (data.get('head_repository') or {}).get('owner') or {}
+    ).get('login')
 
-    # Use gh CLI to search for PRs by head branch
-    try:
-        result = subprocess.run(
-            ['gh', 'pr', 'list', '--head', head_branch, '--json', 'number', '--jq', '.[].number'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        if result.stdout.strip():
-            pr_numbers = [int(n) for n in result.stdout.strip().split('\n') if n]
-            if pr_numbers:
-                print(f"Found PR(s): {pr_numbers}", file=sys.stderr)
-            return pr_numbers
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Warning: gh CLI failed: {e}", file=sys.stderr)
-        return []
-
-    return []
+    return find_prs_by_head_branch(head_branch, head_owner)
 
 
 def main():
