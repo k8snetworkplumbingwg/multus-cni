@@ -6,7 +6,7 @@ ADD . /usr/src/multus-cni
 
 WORKDIR /usr/src/multus-cni
 ENV GO111MODULE=off
-RUN ./hack/build-go.sh
+RUN MODMODE=readonly ./hack/build-go.sh
 
 FROM quay.io/openshift/origin-base:latest
 LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/multus-cni

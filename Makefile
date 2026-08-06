@@ -3,7 +3,6 @@
 .PHONY: deps-update
 deps-update: ; $(info  Updating dependencies...) @ ## Update dependencies
 	go mod tidy
-	go mod vendor
 
 PHONY: build test
 
