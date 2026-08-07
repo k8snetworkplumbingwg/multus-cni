@@ -371,6 +371,40 @@ def _format_previous_run_timestamp(dt: datetime) -> str:
     return dt.strftime(PREVIOUS_RUN_TIMESTAMP_FORMAT)
 
 
+def _previous_run_timestamp_from_comment(comment: dict) -> str:
+    """Label for archiving a comment's current content as a previous run.
+
+    Prefer created_at, then updated_at. Never invent "now" on parse failure —
+    that would mis-date the archived run.
+    """
+    for field in ('created_at', 'updated_at'):
+        raw = comment.get(field)
+        if raw is None:
+            continue
+        if not isinstance(raw, str):
+            print(
+                f"Warning: comment {field} is not a string ({raw!r}); skipping",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            parsed = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        except (ValueError, TypeError) as exc:
+            print(
+                f"Warning: failed to parse comment {field}={raw!r}: {exc}",
+                file=sys.stderr,
+            )
+            continue
+        return _format_previous_run_timestamp(parsed)
+
+    print(
+        "Warning: no usable created_at/updated_at on existing comment; "
+        "labeling archived run without a concrete timestamp",
+        file=sys.stderr,
+    )
+    return "Previous run"
+
+
 def create_previous_run_section(content: str, run_timestamp: str) -> str:
     """Create a collapsible previous run section."""
     section = f"<details>\n<summary><strong>{run_timestamp}</strong></summary>\n\n"
@@ -539,16 +573,8 @@ def main():
                 # Extract current run content (without footer and previous runs)
                 old_content = extract_current_run_content(existing_comment['body'])
 
-                # Timestamp from when the comment was posted (UTC)
-                old_timestamp = _format_previous_run_timestamp(datetime.now(timezone.utc))
-                if 'created_at' in existing_comment:
-                    try:
-                        created_at = datetime.fromisoformat(
-                            existing_comment['created_at'].replace('Z', '+00:00')
-                        )
-                        old_timestamp = _format_previous_run_timestamp(created_at)
-                    except Exception:
-                        pass
+                # Timestamp from the existing comment (created_at, else updated_at)
+                old_timestamp = _previous_run_timestamp_from_comment(existing_comment)
 
                 # Extract any existing previous runs
                 new_body, can_update = build_updated_comment_body(

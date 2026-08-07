@@ -35,7 +35,7 @@ data:
 
     tar xvfzp "/tmp/${CNI_TGZ}" -C "${CNI_BIN_DIR}"
     # Fail closed: pods must not become Ready without secondary-network plugins.
-    for plugin in macvlan host-local bridge loopback; do
+    for plugin in macvlan host-local static bridge loopback; do
       if [ ! -x "${CNI_BIN_DIR}/${plugin}" ]; then
         echo "error: expected executable ${CNI_BIN_DIR}/${plugin} after CNI plugin install"
         ls -la "${CNI_BIN_DIR}" || true

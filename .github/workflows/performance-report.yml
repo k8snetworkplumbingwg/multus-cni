@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -215,6 +217,6 @@ jobs:
           echo "- **Associated PRs:** ${{ steps.get_prs.outputs.pr_numbers }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifacts Processed" >> $GITHUB_STEP_SUMMARY
-          PERF_TEST_COUNT=$(ls -1d *performance-test-data* 2>/dev/null | wc -l | tr -d ' ')
+          PERF_TEST_COUNT=$(ls -1d artifact-downloads/*performance-test-data* 2>/dev/null | wc -l | tr -d ' ')
           echo "- Performance test data dirs: **${PERF_TEST_COUNT}**" >> $GITHUB_STEP_SUMMARY
           find reports enhanced-reports -type f 2>/dev/null | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || true

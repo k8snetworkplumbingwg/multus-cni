@@ -15,9 +15,10 @@ METRICS_DIR=${METRICS_DIR:-perf-data/metrics}
 kubectl label node \
 	-l '!node-role.kubernetes.io/control-plane' \
 	node-role.kubernetes.io/worker= \
-	--overwrite
+	--overwrite \
+	--request-timeout=60s
 
-WORKER_COUNT=$(kubectl get nodes -l 'node-role.kubernetes.io/worker' --no-headers | wc -l | tr -d ' ')
+WORKER_COUNT=$(kubectl get nodes -l 'node-role.kubernetes.io/worker' --no-headers --request-timeout=60s | wc -l | tr -d ' ')
 if [ "${WORKER_COUNT}" -lt 1 ]; then
 	echo "error: no worker nodes found for node-density-cni"
 	exit 1
@@ -30,18 +31,6 @@ fi
 
 rm -rf perf-data node-density-cni-metrics.tgz
 mkdir -p "${METRICS_DIR}"
-
-# Cluster-wide IPAM for the shared eth1 L2 segment (host-local would collide).
-WHEREABOUTS_VERSION=${WHEREABOUTS_VERSION:-v0.9.2}
-WHEREABOUTS_BASE="https://raw.githubusercontent.com/k8snetworkplumbingwg/whereabouts/${WHEREABOUTS_VERSION}/doc/crds"
-echo "Installing whereabouts ${WHEREABOUTS_VERSION}"
-kubectl apply -f "${WHEREABOUTS_BASE}/whereabouts.cni.cncf.io_ippools.yaml"
-kubectl apply -f "${WHEREABOUTS_BASE}/whereabouts.cni.cncf.io_overlappingrangeipreservations.yaml"
-kubectl apply -f "${WHEREABOUTS_BASE}/whereabouts.cni.cncf.io_nodeslicepools.yaml"
-curl -fsSL "${WHEREABOUTS_BASE}/daemonset-install.yaml" \
-	| sed "s|image: ghcr.io/k8snetworkplumbingwg/whereabouts:latest|image: ghcr.io/k8snetworkplumbingwg/whereabouts:${WHEREABOUTS_VERSION}|" \
-	| kubectl apply -f -
-kubectl -n kube-system rollout status daemonset/whereabouts --timeout=300s
 
 # Render CNI version into the NAD used by kube-burner (paths are CWD-relative).
 NAD=kubeburner/templates/density-macvlan-nad.yml
