@@ -136,7 +136,7 @@ func main() {
 
 	// wait for signal
 	sigterm := make(chan os.Signal, 1)
-	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 	<-sigterm
 	klog.Infof("signal received. remove kubeconfig %q and quit.", kubeconfigPath.Path())
 	err = kubeconfigPath.Root.Remove(kubeconfigPath.FileName)
