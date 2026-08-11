@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from github_common import get_github_token, get_repo_info
 
 
 MAX_COMMENT_SIZE = 60000  # GitHub limit is 65536
@@ -37,26 +38,6 @@ PREVIOUS_RUN_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S UTC'
 MULTIPART_COMMENT_PATTERN = re.compile(r'\(Part\s*\d+/\d+\)')
 DETAILS_OPEN_PATTERN = re.compile(r'<details\b')
 DETAILS_CLOSE_PATTERN = re.compile(r'</details>')
-
-
-def get_github_token() -> str:
-    """Get GitHub token from environment."""
-    token = os.getenv('GITHUB_TOKEN')
-    if not token:
-        print("Error: GITHUB_TOKEN environment variable not set", file=sys.stderr)
-        sys.exit(1)
-    return token
-
-
-def get_repo_info() -> tuple[str, str]:
-    """Get repository owner and name from environment."""
-    repo = os.getenv('GITHUB_REPOSITORY')
-    if repo and '/' in repo:
-        owner, name = repo.split('/', 1)
-        return owner, name
-
-    print("Error: GITHUB_REPOSITORY environment variable not set", file=sys.stderr)
-    sys.exit(1)
 
 
 def find_reports(reports_dir: Path) -> list[dict[str, str]]:

@@ -14,33 +14,13 @@ Usage:
 
 import argparse
 import json
-import os
 import sys
 import subprocess
 from pathlib import Path
 from typing import List
 
 import requests
-
-
-def get_github_token() -> str:
-    """Get GitHub token from environment."""
-    token = os.getenv('GITHUB_TOKEN')
-    if not token:
-        print("Error: GITHUB_TOKEN environment variable not set", file=sys.stderr)
-        sys.exit(1)
-    return token
-
-
-def get_repo_info() -> tuple[str, str]:
-    """Get repository owner and name from environment."""
-    repo = os.getenv('GITHUB_REPOSITORY')
-    if repo and '/' in repo:
-        owner, name = repo.split('/', 1)
-        return owner, name
-
-    print("Error: GITHUB_REPOSITORY environment variable not set", file=sys.stderr)
-    sys.exit(1)
+from github_common import get_github_token, get_repo_info
 
 
 def find_prs_by_head_branch(head_branch: str, head_owner: str | None = None) -> List[int]:

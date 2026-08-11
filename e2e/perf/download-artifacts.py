@@ -12,51 +12,12 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 import zipfile
 from pathlib import Path
 
 import requests
-
-
-def get_github_token() -> str:
-    """Get GitHub token from environment."""
-    token = os.getenv('GITHUB_TOKEN')
-    if not token:
-        print("Error: GITHUB_TOKEN environment variable not set", file=sys.stderr)
-        sys.exit(1)
-    return token
-
-
-def get_repo_info() -> tuple[str, str]:
-    """Get repository owner and name from environment or git."""
-    # Try environment variables first (GitHub Actions)
-    repo = os.getenv('GITHUB_REPOSITORY')
-    if repo and '/' in repo:
-        owner, name = repo.split('/', 1)
-        return owner, name
-
-    # Fallback: parse from git remote
-    import subprocess
-    try:
-        result = subprocess.run(
-            ['git', 'config', '--get', 'remote.origin.url'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        url = result.stdout.strip()
-        # Parse github.com:owner/repo.git or https://github.com/owner/repo.git
-        if 'github.com' in url:
-            parts = url.split('github.com')[-1].strip('/:').replace('.git', '').split('/')
-            if len(parts) >= 2:
-                return parts[0], parts[1]
-    except subprocess.CalledProcessError:
-        pass
-
-    print("Error: Could not determine repository info", file=sys.stderr)
-    sys.exit(1)
+from github_common import get_github_token, get_repo_info
 
 
 def list_artifacts(owner: str, repo: str, run_id: int, token: str) -> list[dict]:
@@ -135,7 +96,7 @@ def main():
     if args.owner and args.repo:
         owner, repo = args.owner, args.repo
     else:
-        owner, repo = get_repo_info()
+        owner, repo = get_repo_info(allow_git_fallback=True)
 
     print(f"Repository: {owner}/{repo}", file=sys.stderr)
     print(f"Workflow Run ID: {args.run_id}", file=sys.stderr)
