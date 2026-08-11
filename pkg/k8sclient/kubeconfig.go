@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -52,6 +53,30 @@ const (
 var (
 	certUsages = []certificatesv1.KeyUsage{certificatesv1.UsageDigitalSignature, certificatesv1.UsageClientAuth}
 )
+
+// isTransientCertError determines if a certificate error is transient (e.g., due to
+// certificate rotation) and should be retried, or if it's a permanent error that
+// requires different handling.
+func isTransientCertError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var noCertKeyErr *certificate.NoCertKeyError
+	if errors.As(err, &noCertKeyErr) {
+		// No cert/key currently present (initial provisioning, or rotation
+		// briefly removing the symlink) - retry.
+		return true
+	}
+	// The certificate store wraps these errors with fmt.Errorf("%v", ...) rather than
+	// %w, so errors.Is/errors.As can't unwrap them - string matching is the only option.
+	errMsg := err.Error()
+	if strings.Contains(errMsg, "no such file or directory") ||
+		strings.Contains(errMsg, "failed to find any PEM data") ||
+		strings.Contains(errMsg, "invalid PEM") {
+		return true
+	}
+	return false
+}
 
 // getPerNodeKubeconfig creates new kubeConfig, based on bootstrap, with new certDir
 func getPerNodeKubeconfig(bootstrap *rest.Config, certDir string) *rest.Config {
@@ -154,7 +179,14 @@ func PerNodeK8sClient(nodeName, bootstrapKubeconfigFile string, certDuration tim
 	err = wait.PollWithContext(context.TODO(), time.Second, 2*time.Minute, func(_ context.Context) (bool, error) {
 		var currentCert *tls.Certificate
 		currentCert, storeErr = certificateStore.Current()
-		return currentCert != nil && storeErr == nil, nil
+		if storeErr != nil {
+			if isTransientCertError(storeErr) {
+				logging.Verbosef("Transient cert error (likely rotation in progress), will retry: %v", storeErr)
+				return false, nil
+			}
+			return false, storeErr
+		}
+		return currentCert != nil, nil
 	})
 	if err != nil {
 		return nil, logging.Errorf("certificate was not signed, last cert store err: %v err: %v", storeErr, err)
