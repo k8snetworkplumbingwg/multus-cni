@@ -66,11 +66,9 @@ func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	sigTermCtx, sigTermCancel := context.WithCancel(ctx)
+	// Used by the server readiness handler to report not-ready once shutdown is initiated.
 	isInGracefulShutdownMode := func() bool {
-		if sigTermCtx.Err() == nil {
-			return false
-		}
-		return true
+		return sigTermCtx.Err() != nil
 	}
 
 	daemonConf, err := cniServerConfig(*configFilePath)
@@ -138,6 +136,7 @@ func main() {
 	go func() {
 		for sig := range signalCh {
 			logging.Verbosef("caught %v, stopping...", sig)
+			// Mark graceful-shutdown mode first so readiness probes fail before canceling server context.
 			sigTermCancel()
 			<-time.After(SigTermCancelAfter)
 			cancel()
