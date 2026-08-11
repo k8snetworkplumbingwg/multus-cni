@@ -360,11 +360,11 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 			}
 
 			if !isInGracefulShutdownMode() {
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json")
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
 			}
 		})))
 
