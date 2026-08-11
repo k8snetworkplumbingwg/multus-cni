@@ -67,6 +67,7 @@ func CmdCheck(args *skel.CmdArgs) error {
 
 // CmdDel implements the CNI spec DEL command handler
 func CmdDel(args *skel.CmdArgs) error {
+	// DEL uses healthz (not readyz) so cleanup can still proceed during graceful shutdown.
 	_, _, err := postRequest(args, CheckAPIReadyNow)
 	if err != nil {
 		// No error in DEL (as of CNI spec)
