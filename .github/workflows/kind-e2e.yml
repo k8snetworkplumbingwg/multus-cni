@@ -104,6 +104,20 @@ jobs:
         working-directory: ./e2e
         run: ./test-subdirectory-chaining-passthru.sh
 
+      - name: Test kube-burner node-density-cni
+        if: ${{ matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        working-directory: ./e2e
+        run: CNI_VERSION=${{ matrix.cni-version }} ./test-node-density-cni.sh
+
+      - name: Upload node-density-cni performance test data
+        if: ${{ always() && matrix.multus-manifest == 'multus-daemonset-thick.yml' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          # Consumed by the performance-report workflow (ovn-k style).
+          name: node-density-cni-${{ matrix.cni-version }}-performance-test-data-${{ github.run_id }}
+          path: e2e/perf-data/
+          if-no-files-found: warn
+
       - name: Export kind logs
         if: always()
         run: |

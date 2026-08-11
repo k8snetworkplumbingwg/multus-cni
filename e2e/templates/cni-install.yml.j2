@@ -6,10 +6,43 @@ metadata:
   namespace: kube-system
 data:
   install_cni.sh: |
+    set -eu
+    CNI_PLUGINS_VERSION=v1.4.0
+    CNI_TGZ="cni-plugins-linux-amd64-${CNI_PLUGINS_VERSION}.tgz"
+    CNI_URL="https://github.com/containernetworking/plugins/releases/download/${CNI_PLUGINS_VERSION}/${CNI_TGZ}"
+    CNI_BIN_DIR=/host/opt/cni/bin
+    MAX_ATTEMPTS=5
+
+    mkdir -p "${CNI_BIN_DIR}"
     cd /tmp
-    wget https://github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz
-    cd /host/opt/cni/bin
-    tar xvfzp /tmp/cni-plugins-linux-amd64-v1.4.0.tgz
+    rm -f "${CNI_TGZ}"
+
+    attempt=1
+    while [ "${attempt}" -le "${MAX_ATTEMPTS}" ]; do
+      echo "Downloading ${CNI_URL} (attempt ${attempt}/${MAX_ATTEMPTS})"
+      if wget -O "${CNI_TGZ}" "${CNI_URL}"; then
+        break
+      fi
+      echo "wget failed for ${CNI_URL}"
+      rm -f "${CNI_TGZ}"
+      if [ "${attempt}" -eq "${MAX_ATTEMPTS}" ]; then
+        echo "error: failed to download CNI plugins after ${MAX_ATTEMPTS} attempts"
+        exit 1
+      fi
+      attempt=$((attempt + 1))
+      sleep $((attempt * 2))
+    done
+
+    tar xvfzp "/tmp/${CNI_TGZ}" -C "${CNI_BIN_DIR}"
+    # Fail closed: pods must not become Ready without secondary-network plugins.
+    for plugin in macvlan host-local static bridge loopback; do
+      if [ ! -x "${CNI_BIN_DIR}/${plugin}" ]; then
+        echo "error: expected executable ${CNI_BIN_DIR}/${plugin} after CNI plugin install"
+        ls -la "${CNI_BIN_DIR}" || true
+        exit 1
+      fi
+    done
+    echo "CNI plugins installed successfully in ${CNI_BIN_DIR}"
     sleep infinite
 ---
 apiVersion: apps/v1
@@ -45,6 +78,14 @@ spec:
           limits:
             cpu: "100m"
             memory: "50Mi"
+        # Only Ready after plugins are on the host; kubectl wait in setup_cluster.sh
+        # used to pass even when wget failed because the container still slept.
+        readinessProbe:
+          exec:
+            command: ["test", "-x", "/host/opt/cni/bin/macvlan"]
+          initialDelaySeconds: 2
+          periodSeconds: 5
+          failureThreshold: 24
         securityContext:
           privileged: true
         volumeMounts:

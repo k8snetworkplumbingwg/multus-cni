@@ -3,6 +3,8 @@ bin/
 e2e/bin/
 e2e/yamls/
 e2e/repos/
+e2e/perf-data/
+e2e/node-density-cni-metrics.tgz
 
 # GOPATH created by the build script
 gopath/

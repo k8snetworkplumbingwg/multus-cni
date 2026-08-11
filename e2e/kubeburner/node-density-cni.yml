@@ -1,0 +1,51 @@
+---
+# Multus-aware adaptation of kube-burner kubelet-density-cni.
+# Each iteration creates a webserver Deployment, Service, and curl client
+# Deployment. Pods are annotated for a Multus secondary macvlan network.
+metricsEndpoints:
+  - alias: local-indexer
+    indexer:
+      type: local
+      metricsDirectory: perf-data/metrics
+      createTarball: true
+      tarballName: node-density-cni-metrics.tgz
+
+global:
+  gc: true
+  timeout: 30m
+  measurements:
+    - name: podLatency
+
+jobs:
+  - name: create-density-nad
+    jobIterations: 1
+    qps: 5
+    burst: 5
+    namespacedIterations: false
+    namespace: node-density-cni
+    waitWhenFinished: true
+    cleanup: true
+    objects:
+      - objectTemplate: kubeburner/templates/density-macvlan-nad.yml
+        replicas: 1
+
+  - name: node-density-cni
+    # Overridden by test-node-density-cni.sh via --set jobs.1.jobIterations
+    jobIterations: 64
+    qps: 10
+    burst: 10
+    namespacedIterations: false
+    namespace: node-density-cni
+    waitWhenFinished: true
+    podWait: false
+    cleanup: false
+    preLoadImages: true
+    preLoadPeriod: 2m
+    maxWaitTimeout: 15m
+    objects:
+      - objectTemplate: kubeburner/templates/webserver-deployment.yml
+        replicas: 1
+      - objectTemplate: kubeburner/templates/webserver-service.yml
+        replicas: 1
+      - objectTemplate: kubeburner/templates/curl-deployment.yml
+        replicas: 1
