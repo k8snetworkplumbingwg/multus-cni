@@ -28,14 +28,20 @@ def find_prs_by_head_branch(head_branch: str, head_owner: str | None = None) -> 
     if not head_branch:
         return []
 
-    head_ref = f"{head_owner}:{head_branch}" if head_owner else head_branch
-    print(f"Searching for PRs by head: {head_ref}", file=sys.stderr)
+    # gh pr list --head accepts the branch name only; owner:branch returns no results.
+    if head_owner:
+        print(
+            f"Searching for PRs by head branch {head_branch!r} (owner: {head_owner})",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Searching for PRs by head branch: {head_branch}", file=sys.stderr)
 
     try:
         result = subprocess.run(
             [
                 'gh', 'pr', 'list',
-                '--head', head_ref,
+                '--head', head_branch,
                 '--json', 'number,headRepositoryOwner',
             ],
             capture_output=True,
