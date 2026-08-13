@@ -75,16 +75,28 @@ func main() {
 	}
 	defer kubeconfigPath.Close()
 
-	// check variables
-	if _, err := os.Stat(*bootstrapConfig); err != nil {
-		klog.Fatalf("failed to read bootstrap config %q", *bootstrapConfig)
-	}
-	st, err := os.Stat(*certDir)
+	bootstrapConfigPath, err := cmdutils.NewRootedFile(*bootstrapConfig)
 	if err != nil {
-		klog.Fatalf("failed to find cert directory %q", *certDir)
+		klog.Fatalf("illegal path in bootstrap-config %s: %v", *bootstrapConfig, err)
+	}
+	defer bootstrapConfigPath.Close()
+
+	certDirPath, err := cmdutils.NewRootedDir(*certDir)
+	if err != nil {
+		klog.Fatalf("illegal path in certdir %s: %v", *certDir, err)
+	}
+	defer certDirPath.Close()
+
+	// check variables
+	if _, err := bootstrapConfigPath.Root.Stat(bootstrapConfigPath.FileName); err != nil {
+		klog.Fatalf("failed to read bootstrap config %q", bootstrapConfigPath.Path())
+	}
+	st, err := certDirPath.Root.Stat(".")
+	if err != nil {
+		klog.Fatalf("failed to find cert directory %q", certDirPath.Path())
 	}
 	if !st.IsDir() {
-		klog.Fatalf("cert directory %q is not directory", *certDir)
+		klog.Fatalf("cert directory %q is not directory", certDirPath.Path())
 	}
 	certDuration, err := time.ParseDuration(*certDurationString)
 	if err != nil {
@@ -97,7 +109,7 @@ func main() {
 	}
 
 	// retrieve API server from bootstrapConfig()
-	config, err := clientcmd.BuildConfigFromFlags("", *bootstrapConfig)
+	config, err := clientcmd.BuildConfigFromFlags("", bootstrapConfigPath.Path())
 	if err != nil {
 		klog.Fatalf("cannot get in-cluster config: %v", err)
 	}
@@ -105,7 +117,7 @@ func main() {
 	caData := base64.StdEncoding.EncodeToString(config.CAData)
 
 	// run certManager to create certification
-	if _, err = k8sclient.PerNodeK8sClient(nodeName, *bootstrapConfig, certDuration, *certDir); err != nil {
+	if _, err = k8sclient.PerNodeK8sClient(nodeName, bootstrapConfigPath.Path(), certDuration, certDirPath.Path()); err != nil {
 		klog.Fatalf("failed to start cert manager: %v", err)
 	}
 
@@ -121,7 +133,7 @@ func main() {
 	}
 	templateData := map[string]string{
 		"CADATA":        caData,
-		"CERTDIR":       *certDir,
+		"CERTDIR":       certDirPath.Path(),
 		"K8S_APISERVER": apiServer,
 	}
 	// genearate kubeconfig from template

@@ -32,6 +32,14 @@ type RootedFile struct {
 	path string
 }
 
+// RootedDir is a validated directory path opened as a root for os.Root
+// filesystem operations.
+type RootedDir struct {
+	Root *os.Root
+
+	path string
+}
+
 // NewRootedFile validates rawPath as an absolute file path and opens its parent
 // directory as a root.
 func NewRootedFile(rawPath string) (*RootedFile, error) {
@@ -60,6 +68,23 @@ func NewRootedFileInDir(rootDir, fileName string) (*RootedFile, error) {
 	return openRootedFile(cleanRootDir, cleanFileName)
 }
 
+// NewRootedDir validates rawPath as an absolute directory path and opens it as
+// a root.
+func NewRootedDir(rawPath string) (*RootedDir, error) {
+	path, err := cleanAbsolutePath(rawPath)
+	if err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot open root directory %q: %w", path, err)
+	}
+	return &RootedDir{
+		Root: root,
+		path: path,
+	}, nil
+}
+
 // Path returns the cleaned absolute path for logging and error messages.
 func (r *RootedFile) Path() string {
 	return r.path
@@ -67,6 +92,20 @@ func (r *RootedFile) Path() string {
 
 // Close closes the opened root directory.
 func (r *RootedFile) Close() error {
+	if r == nil || r.Root == nil {
+		return nil
+	}
+	return r.Root.Close()
+}
+
+// Path returns the cleaned absolute directory path for logging and APIs that
+// require a path string.
+func (r *RootedDir) Path() string {
+	return r.path
+}
+
+// Close closes the opened root directory.
+func (r *RootedDir) Close() error {
 	if r == nil || r.Root == nil {
 		return nil
 	}
