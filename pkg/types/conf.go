@@ -161,12 +161,11 @@ func LoadDelegateNetConfFromConfList(confList *libcni.NetworkConfigList, netElem
 		ConfListPlugin:       true,
 	}
 
-	// Marshal the structured NetConfList for Bytes (housekeeping / cache).
-	// Conflist ADD/CHECK/DEL use CNINetworkConfigList, which retains each
-	// plugin's raw bytes from libcni.
-	pluginsBytes, err := json.Marshal(netConfList)
+	// Seed Bytes from libcni raw plugin JSON so deviceID/CNIArgs injection and
+	// re-parsing preserve plugin-specific fields (not only cnitypes.PluginConf keys).
+	pluginsBytes, err := losslessConfListBytes(confList)
 	if err != nil {
-		return nil, logging.Errorf("LoadDelegateNetConfFromConfList: error marshaling netConfList: %v", err)
+		return nil, logging.Errorf("LoadDelegateNetConfFromConfList: error rebuilding conflist bytes: %v", err)
 	}
 
 	if deviceID != "" {

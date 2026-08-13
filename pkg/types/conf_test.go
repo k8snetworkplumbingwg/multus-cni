@@ -1140,7 +1140,13 @@ var _ = Describe("config operations", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(delegate.DeviceID).To(Equal("0000:00:00.0"))
 		Expect(delegate.CNINetworkConfigList.Plugins).NotTo(BeEmpty())
-		Expect(string(delegate.CNINetworkConfigList.Plugins[0].Bytes)).To(ContainSubstring("0000:00:00.0"))
+
+		var plugin map[string]interface{}
+		Expect(json.Unmarshal(delegate.CNINetworkConfigList.Plugins[0].Bytes, &plugin)).To(Succeed())
+		Expect(plugin["deviceID"]).To(Equal("0000:00:00.0"))
+		ipam, ok := plugin["ipam"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(ipam["type"]).To(Equal("host-local"))
 	})
 
 	It("PrepareDelegateForCache preserves CNI-specific fields in Bytes for cached DEL", func() {
@@ -1166,15 +1172,18 @@ var _ = Describe("config operations", func() {
 		delegate, err := LoadDelegateNetConfFromConfList(confList, nil, "", "")
 		Expect(err).NotTo(HaveOccurred())
 
-		// Housekeeping Bytes are lossy until PrepareDelegateForCache runs.
-		var lossyParsed map[string]interface{}
-		Expect(json.Unmarshal(delegate.Bytes, &lossyParsed)).To(Succeed())
-		lossyPlugins, ok := lossyParsed["plugins"].([]interface{})
+		// Bytes are lossless from load; PrepareDelegateForCache aligns Bytes with
+		// CNINetworkConfigList before scratch-cache serialization.
+		var beforeCache map[string]interface{}
+		Expect(json.Unmarshal(delegate.Bytes, &beforeCache)).To(Succeed())
+		beforePlugins, ok := beforeCache["plugins"].([]interface{})
 		Expect(ok).To(BeTrue())
-		lossyCalico, ok := lossyPlugins[0].(map[string]interface{})
+		beforeCalico, ok := beforePlugins[0].(map[string]interface{})
 		Expect(ok).To(BeTrue())
-		Expect(lossyCalico).NotTo(HaveKey("kubernetes"))
-		Expect(lossyCalico).NotTo(HaveKey("datastore_type"))
+		Expect(beforeCalico["datastore_type"]).To(Equal("kubernetes"))
+		beforeK8s, ok := beforeCalico["kubernetes"].(map[string]interface{})
+		Expect(ok).To(BeTrue())
+		Expect(beforeK8s["kubeconfig"]).To(Equal("/etc/cni/net.d/calico-kubeconfig"))
 
 		Expect(PrepareDelegateForCache(delegate)).To(Succeed())
 
