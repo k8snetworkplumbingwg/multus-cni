@@ -121,27 +121,13 @@ func main() {
 		klog.Fatalf("failed to start cert manager: %v", err)
 	}
 
-	fp, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		klog.Fatalf("cannot create kubeconfig file %q: %v", kubeconfigPath.Path(), err)
-	}
-
-	// render kubeconfig
-	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
-	if err != nil {
-		klog.Fatalf("template parse error: %v", err)
-	}
 	templateData := map[string]string{
 		"CADATA":        caData,
 		"CERTDIR":       certDirPath.Path(),
 		"K8S_APISERVER": apiServer,
 	}
-	// genearate kubeconfig from template
-	if err = templateKubeconfig.Execute(fp, templateData); err != nil {
-		klog.Fatalf("cannot create kubeconfig: %v", err)
-	}
-	if err = fp.Close(); err != nil {
-		klog.Fatalf("cannot save kubeconfig: %v", err)
+	if err = writeKubeconfig(kubeconfigPath, templateData); err != nil {
+		klog.Fatalf("%v", err)
 	}
 
 	klog.Infof("kubeconfig %q is saved", kubeconfigPath.Path())
@@ -155,4 +141,26 @@ func main() {
 	if err != nil {
 		klog.Errorf("failed to remove kubeconfig %q: %v", kubeconfigPath.Path(), err)
 	}
+}
+
+func writeKubeconfig(kubeconfigPath *cmdutils.RootedFile, templateData map[string]string) (err error) {
+	fp, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("cannot create kubeconfig file %q: %w", kubeconfigPath.Path(), err)
+	}
+	defer func() {
+		if closeErr := fp.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("cannot save kubeconfig file %q: %w", kubeconfigPath.Path(), closeErr)
+		}
+	}()
+
+	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
+	if err != nil {
+		return fmt.Errorf("template parse error: %w", err)
+	}
+	if err = templateKubeconfig.Execute(fp, templateData); err != nil {
+		return fmt.Errorf("cannot create kubeconfig: %w", err)
+	}
+
+	return nil
 }
