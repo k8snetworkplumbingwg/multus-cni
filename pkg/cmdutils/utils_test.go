@@ -74,12 +74,16 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("opens cleaned absolute file paths as an os.Root and local file name", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_file_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		rawPath := tmpDir + string(os.PathSeparator) + "." + string(os.PathSeparator) + "sample"
 		rootedFile, err := NewRootedFile(rawPath)
 		Expect(err).NotTo(HaveOccurred())
-		defer rootedFile.Close()
+		DeferCleanup(func() {
+			Expect(rootedFile.Close()).To(Succeed())
+		})
 
 		Expect(rootedFile.FileName).To(Equal("sample"))
 		Expect(rootedFile.Path()).To(Equal(filepath.Join(tmpDir, "sample")))
@@ -98,7 +102,9 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("rejects unsafe rooted file paths", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_file_reject_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		unsafePaths := []string{
 			"",
@@ -114,11 +120,15 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("opens cleaned absolute directories with local file names", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_dir_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		rootedFile, err := NewRootedFileInDir(tmpDir+string(os.PathSeparator)+".", "dest")
 		Expect(err).NotTo(HaveOccurred())
-		defer rootedFile.Close()
+		DeferCleanup(func() {
+			Expect(rootedFile.Close()).To(Succeed())
+		})
 
 		Expect(rootedFile.FileName).To(Equal("dest"))
 		Expect(rootedFile.Path()).To(Equal(filepath.Join(tmpDir, "dest")))
@@ -137,11 +147,15 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("opens cleaned absolute directories as an os.Root", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_dir_root_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		rootedDir, err := NewRootedDir(tmpDir + string(os.PathSeparator) + ".")
 		Expect(err).NotTo(HaveOccurred())
-		defer rootedDir.Close()
+		DeferCleanup(func() {
+			Expect(rootedDir.Close()).To(Succeed())
+		})
 
 		Expect(rootedDir.Path()).To(Equal(tmpDir))
 
@@ -163,7 +177,9 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("rejects unsafe rooted directory and file name combinations", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_dir_reject_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		_, err = NewRootedFileInDir("", "dest")
 		Expect(err).To(HaveOccurred())
@@ -187,7 +203,9 @@ var _ = Describe("thin entrypoint testing", func() {
 	It("rejects unsafe rooted directories", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_rooted_dir_only_reject_tmp")
 		Expect(err).NotTo(HaveOccurred())
-		defer os.RemoveAll(tmpDir)
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
 
 		unsafeDirs := []string{
 			"",

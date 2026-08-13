@@ -153,6 +153,9 @@ func writeKubeconfig(kubeconfigPath *cmdutils.RootedFile, templateData map[strin
 			err = fmt.Errorf("cannot save kubeconfig file %q: %w", kubeconfigPath.Path(), closeErr)
 		}
 	}()
+	if err = fp.Chmod(0600); err != nil {
+		return fmt.Errorf("cannot set kubeconfig file mode %q: %w", kubeconfigPath.Path(), err)
+	}
 
 	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
 	if err != nil {

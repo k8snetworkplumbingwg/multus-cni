@@ -15,6 +15,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,7 +31,32 @@ func TestWriteKubeconfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create rooted kubeconfig path: %v", err)
 	}
-	defer kubeconfigPath.Close()
+	t.Cleanup(func() {
+		if err := kubeconfigPath.Close(); err != nil {
+			t.Errorf("failed to close rooted kubeconfig path: %v", err)
+		}
+	})
+
+	existingFile, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		t.Fatalf("failed to create existing kubeconfig: %v", err)
+	}
+	if _, err := existingFile.Write([]byte("existing")); err != nil {
+		t.Fatalf("failed to write existing kubeconfig: %v", err)
+	}
+	if err := existingFile.Chmod(0644); err != nil {
+		t.Fatalf("failed to set existing kubeconfig mode: %v", err)
+	}
+	if err := existingFile.Close(); err != nil {
+		t.Fatalf("failed to close existing kubeconfig: %v", err)
+	}
+	stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
+	if err != nil {
+		t.Fatalf("failed to stat existing kubeconfig: %v", err)
+	}
+	if stat.Mode().Perm() != 0644 {
+		t.Fatalf("expected existing kubeconfig mode 0644, got %v", stat.Mode().Perm())
+	}
 
 	templateData := map[string]string{
 		"CADATA":        "test-ca",
@@ -56,7 +82,7 @@ func TestWriteKubeconfig(t *testing.T) {
 		}
 	}
 
-	stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
+	stat, err = kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
 	if err != nil {
 		t.Fatalf("failed to stat kubeconfig: %v", err)
 	}
