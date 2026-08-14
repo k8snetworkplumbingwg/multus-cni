@@ -216,7 +216,7 @@ func isPerNodeCertEnabled(config *PerNodeCertificate) (bool, error) {
 }
 
 // NewCNIServer creates and returns a new Server object which will listen on a socket in the given path
-func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
+func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) (*Server, error) {
 	var kubeClient *k8s.ClientInfo
 	enabled, err := isPerNodeCertEnabled(daemonConfig.PerNodeCertificate)
 	if enabled {
@@ -258,10 +258,10 @@ func NewCNIServer(daemonConfig *ControllerNetConf, serverConfig []byte, ignoreRe
 		logging.Verbosef("server configured with chroot: %s", daemonConfig.ChrootDir)
 	}
 
-	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator)
+	return newCNIServer(daemonConfig.SocketDir, kubeClient, exec, serverConfig, ignoreReadinessIndicator, isInGracefulShutdownMode)
 }
 
-func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool) (*Server, error) {
+func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, servConfig []byte, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) (*Server, error) {
 	informerFactory, podInformer := newPodInformer(kubeClient.Client, os.Getenv("MULTUS_NODE_NAME"))
 	netdefInformerFactory, netdefInformer := newNetDefInformer(kubeClient.NetClient)
 	kubeClient.SetK8sClientInformers(podInformer, netdefInformer)
@@ -299,7 +299,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusCNIAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusCNIAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
@@ -321,7 +321,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusDelegateAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusDelegateAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
@@ -343,12 +343,29 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusHealthAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet && r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
 			w.WriteHeader(http.StatusOK)
 			w.Header().Set("Content-Type", "application/json")
+		})))
+
+	// handle for '/readyz'
+	router.HandleFunc(api.MultusReadyAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusReadyAPIEndpoint}),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet && r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			if !isInGracefulShutdownMode() {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+			} else {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 		})))
 
 	// this handle for the rest of above

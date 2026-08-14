@@ -44,6 +44,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// SigtermCancelAfter sets the wait time to cancel after sig term
+// TODO: This could be a configuration option
+const SigTermCancelAfter = 10 * time.Second
+
 func main() {
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
@@ -61,6 +65,11 @@ func main() {
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
+	sigTermCtx, sigTermCancel := context.WithCancel(ctx)
+	// Used by the server readiness handler to report not-ready once shutdown is initiated.
+	isInGracefulShutdownMode := func() bool {
+		return sigTermCtx.Err() != nil
+	}
 
 	daemonConf, err := cniServerConfig(*configFilePath)
 	if err != nil {
@@ -109,7 +118,7 @@ func main() {
 		}
 	}
 
-	if err := startMultusDaemon(ctx, daemonConf, ignoreReadinessIndicator); err != nil {
+	if err := startMultusDaemon(ctx, daemonConf, ignoreReadinessIndicator, isInGracefulShutdownMode); err != nil {
 		logging.Panicf("failed start the multus thick-plugin listener: %v", err)
 		os.Exit(3)
 	}
@@ -127,6 +136,9 @@ func main() {
 	go func() {
 		for sig := range signalCh {
 			logging.Verbosef("caught %v, stopping...", sig)
+			// Mark graceful-shutdown mode first so readiness probes fail before canceling server context.
+			sigTermCancel()
+			<-time.After(SigTermCancelAfter)
 			cancel()
 		}
 	}()
@@ -143,7 +155,7 @@ func main() {
 	logging.Verbosef("multus daemon is exited")
 }
 
-func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool) error {
+func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) error {
 	if user, err := user.Current(); err != nil || user.Uid != "0" {
 		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
 	}
@@ -152,7 +164,7 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 		return fmt.Errorf("failed to prepare the cni-socket for communicating with the shim: %w", err)
 	}
 
-	server, err := srv.NewCNIServer(daemonConfig, daemonConfig.ConfigFileContents, ignoreReadinessIndicator)
+	server, err := srv.NewCNIServer(daemonConfig, daemonConfig.ConfigFileContents, ignoreReadinessIndicator, isInGracefulShutdownMode)
 	if err != nil {
 		return fmt.Errorf("failed to create the server: %v", err)
 	}
