@@ -283,6 +283,27 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 				},
 				[]string{"handler", "code", "method"},
 			),
+			cniLookupCounter: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "multus_cni_plugin_lookup_total",
+					Help: "Counter of CNI plugin lookups",
+				},
+				[]string{"plugin", "outcome"},
+			),
+			cniExecCounter: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Name: "multus_cni_plugin_execution_total",
+					Help: "Counter of CNI plugin process executions",
+				},
+				[]string{"plugin", "command", "outcome"},
+			),
+			cniExecDuration: prometheus.NewHistogramVec(
+				prometheus.HistogramOpts{
+					Name: "multus_cni_plugin_execution_duration_seconds",
+					Help: "Duration of CNI plugin process executions",
+				},
+				[]string{"plugin", "command"},
+			),
 		},
 		informerFactory:          informerFactory,
 		podInformer:              podInformer,
@@ -290,10 +311,15 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		netdefInformer:           netdefInformer,
 		ignoreReadinessIndicator: ignoreReadinessIndicator,
 	}
+
+	s.exec = newMetricsExec(s.exec, s.metrics)
 	s.SetKeepAlivesEnabled(false)
 
 	// register metrics
 	prometheus.MustRegister(s.metrics.requestCounter)
+	prometheus.MustRegister(s.metrics.cniLookupCounter)
+	prometheus.MustRegister(s.metrics.cniExecCounter)
+	prometheus.MustRegister(s.metrics.cniExecDuration)
 
 	// handle for '/cni'
 	router.HandleFunc(api.MultusCNIAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusCNIAPIEndpoint}),
