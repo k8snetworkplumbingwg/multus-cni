@@ -120,8 +120,18 @@ func getDelegateDeviceInfo(_ *types.DelegateNetConf, runtimeConf *libcni.Runtime
 	return nil, nil
 }
 
+// saveDelegates writes the pod's delegate list to the scratch cache under CNIDir
+// so CmdDel can reload it when the pod is already gone from the API. Conflist
+// delegates are prepared for cache first: housekeeping Bytes are lossy, but DEL
+// from cache uses Bytes when CNINetworkConfigList is not restored (json:"-").
 func saveDelegates(containerID, dataDir string, delegates []*types.DelegateNetConf) error {
 	logging.Debugf("saveDelegates: %s, %s, %v", containerID, dataDir, delegates)
+	for _, delegate := range delegates {
+		if err := types.PrepareDelegateForCache(delegate); err != nil {
+			return err
+		}
+	}
+
 	delegatesBytes, err := json.Marshal(delegates)
 	if err != nil {
 		return logging.Errorf("saveDelegates: error serializing delegate netconf: %v", err)
@@ -296,16 +306,25 @@ func confStatus(rt *libcni.RuntimeConf, rawNetconf []byte, multusNetconf *types.
 	return err
 }
 
-func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) (cnitypes.Result, error) {
+func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) (cnitypes.Result, error) {
 	logging.Debugf("conflistAdd: %v, %s", rt, string(rawnetconflist))
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.NetworkConfFromBytes(rawnetconflist)
-	if err != nil {
-		return nil, logging.Errorf("conflistAdd: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return nil, logging.Errorf("conflistAdd: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	result, err := cniNet.AddNetworkList(context.Background(), confList, rt)
@@ -316,16 +335,25 @@ func conflistAdd(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *t
 	return result, nil
 }
 
-func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) error {
 	logging.Debugf("conflistCheck: %v, %s", rt, string(rawnetconflist))
 
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.ConfListFromBytes(rawnetconflist)
-	if err != nil {
-		return logging.Errorf("conflistCheck: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return logging.Errorf("conflistCheck: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	err = cniNet.CheckNetworkList(context.Background(), confList, rt)
@@ -336,16 +364,25 @@ func conflistCheck(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf 
 	return err
 }
 
-func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, multusNetconf *types.NetConf, exec invoke.Exec) error {
+func conflistDel(rt *libcni.RuntimeConf, rawnetconflist []byte, cniConfList *libcni.NetworkConfigList, multusNetconf *types.NetConf, exec invoke.Exec) error {
 	logging.Debugf("conflistDel: %v, %s", rt, string(rawnetconflist))
 	// In part, adapted from K8s pkg/kubelet/dockershim/network/cni/cni.go
 	binDirs := filepath.SplitList(os.Getenv("CNI_PATH"))
 	binDirs = append([]string{multusNetconf.BinDir}, binDirs...)
 	cniNet := libcni.NewCNIConfigWithCacheDir(binDirs, multusNetconf.CNIDir, exec)
 
-	confList, err := libcni.ConfListFromBytes(rawnetconflist)
-	if err != nil {
-		return logging.Errorf("conflistDel: error converting the raw bytes into a conflist: %v", err)
+	var confList *libcni.NetworkConfigList
+	var err error
+
+	// This may wind up being set during parsing the default network config.
+	// In this case -- we'll use it as passed. Otherwise, we'll recalculate it.
+	if len(cniConfList.Plugins) > 0 {
+		confList = cniConfList
+	} else {
+		confList, err = libcni.NetworkConfFromBytes(rawnetconflist)
+		if err != nil {
+			return logging.Errorf("conflistDel: error converting the raw bytes into a conflist: %v", err)
+		}
 	}
 
 	err = cniNet.DelNetworkList(context.Background(), confList, rt)
@@ -427,7 +464,7 @@ func DelegateAdd(exec invoke.Exec, kubeClient *k8s.ClientInfo, pod *v1.Pod, dele
 	var result cnitypes.Result
 	var err error
 	if delegate.ConfListPlugin {
-		result, err = conflistAdd(rt, delegate.Bytes, multusNetconf, exec)
+		result, err = conflistAdd(rt, delegate.Bytes, &delegate.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return nil, err
 		}
@@ -498,7 +535,7 @@ func DelegateCheck(exec invoke.Exec, delegateConf *types.DelegateNetConf, rt *li
 
 	var err error
 	if delegateConf.ConfListPlugin {
-		err = conflistCheck(rt, delegateConf.Bytes, multusNetconf, exec)
+		err = conflistCheck(rt, delegateConf.Bytes, &delegateConf.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return logging.Errorf("DelegateCheck: error invoking ConflistCheck - %q: %v", delegateConf.ConfList.Name, err)
 		}
@@ -572,7 +609,7 @@ func DelegateDel(exec invoke.Exec, pod *v1.Pod, delegateConf *types.DelegateNetC
 
 	var err error
 	if delegateConf.ConfListPlugin {
-		err = conflistDel(rt, delegateConf.Bytes, multusNetconf, exec)
+		err = conflistDel(rt, delegateConf.Bytes, &delegateConf.CNINetworkConfigList, multusNetconf, exec)
 		if err != nil {
 			return logging.Errorf("DelegateDel: error invoking ConflistDel - %q: %v", delegateConf.ConfList.Name, err)
 		}
@@ -1083,17 +1120,25 @@ func CmdDel(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) er
 	for _, v := range in.Delegates {
 		if v.ConfListPlugin && v.ConfList.CNIVersion == "" && in.CNIVersion != "" {
 			v.ConfList.CNIVersion = in.CNIVersion
-			// Inject cniVersion onto the raw bytes losslessly. Marshaling the
-			// structured ConfList (types.NetConfList) here would strip
-			// CNI-specific fields (e.g. calico's kubeconfig) and break DEL.
-			updatedBytes, injectErr := types.InjectCNIVersionInConfList(v.Bytes, in.CNIVersion)
-			if injectErr != nil {
-				// error happen but continue to delete; keep the original bytes
-				// rather than clobbering them with nil, which would feed DEL
-				// worse input than before and risk leaking the IP.
-				logging.Errorf("Multus: failed to inject cniVersion into delegate %q config: %v", v.Name, injectErr)
+			// Fresh delegates carry CNINetworkConfigList (DEL uses the fast path).
+			// Scratch-cache delegates do not (json:"-") and DEL falls back to Bytes
+			// prepared losslessly at ADD via PrepareDelegateForCache.
+			if len(v.CNINetworkConfigList.Plugins) > 0 {
+				v.CNINetworkConfigList.CNIVersion = in.CNIVersion
 			} else {
-				v.Bytes = updatedBytes
+				// Cached delegate: CNINetworkConfigList is not restored from scratch
+				// cache; inject cniVersion onto lossless Bytes without stripping fields.
+				// Marshaling the structured ConfList (types.NetConfList) here would strip
+				// CNI-specific fields (e.g. calico's kubeconfig) and break DEL.
+				updatedBytes, injectErr := types.InjectCNIVersionInConfList(v.Bytes, in.CNIVersion)
+				if injectErr != nil {
+					// error happen but continue to delete; keep the original bytes
+					// rather than clobbering them with nil, which would feed DEL
+					// worse input than before and risk leaking the IP.
+					logging.Errorf("Multus: failed to inject cniVersion into delegate %q config: %v", v.Name, injectErr)
+				} else {
+					v.Bytes = updatedBytes
+				}
 			}
 		}
 	}
