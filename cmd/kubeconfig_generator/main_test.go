@@ -14,79 +14,75 @@
 
 package main
 
+// disable dot-imports only for testing
+//revive:disable:dot-imports
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 )
 
-func TestWriteKubeconfig(t *testing.T) {
-	tmpDir := t.TempDir()
-	kubeconfigFile := filepath.Join(tmpDir, "kubeconfig")
+func TestKubeconfigGenerator(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "kubeconfig_generator")
+}
 
-	kubeconfigPath, err := cmdutils.NewRootedFile(kubeconfigFile)
-	if err != nil {
-		t.Fatalf("failed to create rooted kubeconfig path: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := kubeconfigPath.Close(); err != nil {
-			t.Errorf("failed to close rooted kubeconfig path: %v", err)
+var _ = Describe("kubeconfig generator", func() {
+	It("writes kubeconfig and resets an existing permissive file mode", func() {
+		tmpDir, err := os.MkdirTemp("", "multus_kubeconfig_generator_tmp")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
+
+		kubeconfigPath, err := cmdutils.NewRootedFile(filepath.Join(tmpDir, "kubeconfig"))
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			Expect(kubeconfigPath.Close()).To(Succeed())
+		})
+
+		createExistingKubeconfig(kubeconfigPath)
+		stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0644)))
+
+		templateData := map[string]string{
+			"CADATA":        "test-ca",
+			"CERTDIR":       tmpDir,
+			"K8S_APISERVER": "https://api.example.test",
 		}
+		Expect(writeKubeconfig(kubeconfigPath, templateData)).To(Succeed())
+
+		contents, err := kubeconfigPath.Root.ReadFile(kubeconfigPath.FileName)
+		Expect(err).NotTo(HaveOccurred())
+		for _, expected := range []string{
+			"certificate-authority-data: test-ca",
+			"server: https://api.example.test",
+			"client-certificate: " + tmpDir + "/multus-client-current.pem",
+			"client-key: " + tmpDir + "/multus-client-current.pem",
+		} {
+			Expect(string(contents)).To(ContainSubstring(expected))
+		}
+
+		stat, err = kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0600)))
 	})
+})
 
+func createExistingKubeconfig(kubeconfigPath *cmdutils.RootedFile) {
 	existingFile, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		t.Fatalf("failed to create existing kubeconfig: %v", err)
-	}
-	if _, err := existingFile.Write([]byte("existing")); err != nil {
-		t.Fatalf("failed to write existing kubeconfig: %v", err)
-	}
-	if err := existingFile.Chmod(0644); err != nil {
-		t.Fatalf("failed to set existing kubeconfig mode: %v", err)
-	}
-	if err := existingFile.Close(); err != nil {
-		t.Fatalf("failed to close existing kubeconfig: %v", err)
-	}
-	stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
-	if err != nil {
-		t.Fatalf("failed to stat existing kubeconfig: %v", err)
-	}
-	if stat.Mode().Perm() != 0644 {
-		t.Fatalf("expected existing kubeconfig mode 0644, got %v", stat.Mode().Perm())
-	}
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		Expect(existingFile.Close()).To(Succeed())
+	}()
 
-	templateData := map[string]string{
-		"CADATA":        "test-ca",
-		"CERTDIR":       tmpDir,
-		"K8S_APISERVER": "https://api.example.test",
-	}
-	if err := writeKubeconfig(kubeconfigPath, templateData); err != nil {
-		t.Fatalf("failed to write kubeconfig: %v", err)
-	}
-
-	contents, err := kubeconfigPath.Root.ReadFile(kubeconfigPath.FileName)
-	if err != nil {
-		t.Fatalf("failed to read kubeconfig: %v", err)
-	}
-	for _, expected := range []string{
-		"certificate-authority-data: test-ca",
-		"server: https://api.example.test",
-		"client-certificate: " + tmpDir + "/multus-client-current.pem",
-		"client-key: " + tmpDir + "/multus-client-current.pem",
-	} {
-		if !strings.Contains(string(contents), expected) {
-			t.Fatalf("expected generated kubeconfig to contain %q, got:\n%s", expected, string(contents))
-		}
-	}
-
-	stat, err = kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
-	if err != nil {
-		t.Fatalf("failed to stat kubeconfig: %v", err)
-	}
-	if stat.Mode().Perm() != 0600 {
-		t.Fatalf("expected kubeconfig mode 0600, got %v", stat.Mode().Perm())
-	}
+	_, err = existingFile.Write([]byte("existing"))
+	Expect(err).NotTo(HaveOccurred())
+	Expect(existingFile.Chmod(0644)).To(Succeed())
 }
