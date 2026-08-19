@@ -33,6 +33,27 @@ func TestKubeconfigGenerator(t *testing.T) {
 }
 
 var _ = Describe("kubeconfig generator", func() {
+	It("writes a new kubeconfig with private file mode", func() {
+		tmpDir, err := os.MkdirTemp("", "multus_kubeconfig_generator_tmp")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		})
+
+		kubeconfigPath, err := cmdutils.NewRootedFile(filepath.Join(tmpDir, "kubeconfig"))
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			Expect(kubeconfigPath.Close()).To(Succeed())
+		})
+
+		Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(Succeed())
+
+		expectKubeconfigContents(kubeconfigPath, tmpDir)
+		stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0600)))
+	})
+
 	It("writes kubeconfig and resets an existing permissive file mode", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_kubeconfig_generator_tmp")
 		Expect(err).NotTo(HaveOccurred())
@@ -51,29 +72,35 @@ var _ = Describe("kubeconfig generator", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0644)))
 
-		templateData := map[string]string{
-			"CADATA":        "test-ca",
-			"CERTDIR":       tmpDir,
-			"K8S_APISERVER": "https://api.example.test",
-		}
-		Expect(writeKubeconfig(kubeconfigPath, templateData)).To(Succeed())
+		Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(Succeed())
 
-		contents, err := kubeconfigPath.Root.ReadFile(kubeconfigPath.FileName)
-		Expect(err).NotTo(HaveOccurred())
-		for _, expected := range []string{
-			"certificate-authority-data: test-ca",
-			"server: https://api.example.test",
-			"client-certificate: " + tmpDir + "/multus-client-current.pem",
-			"client-key: " + tmpDir + "/multus-client-current.pem",
-		} {
-			Expect(string(contents)).To(ContainSubstring(expected))
-		}
-
+		expectKubeconfigContents(kubeconfigPath, tmpDir)
 		stat, err = kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0600)))
 	})
 })
+
+func templateData(certDir string) map[string]string {
+	return map[string]string{
+		"CADATA":        "test-ca",
+		"CERTDIR":       certDir,
+		"K8S_APISERVER": "https://api.example.test",
+	}
+}
+
+func expectKubeconfigContents(kubeconfigPath *cmdutils.RootedFile, certDir string) {
+	contents, err := kubeconfigPath.Root.ReadFile(kubeconfigPath.FileName)
+	Expect(err).NotTo(HaveOccurred())
+	for _, expected := range []string{
+		"certificate-authority-data: test-ca",
+		"server: https://api.example.test",
+		"client-certificate: " + certDir + "/multus-client-current.pem",
+		"client-key: " + certDir + "/multus-client-current.pem",
+	} {
+		Expect(string(contents)).To(ContainSubstring(expected))
+	}
+}
 
 func createExistingKubeconfig(kubeconfigPath *cmdutils.RootedFile) {
 	existingFile, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
