@@ -14,70 +14,68 @@
 
 package main
 
-// disable dot-imports only for testing
-//revive:disable:dot-imports
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 )
 
 func TestKubeconfigGenerator(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "kubeconfig_generator")
+	gomega.RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "kubeconfig_generator")
 }
 
-var _ = Describe("kubeconfig generator", func() {
-	It("writes a new kubeconfig with private file mode", func() {
+var _ = ginkgo.Describe("kubeconfig generator", func() {
+	ginkgo.It("writes a new kubeconfig with private file mode", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_kubeconfig_generator_tmp")
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(os.RemoveAll(tmpDir)).To(gomega.Succeed())
 		})
 
 		kubeconfigPath, err := cmdutils.NewRootedFile(filepath.Join(tmpDir, "kubeconfig"))
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(kubeconfigPath.Close()).To(Succeed())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(kubeconfigPath.Close()).To(gomega.Succeed())
 		})
 
-		Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(Succeed())
+		gomega.Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(gomega.Succeed())
 
 		expectKubeconfigContents(kubeconfigPath, tmpDir)
 		stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0600)))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(stat.Mode().Perm()).To(gomega.Equal(os.FileMode(0600)))
 	})
 
-	It("writes kubeconfig and resets an existing permissive file mode", func() {
+	ginkgo.It("writes kubeconfig and resets an existing permissive file mode", func() {
 		tmpDir, err := os.MkdirTemp("", "multus_kubeconfig_generator_tmp")
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(os.RemoveAll(tmpDir)).To(Succeed())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(os.RemoveAll(tmpDir)).To(gomega.Succeed())
 		})
 
 		kubeconfigPath, err := cmdutils.NewRootedFile(filepath.Join(tmpDir, "kubeconfig"))
-		Expect(err).NotTo(HaveOccurred())
-		DeferCleanup(func() {
-			Expect(kubeconfigPath.Close()).To(Succeed())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		ginkgo.DeferCleanup(func() {
+			gomega.Expect(kubeconfigPath.Close()).To(gomega.Succeed())
 		})
 
 		createExistingKubeconfig(kubeconfigPath)
 		stat, err := kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0644)))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(stat.Mode().Perm()).To(gomega.Equal(os.FileMode(0644)))
 
-		Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(Succeed())
+		gomega.Expect(writeKubeconfig(kubeconfigPath, templateData(tmpDir))).To(gomega.Succeed())
 
 		expectKubeconfigContents(kubeconfigPath, tmpDir)
 		stat, err = kubeconfigPath.Root.Stat(kubeconfigPath.FileName)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(stat.Mode().Perm()).To(Equal(os.FileMode(0600)))
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		gomega.Expect(stat.Mode().Perm()).To(gomega.Equal(os.FileMode(0600)))
 	})
 })
 
@@ -91,25 +89,25 @@ func templateData(certDir string) map[string]string {
 
 func expectKubeconfigContents(kubeconfigPath *cmdutils.RootedFile, certDir string) {
 	contents, err := kubeconfigPath.Root.ReadFile(kubeconfigPath.FileName)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	for _, expected := range []string{
 		"certificate-authority-data: test-ca",
 		"server: https://api.example.test",
 		"client-certificate: " + certDir + "/multus-client-current.pem",
 		"client-key: " + certDir + "/multus-client-current.pem",
 	} {
-		Expect(string(contents)).To(ContainSubstring(expected))
+		gomega.Expect(string(contents)).To(gomega.ContainSubstring(expected))
 	}
 }
 
 func createExistingKubeconfig(kubeconfigPath *cmdutils.RootedFile) {
 	existingFile, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	defer func() {
-		Expect(existingFile.Close()).To(Succeed())
+		gomega.Expect(existingFile.Close()).To(gomega.Succeed())
 	}()
 
 	_, err = existingFile.Write([]byte("existing"))
-	Expect(err).NotTo(HaveOccurred())
-	Expect(existingFile.Chmod(0644)).To(Succeed())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	gomega.Expect(existingFile.Chmod(0644)).To(gomega.Succeed())
 }
