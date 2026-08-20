@@ -21,12 +21,11 @@ jobs:
     name: Process Performance Results
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
+          # Always use trusted default-branch code; never checkout fork commits for since we cannot trust it.
           persist-credentials: false
 
       - name: Set up Python
@@ -40,6 +39,8 @@ jobs:
           pip install -r e2e/perf/requirements.txt
 
       - name: Download performance test data artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           e2e/perf/download-artifacts.py \
             --run-id ${{ github.event.workflow_run.id }} \
@@ -80,6 +81,8 @@ jobs:
 
       - name: Get associated PRs
         id: get_prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBERS=$(e2e/perf/get-pr-info.py \
             --event-path $GITHUB_EVENT_PATH \
@@ -90,6 +93,8 @@ jobs:
       - name: Fetch baseline run
         id: get_baseline
         if: steps.get_prs.outputs.pr_numbers != '[]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Prefer a successful push run of e2e-kind as the baseline when no
           # scheduled performance lane exists yet.
@@ -109,6 +114,8 @@ jobs:
 
       - name: Download baseline artifacts
         if: steps.get_baseline.outputs.baseline_run_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           e2e/perf/download-artifacts.py \
             --run-id ${{ steps.get_baseline.outputs.baseline_run_id }} \
@@ -182,6 +189,8 @@ jobs:
 
       - name: Post performance report to PRs
         if: steps.get_prs.outputs.pr_numbers != '[]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PR_NUMBERS=$(echo '${{ steps.get_prs.outputs.pr_numbers }}' | python3 -c "import sys, json; print(' '.join(f'--pr {pr}' for pr in json.load(sys.stdin)))")
 
