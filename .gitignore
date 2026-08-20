@@ -1,5 +1,8 @@
 # Binary output dir
 bin/
+
+# Go vendor directory
+vendor/
 e2e/bin/
 e2e/yamls/
 e2e/repos/
