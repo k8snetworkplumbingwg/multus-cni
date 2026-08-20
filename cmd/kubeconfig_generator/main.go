@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"text/template"
 	"time"
 
 	"github.com/spf13/pflag"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -63,27 +63,40 @@ func main() {
 	certDurationString := pflag.StringP("cert-duration", "", "10m", "specify certificate duration")
 	helpFlag := pflag.BoolP("help", "h", false, "show help message and quit")
 
-	kubeconfigPath, err := filepath.Abs(*kubeconfigPathRaw)
-	if err != nil {
-		klog.Fatalf("illegal path %s in kubeconfigPath %s: %v", kubeconfigPath, *kubeconfigPathRaw, err)
-	}
-
 	pflag.Parse()
 	if *helpFlag {
 		pflag.PrintDefaults()
 		os.Exit(1)
 	}
 
-	// check variables
-	if _, err := os.Stat(*bootstrapConfig); err != nil {
-		klog.Fatalf("failed to read bootstrap config %q", *bootstrapConfig)
-	}
-	st, err := os.Stat(*certDir)
+	kubeconfigPath, err := cmdutils.NewRootedFile(*kubeconfigPathRaw)
 	if err != nil {
-		klog.Fatalf("failed to find cert directory %q", *certDir)
+		klog.Fatalf("illegal path in kubeconfigPath %s: %v", *kubeconfigPathRaw, err)
+	}
+	defer kubeconfigPath.Close()
+
+	bootstrapConfigPath, err := cmdutils.NewRootedFile(*bootstrapConfig)
+	if err != nil {
+		klog.Fatalf("illegal path in bootstrap-config %s: %v", *bootstrapConfig, err)
+	}
+	defer bootstrapConfigPath.Close()
+
+	certDirPath, err := cmdutils.NewRootedDir(*certDir)
+	if err != nil {
+		klog.Fatalf("illegal path in certdir %s: %v", *certDir, err)
+	}
+	defer certDirPath.Close()
+
+	// check variables
+	if _, err := bootstrapConfigPath.Root.Stat(bootstrapConfigPath.FileName); err != nil {
+		klog.Fatalf("failed to read bootstrap config %q", bootstrapConfigPath.Path())
+	}
+	st, err := certDirPath.Root.Stat(".")
+	if err != nil {
+		klog.Fatalf("failed to find cert directory %q", certDirPath.Path())
 	}
 	if !st.IsDir() {
-		klog.Fatalf("cert directory %q is not directory", *certDir)
+		klog.Fatalf("cert directory %q is not directory", certDirPath.Path())
 	}
 	certDuration, err := time.ParseDuration(*certDurationString)
 	if err != nil {
@@ -96,7 +109,7 @@ func main() {
 	}
 
 	// retrieve API server from bootstrapConfig()
-	config, err := clientcmd.BuildConfigFromFlags("", *bootstrapConfig)
+	config, err := clientcmd.BuildConfigFromFlags("", bootstrapConfigPath.Path())
 	if err != nil {
 		klog.Fatalf("cannot get in-cluster config: %v", err)
 	}
@@ -104,42 +117,53 @@ func main() {
 	caData := base64.StdEncoding.EncodeToString(config.CAData)
 
 	// run certManager to create certification
-	if _, err = k8sclient.PerNodeK8sClient(nodeName, *bootstrapConfig, certDuration, *certDir); err != nil {
+	if _, err = k8sclient.PerNodeK8sClient(nodeName, bootstrapConfigPath.Path(), certDuration, certDirPath.Path()); err != nil {
 		klog.Fatalf("failed to start cert manager: %v", err)
 	}
 
-	fp, err := os.OpenFile(kubeconfigPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		klog.Fatalf("cannot create kubeconfig file %q: %v", kubeconfigPath, err)
-	}
-
-	// render kubeconfig
-	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
-	if err != nil {
-		klog.Fatalf("template parse error: %v", err)
-	}
 	templateData := map[string]string{
 		"CADATA":        caData,
-		"CERTDIR":       *certDir,
+		"CERTDIR":       certDirPath.Path(),
 		"K8S_APISERVER": apiServer,
 	}
-	// genearate kubeconfig from template
-	if err = templateKubeconfig.Execute(fp, templateData); err != nil {
-		klog.Fatalf("cannot create kubeconfig: %v", err)
-	}
-	if err = fp.Close(); err != nil {
-		klog.Fatalf("cannot save kubeconfig: %v", err)
+	if err = writeKubeconfig(kubeconfigPath, templateData); err != nil {
+		klog.Fatalf("%v", err)
 	}
 
-	klog.Infof("kubeconfig %q is saved", kubeconfigPath)
+	klog.Infof("kubeconfig %q is saved", kubeconfigPath.Path())
 
 	// wait for signal
 	sigterm := make(chan os.Signal, 1)
-	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 	<-sigterm
-	klog.Infof("signal received. remove kubeconfig %q and quit.", kubeconfigPath)
-	err = os.Remove(kubeconfigPath)
+	klog.Infof("signal received. remove kubeconfig %q and quit.", kubeconfigPath.Path())
+	err = kubeconfigPath.Root.Remove(kubeconfigPath.FileName)
 	if err != nil {
-		klog.Errorf("failed to remove kubeconfig %q: %v", kubeconfigPath, err)
+		klog.Errorf("failed to remove kubeconfig %q: %v", kubeconfigPath.Path(), err)
 	}
+}
+
+func writeKubeconfig(kubeconfigPath *cmdutils.RootedFile, templateData map[string]string) (err error) {
+	fp, err := kubeconfigPath.Root.OpenFile(kubeconfigPath.FileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("cannot create kubeconfig file %q: %w", kubeconfigPath.Path(), err)
+	}
+	defer func() {
+		if closeErr := fp.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("cannot save kubeconfig file %q: %w", kubeconfigPath.Path(), closeErr)
+		}
+	}()
+	if err = fp.Chmod(0600); err != nil {
+		return fmt.Errorf("cannot set kubeconfig file mode %q: %w", kubeconfigPath.Path(), err)
+	}
+
+	templateKubeconfig, err := template.New("kubeconfig").Parse(kubeConfigTemplate)
+	if err != nil {
+		return fmt.Errorf("template parse error: %w", err)
+	}
+	if err = templateKubeconfig.Execute(fp, templateData); err != nil {
+		return fmt.Errorf("cannot create kubeconfig: %w", err)
+	}
+
+	return nil
 }
