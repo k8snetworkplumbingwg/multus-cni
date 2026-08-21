@@ -395,7 +395,7 @@ This feature is based on [improvements made to libcni for "safe subdirectory-bas
 
 `auxiliaryCNIChainName` is meant to be set as a CNI configuration name, this name is arbitrary but must match the subdirectory name.
 
-Consider this [daemon configuration](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/deployments/multus-daemonset-thick.yml#L113):
+Consider this [daemon configuration](https://github.com/k8snetworkplumbingwg/multus-cni/blob/master/deploy/manifests/daemonset-thick.yml#L113):
 
 ```
 {

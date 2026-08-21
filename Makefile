@@ -1,6 +1,7 @@
 
 
-.PHONY: deps-update
+.PHONY: deps-update build test yamllint
+
 deps-update: ; $(info  Updating dependencies...) @ ## Update dependencies
 	go mod tidy
 
@@ -11,3 +12,6 @@ build:
 
 test:
 	sudo ./hack/test-go.sh
+
+yamllint:
+	yamllint .
