@@ -4,12 +4,9 @@
 exclude:
   global:
     - "**/*_test.go"
-    - vendor/github.com/containernetworking/cni/libcni
-    - vendor/github.com/go-task/slim-sprig
-    - vendor/github.com/google/uuid
-    - vendor/github.com/onsi/ginkgo/v2/ginkgo/internal
-    - vendor/github.com/onsi/ginkgo/v2/ginkgo/unfocus
-    - vendor/github.com/onsi/ginkgo/v2/internal
-    - vendor/k8s.io/client-go/util/cert
-    - vendor/k8s.io/klog
-    - vendor/k8s.io/klog/v2
+    # Upstream GitHub Actions performance reporting helpers are not shipped in
+    # downstream images; Snyk flags their local artifact paths.
+    - e2e/perf/compare-reports.py
+    - e2e/perf/download-artifacts.py
+    - e2e/perf/generate_perf_report.py
+    - e2e/perf/get-pr-info.py
