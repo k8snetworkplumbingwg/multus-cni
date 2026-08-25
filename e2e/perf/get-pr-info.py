@@ -23,21 +23,50 @@ import requests
 from github_common import get_github_token, get_repo_info
 
 
-def find_prs_by_head_branch(head_branch: str, head_owner: str | None = None) -> List[int]:
-    """Find open PRs for a head branch, optionally scoped to a fork/owner."""
+def find_prs_by_head_branch(
+    head_branch: str,
+    head_owner: str | None = None,
+    repo: str | None = None,
+) -> List[int]:
+    """Find open PR numbers whose head branch matches.
+
+    Used by workflow_run handlers to map an e2e-kind run back to the PR that
+    triggered it. Pass values from the triggering run's metadata:
+
+        head_branch  workflow_run.head_branch (e.g. "gracefulterm")
+        head_owner   workflow_run.head_repository.owner.login (e.g. "wizhaoredhat")
+        repo         upstream "owner/name" (e.g. "k8snetworkplumbingwg/multus-cni")
+
+    Search by branch name only, then filter by head_owner when given. Do not pass
+    "owner:branch" to gh: `gh pr list --head` documents that syntax as unsupported
+    and returns no results for fork PRs.
+
+    Returns:
+        Matching PR numbers, or [] when none are found or gh fails.
+    """
     if not head_branch:
         return []
 
-    head_ref = f"{head_owner}:{head_branch}" if head_owner else head_branch
-    print(f"Searching for PRs by head: {head_ref}", file=sys.stderr)
+    # gh pr list --head accepts the branch name only; owner:branch returns no results.
+    if head_owner:
+        print(
+            f"Searching for PRs by head branch {head_branch!r} (owner: {head_owner})",
+            file=sys.stderr,
+        )
+    else:
+        print(f"Searching for PRs by head branch: {head_branch}", file=sys.stderr)
+
+    cmd = [
+        'gh', 'pr', 'list',
+        '--head', head_branch,
+        '--json', 'number,headRepositoryOwner',
+    ]
+    if repo:
+        cmd.extend(['--repo', repo])
 
     try:
         result = subprocess.run(
-            [
-                'gh', 'pr', 'list',
-                '--head', head_ref,
-                '--json', 'number,headRepositoryOwner',
-            ],
+            cmd,
             capture_output=True,
             text=True,
             check=True,
@@ -91,7 +120,8 @@ def get_prs_from_event_file(event_path: Path) -> List[int]:
         (workflow_run.get('head_repository') or {}).get('owner') or {}
     ).get('login')
 
-    return find_prs_by_head_branch(head_branch, head_owner)
+    owner, name = get_repo_info()
+    return find_prs_by_head_branch(head_branch, head_owner, f"{owner}/{name}")
 
 
 def get_prs_from_api(owner: str, repo: str, run_id: int, token: str) -> List[int]:
@@ -124,7 +154,7 @@ def get_prs_from_api(owner: str, repo: str, run_id: int, token: str) -> List[int
         (data.get('head_repository') or {}).get('owner') or {}
     ).get('login')
 
-    return find_prs_by_head_branch(head_branch, head_owner)
+    return find_prs_by_head_branch(head_branch, head_owner, f"{owner}/{repo}")
 
 
 def main():
