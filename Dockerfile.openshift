@@ -3,7 +3,8 @@ FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 AS b
 ADD . /usr/src/multus-cni
 WORKDIR /usr/src/multus-cni
 ENV CGO_ENABLED=1
-ENV GO111MODULE=off
+ENV GO111MODULE=on
+ENV GOFLAGS=-mod=readonly
 ENV VERSION=rhel9 COMMIT=unset
 RUN ./hack/build-go.sh && \
        cd /usr/src/multus-cni/bin
