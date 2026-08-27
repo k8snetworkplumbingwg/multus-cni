@@ -140,7 +140,6 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 			}
 		}
 	}
-	types.SortDeviceIDs(resourceMap)
 	return resourceMap, nil
 }
 

@@ -200,7 +200,6 @@ func (d *draClient) GetPodResourceMap(ctx context.Context, pod *v1.Pod, resource
 		}
 	}
 
-	types.SortDeviceIDs(resourceMap)
 	logging.Verbosef("GetPodResourceMap: successfully processed all DRA resources for pod %s/%s, total resources: %d",
 		pod.Namespace, pod.Name, len(resourceMap))
 	return nil
