@@ -132,12 +132,130 @@ var _ = Describe("Kubelet checkpoint data read operations", func() {
 			Expect(len(resourceInfo.DeviceIDs)).To(BeEquivalentTo(2))
 		})
 
-		It("should have \"0000:03:02.3\" in deviceIDs[0]", func() {
-			Expect(resourceInfo.DeviceIDs[0]).To(BeEquivalentTo("0000:03:02.3"))
+		// Single-container allocation is sorted; container order is preserved across entries.
+		It("should have \"0000:03:02.0\" in deviceIDs[0] (per-container sorted)", func() {
+			Expect(resourceInfo.DeviceIDs[0]).To(BeEquivalentTo("0000:03:02.0"))
 		})
 
-		It("should have \"0000:03:02.0\" in deviceIDs[1]", func() {
-			Expect(resourceInfo.DeviceIDs[1]).To(BeEquivalentTo("0000:03:02.0"))
+		It("should have \"0000:03:02.3\" in deviceIDs[1] (per-container sorted)", func() {
+			Expect(resourceInfo.DeviceIDs[1]).To(BeEquivalentTo("0000:03:02.3"))
+		})
+	})
+
+	Context("Using a checkpoint file with multiple containers sharing a resource name", func() {
+		const multiContainerFile = "/tmp/kubelet_internal_checkpoint_multi_container"
+
+		var (
+			fakeCp      *fakeCheckpoint
+			resourceMap map[string]*types.ResourceInfo
+		)
+
+		BeforeEach(func() {
+			// appcntr1 and appcntr2 both get devices from intel.com/sriov_net_A,
+			// and a third entry belongs to a different pod.
+			sampleData := `{
+				"Data": {
+					"PodDeviceEntries": [
+					{
+						"PodUID": "8f5ba1b4-cc11-11e8-89df-408d5c537d23",
+						"ContainerName": "appcntr1",
+						"ResourceName": "intel.com/sriov_net_A",
+						"DeviceIDs": {"-1": [
+							"0000:03:02.3",
+							"0000:03:02.0"
+							]
+						},
+						"AllocResp": ""
+					},
+					{
+						"PodUID": "8f5ba1b4-cc11-11e8-89df-408d5c537d23",
+						"ContainerName": "appcntr2",
+						"ResourceName": "intel.com/sriov_net_A",
+						"DeviceIDs": {"-1": [
+							"0000:03:02.5",
+							"0000:03:02.1"
+							]
+						},
+						"AllocResp": ""
+					},
+					{
+						"PodUID": "8f5ba1b4-cc11-11e8-89df-408d5c537d23",
+						"ContainerName": "appcntr2",
+						"ResourceName": "intel.com/sriov_net_B",
+						"DeviceIDs": {
+							"1": ["0000:03:06.3"],
+							"0": ["0000:03:06.0"]
+						},
+						"AllocResp": ""
+					},
+					{
+						"PodUID": "970a395d-bb3b-11e8-89df-408d5c537d23",
+						"ContainerName": "appcntr1",
+						"ResourceName": "intel.com/sriov_net_A",
+						"DeviceIDs": {"-1": [
+							"0000:03:02.7"
+							]
+						},
+						"AllocResp": ""
+					}
+					],
+					"RegisteredDevices": {
+					"intel.com/sriov_net_A": [
+						"0000:03:02.0",
+						"0000:03:02.1",
+						"0000:03:02.3",
+						"0000:03:02.5",
+						"0000:03:02.7"
+					],
+					"intel.com/sriov_net_B": [
+						"0000:03:06.0",
+						"0000:03:06.3"
+					]
+					}
+				},
+				"Checksum": 0
+				}`
+
+			fakeCp = &fakeCheckpoint{fileName: multiContainerFile}
+			Expect(fakeCp.WriteToFile([]byte(sampleData))).To(Succeed())
+
+			cp, err := getCheckpoint(multiContainerFile)
+			Expect(err).NotTo(HaveOccurred())
+
+			fakePod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "fakePod",
+					Namespace: "podNamespace",
+					UID:       k8sTypes.UID("8f5ba1b4-cc11-11e8-89df-408d5c537d23"),
+				},
+			}
+			resourceMap, err = cp.GetPodResourceMap(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			Expect(fakeCp.DeleteFile()).To(Succeed())
+		})
+
+		// appcntr1's devices must stay ahead of appcntr2's so that each container's
+		// network attachments get the devices allocated to that container.
+		It("should sort within a container and keep containers in checkpoint order", func() {
+			rInfo, ok := resourceMap["intel.com/sriov_net_A"]
+			Expect(ok).To(BeTrue())
+			Expect(rInfo.DeviceIDs).To(Equal([]string{
+				"0000:03:02.0", "0000:03:02.3",
+				"0000:03:02.1", "0000:03:02.5",
+			}))
+		})
+
+		It("should sort the device IDs a container owns across NUMA nodes", func() {
+			rInfo, ok := resourceMap["intel.com/sriov_net_B"]
+			Expect(ok).To(BeTrue())
+			Expect(rInfo.DeviceIDs).To(Equal([]string{"0000:03:06.0", "0000:03:06.3"}))
+		})
+
+		It("should not include device IDs allocated to another pod", func() {
+			Expect(resourceMap["intel.com/sriov_net_A"].DeviceIDs).NotTo(ContainElement("0000:03:02.7"))
 		})
 	})
 

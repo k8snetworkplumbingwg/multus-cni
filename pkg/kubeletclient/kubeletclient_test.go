@@ -276,4 +276,130 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 			Expect(resourceMap).To(Equal(emptyRMap))
 		})
 	})
+
+	Context("GetPodResourceMap() DeviceID ordering", func() {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-name", Namespace: "pod-namespace"},
+		}
+
+		It("sorts IDs within a container and does not mutate kubelet-owned slices", func() {
+			c0IDs := []string{"0000:03:00.5", "0000:03:00.1"}
+			rc := &kubeletClient{
+				resources: []*podresourcesapi.PodResources{
+					{
+						Name:      "pod-name",
+						Namespace: "pod-namespace",
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name: "ctr-0",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: c0IDs},
+								},
+							},
+							{
+								Name: "ctr-1",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:00.9"}},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceMap, err := rc.GetPodResourceMap(pod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceMap["sriov"].DeviceIDs).To(Equal([]string{"0000:03:00.1", "0000:03:00.5", "0000:03:00.9"}))
+			Expect(c0IDs).To(Equal([]string{"0000:03:00.5", "0000:03:00.1"}))
+		})
+
+		It("does not reorder devices across containers", func() {
+			rc := &kubeletClient{
+				resources: []*podresourcesapi.PodResources{
+					{
+						Name:      "pod-name",
+						Namespace: "pod-namespace",
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name: "ctr-0",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:00.5"}},
+								},
+							},
+							{
+								Name: "ctr-1",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:00.1"}},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceMap, err := rc.GetPodResourceMap(pod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceMap["sriov"].DeviceIDs).To(Equal([]string{"0000:03:00.5", "0000:03:00.1"}))
+		})
+
+		// Each container requests two devices of the same resource name. IDs are
+		// sorted inside a container; container blocks stay in kubelet order.
+		It("sorts within each container when both have multiple devices of the same resource", func() {
+			rc := &kubeletClient{
+				resources: []*podresourcesapi.PodResources{
+					{
+						Name:      "pod-name",
+						Namespace: "pod-namespace",
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name: "ctr-0",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:02.3", "0000:03:02.0"}},
+								},
+							},
+							{
+								Name: "ctr-1",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:02.5", "0000:03:02.1"}},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceMap, err := rc.GetPodResourceMap(pod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceMap["sriov"].DeviceIDs).To(Equal([]string{
+				"0000:03:02.0", "0000:03:02.3",
+				"0000:03:02.1", "0000:03:02.5",
+			}))
+		})
+
+		It("aggregates then sorts multiple ContainerDevices rows for the same resource on one container", func() {
+			rc := &kubeletClient{
+				resources: []*podresourcesapi.PodResources{
+					{
+						Name:      "pod-name",
+						Namespace: "pod-namespace",
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name: "ctr-0",
+								Devices: []*podresourcesapi.ContainerDevices{
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:00.5", "0000:03:00.1"}},
+									{ResourceName: "sriov", DeviceIds: []string{"0000:03:00.9", "0000:03:00.2"}},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			resourceMap, err := rc.GetPodResourceMap(pod)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resourceMap["sriov"].DeviceIDs).To(Equal([]string{
+				"0000:03:00.1", "0000:03:00.2", "0000:03:00.5", "0000:03:00.9",
+			}))
+		})
+	})
 })

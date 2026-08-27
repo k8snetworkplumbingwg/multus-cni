@@ -102,10 +102,11 @@ func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resource
 				entry = &types.ResourceInfo{}
 				resourceMap[pod.ResourceName] = entry
 			}
+			var ids []string
 			for _, v := range pod.DeviceIDs {
-				// already exists; append to it
-				entry.DeviceIDs = append(entry.DeviceIDs, v...)
+				ids = append(ids, v...)
 			}
+			entry.DeviceIDs = append(entry.DeviceIDs, types.CopyAndSortDeviceIDs(ids)...)
 		}
 	}
 	return resourceMap, nil

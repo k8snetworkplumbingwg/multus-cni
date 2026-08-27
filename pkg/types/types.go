@@ -17,6 +17,7 @@ package types
 
 import (
 	"net"
+	"sort"
 
 	"github.com/containernetworking/cni/libcni"
 	"github.com/containernetworking/cni/pkg/types"
@@ -176,6 +177,18 @@ type K8sArgs struct {
 type ResourceInfo struct {
 	Index     int
 	DeviceIDs []string
+}
+
+// CopyAndSortDeviceIDs returns a sorted copy of ids. Callers use this to
+// stabilize order within one container's allocation without mutating kubelet
+// state or reordering devices across containers.
+func CopyAndSortDeviceIDs(ids []string) []string {
+	if ids == nil {
+		return nil
+	}
+	out := append([]string(nil), ids...)
+	sort.Strings(out)
+	return out
 }
 
 // ResourceClient provides a kubelet Pod resource handle
