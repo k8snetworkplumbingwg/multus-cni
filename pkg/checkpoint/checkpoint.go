@@ -108,6 +108,5 @@ func (cp *checkpoint) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resource
 			}
 		}
 	}
-	types.SortDeviceIDs(resourceMap)
 	return resourceMap, nil
 }
