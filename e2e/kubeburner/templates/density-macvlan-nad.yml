@@ -1,0 +1,20 @@
+---
+# host-local IPAM: Multus/macvlan require an IP result on ADD. Addresses are
+# unused by the density probes (Service/cluster network), but static IPAM
+# without addresses fails with "IPAM plugin returned missing IP config".
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: density-macvlan
+spec:
+  config: '{
+    "cniVersion": "0.4.0",
+    "name": "density-macvlan",
+    "type": "macvlan",
+    "master": "eth1",
+    "mode": "bridge",
+    "ipam": {
+      "type": "host-local",
+      "subnet": "10.20.0.0/16"
+    }
+  }'

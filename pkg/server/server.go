@@ -299,7 +299,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusCNIAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusCNIAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
@@ -321,7 +321,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusDelegateAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusDelegateAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
@@ -343,7 +343,7 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 	router.HandleFunc(api.MultusHealthAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet && r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
@@ -352,19 +352,19 @@ func newCNIServer(rundir string, kubeClient *k8s.ClientInfo, exec invoke.Exec, s
 		})))
 
 	// handle for '/readyz'
-	router.HandleFunc(api.MultusReadyAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusHealthAPIEndpoint}),
+	router.HandleFunc(api.MultusReadyAPIEndpoint, promhttp.InstrumentHandlerCounter(s.metrics.requestCounter.MustCurryWith(prometheus.Labels{"handler": api.MultusReadyAPIEndpoint}),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodGet && r.Method != http.MethodPost {
-				http.Error(w, fmt.Sprintf("Method not allowed"), http.StatusMethodNotAllowed)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 				return
 			}
 
 			if !isInGracefulShutdownMode() {
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json")
 			} else {
-				w.WriteHeader(http.StatusInternalServerError)
 				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
 			}
 		})))
 

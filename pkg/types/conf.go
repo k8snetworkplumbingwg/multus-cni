@@ -83,43 +83,64 @@ func ConvertNetworkConfigListToNetConfList(ncList *libcni.NetworkConfigList) (*t
 	return netConfList, nil
 }
 
-// rawConfListBytes rebuilds the complete conflist JSON from a libcni
+// losslessConfListBytes rebuilds the complete conflist JSON from a libcni
 // NetworkConfigList without losing any field. It takes the list-level keys
 // from the original bytes and rebuilds the "plugins" array from each plugin's
 // raw bytes. Per-plugin raw bytes are used (instead of confList.Bytes as a
 // whole) because libcni appends plugins loaded from a subdirectory chain into
 // confList.Plugins without updating confList.Bytes; relying on confList.Bytes
 // alone would drop those appended plugins.
-func rawConfListBytes(confList *libcni.NetworkConfigList) ([]byte, error) {
-	var rawList map[string]interface{}
+func losslessConfListBytes(confList *libcni.NetworkConfigList) ([]byte, error) {
+	var rawList map[string]json.RawMessage
 	if err := json.Unmarshal(confList.Bytes, &rawList); err != nil {
-		return nil, logging.Errorf("rawConfListBytes: failed to unmarshal conflist bytes: %v", err)
+		return nil, logging.Errorf("losslessConfListBytes: failed to unmarshal conflist bytes: %v", err)
 	}
 
-	plugins := make([]interface{}, 0, len(confList.Plugins))
-	for idx, plugin := range confList.Plugins {
-		var rawPlugin map[string]interface{}
-		if err := json.Unmarshal(plugin.Bytes, &rawPlugin); err != nil {
-			return nil, logging.Errorf("rawConfListBytes: failed to unmarshal plugin #%d: %v", idx, err)
-		}
-		plugins = append(plugins, rawPlugin)
+	plugins := make([]json.RawMessage, 0, len(confList.Plugins))
+	for _, plugin := range confList.Plugins {
+		plugins = append(plugins, json.RawMessage(plugin.Bytes))
 	}
-	rawList["plugins"] = plugins
+
+	pluginsBytes, err := json.Marshal(plugins)
+	if err != nil {
+		return nil, logging.Errorf("losslessConfListBytes: failed to marshal plugins array: %v", err)
+	}
+	rawList["plugins"] = pluginsBytes
 
 	return json.Marshal(rawList)
 }
 
 // InjectCNIVersionInConfList sets the cniVersion field on a conflist JSON
-// without losing any other field. It is used on the DEL path to backfill the
-// cniVersion onto the raw bytes; marshaling the structured NetConfList instead
-// would strip CNI-specific fields and break the plugin's DEL.
+// without losing any other field. It is used on the cached DEL path to backfill
+// cniVersion onto lossless delegate Bytes.
 func InjectCNIVersionInConfList(inBytes []byte, cniVersion string) ([]byte, error) {
-	var rawConfig map[string]interface{}
+	var rawConfig map[string]json.RawMessage
 	if err := json.Unmarshal(inBytes, &rawConfig); err != nil {
 		return nil, logging.Errorf("InjectCNIVersionInConfList: failed to unmarshal inBytes: %v", err)
 	}
-	rawConfig["cniVersion"] = cniVersion
+
+	verBytes, err := json.Marshal(cniVersion)
+	if err != nil {
+		return nil, logging.Errorf("InjectCNIVersionInConfList: failed to marshal cniVersion: %v", err)
+	}
+	rawConfig["cniVersion"] = verBytes
 	return json.Marshal(rawConfig)
+}
+
+// PrepareDelegateForCache rewrites conflist delegate Bytes losslessly from
+// CNINetworkConfigList so cached DEL receives the same complete config ADD did.
+// CNINetworkConfigList is not serialized to the scratch cache (json:"-").
+func PrepareDelegateForCache(delegate *DelegateNetConf) error {
+	if !delegate.ConfListPlugin || len(delegate.CNINetworkConfigList.Plugins) == 0 {
+		return nil
+	}
+
+	pluginsBytes, err := losslessConfListBytes(&delegate.CNINetworkConfigList)
+	if err != nil {
+		return logging.Errorf("PrepareDelegateForCache: error rebuilding conflist bytes: %v", err)
+	}
+	delegate.Bytes = pluginsBytes
+	return nil
 }
 
 // LoadDelegateNetConfFromConfList converts a libcni.NetworkConfigList into a DelegateNetConf structure
@@ -134,18 +155,15 @@ func LoadDelegateNetConfFromConfList(confList *libcni.NetworkConfigList, netElem
 	}
 
 	delegateConf := &DelegateNetConf{
-		Name:           netConfList.Name,
-		ConfList:       *netConfList,
-		ConfListPlugin: true,
+		Name:                 netConfList.Name,
+		ConfList:             *netConfList,
+		CNINetworkConfigList: *confList,
+		ConfListPlugin:       true,
 	}
 
-	// Preserve the original conflist bytes losslessly. The structured
-	// NetConfList (via cnitypes.PluginConf) drops any field outside
-	// cniVersion/name/type/capabilities/ipam.type/dns, which would strip
-	// CNI-specific fields such as calico's kubeconfig/datastore_type and
-	// break the plugin's DEL (e.g. failing to release IPs). Rebuild from the
-	// libcni raw bytes instead so DEL receives the same complete config ADD did.
-	pluginsBytes, err := rawConfListBytes(confList)
+	// Seed Bytes from libcni raw plugin JSON so deviceID/CNIArgs injection and
+	// re-parsing preserve plugin-specific fields (not only cnitypes.PluginConf keys).
+	pluginsBytes, err := losslessConfListBytes(confList)
 	if err != nil {
 		return nil, logging.Errorf("LoadDelegateNetConfFromConfList: error rebuilding conflist bytes: %v", err)
 	}
@@ -164,6 +182,18 @@ func LoadDelegateNetConfFromConfList(confList *libcni.NetworkConfigList, netElem
 		if err != nil {
 			return nil, logging.Errorf("LoadDelegateNetConfFromConfList: failed to add cni-args in NetConfList bytes: %v", err)
 		}
+	}
+
+	// deviceID and CNIArgs are injected into pluginsBytes only; CNINetworkConfigList
+	// was copied from confList before those edits. ADD/CHECK/DEL use the fast path
+	// (CNINetworkConfigList when Plugins is non-empty), not Bytes, so re-parse once
+	// here to keep libcni and PrepareDelegateForCache aligned with the mutated JSON.
+	if deviceID != "" || (netElement != nil && netElement.CNIArgs != nil) {
+		updatedConfList, err := libcni.NetworkConfFromBytes(pluginsBytes)
+		if err != nil {
+			return nil, logging.Errorf("LoadDelegateNetConfFromConfList: error re-parsing conflist bytes: %v", err)
+		}
+		delegateConf.CNINetworkConfigList = *updatedConfList
 	}
 
 	delegateConf.Bytes = pluginsBytes

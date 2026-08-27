@@ -1,0 +1,23 @@
+# This dockerfile is specific to building Multus for OpenShift
+# The okd-builder image is locally built from https://raw.githubusercontent.com/okd-project/images/main/okd-builder.Dockerfile
+FROM local/okdbuilder:latest as builder
+
+ADD . /usr/src/multus-cni
+
+WORKDIR /usr/src/multus-cni
+ENV GO111MODULE=off
+RUN MODMODE=readonly ./hack/build-go.sh
+
+FROM quay.io/openshift/origin-base:latest
+LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/multus-cni
+RUN mkdir -p /usr/src/multus-cni/images && mkdir -p /usr/src/multus-cni/bin
+COPY --from=builder /usr/src/multus-cni/bin/multus /usr/src/multus-cni/bin
+COPY --from=builder /usr/src/multus-cni/bin/install_multus /
+COPY --from=builder /usr/src/multus-cni/bin/thin_entrypoint /
+
+LABEL io.k8s.display-name="Multus CNI" \
+      io.k8s.description="This is a component of OpenShift Container Platform and provides a meta CNI plugin." \
+      io.openshift.tags="openshift" \
+      maintainer="Doug Smith <dosmith@redhat.com>"
+
+ENTRYPOINT ["/thin_entrypoint"]

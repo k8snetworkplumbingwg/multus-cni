@@ -63,23 +63,24 @@ export CGO_ENABLED=${CGO_ENABLED:-0}
 # build with go modules
 export GO111MODULE=on
 
+BUILD_ARGS=()
 if [ -n "$MODMODE" ]; then
 	BUILD_ARGS=(-mod "$MODMODE")
 fi
 
 echo "Building multus"
-go build -o ${DEST_DIR}/multus ${BUILD_ARGS} -ldflags "${LDFLAGS}" "$@" ./cmd/multus
+go build -o ${DEST_DIR}/multus "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" "$@" ./cmd/multus
 echo "Building multus-daemon"
-go build -o "${DEST_DIR}"/multus-daemon ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/multus-daemon
+go build -o "${DEST_DIR}"/multus-daemon "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/multus-daemon
 echo "Building multus-shim"
-go build -o "${DEST_DIR}"/multus-shim ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/multus-shim
+go build -o "${DEST_DIR}"/multus-shim "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/multus-shim
 echo "Building install_multus"
-go build -o "${DEST_DIR}"/install_multus ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/install_multus
+go build -o "${DEST_DIR}"/install_multus "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/install_multus
 echo "Building thin_entrypoint"
-go build -o "${DEST_DIR}"/thin_entrypoint ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/thin_entrypoint
+go build -o "${DEST_DIR}"/thin_entrypoint "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/thin_entrypoint
 echo "Building kubeconfig_generator"
-go build -o "${DEST_DIR}"/kubeconfig_generator ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/kubeconfig_generator
+go build -o "${DEST_DIR}"/kubeconfig_generator "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/kubeconfig_generator
 echo "Building cert-approver"
-go build -o "${DEST_DIR}"/cert-approver ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/cert-approver
+go build -o "${DEST_DIR}"/cert-approver "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/cert-approver
 echo "Building passthru CNI"
-go build -o "${DEST_DIR}"/passthru ${BUILD_ARGS} -ldflags "${LDFLAGS}" ./cmd/passthru-cni
+go build -o "${DEST_DIR}"/passthru "${BUILD_ARGS[@]}" -ldflags "${LDFLAGS}" ./cmd/passthru-cni

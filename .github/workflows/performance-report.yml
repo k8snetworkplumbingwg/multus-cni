@@ -1,0 +1,231 @@
+name: performance-report
+
+on:
+  workflow_run:
+    workflows: ["e2e-kind"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  actions: read
+
+concurrency:
+  group: perf-report-${{ github.event.workflow_run.head_branch || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  process-performance-results:
+    name: Process Performance Results
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Always use trusted default-branch code; never checkout fork commits for since we cannot trust it.
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r e2e/perf/requirements.txt
+
+      - name: Download performance test data artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          e2e/perf/download-artifacts.py \
+            --run-id ${{ github.event.workflow_run.id }} \
+            --filter "performance-test-data" \
+            --output-dir artifact-downloads \
+            --extract
+
+      - name: Organize extracted artifacts and generate JSON data
+        run: |
+          for dir in artifact-downloads/*performance-test-data*; do
+            if [ -d "$dir" ]; then
+              workload=$(basename "$dir" | sed 's/-performance-test-data-.*//')
+              mkdir -p "reports/${workload}"
+
+              metrics_dir=""
+              if [ -d "$dir/perf-data/metrics" ]; then
+                metrics_dir="$dir/perf-data/metrics"
+              elif [ -d "$dir/metrics" ]; then
+                metrics_dir="$dir/metrics"
+              fi
+
+              if [ -n "$metrics_dir" ]; then
+                echo "Processing workload: $workload (metrics: $metrics_dir)"
+                python3 e2e/perf/generate_perf_report.py \
+                  --workload "$workload" \
+                  --metrics-dir "$metrics_dir" \
+                  --json-output "reports/${workload}/performance_data.json" \
+                  --output "reports/${workload}/performance_report.md"
+              else
+                echo "Warning: no metrics directory found under $dir"
+                find "$dir" -type f | head -50 || true
+              fi
+            fi
+          done
+
+          echo "=== Generated reports structure ==="
+          find reports -type f 2>/dev/null || true
+
+      - name: Get associated PRs
+        id: get_prs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBERS=$(e2e/perf/get-pr-info.py \
+            --event-path $GITHUB_EVENT_PATH \
+            --format json)
+          echo "pr_numbers=$PR_NUMBERS" >> $GITHUB_OUTPUT
+          echo "Found PRs: $PR_NUMBERS"
+
+      - name: Fetch baseline run
+        id: get_baseline
+        if: steps.get_prs.outputs.pr_numbers != '[]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Prefer a successful push run of e2e-kind as the baseline when no
+          # scheduled performance lane exists yet.
+          BASELINE_INFO=$(e2e/perf/get-baseline-run.py \
+            --workflow kind-e2e.yml \
+            --event push \
+            --output json) || echo "{}"
+
+          BASELINE_ID=$(echo "$BASELINE_INFO" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('id', ''))" 2>/dev/null || echo "")
+          BASELINE_URL=$(echo "$BASELINE_INFO" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data.get('url', ''))" 2>/dev/null || echo "")
+
+          echo "baseline_run_id=$BASELINE_ID" >> $GITHUB_OUTPUT
+          echo "baseline_run_url=$BASELINE_URL" >> $GITHUB_OUTPUT
+
+          echo "Baseline run ID: $BASELINE_ID"
+          echo "Baseline run URL: $BASELINE_URL"
+
+      - name: Download baseline artifacts
+        if: steps.get_baseline.outputs.baseline_run_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          e2e/perf/download-artifacts.py \
+            --run-id ${{ steps.get_baseline.outputs.baseline_run_id }} \
+            --filter "performance-test-data" \
+            --output-dir baseline-downloads \
+            --extract
+
+      - name: Organize baseline artifacts and generate JSON data
+        if: steps.get_baseline.outputs.baseline_run_id != ''
+        run: |
+          mkdir -p baseline-reports
+          for dir in baseline-downloads/*performance-test-data*; do
+            if [ -d "$dir" ]; then
+              workload=$(basename "$dir" | sed 's/-performance-test-data-.*//')
+              mkdir -p "baseline-reports/${workload}"
+
+              metrics_dir=""
+              if [ -d "$dir/perf-data/metrics" ]; then
+                metrics_dir="$dir/perf-data/metrics"
+              elif [ -d "$dir/metrics" ]; then
+                metrics_dir="$dir/metrics"
+              fi
+
+              if [ -n "$metrics_dir" ]; then
+                echo "Processing baseline workload: $workload"
+                python3 e2e/perf/generate_perf_report.py \
+                  --workload "$workload" \
+                  --metrics-dir "$metrics_dir" \
+                  --json-output "baseline-reports/${workload}/performance_data.json" \
+                  --output "baseline-reports/${workload}/performance_report.md"
+              fi
+            fi
+          done
+
+          echo "=== Baseline reports structure ==="
+          find baseline-reports -type f 2>/dev/null || echo "No baseline reports found"
+
+      - name: Compare reports with baseline
+        if: steps.get_prs.outputs.pr_numbers != '[]'
+        run: |
+          mkdir -p enhanced-reports
+
+          for workload_dir in reports/*/; do
+            if [ -d "$workload_dir" ]; then
+              workload=$(basename "$workload_dir")
+              current_json="$workload_dir/performance_data.json"
+              baseline_json="baseline-reports/$workload/performance_data.json"
+              enhanced_report="enhanced-reports/$workload/performance_report.md"
+
+              if [ -f "$current_json" ]; then
+                echo "Comparing data for workload: $workload"
+                mkdir -p "enhanced-reports/$workload"
+
+                if [ -f "$baseline_json" ]; then
+                  e2e/perf/compare-reports.py \
+                    --current "$current_json" \
+                    --baseline "$baseline_json" \
+                    --baseline-url "${{ steps.get_baseline.outputs.baseline_run_url }}" \
+                    --output "$enhanced_report"
+                else
+                  echo "No baseline found for $workload, using current data as-is"
+                  e2e/perf/compare-reports.py \
+                    --current "$current_json" \
+                    --output "$enhanced_report"
+                fi
+              else
+                echo "Warning: No JSON data found for $workload"
+              fi
+            fi
+          done
+
+      - name: Post performance report to PRs
+        if: steps.get_prs.outputs.pr_numbers != '[]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBERS=$(echo '${{ steps.get_prs.outputs.pr_numbers }}' | python3 -c "import sys, json; print(' '.join(f'--pr {pr}' for pr in json.load(sys.stdin)))")
+
+          if [ -n "$PR_NUMBERS" ]; then
+            e2e/perf/post-pr-comment.py \
+              $PR_NUMBERS \
+              --reports-dir enhanced-reports \
+              --run-id "${{ github.event.workflow_run.id }}" \
+              --run-url "${{ github.event.workflow_run.html_url }}" \
+              --status "${{ github.event.workflow_run.conclusion }}" \
+              --baseline-id "${{ steps.get_baseline.outputs.baseline_run_id }}" \
+              --baseline-url "${{ steps.get_baseline.outputs.baseline_run_url }}"
+          fi
+
+      - name: Upload processed artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: processed-performance-data-${{ github.event.workflow_run.id }}
+          path: |
+            reports/
+            enhanced-reports/
+            baseline-reports/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Performance Report Processing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow Run ID:** ${{ github.event.workflow_run.id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Conclusion:** ${{ github.event.workflow_run.conclusion }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Associated PRs:** ${{ steps.get_prs.outputs.pr_numbers }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts Processed" >> $GITHUB_STEP_SUMMARY
+          PERF_TEST_COUNT=$(ls -1d artifact-downloads/*performance-test-data* 2>/dev/null | wc -l | tr -d ' ')
+          echo "- Performance test data dirs: **${PERF_TEST_COUNT}**" >> $GITHUB_STEP_SUMMARY
+          find reports enhanced-reports -type f 2>/dev/null | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || true

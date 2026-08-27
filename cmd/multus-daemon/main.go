@@ -26,7 +26,6 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -34,6 +33,7 @@ import (
 	"golang.org/x/net/netutil"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 
+	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/cmdutils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/multus"
 	srv "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/server"
@@ -66,11 +66,9 @@ func main() {
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	sigTermCtx, sigTermCancel := context.WithCancel(ctx)
+	// Used by the server readiness handler to report not-ready once shutdown is initiated.
 	isInGracefulShutdownMode := func() bool {
-		if sigTermCtx.Err() == nil {
-			return false
-		}
-		return true
+		return sigTermCtx.Err() != nil
 	}
 
 	daemonConf, err := cniServerConfig(*configFilePath)
@@ -138,6 +136,7 @@ func main() {
 	go func() {
 		for sig := range signalCh {
 			logging.Verbosef("caught %v, stopping...", sig)
+			// Mark graceful-shutdown mode first so readiness probes fail before canceling server context.
 			sigTermCancel()
 			<-time.After(SigTermCancelAfter)
 			cancel()
@@ -222,34 +221,44 @@ func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf,
 }
 
 func cniServerConfig(configFilePath string) (*srv.ControllerNetConf, error) {
-	path, err := filepath.Abs(configFilePath)
+	configPath, err := cmdutils.NewRootedFile(configFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("illegal path %s in server config path %s: %w", path, configFilePath, err)
+		return nil, fmt.Errorf("illegal path in server config path %s: %w", configFilePath, err)
 	}
+	defer configPath.Close()
 
-	configFileContents, err := os.ReadFile(path)
+	configFileContents, err := configPath.Root.ReadFile(configPath.FileName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read server config %s: %w", configPath.Path(), err)
 	}
 	return srv.LoadDaemonNetConf(configFileContents)
 }
 
 func copyUserProvidedConfig(multusConfigPath string, cniConfigDir string) error {
-	path, err := filepath.Abs(multusConfigPath)
+	srcPath, err := cmdutils.NewRootedFile(multusConfigPath)
 	if err != nil {
-		return fmt.Errorf("illegal path %s in multusConfigPath %s: %w", path, multusConfigPath, err)
+		return fmt.Errorf("illegal path in multusConfigPath %s: %w", multusConfigPath, err)
 	}
+	defer srcPath.Close()
 
-	srcFile, err := os.Open(path)
+	srcFile, err := srcPath.Root.Open(srcPath.FileName)
 	if err != nil {
-		return fmt.Errorf("failed to open (READ only) file %s: %w", path, err)
+		return fmt.Errorf("failed to open (READ only) file %s: %w", srcPath.Path(), err)
 	}
+	defer srcFile.Close()
 
-	dstFileName := cniConfigDir + "/" + filepath.Base(multusConfigPath)
-	dstFile, err := os.Create(dstFileName)
+	dstPath, err := cmdutils.NewRootedFileInDir(cniConfigDir, srcPath.FileName)
 	if err != nil {
-		return fmt.Errorf("creating copying file %s: %w", dstFileName, err)
+		return fmt.Errorf("illegal destination path in cniConfigDir %s: %w", cniConfigDir, err)
 	}
+	defer dstPath.Close()
+
+	dstFile, err := dstPath.Root.Create(dstPath.FileName)
+	if err != nil {
+		return fmt.Errorf("creating copying file %s: %w", dstPath.Path(), err)
+	}
+	defer dstFile.Close()
+
 	nBytes, err := io.Copy(dstFile, srcFile)
 	if err != nil {
 		return fmt.Errorf("error copying file: %w", err)

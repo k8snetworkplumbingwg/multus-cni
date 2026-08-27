@@ -60,8 +60,9 @@ var _ = Describe("Configuration Manager", func() {
 			"cniVersion": %q,
 			"multusAutoconfigDir": %q,
 			"multusMasterCNI": %q,
+			"cniConfigDir": %q,
 			"forceCNIVersion": false
-		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName)
+		}`, defaultCniConfig, cniVersion, multusConfigDir, primaryCNIPluginName, multusConfigDir)
 		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
 		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
 

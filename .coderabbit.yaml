@@ -1,0 +1,304 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+early_access: false
+enable_free_tier: true
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  review_status: true
+  collapse_walkthrough: false
+
+  path_filters:
+    - "!**/vendor/**"
+    - "!vendor/**"
+    - "!go.sum"
+
+  auto_review:
+    enabled: true
+    drafts: true
+
+  # ── Path instructions ────────────────────────────────────────
+  path_instructions:
+
+    # ── Go code — general ────────────────────────────────────────
+    - path: "**/*.go"
+      instructions: |
+        Go security and best practices:
+        - Never ignore error returns; wrap errors with context using fmt.Errorf("...: %w", err)
+        - Use stdlib crypto/* and golang.org/x/crypto; avoid third-party crypto libraries
+        - Integer overflow: bounds-check user-supplied sizes
+        - context.Context for cancellation and timeouts on all network/gRPC operations
+        - Nil pointer checks on CNI args, NetConf, and DelegateNetConf structs
+          before accessing fields — CNI runtime data can be incomplete
+        - Use structured logging (klog v1/v2) with appropriate verbosity levels
+        - Network namespace operations require careful error handling —
+          always restore the original namespace on error paths
+        - CNI handler functions (cmdAdd, cmdDel, cmdCheck) may return
+          contextual or wrapped Go errors; the skel.PluginMainFuncs
+          dispatcher handles CNI JSON error serialization
+
+    # ── Core multus logic ────────────────────────────────────────
+    - path: "pkg/multus/**/*.go"
+      instructions: |
+        Core CNI plugin logic review:
+        - Verify CNI spec compliance across supported versions (0.2.0, 0.4.0, 1.0.0)
+        - Delegate plugin invocation must handle failures gracefully —
+          rollback already-added interfaces if a later delegate fails in cmdAdd
+        - Network selection from annotations must validate the annotation format
+          and handle malformed NetworkSelectionElement entries
+        - Network namespace operations: always defer namespace restoration
+          to prevent leaving the process in the wrong namespace on error
+        - Check that the default network delegate is always invoked first
+        - Verify proper handling of prevResult for chained CNI plugins
+        - Resource (device) allocation tracking via checkpoint must be atomic
+
+    # ── Thick plugin server ──────────────────────────────────────
+    - path: "pkg/server/**/*.go"
+      instructions: |
+        Thick plugin daemon and gRPC server review:
+        - gRPC server must handle concurrent requests safely
+        - Socket file cleanup on shutdown: verify the Unix domain socket
+          is removed on graceful and ungraceful termination
+        - Configuration file watching (fsnotify): verify events are debounced
+          and do not cause config reload storms
+        - TLS/certificate handling for metrics endpoint: verify proper rotation
+        - Server configuration must be validated at startup, not at request time
+        - API compatibility between shim and daemon must be maintained —
+          check that request/response types match across versions
+        - Health check and readiness endpoints should reflect actual daemon state
+
+    # ── Kubernetes client ────────────────────────────────────────
+    - path: "pkg/k8sclient/**/*.go"
+      instructions: |
+        Kubernetes client review:
+        - Kubeconfig file handling: verify secure file permissions (0600)
+          and no secrets logged
+        - Network Attachment Definition (NAD) lookups must handle not-found
+          errors distinctly from other API errors
+        - Client caching: verify informer/lister patterns are used correctly
+          to avoid excessive API server load
+        - Namespace scoping: ensure NAD lookups respect the pod's namespace
+          and the default network namespace
+
+    # ── Types and configuration ──────────────────────────────────
+    - path: "pkg/types/**/*.go"
+      instructions: |
+        Type definitions and configuration review:
+        - NetConf changes must maintain backward compatibility with existing
+          CNI configuration files — new fields should have sensible zero values
+        - NetworkSelectionElement: verify JSON tag naming follows CNI conventions
+        - DelegateNetConf: ensure all delegate plugin configuration fields
+          are properly forwarded without loss
+        - Validate that type changes are reflected in all serialization paths
+          (JSON marshaling/unmarshaling)
+
+    # ── Network utilities ────────────────────────────────────────
+    - path: "pkg/netutils/**/*.go"
+      instructions: |
+        Network utility review:
+        - Network namespace operations are privileged — verify proper
+          error handling and namespace restoration on all code paths
+        - Interface naming must comply with Linux kernel limits (15 chars max)
+        - Device operations (link set, address set) via netlink must handle
+          EBUSY and other transient errors with appropriate retries
+        - Verify no file descriptor leaks when opening network namespaces
+
+    # ── DRA and kubelet client ───────────────────────────────────
+    - path: "pkg/{draclient,kubeletclient}/**/*.go"
+      instructions: |
+        Dynamic Resource Allocation and kubelet client review:
+        - gRPC connections to kubelet must use proper timeouts and retry logic
+        - PodResources API responses may be incomplete — handle nil/empty
+          device lists gracefully
+        - DRA resource claims must be validated before use
+        - Connection errors should be distinguished from data errors
+          for proper error reporting
+
+    # ── Command binaries ─────────────────────────────────────────
+    - path: "cmd/**/*.go"
+      instructions: |
+        Binary entry point review:
+        - CNI plugin binaries (multus, multus-shim, passthru-cni) must follow
+          the CNI specification for stdin/stdout/stderr handling
+        - Daemon binary (multus-daemon) must handle signals (SIGTERM, SIGINT)
+          for graceful shutdown including socket cleanup
+        - Installer binary must validate target paths and handle permission
+          errors when copying binaries to host CNI directories
+        - Entry point binaries must not panic — recover and return proper
+          error codes/messages
+
+    # ── Kubernetes/OpenShift manifests ────────────────────────────
+    - path: "**/*.{yaml,yml}"
+      instructions: |
+        If this is a Kubernetes/OpenShift manifest:
+        - securityContext: runAsNonRoot, readOnlyRootFilesystem,
+          allowPrivilegeEscalation: false where applicable
+        - Drop ALL capabilities, add only what is required
+        - Resource limits (cpu, memory) on every container
+        - RBAC: least privilege; no cluster-admin for workloads
+        - Liveness + readiness probes defined
+        - automountServiceAccountToken: false unless needed
+
+        Multus-specific manifest review:
+        - DaemonSet manifests: verify volume mounts for CNI bin directory
+          (/opt/cni/bin) and CNI config directory (/etc/cni/net.d) are correct
+        - Thick plugin DaemonSet: verify Unix socket mount for daemon communication
+        - Host path volumes require proper mount propagation settings
+        - Init containers for CNI binary installation must complete before
+          the main container starts
+        - CRI-O specific manifests: verify socket path differences from containerd
+
+    # ── Deployment manifests ─────────────────────────────────────
+    - path: "deployments/**/*.{yaml,yml}"
+      instructions: |
+        Deployment manifest review:
+        - Three deployment modes: thin (multus-daemonset.yml),
+          thick (multus-daemonset-thick.yml), CRI-O (multus-daemonset-crio.yml)
+        - Verify consistency across all three manifests for shared configuration
+        - DaemonSet update strategy should be RollingUpdate with appropriate
+          maxUnavailable settings for CNI plugins (node disruption impact)
+        - ServiceAccount and RBAC must allow reading NetworkAttachmentDefinitions
+          and pods but nothing more
+        - Tolerations should include control-plane/master taints for full coverage
+
+    # ── Dockerfiles / container images ───────────────────────────
+    - path: "images/{Dockerfile,Dockerfile.*}"
+      instructions: |
+        Container image security:
+        - Multi-stage builds preferred; no build tools in final image
+        - USER non-root where possible (note: CNI plugins may need root for
+          network namespace operations)
+        - COPY specific files, not entire context
+        - No secrets in ENV, ARG, or COPY
+        - No package manager cache in final layer
+        - This project has 4 container images:
+          Dockerfile (thin plugin, distroless base),
+          Dockerfile.thick (thick plugin, Debian slim),
+          Dockerfile.debug (debug, distroless debug base),
+          Dockerfile.openshift (OpenShift/OKD build)
+        - Verify ENTRYPOINT matches the intended binary for each image variant
+
+    # ── E2E tests ────────────────────────────────────────────────
+    - path: "e2e/**/*.sh"
+      instructions: |
+        E2E test scripts review (shell-based, Kind clusters):
+        - Scripts must use 'set -e' for fail-fast behavior
+        - Cleanup of Kind clusters and resources on test failure (trap handlers)
+        - kubectl commands should use explicit timeouts and --wait flags
+        - Network connectivity tests should retry with backoff for pod readiness
+        - Verify tests cover both thin and thick plugin deployment modes
+        - Template generation (j2cli/sed) must produce valid YAML
+        - Check for hardcoded image tags that should be parameterized
+
+    # ── Unit tests ───────────────────────────────────────────────
+    - path: "{cmd,pkg}/**/*_test.go"
+      instructions: |
+        Unit test quality (Ginkgo v2 + Gomega):
+        - Test names must be stable and deterministic — no dynamic values
+          in It/Describe/Context titles
+        - CNI version-specific tests (020, 040, 100): verify coverage
+          across all supported CNI spec versions
+        - Mock external dependencies (Kubernetes API, network namespace ops)
+          rather than requiring real cluster or root access
+        - Test error paths, not just happy paths
+        - Network namespace tests may require sudo — verify CI compatibility
+        - Assertions should include meaningful failure messages
+        - Verify test cleanup of any created network namespaces or interfaces
+
+    # ── Hack/build scripts ───────────────────────────────────────
+    - path: "hack/**/*.sh"
+      instructions: |
+        Build and test scripts review:
+        - Scripts must be POSIX-compatible or explicitly require bash
+        - build-go.sh: verify cross-compilation settings (GOOS, GOARCH)
+          produce correct binaries for all supported platforms
+          (386, amd64, arm, arm64, ppc64le, s390x)
+        - test-go.sh: verify race detector and coverage flags are correct
+        - Scripts should exit with appropriate error codes on failure
+
+    # ── Supply chain & dependencies ──────────────────────────────
+    - path: "**/go.mod"
+      instructions: |
+        Supply chain security:
+        - New dependencies: justify the need, check license compatibility
+        - Pin exact versions; verify no unnecessary indirect dependencies added
+        - Flag known CVEs (cross-ref osv.dev)
+        - Check for replace directives pointing to forks — ensure they are
+          intentional and documented
+        - This project uses gopkg.in import path (gopkg.in/k8snetworkplumbingwg/multus-cni.v4)
+          — verify import path consistency
+        - Key dependencies: containernetworking/cni, containernetworking/plugins,
+          k8snetworkplumbingwg/network-attachment-definition-client,
+          vishvananda/netlink, k8s.io/api, k8s.io/client-go, k8s.io/kubelet
+
+    # ── CI/CD & GitHub Actions ───────────────────────────────────
+    - path: ".github/workflows/**/*"
+      instructions: |
+        CI/CD security:
+        - Pin actions by full SHA, not tag
+        - No secrets in logs; mask sensitive outputs
+        - Least privilege: minimize GITHUB_TOKEN permissions
+        - No pull_request_target with checkout of PR head
+        - Verify test.yml includes Revive lint, go fmt, go vet, and unit tests
+        - Build workflow must cover all architectures:
+          386, amd64, arm, arm64, ppc64le, s390x
+        - Image build workflow: verify Trivy scan is included
+        - Kind E2E workflow: verify both thin and thick plugin modes are tested
+
+    # ── Cryptography files ───────────────────────────────────────
+    - path: "**/*{crypt,cipher,sign,hash,tls,ssl,cert,key,token}*"
+      instructions: |
+        Cryptographic security:
+        - Banned: MD5, SHA1, DES, RC4, 3DES, Blowfish, ECB mode
+        - Symmetric: AES-256-GCM or ChaCha20-Poly1305
+        - Signing: Ed25519 or ECDSA P-256+
+        - Constant-time comparison for all secret/token data
+        - No custom crypto; use vetted libraries only
+        - Certificate generation and approval (cert-approver, kubeconfig_generator):
+          verify minimum TLS version (1.2+) and proper certificate rotation
+
+    # ── GoReleaser configuration ─────────────────────────────────
+    - path: ".goreleaser.yml"
+      instructions: |
+        GoReleaser configuration review:
+        - Verify build targets match the supported architectures
+        - Check that binary names match the expected CNI plugin names
+        - Verify release artifacts include all necessary binaries
+
+  # ── Security scanners ────────────────────────────────────────
+  tools:
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    checkov:
+      enabled: true
+    hadolint:
+      enabled: true
+    trivy:
+      enabled: true
+    osvScanner:
+      enabled: true
+    actionlint:
+      enabled: true
+    ast-grep:
+      essential_rules: true
+
+# ── Knowledge base ───────────────────────────────────────────
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "**/CONTRIBUTING.md"
+  issues:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+
+chat:
+  auto_reply: true
+  art: false

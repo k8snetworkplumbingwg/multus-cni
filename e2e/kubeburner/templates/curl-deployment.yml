@@ -1,0 +1,42 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: curl-{{.Replica}}-{{.Iteration}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: curl-{{.Replica}}-{{.Iteration}}
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: curl-{{.Replica}}-{{.Iteration}}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: density-macvlan
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      containers:
+        - name: curlapp
+          image: quay.io/cloud-bulldozer/curl:latest
+          command: ["sleep", "inf"]
+          env:
+            - name: WEBSERVER_HOSTNAME
+              value: webserver-{{.Replica}}-{{.Iteration}}
+            - name: WEBSERVER_PORT
+              value: "8080"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: false
+          startupProbe:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "curl --fail --silent --show-error ${WEBSERVER_HOSTNAME}:${WEBSERVER_PORT}"
+            periodSeconds: 1
+            timeoutSeconds: 1
+            failureThreshold: 600
+      restartPolicy: Always
