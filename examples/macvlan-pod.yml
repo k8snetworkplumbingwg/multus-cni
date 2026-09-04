@@ -1,13 +1,13 @@
 ---
-# This net-attach-def defines macvlan-conf with 
-#   + ips capabilities to specify ip in pod annotation and 
+# This net-attach-def defines macvlan-conf with
+#   + ips capabilities to specify ip in pod annotation and
 #   + mac capabilities to specify mac address in pod annotation
 # default gateway is defined as well
 apiVersion: "k8s.cni.cncf.io/v1"
 kind: NetworkAttachmentDefinition
 metadata:
   name: macvlan-conf
-spec: 
+spec:
   config: '{
       "cniVersion": "0.3.1",
       "plugins": [
@@ -23,7 +23,7 @@ spec:
                 "dst": "0.0.0.0/0",
                 "gw": "10.1.1.1"
               }
-            ] 
+            ]
           }
         }, {
           "capabilities": { "mac": true },
@@ -32,8 +32,8 @@ spec:
       ]
     }'
 ---
-# Define a pod with macvlan-conf, defined above, with ip address and mac, and 
-# "gateway" overrides default gateway to use macvlan-conf's one. 
+# Define a pod with macvlan-conf, defined above, with ip address and mac, and
+# "gateway" overrides default gateway to use macvlan-conf's one.
 # without "gateway" in k8s.v1.cni.cncf.io/networks, default route will be cluster
 # network interface, eth0, even tough macvlan-conf has default gateway config.
 apiVersion: v1
@@ -49,9 +49,9 @@ metadata:
             }]'
 spec:
   containers:
-  - name: samplepod
-    command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
-    image: dougbtv/centos-network
-    ports:
-    - containerPort: 80
+    - name: samplepod
+      command: ["/bin/bash", "-c", "trap : TERM INT; sleep infinity & wait"]
+      image: dougbtv/centos-network
+      ports:
+        - containerPort: 80
   automountServiceAccountToken: false

@@ -1,0 +1,13 @@
+---
+{{- if eq .Values.pluginType "thick" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: multus-daemon-config
+  namespace: {{ include "multusCni.namespace" . }}
+  labels:
+    {{- include "multusCni.labels" . | nindent 4 }}
+data:
+  daemon-config.json: |
+    {{- tpl .Values.thick.daemonConfig . | nindent 4 }}
+{{- end }}
