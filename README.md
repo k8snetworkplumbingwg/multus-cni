@@ -56,6 +56,7 @@ In addition to the [quick-start guide](docs/quickstart.md), you may:
 - [How to use](docs/how-to-use.md)
 - [Quick Start Guide](docs/quickstart.md)
 - [Configuration](docs/configuration.md)
+- [Device resource assignment](docs/device-resource-assignment.md)
 - [Development and Support Information](docs/development.md)
 - [Thick Plugin](docs/thick-plugin.md)
 

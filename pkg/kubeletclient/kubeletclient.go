@@ -144,11 +144,26 @@ func (rc *kubeletClient) GetPodResourceMap(pod *v1.Pod) (map[string]*types.Resou
 }
 
 func (rc *kubeletClient) getDevicePluginResources(devices []*podresourcesapi.ContainerDevices, resourceMap map[string]*types.ResourceInfo) {
+	// One container may have several ContainerDevices rows for the same
+	// ResourceName. Aggregate those IDs, sort once, then append so this
+	// container contributes a single deterministic list without reordering
+	// other containers already in resourceMap.
+	aggregated := map[string][]string{}
+	var resourceOrder []string
+	seen := map[string]struct{}{}
 	for _, dev := range devices {
-		if rInfo, ok := resourceMap[dev.ResourceName]; ok {
-			rInfo.DeviceIDs = append(rInfo.DeviceIDs, dev.DeviceIds...)
+		if _, ok := seen[dev.ResourceName]; !ok {
+			seen[dev.ResourceName] = struct{}{}
+			resourceOrder = append(resourceOrder, dev.ResourceName)
+		}
+		aggregated[dev.ResourceName] = append(aggregated[dev.ResourceName], dev.DeviceIds...)
+	}
+	for _, name := range resourceOrder {
+		deviceIDs := types.CopyAndSortDeviceIDs(aggregated[name])
+		if rInfo, ok := resourceMap[name]; ok {
+			rInfo.DeviceIDs = append(rInfo.DeviceIDs, deviceIDs...)
 		} else {
-			resourceMap[dev.ResourceName] = &types.ResourceInfo{DeviceIDs: dev.DeviceIds}
+			resourceMap[name] = &types.ResourceInfo{DeviceIDs: deviceIDs}
 		}
 	}
 }
