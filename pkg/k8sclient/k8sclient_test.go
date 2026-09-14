@@ -1597,10 +1597,10 @@ users:
 		Context("when pod has a DRA claim and the NAD carries a resourceName annotation", func() {
 			// Override getResourceClientFunc so the kubelet stub returns an empty map,
 			// letting us isolate the DRA branch in getKubernetesDelegate.
-			var origGetResourceClient func(string) (types.ResourceClient, error)
+			var origGetResourceClient func(string, *types.NetConf) (types.ResourceClient, error)
 			BeforeEach(func() {
 				origGetResourceClient = getResourceClientFunc
-				getResourceClientFunc = func(string) (types.ResourceClient, error) {
+				getResourceClientFunc = func(string, *types.NetConf) (types.ResourceClient, error) {
 					return &fakeEmptyResourceClient{}, nil
 				}
 			})
@@ -1666,7 +1666,7 @@ users:
 
 				net := &types.NetworkSelectionElement{Name: "sriov-net", Namespace: fakeNamespace}
 				// Pass nil so getKubernetesDelegate enters the DRA lookup branch.
-				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, &types.NetConf{ConfDir: tmpDir}, fakePod, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 
@@ -1943,7 +1943,7 @@ users:
 				}
 
 				// Call getKubernetesDelegate - should work without DRA
-				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, &types.NetConf{ConfDir: tmpDir}, fakePod, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 				// ResourceMap should be empty (no DRA resources)
@@ -1952,12 +1952,12 @@ users:
 		})
 
 		Context("when DRA client fails to get resources", func() {
-			var origGetResourceClient func(string) (types.ResourceClient, error)
+			var origGetResourceClient func(string, *types.NetConf) (types.ResourceClient, error)
 
 			BeforeEach(func() {
 				origGetResourceClient = getResourceClientFunc
 				// Stub kubelet so we get past device-plugin checkpoint/socket and exercise draclient.
-				getResourceClientFunc = func(string) (types.ResourceClient, error) {
+				getResourceClientFunc = func(string, *types.NetConf) (types.ResourceClient, error) {
 					return &fakeEmptyResourceClient{}, nil
 				}
 			})
@@ -2010,7 +2010,7 @@ users:
 					Namespace: fakeNamespace,
 				}
 
-				_, _, err = getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				_, _, err = getKubernetesDelegate(clientInfo, net, &types.NetConf{ConfDir: tmpDir}, fakePod, nil)
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("failed to get resourceMap from DRA client"))
 				Expect(err.Error()).To(ContainSubstring("not found"))
@@ -2110,7 +2110,7 @@ users:
 
 				// Call getNetDelegate
 				resourceMap := make(map[string]*types.ResourceInfo)
-				delegate, updatedResourceMap, err := getNetDelegate(clientInfo, fakePod, "netdelegate-network", tmpDir, fakeNamespace, resourceMap)
+				delegate, updatedResourceMap, err := getNetDelegate(clientInfo, fakePod, "netdelegate-network", &types.NetConf{ConfDir: tmpDir, MultusNamespace: fakeNamespace}, resourceMap)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 				Expect(updatedResourceMap).NotTo(BeNil())
@@ -2122,11 +2122,11 @@ users:
 			// SR-IOV device-plugin allocation, letting us exercise the combined kubelet+DRA path.
 			const sriovResourceName = "openshift/sriov"
 			const sriovDeviceIDKubelet = "0000:01:00.4"
-			var origGetResourceClient func(string) (types.ResourceClient, error)
+			var origGetResourceClient func(string, *types.NetConf) (types.ResourceClient, error)
 
 			BeforeEach(func() {
 				origGetResourceClient = getResourceClientFunc
-				getResourceClientFunc = func(string) (types.ResourceClient, error) {
+				getResourceClientFunc = func(string, *types.NetConf) (types.ResourceClient, error) {
 					return &fakeResourceClient{
 						resourceMap: map[string]*types.ResourceInfo{
 							sriovResourceName: {DeviceIDs: []string{sriovDeviceIDKubelet}},
@@ -2198,7 +2198,7 @@ users:
 				Expect(err).NotTo(HaveOccurred())
 
 				net := &types.NetworkSelectionElement{Name: "sriov-net", Namespace: fakeNamespace}
-				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, &types.NetConf{ConfDir: tmpDir}, fakePod, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 
@@ -2262,7 +2262,7 @@ users:
 				Expect(err).NotTo(HaveOccurred())
 
 				net := &types.NetworkSelectionElement{Name: "sriov-net", Namespace: fakeNamespace}
-				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, tmpDir, fakePod, nil)
+				delegate, resourceMap, err := getKubernetesDelegate(clientInfo, net, &types.NetConf{ConfDir: tmpDir}, fakePod, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(delegate).NotTo(BeNil())
 

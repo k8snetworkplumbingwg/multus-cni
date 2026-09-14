@@ -35,11 +35,11 @@ import (
 )
 
 const (
-	defaultKubeletSocket       = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
-	kubeletConnectionTimeout   = 10 * time.Second
-	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
-	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
-	unixProtocol               = "unix"
+	defaultKubeletSocket              = "kubelet" // which is defined in k8s.io/kubernetes/pkg/kubelet/apis/podresources
+	kubeletConnectionTimeout          = 10 * time.Second
+	defaultPodResourcesMaxSize        = 1024 * 1024 * 16 // 16 Mb
+	defaultKubeletPodResourcesDirName = "pod-resources"
+	unixProtocol                      = "unix"
 )
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
@@ -52,8 +52,8 @@ func localEndpoint(path string) *url.URL {
 }
 
 // GetResourceClient returns an instance of ResourceClient interface initialized with Pod resource information
-func GetResourceClient(kubeletSocket string) (types.ResourceClient, error) {
-	kubeletSocketURL := localEndpoint(filepath.Join(defaultPodResourcesPath, defaultKubeletSocket))
+func GetResourceClient(kubeletSocket string, conf *types.NetConf) (types.ResourceClient, error) {
+	kubeletSocketURL := localEndpoint(filepath.Join(conf.KubeletRootDir, defaultKubeletPodResourcesDirName, defaultKubeletSocket))
 
 	if kubeletSocket != "" {
 		kubeletSocketURL = &url.URL{

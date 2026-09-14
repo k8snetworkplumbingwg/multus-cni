@@ -38,6 +38,8 @@ type NetConf struct {
 	ConfDir string `json:"confDir"`
 	CNIDir  string `json:"cniDir"`
 	BinDir  string `json:"binDir"`
+	// Defaults to "/var/lib/kubelet"
+	KubeletRootDir string `json:"kubeletRootDir"`
 	// RawDelegates is private to the NetConf class; use Delegates instead
 	RawDelegates []map[string]interface{} `json:"delegates"`
 	// These parameters are exclusive in one config file:

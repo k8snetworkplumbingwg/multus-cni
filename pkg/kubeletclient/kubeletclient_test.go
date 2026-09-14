@@ -40,9 +40,10 @@ import (
 )
 
 var (
-	socketDir  string
-	socketName string
-	fakeServer *fakeResourceServer
+	socketDir      string
+	socketName     string
+	kubeletRootDir string
+	fakeServer     *fakeResourceServer
 )
 
 type fakeResourceServer struct {
@@ -132,7 +133,8 @@ func setUp() error {
 	if err != nil {
 		return err
 	}
-	testingPodResourcesPath := filepath.Join(tempSocketDir, defaultPodResourcesPath)
+	kubeletRootDir = filepath.Join(tempSocketDir, "var", "lib", "kubelet")
+	testingPodResourcesPath := filepath.Join(kubeletRootDir, defaultKubeletPodResourcesDirName)
 
 	if err := os.MkdirAll(testingPodResourcesPath, os.ModeDir); err != nil {
 		return err
@@ -174,12 +176,18 @@ var _ = Describe("Kubelet resource endpoint data read operations", func() {
 
 	Context("GetResourceClient()", func() {
 		It("should return no error", func() {
-			_, err := GetResourceClient(testKubeletSocket.Path)
+			_, err := GetResourceClient("", &mtypes.NetConf{KubeletRootDir: kubeletRootDir})
 			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should fail with missing file", func() {
-			_, err := GetResourceClient("unix:/sampleSocketString")
+			_, err := GetResourceClient("unix:/sampleSocketString", &mtypes.NetConf{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("error reading file"))
+		})
+
+		It("should fail with missing kubeletRootDir", func() {
+			_, err := GetResourceClient("", &mtypes.NetConf{KubeletRootDir: filepath.Join(kubeletRootDir, "nonexistent")})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("error reading file"))
 		})

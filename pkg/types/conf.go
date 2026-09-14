@@ -38,6 +38,7 @@ const (
 	defaultCNIDir                 = "/var/lib/cni/multus"
 	defaultConfDir                = "/etc/cni/multus/net.d"
 	defaultBinDir                 = "/opt/cni/bin"
+	defaultKubeletRootDir         = "/var/lib/kubelet"
 	defaultReadinessIndicatorFile = ""
 	defaultMultusNamespace        = "kube-system"
 	defaultNonIsolatedNamespace   = "default"
@@ -509,6 +510,7 @@ func GetDefaultNetConf() *NetConf {
 		BinDir:                 defaultBinDir,
 		ConfDir:                defaultConfDir,
 		CNIDir:                 defaultCNIDir,
+		KubeletRootDir:         defaultKubeletRootDir,
 		LogToStderr:            true,
 		MultusNamespace:        defaultMultusNamespace,
 		NonIsolatedNamespaces:  []string{defaultNonIsolatedNamespace},
