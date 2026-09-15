@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-[The Multus Slack Page](https://intel-corp.herokuapp.com/).
+[The Multus Slack Page](https://cloud-native.slack.com/archives/C0C0JJF4U8L).
 All complaints will be reviewed and investigated promptly and fairly. Or you
 may specifically contact Doug Smith (dosmith@redhat.com) via email.
 
