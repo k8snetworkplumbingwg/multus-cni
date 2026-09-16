@@ -25,7 +25,6 @@ import (
 	"net/http/pprof"
 	"os"
 	"os/signal"
-	"os/user"
 	"sync"
 	"syscall"
 	"time"
@@ -156,8 +155,8 @@ func main() {
 }
 
 func startMultusDaemon(ctx context.Context, daemonConfig *srv.ControllerNetConf, ignoreReadinessIndicator bool, isInGracefulShutdownMode func() bool) error {
-	if user, err := user.Current(); err != nil || user.Uid != "0" {
-		return fmt.Errorf("failed to run multus-daemon with root: %v, now running in uid: %s", err, user.Uid)
+	if euid := os.Geteuid(); euid != 0 {
+		return fmt.Errorf("failed to run multus-daemon with root, now running in uid: %d", euid)
 	}
 
 	if err := srv.FilesystemPreRequirements(daemonConfig.SocketDir); err != nil {
