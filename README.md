@@ -62,6 +62,5 @@ In addition to the [quick-start guide](docs/quickstart.md), you may:
 
 ## Contact Us
 
-For any questions about Multus CNI, open up a GitHub issue or feel free to ask a question in #general in the [NPWG Slack](https://npwg-team.slack.com/).
+For any questions about Multus CNI, open up a GitHub issue or feel free to ask a question in #general in the [NPWG Slack](https://cloud-native.slack.com/archives/C0C0JJF4U8L).
 
-To be invited, use [this slack invite link](https://join.slack.com/t/npwg-team/shared_invite/zt-1u2vmsn2b-tKdOokdPY73zn9B32JoAOg).

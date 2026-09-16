@@ -54,4 +54,4 @@ We accept github pull requests.
 ## Email and Chat
 
 The project uses the Slack chat:
-- Slack: #[Intel-Corp](https://intel-corp.herokuapp.com/) channel on slack
+- Slack: #[k8snetworkplumbingwg](https://cloud-native.slack.com/archives/C0C0JJF4U8L) channel on the CNCF slack
