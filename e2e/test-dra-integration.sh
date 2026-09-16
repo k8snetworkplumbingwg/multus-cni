@@ -21,7 +21,7 @@ cd ${repo_path}
 ./demo/build-driver.sh
 KIND_CLUSTER_NAME=kind ./demo/scripts/load-driver-image-into-kind.sh
 cd "$MULTUS_DIR"
-chart_path=${repo_path}/deployments/helm/dra-example-driver/
+chart_path=${repo_path}/deploy/helm/dra-example-driver/
 overriden_values_path=${chart_path}/overriden_values.yaml
 
 # With the thick plugin, in kind, the primary network on the control plane is not always working as expected. The pods
