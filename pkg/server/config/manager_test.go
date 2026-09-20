@@ -132,6 +132,18 @@ var _ = Describe("Configuration Manager", func() {
 		}, 2).Should(ContainSubstring("portMappings"))
 	})
 
+	It("removes the generated configuration on exit by default", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		Expect(configManager.Start(ctx, wg)).To(Succeed())
+		Expect(configManager.multusConfigFilePath).To(BeAnExistingFile())
+		cancel()
+		wg.Wait()
+
+		_, err := os.Stat(configManager.multusConfigFilePath)
+		Expect(os.IsNotExist(err)).To(BeTrue())
+	})
+
 	When("the user requests the name of the multus configuration to be overridden", func() {
 		BeforeEach(func() {
 			Expect(configManager.overrideNetworkName()).To(Succeed())
@@ -192,4 +204,54 @@ var _ = Describe("Configuration Manager with mismatched cniVersion", func() {
 		Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
 	})
 
+})
+
+var _ = Describe("Configuration Manager cleanup policy", func() {
+	It("preserves the generated configuration when cleanup on exit is disabled", func() {
+		multusConfigDir, err := os.MkdirTemp("", "multus-config")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			Expect(os.RemoveAll(multusConfigDir)).To(Succeed())
+		}()
+
+		defaultCniConfig := fmt.Sprintf("%s/00-mycni.conf", multusConfigDir)
+		Expect(os.WriteFile(defaultCniConfig, []byte(`
+{
+  "cniVersion": "0.4.0",
+  "name": "mycni-name",
+  "type": "mycni",
+  "ipam": {},
+  "dns": {}
+}
+`), UserRWPermission)).To(Succeed())
+
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"multusAutoconfigDir": %q,
+			"multusMasterCNI": %q,
+			"cniConfigDir": %q,
+			"cleanupConfigOnExit": false
+		}`, defaultCniConfig, cniVersion, multusConfigDir, "00-mycni.conf", multusConfigDir)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", multusConfigDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConf, err := ParseMultusConfig(multusConfFileName)
+		Expect(err).NotTo(HaveOccurred())
+		configManager, err := NewManager(*multusConf)
+		Expect(err).NotTo(HaveOccurred())
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		wg := &sync.WaitGroup{}
+		Expect(configManager.Start(ctx, wg)).To(Succeed())
+		generatedConfig, err := os.ReadFile(configManager.multusConfigFilePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(generatedConfig).NotTo(ContainSubstring("cleanupConfigOnExit"))
+		cancel()
+		wg.Wait()
+
+		_, err = os.Stat(configManager.multusConfigFilePath)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
