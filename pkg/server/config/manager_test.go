@@ -135,13 +135,16 @@ var _ = Describe("Configuration Manager", func() {
 	It("removes the generated configuration on exit by default", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		Expect(configManager.Start(ctx, wg)).To(Succeed())
-		Expect(configManager.multusConfigFilePath).To(BeAnExistingFile())
+		Expect(configManager.Start(ctx, wg)).To(Succeed(),
+			"default cleanup should start for generated config %q", configManager.multusConfigFilePath)
+		Expect(configManager.multusConfigFilePath).To(BeAnExistingFile(),
+			"default cleanup should first generate config %q", configManager.multusConfigFilePath)
 		cancel()
 		wg.Wait()
 
 		_, err := os.Stat(configManager.multusConfigFilePath)
-		Expect(os.IsNotExist(err)).To(BeTrue())
+		Expect(os.IsNotExist(err)).To(BeTrue(),
+			"default cleanup should remove generated config %q, stat error: %v", configManager.multusConfigFilePath, err)
 	})
 
 	When("the user requests the name of the multus configuration to be overridden", func() {
@@ -244,14 +247,18 @@ var _ = Describe("Configuration Manager cleanup policy", func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		wg := &sync.WaitGroup{}
-		Expect(configManager.Start(ctx, wg)).To(Succeed())
+		Expect(configManager.Start(ctx, wg)).To(Succeed(),
+			"disabled cleanup should start for generated config %q", configManager.multusConfigFilePath)
 		generatedConfig, err := os.ReadFile(configManager.multusConfigFilePath)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(generatedConfig).NotTo(ContainSubstring("cleanupConfigOnExit"))
+		Expect(err).NotTo(HaveOccurred(),
+			"disabled cleanup should generate config %q", configManager.multusConfigFilePath)
+		Expect(generatedConfig).NotTo(ContainSubstring("cleanupConfigOnExit"),
+			"daemon-only cleanup policy should not appear in generated config %q", configManager.multusConfigFilePath)
 		cancel()
 		wg.Wait()
 
 		_, err = os.Stat(configManager.multusConfigFilePath)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred(),
+			"disabled cleanup should preserve generated config %q", configManager.multusConfigFilePath)
 	})
 })

@@ -95,6 +95,7 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 	return nil
 }
 
+// newManager returns a manager configured with an explicit primary CNI plugin.
 func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error) {
 	if config.ForceCNIVersion {
 		err := overrideCNIVersion(filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName), config.CNIVersion)
@@ -168,7 +169,9 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 		logging.Verbosef("ConfigWatcher done")
 		if m.cleanupConfigOnExit {
 			logging.Verbosef("Delete old config @ %v", multusConfigFile)
-			os.Remove(multusConfigFile)
+			if err := os.Remove(multusConfigFile); err != nil && !os.IsNotExist(err) {
+				_ = logging.Errorf("failed to remove generated Multus config %q on shutdown: %v", multusConfigFile, err)
+			}
 		}
 	}()
 
