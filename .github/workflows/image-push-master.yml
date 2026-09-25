@@ -113,4 +113,3 @@ jobs:
 #            ghcr.io/${{ github.repository }}:latest-origin
 #            ghcr.io/${{ github.repository }}:snapshot-origin
 #          file: images/Dockerfile.openshift
-

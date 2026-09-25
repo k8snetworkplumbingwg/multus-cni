@@ -97,6 +97,13 @@ kind export kubeconfig
 sudo env PATH=${PATH} koko -p "$worker1_pid,eth1" -p "$worker2_pid,eth1"
 sleep 1
 kubectl -n kube-system wait --for=condition=available deploy/coredns --timeout=300s
+if [ ! -d yamls ]; then
+	mkdir yamls
+fi
+cp ../deploy/crds/k8s.cni.cncf.io_network-attachment-definitions.yml yamls/
+cp ../deploy/manifests/rbac.yml yamls/
+kubectl create -f yamls/k8s.cni.cncf.io_network-attachment-definitions.yml
+kubectl create -f yamls/rbac.yml
 kubectl create -f yamls/$MULTUS_MANIFEST
 sleep 1
 kubectl -n kube-system wait --for=condition=ready -l name=multus pod --timeout=300s
