@@ -30,6 +30,16 @@ import (
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
 )
 
+func isIPNetZero(ipnet *net.IPNet) bool {
+	if ipnet == nil {
+		return true
+	}
+	if ones, _ := ipnet.Mask.Size(); ones != 0 {
+		return false
+	}
+	return ipnet.IP.Equal(net.IPv4zero) || ipnet.IP.Equal(net.IPv6zero)
+}
+
 // DeleteDefaultGW removes the default gateway from marked interfaces.
 func DeleteDefaultGW(netnsPath string, ifName string) error {
 	netns, err := ns.GetNS(netnsPath)
@@ -43,7 +53,7 @@ func DeleteDefaultGW(netnsPath string, ifName string) error {
 		link, _ := netlink.LinkByName(ifName)
 		routes, _ := netlink.RouteList(link, netlink.FAMILY_ALL)
 		for _, nlroute := range routes {
-			if nlroute.Dst == nil {
+			if isIPNetZero(nlroute.Dst) {
 				err = netlink.RouteDel(&nlroute)
 			}
 		}
