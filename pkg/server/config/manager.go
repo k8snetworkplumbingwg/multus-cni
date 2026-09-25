@@ -43,6 +43,7 @@ type Manager struct {
 	multusConfigDir            string
 	multusConfigFilePath       string
 	readinessIndicatorFilePath string
+	cleanupConfigOnExit        bool
 	primaryCNIConfigPath       string
 }
 
@@ -94,6 +95,7 @@ func overrideCNIVersion(cniConfigFile string, multusCNIVersion string) error {
 	return nil
 }
 
+// newManager returns a manager configured with an explicit primary CNI plugin.
 func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error) {
 	if config.ForceCNIVersion {
 		err := overrideCNIVersion(filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName), config.CNIVersion)
@@ -116,6 +118,11 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		return nil, logging.Errorf("cannot specify %s/%s to prevent recursive config load", config.MultusAutoconfigDir, multusConfigFileName)
 	}
 
+	cleanupConfigOnExit := true
+	if config.CleanupConfigOnExit != nil {
+		cleanupConfigOnExit = *config.CleanupConfigOnExit
+	}
+
 	configManager := &Manager{
 		configWatcher:              watcher,
 		multusConfig:               &config,
@@ -123,6 +130,7 @@ func newManager(config MultusConf, defaultCNIPluginName string) (*Manager, error
 		multusConfigFilePath:       filepath.Join(config.CniConfigDir, multusConfigFileName),
 		primaryCNIConfigPath:       filepath.Join(config.MultusAutoconfigDir, defaultCNIPluginName),
 		readinessIndicatorFilePath: config.ReadinessIndicatorFile,
+		cleanupConfigOnExit:        cleanupConfigOnExit,
 	}
 
 	if err := configManager.loadPrimaryCNIConfigFromFile(); err != nil {
@@ -159,8 +167,12 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 			_ = logging.Errorf("error watching file: %v", err)
 		}
 		logging.Verbosef("ConfigWatcher done")
-		logging.Verbosef("Delete old config @ %v", multusConfigFile)
-		os.Remove(multusConfigFile)
+		if m.cleanupConfigOnExit {
+			logging.Verbosef("Delete old config @ %v", multusConfigFile)
+			if err := os.Remove(multusConfigFile); err != nil && !os.IsNotExist(err) {
+				_ = logging.Errorf("failed to remove generated Multus config %q on shutdown: %v", multusConfigFile, err)
+			}
+		}
 	}()
 
 	return nil

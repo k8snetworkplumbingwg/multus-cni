@@ -61,6 +61,7 @@ This is a general index of options, however note that you must set either the `c
 * `capabilities` ({}list, optional): [capabilities](https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md#dynamic-plugin-specific-fields-capabilities--runtime-configuration) supported by at least one of the delegates. (NOTE: Multus only supports portMappings/Bandwidth capability for cluster networks).
 * [`readinessindicatorfile`](#Default-Network-Readiness-Indicator): The path to a file whose existence denotes that the default network is ready
 message to next when some missing error. Defaults to false.
+* [`cleanupConfigOnExit`](#cleanup-config-on-exit) (bool, optional): Whether to remove the generated Multus CNI config file from `cniConfigDir` on exit. Defaults to `true`.
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
 * `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
@@ -143,6 +144,16 @@ Only one option is necessary to configure this functionality:
 * `readinessindicatorfile`: The path to a file whose existence denotes that the default network is ready.
 
 *NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
+
+### Cleanup Config On Exit
+
+Default: `true`
+
+When set to `true`, Multus removes the generated CNI config file from `cniConfigDir` when the daemon exits. This prevents the CNI runtime from trying to use Multus while it is not running.
+
+Set this option to `false` if the primary CNI may start before Multus during a node reboot or daemon restart. Keeping the generated config in place prevents pods created during that interval from silently bypassing Multus.
+
+Note that setting this to `false` may cause pods to crash-loop until Multus starts.
 
 
 ### Logging
