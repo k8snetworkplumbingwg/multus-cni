@@ -164,7 +164,7 @@ spec:
       serviceAccountName: multus
       containers:
         - name: kube-multus
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable-thick
           command: [ "/usr/src/multus-cni/bin/multus-daemon" ]
           resources:
             requests:
@@ -211,7 +211,7 @@ spec:
                   fieldPath: spec.nodeName
       initContainers:
         - name: install-multus-binary
-          image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot-thick
+          image: ghcr.io/k8snetworkplumbingwg/multus-cni:stable-thick
           command:
             - "/usr/src/multus-cni/bin/install_multus"
             - "-d"
