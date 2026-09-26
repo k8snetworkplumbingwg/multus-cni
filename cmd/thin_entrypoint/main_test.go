@@ -254,7 +254,7 @@ var _ = Describe("thin entrypoint testing", func() {
         "logLevel": "debug",
         "logFile": "/tmp/foobar.log",
         "binDir": "/tmp/add_bin_dir",
-        "cniConf": "/tmp/multus/net.d",
+        "confDir": "/tmp/multus/net.d",
         "readinessindicatorfile": "/var/lib/foobar_indicator",
         "kubeconfig": "/etc/foobar_kubeconfig",
         "delegates": [
@@ -469,7 +469,7 @@ var _ = Describe("thin entrypoint testing", func() {
         "logLevel": "debug",
         "logFile": "/tmp/foobar.log",
         "binDir": "/tmp/add_bin_dir",
-        "cniConf": "/tmp/multus/net.d",
+        "confDir": "/tmp/multus/net.d",
         "readinessindicatorfile": "/var/lib/foobar_indicator",
         "kubeconfig": "/etc/foobar_kubeconfig",
         "delegates": [
