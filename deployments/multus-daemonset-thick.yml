@@ -154,6 +154,7 @@ spec:
         app: multus
         name: multus
     spec:
+      priorityClassName: system-node-critical
       hostNetwork: true
       hostPID: true
       tolerations:
