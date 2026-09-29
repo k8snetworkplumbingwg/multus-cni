@@ -40,14 +40,27 @@ func DeleteDefaultGW(netnsPath string, ifName string) error {
 
 	err = netns.Do(func(_ ns.NetNS) error {
 		var err error
-		link, _ := netlink.LinkByName(ifName)
-		routes, _ := netlink.RouteList(link, netlink.FAMILY_ALL)
+		link, err := netlink.LinkByName(ifName)
+		if err != nil {
+			// Deletion is a cleanup path: if the interface is absent there is
+			// no default gateway to remove, so treat it as a no-op instead of
+			// passing a nil link into RouteList.
+			logging.Debugf("DeleteDefaultGW: interface %s not found, nothing to do: %v", ifName, err)
+			return nil
+		}
+		routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return logging.Errorf("DeleteDefaultGW: Error listing routes on %s: %v", ifName, err)
+		}
 		for _, nlroute := range routes {
 			if nlroute.Dst == nil {
 				err = netlink.RouteDel(&nlroute)
+				if err != nil {
+					return logging.Errorf("DeleteDefaultGW: Error deleting route: %v", err)
+				}
 			}
 		}
-		return err
+		return nil
 	})
 	return err
 }
