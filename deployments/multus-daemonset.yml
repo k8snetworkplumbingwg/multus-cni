@@ -189,6 +189,7 @@ spec:
       - operator: Exists
         effect: NoExecute
       serviceAccountName: multus
+      priorityClassName: system-node-critical
       containers:
       - name: kube-multus
         image: ghcr.io/k8snetworkplumbingwg/multus-cni:snapshot
