@@ -10,6 +10,12 @@ RUN  cd /usr/src/multus-cni && \
 
 FROM debian:stable-slim
 LABEL org.opencontainers.image.source=https://github.com/k8snetworkplumbingwg/multus-cni
+
+# egress-cni invokes ip6tables for IPv6 SNAT rules in thick mode.
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes iptables \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /usr/src/multus-cni/bin /usr/src/multus-cni/bin
 COPY --from=build /usr/src/multus-cni/LICENSE /usr/src/multus-cni/LICENSE
 COPY --from=build /usr/src/multus-cni/bin/cert-approver /
