@@ -167,15 +167,20 @@ func (m *Manager) Start(ctx context.Context, wg *sync.WaitGroup) error {
 			_ = logging.Errorf("error watching file: %v", err)
 		}
 		logging.Verbosef("ConfigWatcher done")
-		if m.cleanupConfigOnExit {
-			logging.Verbosef("Delete old config @ %v", multusConfigFile)
-			if err := os.Remove(multusConfigFile); err != nil && !os.IsNotExist(err) {
-				_ = logging.Errorf("failed to remove generated Multus config %q on shutdown: %v", multusConfigFile, err)
-			}
-		}
+		m.cleanupGeneratedConfig(multusConfigFile)
 	}()
 
 	return nil
+}
+
+func (m *Manager) cleanupGeneratedConfig(configFile string) {
+	if !m.cleanupConfigOnExit {
+		return
+	}
+	logging.Verbosef("Delete old config @ %v", configFile)
+	if err := os.Remove(configFile); err != nil && !os.IsNotExist(err) {
+		_ = logging.Errorf("failed to remove generated Multus config %q on shutdown: %v", configFile, err)
+	}
 }
 
 func (m *Manager) loadPrimaryCNIConfigFromFile() error {
@@ -241,7 +246,7 @@ func (m *Manager) monitorPluginConfiguration(ctx context.Context) error {
 			// if readinessIndicatorFile is removed, then restart multus
 			if m.readinessIndicatorFilePath != "" && m.readinessIndicatorFilePath == event.Name {
 				logging.Verbosef("readiness indicator file is gone. restart multus-daemon")
-				os.Remove(m.multusConfigFilePath)
+				m.cleanupGeneratedConfig(m.multusConfigFilePath)
 				os.Exit(2)
 			}
 

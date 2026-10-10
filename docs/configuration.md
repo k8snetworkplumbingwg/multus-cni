@@ -149,7 +149,7 @@ Only one option is necessary to configure this functionality:
 
 Default: `true`
 
-When set to `true`, Multus removes the generated CNI config file from `cniConfigDir` when the daemon exits. This prevents the CNI runtime from trying to use Multus while it is not running.
+When set to `true`, Multus removes the generated CNI config file from `cniConfigDir` when the daemon exits, including restarts triggered by removal or renaming of the readiness indicator. This prevents the CNI runtime from trying to use Multus while it is not running.
 
 Set this option to `false` if the primary CNI may start before Multus during a node reboot or daemon restart. Keeping the generated config in place prevents pods created during that interval from silently bypassing Multus.
 
