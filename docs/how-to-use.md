@@ -431,6 +431,79 @@ spec:
 EOF
 ```
 
+#### Launch pod with json annotation with resourceName
+
+The resource pool a network attachment should use is normally selected with the
+`k8s.v1.cni.cncf.io/resourceName` annotation on the NetworkAttachmentDefinition.
+The same selection can instead be set per attachment in the network selection
+element by adding `"resourceName": "<resource>"`. This lets attachments backed by
+different resource pools reference the same NetworkAttachmentDefinition, without
+creating a separate NetworkAttachmentDefinition per resource pool.
+
+To make sure only allowed resource pools are used for each network, the NetworkAttachmentDefinition
+should list them in the `k8s.v1.cni.cncf.io/allowedResourceNames` annotation:
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net
+  annotations:
+    k8s.v1.cni.cncf.io/allowedResourceNames: intel.com/sriov,nvidia.com/sriov
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "type": "sriov",
+      "name": "sriov-net"
+    }'
+EOF
+```
+
+Then launch a pod that selects one of the allowed pools in its network selection element:
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-07
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name" : "sriov-net",
+              "resourceName": "intel.com/sriov" }
+    ]'
+spec:
+  containers:
+  - name: pod-case-07
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+    resources:
+      requests:
+        intel.com/sriov: '1'
+      limits:
+        intel.com/sriov: '1'
+EOF
+```
+
+The following rules apply to `resourceName` in a network selection element:
+
+* If the NetworkAttachmentDefinition also carries a `k8s.v1.cni.cncf.io/resourceName`
+  annotation and it differs from the requested `resourceName`, Multus reports an
+  error and a `ResourceNameConflict` event on the pod. Setting the same value in
+  both places is allowed.
+* Otherwise the requested `resourceName` must be one of the names listed in the
+  NetworkAttachmentDefinition's `k8s.v1.cni.cncf.io/allowedResourceNames`
+  annotation. If it is not, or the annotation is unset or empty, Multus reports an
+  error and a `ResourceNameNotAllowed` event on the pod. Pods cannot pick a pool
+  the NetworkAttachmentDefinition author did not allow.
+* `k8s.v1.cni.cncf.io/allowedResourceNames` only applies to network selection
+  element requests. The NetworkAttachmentDefinition's own
+  `k8s.v1.cni.cncf.io/resourceName` annotation is not checked against it.
+
 ### Verifying pod network
 
 Following the example of `ip -d address` output of above pod, "pod-case-06":
