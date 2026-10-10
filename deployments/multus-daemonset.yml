@@ -182,6 +182,7 @@ spec:
         app: multus
         name: multus
     spec:
+      priorityClassName: system-node-critical
       hostNetwork: true
       tolerations:
       - operator: Exists
