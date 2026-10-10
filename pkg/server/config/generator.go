@@ -52,6 +52,7 @@ type MultusConf struct {
 	NamespaceIsolation       bool                `json:"namespaceIsolation,omitempty"`
 	RawNonIsolatedNamespaces string              `json:"globalNamespaces,omitempty"`
 	ReadinessIndicatorFile   string              `json:"readinessindicatorfile,omitempty"`
+	CleanupConfigOnExit      *bool               `json:"cleanupConfigOnExit,omitempty"`
 	Type                     string              `json:"type"`
 	CniDir                   string              `json:"cniDir,omitempty"`
 	CniConfigDir             string              `json:"cniConfigDir,omitempty"`
@@ -71,11 +72,13 @@ func ParseMultusConfig(configPath string) (*MultusConf, error) {
 		return nil, fmt.Errorf("ParseMultusConfig failed to read the config file's contents: %w", err)
 	}
 
+	cleanupConfigOnExit := true
 	multusconf := MultusConf{
-		MultusConfigFile: "auto",
-		Type:             multusPluginName,
-		Capabilities:     map[string]bool{},
-		CniConfigDir:     "/etc/cni/net.d",
+		MultusConfigFile:    "auto",
+		Type:                multusPluginName,
+		Capabilities:        map[string]bool{},
+		CniConfigDir:        "/etc/cni/net.d",
+		CleanupConfigOnExit: &cleanupConfigOnExit,
 	}
 
 	if err := json.Unmarshal(config, &multusconf); err != nil {
@@ -129,6 +132,9 @@ func (mc *MultusConf) Generate() (string, error) {
 	mc.MultusAutoconfigDir = ""
 	mc.MultusMasterCni = ""
 	mc.ForceCNIVersion = false
+	// CleanupConfigOnExit controls the daemon lifecycle and is not part of the
+	// generated CNI plugin configuration.
+	mc.CleanupConfigOnExit = nil
 	// Readiness indicator file existence is already handled by the
 	// ConfigManager via an fsnotify watch, so CmdAdd/CmdDel don't need to.
 	mc.ReadinessIndicatorFile = ""
