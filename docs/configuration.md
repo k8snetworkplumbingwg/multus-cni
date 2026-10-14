@@ -153,7 +153,9 @@ When set to `true`, Multus removes the generated CNI config file from `cniConfig
 
 Set this option to `false` if the primary CNI may start before Multus during a node reboot or daemon restart. Keeping the generated config in place prevents pods created during that interval from silently bypassing Multus.
 
-Note that setting this to `false` may cause pods to crash-loop until Multus starts.
+While the daemon is unavailable, the retained configuration keeps Multus selected. The shim waits for the daemon to become ready and fails the CNI request if it remains unavailable; it does not switch to the primary CNI. Pod sandbox creation may therefore fail and be retried until Multus starts.
+
+When uninstalling Multus with cleanup disabled, remove the generated `00-multus.conf` from `cniConfigDir` explicitly once the replacement CNI is ready. For a rollback to the default cleanup behavior, set `cleanupConfigOnExit` to `true` in the daemon configuration and restart the daemon so the new manager uses that policy. Do not remove the retained configuration during a temporary daemon outage if you want to prevent pods from bypassing Multus.
 
 
 ### Logging
