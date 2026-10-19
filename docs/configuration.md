@@ -38,7 +38,7 @@ Example configuration using `clusterNetwork` (see also [using delegates](#using-
     "systemNamespaces": ["kube-system", "admin"],
     "multusNamespace": "kube-system",
     "auxiliaryCNIChainName": "cni-chain-config",
-    allowTryDeleteOnErr: false
+    "retryDeleteOnError": false
 }
 ```
 
