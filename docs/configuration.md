@@ -63,7 +63,10 @@ This is a general index of options, however note that you must set either the `c
 message to next when some missing error. Defaults to false.
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
-* `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
+* `retryDeleteOnError` (bool, optional): Keep the used delegate cache file after a DEL error to allow a later retry. Defaults to false.
+  Delegate DEL is attempted with either value, and any deletion error is returned.
+  When false, the used cache file is removed even on error. When true, it is removed only on success or if the error contains `no such file or directory`.
+  The CNI runtime decides whether to retry DEL.
 * [`auxiliaryCNIChainName`](#auxiliaryCNIChainName) (string, optional): Enable loading CNI configurations from disk as chained plugins in an auxiliary CNI chain
 
 ### Using `clusterNetwork`
