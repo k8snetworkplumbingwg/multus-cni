@@ -40,6 +40,17 @@ func TestNetutils(t *testing.T) {
 	RunSpecs(t, "netutils")
 }
 
+var _ = Describe("default route detection", func() {
+	DescribeTable("detects default routes",
+		func(dst *net.IPNet) {
+			Expect(isIPNetZero(dst)).To(BeTrue())
+		},
+		Entry("nil destination", nil),
+		Entry("IPv4 zero prefix", &net.IPNet{IP: net.IPv4zero, Mask: net.CIDRMask(0, 32)}),
+		Entry("IPv6 zero prefix", &net.IPNet{IP: net.IPv6zero, Mask: net.CIDRMask(0, 128)}),
+	)
+})
+
 // helper function
 func testAddRoute(link netlink.Link, ip net.IP, mask net.IPMask, gw net.IP) error {
 	dst := &net.IPNet{
@@ -232,6 +243,18 @@ var _ = Describe("netutil netlink function testing", func() {
 				defer GinkgoRecover()
 
 				Expect(DeleteDefaultGW(args.Netns, IFNAME)).Should(Succeed())
+				return nil
+			})).Should(Succeed())
+
+			Expect(targetNS.Do(func(ns.NetNS) error {
+				defer GinkgoRecover()
+				link, err := netlink.LinkByName(IFNAME)
+				Expect(err).NotTo(HaveOccurred())
+				routes, err := netlink.RouteList(link, netlink.FAMILY_ALL)
+				Expect(err).NotTo(HaveOccurred())
+				for _, route := range routes {
+					Expect(isIPNetZero(route.Dst)).To(BeFalse())
+				}
 				return nil
 			})).Should(Succeed())
 		})
