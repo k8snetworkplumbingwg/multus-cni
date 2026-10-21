@@ -141,6 +141,9 @@ func GetListener(socketPath string) (net.Listener, error) {
 	if err != nil {
 		return nil, logging.Errorf("failed to listen on pod info socket: %v", err)
 	}
+	if unixListener, ok := l.(*net.UnixListener); ok {
+		unixListener.SetUnlinkOnClose(false)
+	}
 	if err := os.Chmod(socketPath, config.UserRWPermission); err != nil {
 		_ = l.Close()
 		return nil, logging.Errorf("failed to listen on pod info socket: %v", err)
