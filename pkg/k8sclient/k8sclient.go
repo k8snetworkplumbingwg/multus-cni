@@ -49,9 +49,10 @@ import (
 )
 
 const (
-	resourceNameAnnot      = "k8s.v1.cni.cncf.io/resourceName"
-	defaultNetAnnot        = "v1.multus-cni.io/default-network"
-	networkAttachmentAnnot = "k8s.v1.cni.cncf.io/networks"
+	resourceNameAnnot         = "k8s.v1.cni.cncf.io/resourceName"
+	allowedResourceNamesAnnot = "k8s.v1.cni.cncf.io/allowedResourceNames"
+	defaultNetAnnot           = "v1.multus-cni.io/default-network"
+	networkAttachmentAnnot    = "k8s.v1.cni.cncf.io/networks"
 )
 
 // getResourceClientFunc returns kubelet / device-plugin resource info for a pod.
@@ -293,6 +294,18 @@ func parsePodNetworkAnnotation(podNetworks, defaultNamespace string) ([]*types.N
 	return networks, nil
 }
 
+// isResourceNameAllowed reports whether resourceName is listed in the
+// comma-separated allowedResourceNames annotation value. Whitespace around
+// entries is ignored; an empty or unset list allows nothing.
+func isResourceNameAllowed(resourceName, allowedResourceNames string) bool {
+	for _, allowed := range strings.Split(allowedResourceNames, ",") {
+		if strings.TrimSpace(allowed) == resourceName {
+			return true
+		}
+	}
+	return false
+}
+
 func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElement, confdir string, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) (*types.DelegateNetConf, map[string]*types.ResourceInfo, error) {
 
 	logging.Debugf("getKubernetesDelegate: %v, %v, %s, %v, %v", client, net, confdir, pod, resourceMap)
@@ -306,12 +319,37 @@ func getKubernetesDelegate(client *ClientInfo, net *types.NetworkSelectionElemen
 		return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
 	}
 
-	// Get resourceName annotation from NetworkAttachmentDefinition
+	// Get resourceName from the NetworkAttachmentDefinition annotation. It may
+	// also be set per-attachment by the NetworkSelectionElement, which lets
+	// different device pools attach to the same network without duplicating the
+	// NAD. If both are set and disagree, that is a misconfiguration.
 	deviceID := ""
-	resourceName, ok := customResource.GetAnnotations()[resourceNameAnnot]
-	if ok && pod != nil && pod.Name != "" && pod.Namespace != "" {
-		// ResourceName annotation is found; try to get device info from resourceMap
-		logging.Debugf("getKubernetesDelegate: found resourceName annotation : %s", resourceName)
+	resourceName := customResource.GetAnnotations()[resourceNameAnnot]
+	if net.ResourceNameRequest != "" {
+		if resourceName != "" && resourceName != net.ResourceNameRequest {
+			errMsg := fmt.Sprintf("conflicting resourceName for network %s: NAD annotation %q does not match NetworkSelectionElement request %q",
+				net.Name, resourceName, net.ResourceNameRequest)
+			if client != nil {
+				client.Eventf(pod, v1.EventTypeWarning, "ResourceNameConflict", "%s", errMsg)
+			}
+			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
+		}
+		// A request equal to the NAD's own resourceName changes nothing; any
+		// other value must be listed in the NAD's allowedResourceNames.
+		allowed := customResource.GetAnnotations()[allowedResourceNamesAnnot]
+		if resourceName == "" && !isResourceNameAllowed(net.ResourceNameRequest, allowed) {
+			errMsg := fmt.Sprintf("resourceName %q requested by NetworkSelectionElement is not allowed for network %s: %s is %q",
+				net.ResourceNameRequest, net.Name, allowedResourceNamesAnnot, allowed)
+			if client != nil {
+				client.Eventf(pod, v1.EventTypeWarning, "ResourceNameNotAllowed", "%s", errMsg)
+			}
+			return nil, resourceMap, logging.Errorf("getKubernetesDelegate: %s", errMsg)
+		}
+		resourceName = net.ResourceNameRequest
+	}
+	if resourceName != "" && pod != nil && pod.Name != "" && pod.Namespace != "" {
+		// ResourceName is set; try to get device info from resourceMap
+		logging.Debugf("getKubernetesDelegate: using resourceName : %s", resourceName)
 
 		if resourceMap == nil {
 			ck, err := getResourceClientFunc("")
