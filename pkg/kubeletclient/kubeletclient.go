@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -40,7 +41,16 @@ const (
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	unixProtocol               = "unix"
+	resourceCacheTTL           = 5 * time.Second
 )
+
+// resourceCache holds the last client.List() result so repeated
+// GetResourceClient calls within resourceCacheTTL skip the kubelet round trip.
+var resourceCache struct {
+	sync.Mutex
+	resources []*podresourcesapi.PodResources
+	expiry    time.Time
+}
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
 // which is in k8s.io/kubernetes/pkg/kubelet/util
@@ -90,6 +100,15 @@ func getKubeletResourceClient(kubeletSocketURL *url.URL, timeout time.Duration) 
 }
 
 func getKubeletClient(kubeletSocketURL *url.URL) (types.ResourceClient, error) {
+	resourceCache.Lock()
+	if time.Now().Before(resourceCache.expiry) {
+		resources := resourceCache.resources
+		resourceCache.Unlock()
+		logging.Debugf("getKubeletClient: using cached pod resources")
+		return &kubeletClient{resources: resources}, nil
+	}
+	resourceCache.Unlock()
+
 	newClient := &kubeletClient{}
 
 	client, conn, err := getKubeletResourceClient(kubeletSocketURL, 10*time.Second)
@@ -101,6 +120,11 @@ func getKubeletClient(kubeletSocketURL *url.URL) (types.ResourceClient, error) {
 	if err := newClient.getPodResources(client); err != nil {
 		return nil, logging.Errorf("getKubeletClient: error getting pod resources from client: %v\n", err)
 	}
+
+	resourceCache.Lock()
+	resourceCache.resources = newClient.resources
+	resourceCache.expiry = time.Now().Add(resourceCacheTTL)
+	resourceCache.Unlock()
 
 	return newClient, nil
 }
