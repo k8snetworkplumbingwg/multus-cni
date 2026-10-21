@@ -115,8 +115,9 @@ func NewClient(client resourcev1.ResourceV1Interface) ClientInterface {
 // CNI) are silently skipped, allowing mixed SR-IOV + GPU claims to succeed. Devices
 // missing k8s.cni.cncf.io/resourceName are also skipped since there is no NAD to map
 // them to. If pod.Status.ExtendedResourceClaimStatus is set, it is processed with the
-// same logic but strict validation: device resourceName must match the extended
-// resource mapping exactly or an error is returned.
+// same skipping rules (so non-network extended resources such as a DRA-backed
+// nvidia.com/gpu are ignored), but a device that does carry a resourceName must match
+// the extended resource mapping exactly or an error is returned.
 //
 // ctx is respected for cancellation; a 20-second safety timeout is applied on top.
 func (d *draClient) GetPodResourceMap(ctx context.Context, pod *v1.Pod, resourceMap map[string]*types.ResourceInfo) error {
@@ -240,15 +241,51 @@ func (d *draClient) processExtendedResourceClaimStatus(ctx context.Context, node
 		for _, result := range results {
 			info, err := d.getDeviceInfo(ctx, nodeName, result)
 			if err != nil {
+				if errors.Is(err, errDeviceNotInAnySlice) {
+					// Only a device that IS published in a ResourceSlice but carries no deviceID
+					// (e.g. a GPU requested as a DRA-backed extended resource such as
+					// nvidia.com/gpu) is a non-network device that can be ignored. A device that
+					// is absent from every slice is a real lookup failure: skipping it would hand
+					// an empty device ID to the delegate, so keep returning the error.
+					cached, published := d.deviceInfoCache[deviceInfoCacheKey{
+						driverPool: fmt.Sprintf("%s/%s", result.Driver, result.Pool),
+						deviceName: result.Device,
+					}]
+					if !published {
+						logging.Errorf("GetPodResourceMap: failed to get device info for extended resource claim %s request %s: %v", claimName, mapping.RequestName, err)
+						return err
+					}
+					// A device that publishes a resourceName (even without a deviceID) must
+					// still match the extended resource mapping.
+					if cached.ResourceName != "" && cached.ResourceName != mapping.ResourceName {
+						resErr := fmt.Errorf("device %s: %s is %q but extended resource mapping for request %q is %q",
+							result.Device, multusResourceNameAttr, cached.ResourceName, mapping.RequestName, mapping.ResourceName)
+						logging.Errorf("GetPodResourceMap: %v", resErr)
+						return resErr
+					}
+					// A published device that claims this network resource but has no deviceID is
+					// a misconfigured network device; skipping it would leave the delegate with an
+					// empty device ID, so fail instead.
+					if cached.ResourceName != "" {
+						resErr := fmt.Errorf("device %s has %s %q matching extended resource mapping for request %q but is missing required attribute %s",
+							result.Device, multusResourceNameAttr, cached.ResourceName, mapping.RequestName, multusDeviceIDAttr)
+						logging.Errorf("GetPodResourceMap: %v", resErr)
+						return resErr
+					}
+					logging.Warningf(
+						"GetPodResourceMap: skipping extended resource %q (claim %s request %s driver=%s pool=%s device=%s): %v",
+						mapping.ResourceName, claimName, mapping.RequestName, result.Driver, result.Pool, result.Device, err)
+					continue
+				}
 				logging.Errorf("GetPodResourceMap: failed to get device info for extended resource claim %s request %s: %v", claimName, mapping.RequestName, err)
 				return err
 			}
 
 			if info.ResourceName == "" {
-				resErr := fmt.Errorf("device %s missing required attribute %s (must match NAD k8s.v1.cni.cncf.io/resourceName and extended mapping %q)",
-					result.Device, multusResourceNameAttr, resourceMapKey)
-				logging.Errorf("GetPodResourceMap: %v", resErr)
-				return resErr
+				logging.Warningf(
+					"GetPodResourceMap: skipping extended resource %q (claim %s request %s device=%s): no %q (only devices published for CNI are mapped)",
+					mapping.ResourceName, claimName, mapping.RequestName, result.Device, multusResourceNameAttr)
+				continue
 			}
 			if info.ResourceName != mapping.ResourceName {
 				resErr := fmt.Errorf("device %s: %s is %q but extended resource mapping for request %q is %q",
@@ -302,20 +339,57 @@ func (d *draClient) ensureDriverCachePopulated(ctx context.Context, nodeName, dr
 	logging.Debugf("ensureDriverCachePopulated: listed %d ResourceSlice(s) for node=%q driver=%q", len(slices.Items), nodeName, driverName)
 
 	for i := range slices.Items {
-		slice := &slices.Items[i]
-		driverPool := fmt.Sprintf("%s/%s", slice.Spec.Driver, slice.Spec.Pool.Name)
-		for _, device := range slice.Spec.Devices {
-			key := deviceInfoCacheKey{driverPool: driverPool, deviceName: device.Name}
-			info := &deviceInfo{}
-			if attr, ok := device.Attributes[multusDeviceIDAttr]; ok && attr.StringValue != nil {
-				info.DeviceID = *attr.StringValue
-			}
-			if attr, ok := device.Attributes[multusResourceNameAttr]; ok && attr.StringValue != nil {
-				info.ResourceName = *attr.StringValue
-			}
-			if info.DeviceID != "" {
-				d.deviceInfoCache[key] = info
-			}
+		d.cacheSliceDevices(&slices.Items[i])
+	}
+
+	d.populatedDrivers[populatedKey] = true
+	return nil
+}
+
+// cacheSliceDevices extracts the Multus attributes of every device in slice into deviceInfoCache.
+// Every published device is cached, even without Multus attributes, so the extended-resource
+// path can tell "published but not a network device" (skip) from "absent from every slice"
+// (error), and still check resourceName mismatches.
+func (d *draClient) cacheSliceDevices(slice *resourcev1api.ResourceSlice) {
+	driverPool := fmt.Sprintf("%s/%s", slice.Spec.Driver, slice.Spec.Pool.Name)
+	for _, device := range slice.Spec.Devices {
+		key := deviceInfoCacheKey{driverPool: driverPool, deviceName: device.Name}
+		info := &deviceInfo{}
+		if attr, ok := device.Attributes[multusDeviceIDAttr]; ok && attr.StringValue != nil {
+			info.DeviceID = *attr.StringValue
+		}
+		if attr, ok := device.Attributes[multusResourceNameAttr]; ok && attr.StringValue != nil {
+			info.ResourceName = *attr.StringValue
+		}
+		d.deviceInfoCache[key] = info
+	}
+}
+
+// ensureNonNodeScopedCachePopulated covers the node-filtered cache miss in
+// ensureDriverCachePopulated: slices selected by AllNodes or NodeSelector (or per-device node
+// selection) have no spec.nodeName, so the spec.nodeName field selector never returns them.
+// It lists the driver's slices and caches the ones without spec.nodeName. No node eligibility
+// check is needed: lookups are by the device the scheduler already allocated to this pod.
+// Subsequent calls for the same driver are no-ops.
+func (d *draClient) ensureNonNodeScopedCachePopulated(ctx context.Context, driverName string) error {
+	populatedKey := "*/" + driverName
+	if d.populatedDrivers[populatedKey] {
+		return nil
+	}
+
+	listOptions := metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("%s=%s", resourcev1api.ResourceSliceSelectorDriver, driverName),
+	}
+	logging.Debugf("ensureNonNodeScopedCachePopulated: listing ResourceSlices (fieldSelector=%q)", listOptions.FieldSelector)
+	slices, err := d.client.ResourceSlices().List(ctx, listOptions)
+	if err != nil {
+		logging.Errorf("ensureNonNodeScopedCachePopulated: failed to list resource slices: %v", err)
+		return fmt.Errorf("failed to list non-node-scoped ResourceSlices for driver %q: %w", driverName, err)
+	}
+
+	for i := range slices.Items {
+		if slices.Items[i].Spec.NodeName == nil {
+			d.cacheSliceDevices(&slices.Items[i])
 		}
 	}
 
@@ -329,8 +403,9 @@ func (d *draClient) ensureDriverCachePopulated(ctx context.Context, nodeName, dr
 // field selectors and extracts only the two attributes Multus needs. Subsequent
 // calls for the same driver are O(1) map lookups with no API traffic.
 // Returns errDeviceNotInAnySlice (wrapped) if the device is absent from the cache
-// or lacks a deviceID attribute; callers in the normal claims path treat this as
-// a skip, while the extended-resource path treats it as a hard error.
+// or lacks a deviceID attribute. The normal claims path treats both as a skip; the
+// extended-resource path skips only devices that are published without a deviceID and
+// returns the error for devices absent from every slice.
 func (d *draClient) getDeviceInfo(ctx context.Context, nodeName string, result resourcev1api.DeviceRequestAllocationResult) (*deviceInfo, error) {
 	driverPool := fmt.Sprintf("%s/%s", result.Driver, result.Pool)
 	logging.Debugf("getDeviceInfo: looking up device for driver/pool: %s, device: %s", driverPool, result.Device)
@@ -341,15 +416,25 @@ func (d *draClient) getDeviceInfo(ctx context.Context, nodeName string, result r
 
 	key := deviceInfoCacheKey{driverPool: driverPool, deviceName: result.Device}
 	info, ok := d.deviceInfoCache[key]
+	if !ok && nodeName != "" {
+		// The node-scoped list misses slices selected by AllNodes/NodeSelector; check those
+		// before treating the device as unpublished.
+		if err := d.ensureNonNodeScopedCachePopulated(ctx, result.Driver); err != nil {
+			return nil, err
+		}
+		info, ok = d.deviceInfoCache[key]
+	}
 	if !ok {
 		notFoundErr := fmt.Errorf("%w: device %s not found for claim resource %s/%s in any matching resource slice",
 			errDeviceNotInAnySlice, result.Device, result.Driver, result.Pool)
-		logging.Errorf("getDeviceInfo: %v", notFoundErr)
+		// Not an error by itself: devices without Multus attributes (e.g. GPUs) are never
+		// cached. Callers decide whether to skip (and log a warning) or fail.
+		logging.Debugf("getDeviceInfo: %v", notFoundErr)
 		return nil, notFoundErr
 	}
 
 	if info.DeviceID == "" {
-		logging.Warningf(
+		logging.Debugf(
 			"getDeviceInfo: device %q (driver %q, pool %q) has no %q in ResourceSlice; skipping allocation result",
 			result.Device, result.Driver, result.Pool, multusDeviceIDAttr)
 		return nil, fmt.Errorf("%w: device %q present in slice but missing %q",
