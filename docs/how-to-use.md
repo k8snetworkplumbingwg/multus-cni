@@ -84,26 +84,33 @@ metadata:
   namespace: kube-system
 ---
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: multus
 rules:
   - apiGroups: ["k8s.cni.cncf.io"]
     resources:
-      - '*'
+      - network-attachment-definitions
     verbs:
-      - '*'
+      - get
+      - list
+      - watch
   - apiGroups:
       - ""
     resources:
       - pods
-      - pods/status
     verbs:
       - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - patch
       - update
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: multus
 roleRef:

@@ -60,19 +60,24 @@ metadata:
 rules:
   - apiGroups: ["k8s.cni.cncf.io"]
     resources:
-      - '*'
+      - network-attachment-definitions
     verbs:
-      - '*'
+      - get
+      - list
+      - watch
   - apiGroups:
       - ""
     resources:
       - pods
-      - pods/status
     verbs:
       - get
-      - list
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - patch
       - update
-      - watch
   - apiGroups:
       - "resource.k8s.io"
     resources:
