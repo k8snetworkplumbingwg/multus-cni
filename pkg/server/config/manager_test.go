@@ -89,7 +89,9 @@ var _ = Describe("Configuration Manager", func() {
 	})
 
 	DescribeTable("Rejects unavailable primary CNI configuration", func(primaryConfig string, remove bool) {
-		defer configManager.configWatcher.Close()
+		defer func() {
+			Expect(configManager.configWatcher.Close()).To(Succeed(), "close config watcher")
+		}()
 		if remove {
 			Expect(os.Remove(defaultCniConfig)).To(Succeed())
 		} else {
@@ -107,7 +109,9 @@ var _ = Describe("Configuration Manager", func() {
 	)
 
 	It("Rejects startup without overwriting an existing config when primary config generation fails", func() {
-		defer configManager.configWatcher.Close()
+		defer func() {
+			Expect(configManager.configWatcher.Close()).To(Succeed(), "close config watcher")
+		}()
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 		_, err = configManager.PersistMultusConfig(config)
