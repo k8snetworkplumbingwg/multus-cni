@@ -25,6 +25,7 @@ import (
 	"github.com/containernetworking/cni/pkg/skel"
 )
 
+// startShimTestServer starts a Unix HTTP server with the supplied handler and registers cleanup.
 func startShimTestServer(t *testing.T, handler http.HandlerFunc) string {
 	t.Helper()
 	socketDir := t.TempDir()
@@ -48,6 +49,7 @@ func startShimTestServer(t *testing.T, handler http.HandlerFunc) string {
 	return socketDir
 }
 
+// TestCmdDel verifies communication errors, suppressed delegate errors, and daemon recovery.
 func TestCmdDel(t *testing.T) {
 	for _, scenario := range []string{"connection failure", "delegate failure", "daemon recovery"} {
 		t.Run(scenario, func(t *testing.T) {

@@ -60,6 +60,7 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 	return doCNI(context.Background(), url, req, socketPath)
 }
 
+// doCNI sends a CNI request over the Unix socket using the supplied context.
 func doCNI(ctx context.Context, url string, req interface{}, socketPath string) ([]byte, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -82,13 +83,13 @@ func doCNI(ctx context.Context, url string, req interface{}, socketPath string) 
 	httpRequest.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(httpRequest)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to send CNI request: %v", errDaemonUnavailable, err)
+		return nil, fmt.Errorf("%w: failed to send CNI request: %w", errDaemonUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("%w: failed to read CNI result: %v", errDaemonUnavailable, err)
+		return nil, fmt.Errorf("%w: failed to read CNI result: %w", errDaemonUnavailable, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -137,7 +138,7 @@ func WaitUntilAPIHealthy(socketPath string) error {
 		return err == nil, nil
 	})
 	if err != nil {
-		return fmt.Errorf("%w: %v", errDaemonUnavailable, err)
+		return fmt.Errorf("%w: %w", errDaemonUnavailable, err)
 	}
 	return nil
 }

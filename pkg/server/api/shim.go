@@ -97,6 +97,7 @@ func CmdStatus(args *skel.CmdArgs) error {
 	return nil
 }
 
+// postRequest checks daemon availability, forwards the CNI request, and decodes the response.
 func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, string, error) {
 	multusShimConfig, err := shimConfig(args.StdinData)
 	if err != nil {
@@ -149,6 +150,7 @@ func newCNIRequest(args *skel.CmdArgs) (*Request, error) {
 	}, nil
 }
 
+// shimConfig parses the shim configuration and initializes logging.
 func shimConfig(cniConfig []byte) (*ShimNetConf, error) {
 	multusConfig := &ShimNetConf{}
 	if err := json.Unmarshal(cniConfig, multusConfig); err != nil {
