@@ -107,6 +107,11 @@ It allows the following keys:
 - `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
   as well. By default, it is disabled.
 
+Before DEL, the shim waits up to 60 seconds for daemon health. Health timeouts
+and communication failures are returned to the runtime for retry; daemon-reported
+cleanup errors are logged and suppressed. The timeout covers health checks only,
+not delegate cleanup.
+
 #### Chroot configuration
 
 In thick plugin case, delegate CNI plugin is executed by multus-daemon from Pod, hence if the delegate CNI requires resources in container host, for example unix socket or even file, then CNI plugin is failed to execute because multus-daemon runs in Pod. Multus-daemon supports "chrootDir" option which executes delegate CNI under chroot (to container host).
