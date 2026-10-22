@@ -19,6 +19,11 @@ package server
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	k8s "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/k8sclient"
+	kapi "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/cache"
 )
 
 var _ = Describe("Server", func() {
@@ -47,6 +52,7 @@ var _ = Describe("Server", func() {
 	"namespaceIsolation": false,
 	"globalNamespaces": "other,namespace",
 	"readinessindicatorfile": "/host/run/multus/cni/net.d/10-ovn-kubernetes.conf",
+	"liveNetworkConfigOnAdd": true,
 	"daemonSocketDir": "/somewhere/socket",
 	"socketDir": "/host/run/multus/socket"
 }`)
@@ -72,6 +78,7 @@ var _ = Describe("Server", func() {
 	"namespaceIsolation": false,
 	"globalNamespaces": "other,namespace",
 	"readinessindicatorfile": "/host/run/multus/cni/net.d/10-ovn-kubernetes.conf",
+	"liveNetworkConfigOnAdd": true,
 	"daemonSocketDir": "/somewhere/socket",
 	"socketDir": "/host/run/multus/socket"
 }`))
@@ -97,8 +104,37 @@ var _ = Describe("Server", func() {
 	"multusAutoconfigDir": "/host/run/multus/cni/net.d",
 	"namespaceIsolation": false,
 	"globalNamespaces": "other,namespace",
+	"liveNetworkConfigOnAdd": true,
 	"daemonSocketDir": "/somewhere/socket",
 	"socketDir": "/host/run/multus/socket"
 }`))
+	})
+
+	It("daemon config overrides liveNetworkConfigOnAdd from the shim", func() {
+		merged, err := overrideCNIConfigWithServerConfig(
+			[]byte(`{"liveNetworkConfigOnAdd":false}`),
+			[]byte(`{"liveNetworkConfigOnAdd":true}`), false)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(merged).To(MatchJSON(`{"liveNetworkConfigOnAdd":true}`))
+
+		merged, err = overrideCNIConfigWithServerConfig(
+			[]byte(`{"liveNetworkConfigOnAdd":true}`),
+			[]byte(`{"liveNetworkConfigOnAdd":false}`), false)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(merged).To(MatchJSON(`{"liveNetworkConfigOnAdd":false}`))
+	})
+
+	It("recovers a missing Pod UID from the API when the informer is stale", func() {
+		pod := &kapi.Pod{ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "workers", UID: "latest-uid"}}
+		stalePod := pod.DeepCopy()
+		stalePod.UID = "old-uid"
+		informer := cache.NewSharedIndexInformer(&cache.ListWatch{}, &kapi.Pod{}, 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		Expect(informer.GetStore().Add(stalePod)).To(Succeed())
+		client := &k8s.ClientInfo{Client: fake.NewSimpleClientset(pod), PodInformer: informer}
+		args, err := kubernetesRuntimeArgs(map[string]string{
+			"CNI_ARGS": "K8S_POD_NAME=workload;K8S_POD_NAMESPACE=workers",
+		}, client)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(args.K8S_POD_UID)).To(Equal("latest-uid"))
 	})
 })

@@ -964,6 +964,47 @@ var _ = Describe("multus operations cniVersion 1.0.0 config", func() {
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
 
+	It("fails ADD when the required live Pod is not found", func() {
+		args := &skel.CmdArgs{
+			Args:      "K8S_POD_NAME=missing;K8S_POD_NAMESPACE=test",
+			StdinData: []byte(`{"cniVersion":"1.0.0","name":"multus","type":"multus","delegates":[{"type":"fake"}],"liveNetworkConfigOnAdd":true}`),
+		}
+		_, err := CmdAdd(args, nil, NewFakeClientInfo())
+		Expect(err).To(MatchError(ContainSubstring("live Pod read failed")))
+	})
+
+	It("loads the latest Pod network selection and NAD when informer entries are stale", func() {
+		pod := testhelpers.NewFakePod("testpod", "rail-a@net1", "")
+		defaultConfig := `{"cniVersion":"1.0.0","name":"default","type":"bridge"}`
+		config := `{"cniVersion":"1.0.0","name":"rail-a","type":"sriov","deviceID":"0000:03:00.1"}`
+		fKubeClient := NewFakeClientInfo()
+		_, err := fKubeClient.AddPod(pod)
+		Expect(err).NotTo(HaveOccurred())
+		_, err = fKubeClient.AddNetAttachDef(testhelpers.NewFakeNetAttachDef("test", "rail-a", config))
+		Expect(err).NotTo(HaveOccurred())
+
+		stalePod := pod.DeepCopy()
+		stalePod.Annotations = map[string]string{}
+		podInformer := cache.NewSharedIndexInformer(&cache.ListWatch{}, &kapi.Pod{}, 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		Expect(podInformer.GetStore().Add(stalePod)).To(Succeed())
+		netdefInformer := cache.NewSharedIndexInformer(&cache.ListWatch{}, &netdefv1.NetworkAttachmentDefinition{}, 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		fKubeClient.SetK8sClientInformers(podInformer, netdefInformer)
+
+		args := &skel.CmdArgs{
+			ContainerID: "live-read-container", Netns: testNS.Path(), IfName: "eth0",
+			Args:      fmt.Sprintf("K8S_POD_NAME=%s;K8S_POD_NAMESPACE=%s;K8S_POD_UID=%s", pod.Name, pod.Namespace, pod.UID),
+			StdinData: []byte(fmt.Sprintf(`{"cniVersion":"1.0.0","name":"multus","type":"multus","cniDir":%q,"delegates":[%s],"liveNetworkConfigOnAdd":true}`, tmpDir, defaultConfig)),
+		}
+		fExec := newFakeExec()
+		fExec.addPlugin100(nil, "eth0", defaultConfig, &cni100.Result{CNIVersion: "1.0.0"}, nil)
+		fExec.addPlugin100(nil, "net1", config, &cni100.Result{CNIVersion: "1.0.0"}, nil)
+		_, err = CmdAdd(args, fExec, fKubeClient)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(fExec.addIndex).To(Equal(2))
+		Expect(fKubeClient.PodInformer).To(BeIdenticalTo(podInformer))
+		Expect(fKubeClient.NetDefInformer).To(BeIdenticalTo(netdefInformer))
+	})
+
 	It("executes clusterNetwork delegate with a shared informer if pod is not immediately found", func() {
 		fakePod := testhelpers.NewFakePod("testpod", "", "kube-system/net1")
 		net1 := `{

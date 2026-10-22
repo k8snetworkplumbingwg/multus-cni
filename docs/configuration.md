@@ -64,6 +64,7 @@ message to next when some missing error. Defaults to false.
 * `systemNamespaces` ([]string, optional): list of namespaces for Kubernetes system (namespaces listed here will not have `defaultNetworks` added)
 * `multusNamespace` (string, optional): namespace for `clusterNetwork`/`defaultNetworks` (the default value is `kube-system`)
 * `retryDeleteOnError` (bool, optional): Enable or disable delegate DEL 
+* [`liveNetworkConfigOnAdd`](#Live-Network-Configuration-on-ADD) (boolean, optional): Read the Pod and NetworkAttachmentDefinitions directly from the API during ADD instead of using thick-plugin informer caches. Defaults to false.
 * [`auxiliaryCNIChainName`](#auxiliaryCNIChainName) (string, optional): Enable loading CNI configurations from disk as chained plugins in an auxiliary CNI chain
 
 ### Using `clusterNetwork`
@@ -143,6 +144,12 @@ Only one option is necessary to configure this functionality:
 * `readinessindicatorfile`: The path to a file whose existence denotes that the default network is ready.
 
 *NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
+
+### Live Network Configuration on ADD
+
+Set `liveNetworkConfigOnAdd` to `true` when ADD must observe recently patched Pod network selections or newly created NetworkAttachmentDefinitions. It makes live API reads for the Pod and selected NADs and fails ADD if a required read fails. The setting is disabled by default and adds API requests to each ADD.
+
+For the thick plugin, set this option in `daemon-config.json`; the daemon configuration overrides the shim configuration.
 
 
 ### Logging

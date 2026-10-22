@@ -254,6 +254,25 @@ var _ = Describe("Configuration Generator", func() {
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
+
+	It("preserves liveNetworkConfigOnAdd in generated shim configuration", func() {
+		multusConfFile := fmt.Sprintf(`{
+			"name": %q,
+			"cniVersion": %q,
+			"clusterNetwork": %q,
+			"liveNetworkConfigOnAdd": true
+		}`, primaryCNIName, cniVersion, primaryCNIFile)
+		multusConfFileName := fmt.Sprintf("%s/10-testcni.conf", tmpDir)
+		Expect(os.WriteFile(multusConfFileName, []byte(multusConfFile), 0755)).To(Succeed())
+
+		multusConfig, err := ParseMultusConfig(multusConfFileName)
+		Expect(err).NotTo(HaveOccurred())
+		generated, err := multusConfig.Generate()
+		Expect(err).NotTo(HaveOccurred())
+		var generatedConf map[string]interface{}
+		Expect(json.Unmarshal([]byte(generated), &generatedConf)).To(Succeed())
+		Expect(generatedConf["liveNetworkConfigOnAdd"]).To(BeTrue())
+	})
 })
 
 func documentHelper(pluginInfo string) interface{} {

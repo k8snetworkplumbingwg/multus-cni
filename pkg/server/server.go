@@ -643,7 +643,7 @@ func podUID(kubeclient *k8s.ClientInfo, cniArgs map[string]string, podNamespace,
 	// containerd 1.5: https://github.com/containerd/containerd/pull/5643
 	uid, found := cniArgs["K8S_POD_UID"]
 	if !found {
-		pod, err := kubeclient.GetPod(podNamespace, podName)
+		pod, err := kubeclient.GetPodAPILiveQuery(context.TODO(), podNamespace, podName)
 		if err != nil {
 			return "", fmt.Errorf("missing pod UID; attempted to recover it from the K8s API, but failed: %w", err)
 		}

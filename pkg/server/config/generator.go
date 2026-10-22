@@ -62,6 +62,7 @@ type MultusConf struct {
 	MultusAutoconfigDir      string              `json:"multusAutoconfigDir,omitempty"`
 	ForceCNIVersion          bool                `json:"forceCNIVersion,omitempty"`
 	OverrideNetworkName      bool                `json:"overrideNetworkName,omitempty"`
+	LiveNetworkConfigOnAdd   bool                `json:"liveNetworkConfigOnAdd,omitempty"`
 }
 
 // ParseMultusConfig parses multus config from configPath and create MultusConf.
