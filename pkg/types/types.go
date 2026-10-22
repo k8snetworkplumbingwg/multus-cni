@@ -67,6 +67,8 @@ type NetConf struct {
 
 	// Retry delegate DEL message to next when some error
 	RetryDeleteOnError bool `json:"retryDeleteOnError"`
+	// Use live Pod and NetworkAttachmentDefinition reads for ADD.
+	LiveNetworkConfigOnAdd bool `json:"liveNetworkConfigOnAdd,omitempty"`
 }
 
 // RuntimeConfig specifies CNI RuntimeConfig

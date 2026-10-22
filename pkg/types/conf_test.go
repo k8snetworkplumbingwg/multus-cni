@@ -75,7 +75,8 @@ var _ = Describe("config operations", func() {
       "portMappings": [
         {"hostPort": 8080, "containerPort": 80, "protocol": "tcp"}
       ]
-    }
+    },
+    "liveNetworkConfigOnAdd": true
 
 }`
 		netConf, err := LoadNetConf([]byte(conf))
@@ -84,6 +85,7 @@ var _ = Describe("config operations", func() {
 		Expect(netConf.Delegates[0].Conf.Type).To(Equal("weave-net"))
 		Expect(netConf.Delegates[0].MasterPlugin).To(BeTrue())
 		Expect(netConf.RuntimeConfig.PortMaps).To(HaveLen(1))
+		Expect(netConf.LiveNetworkConfigOnAdd).To(BeTrue())
 	})
 
 	It("fails to load invalid multus configuration (bad json)", func() {

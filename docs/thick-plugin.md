@@ -70,6 +70,7 @@ for client/server communication will be located. This is the location where the
 is provided.
 - `"logFile"`: the path to where the daemon logs will be persisted.
 - `"logLevel"`: the logging level for the multus daemon logs.
+- `"liveNetworkConfigOnAdd"`: If `true`, ADD reads the Pod and selected NetworkAttachmentDefinitions from the API instead of informer caches. This adds API requests to each ADD and overrides the shim value.
 - `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr
 as well. By default, it is disabled.
 - `"auxiliaryCNIChainName"`: set a value to execute chained cni configurations from disk in an auxiliary CNI chain (see details in [configuration.md](configuration.md))

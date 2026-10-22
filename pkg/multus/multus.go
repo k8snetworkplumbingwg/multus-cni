@@ -778,6 +778,16 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if err != nil {
 		return nil, cmdErr(nil, "error getting k8s client: %v", err)
 	}
+	if n.LiveNetworkConfigOnAdd {
+		if kubeClient == nil {
+			return nil, cmdErr(nil, "liveNetworkConfigOnAdd requires a Kubernetes client")
+		}
+		// Bypass informer caches for this ADD without changing the shared client.
+		liveClient := *kubeClient
+		liveClient.PodInformer = nil
+		liveClient.NetDefInformer = nil
+		kubeClient = &liveClient
+	}
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
 	if err != nil {
@@ -793,6 +803,9 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
 		if stderrors.Is(err, errPodNotFound) {
+			if n.LiveNetworkConfigOnAdd {
+				return nil, cmdErr(k8sArgs, "live Pod read failed: %v", err)
+			}
 			emptyResult := emptyCNIResult(args, n.CNIVersion)
 			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyResult)
 			return emptyResult, nil
