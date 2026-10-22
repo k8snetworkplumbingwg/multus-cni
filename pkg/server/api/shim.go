@@ -67,11 +67,14 @@ func CmdCheck(args *skel.CmdArgs) error {
 
 // CmdDel implements the CNI spec DEL command handler
 func CmdDel(args *skel.CmdArgs) error {
-	// DEL uses healthz (not readyz) so cleanup can still proceed during graceful shutdown.
-	_, _, err := postRequest(args, CheckAPIReadyNow)
+	// Wait for healthz so DEL can proceed during graceful shutdown.
+	_, _, err := postRequest(args, WaitUntilAPIHealthy)
 	if err != nil {
-		// No error in DEL (as of CNI spec)
 		logging.Errorf("CmdDel (shim): %v", err)
+		if stderrors.Is(err, errDaemonUnavailable) {
+			// Avoid runtime suppression of socket errors such as "not found".
+			return errDaemonUnavailable
+		}
 	}
 	return nil
 }
@@ -100,7 +103,6 @@ func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, 
 		return nil, "", fmt.Errorf("invalid CNI configuration passed to multus-shim: %w", err)
 	}
 
-	// Execute the readiness check as necessary (e.g. don't wait on CNI DEL)
 	if err := readinessCheck(multusShimConfig.MultusSocketDir); err != nil {
 		return nil, multusShimConfig.CNIVersion, err
 	}
@@ -117,7 +119,7 @@ func postRequest(args *skel.CmdArgs, readinessCheck readyCheckFunc) (*Response, 
 		if stderrors.As(err, &cniErr) {
 			return nil, multusShimConfig.CNIVersion, err
 		}
-		return nil, multusShimConfig.CNIVersion, fmt.Errorf("%s: StdinData: %s", err.Error(), string(args.StdinData))
+		return nil, multusShimConfig.CNIVersion, fmt.Errorf("%w: StdinData: %s", err, string(args.StdinData))
 	}
 
 	response := &Response{}

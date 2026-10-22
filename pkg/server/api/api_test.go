@@ -83,3 +83,14 @@ func TestCheckAPIReadyNowUsesHealthzEndpoint(t *testing.T) {
 		t.Fatalf("expected health endpoint %q, got %q", MultusHealthAPIEndpoint, gotPath)
 	}
 }
+
+func TestWaitUntilAPIHealthyUsesHealthzEndpoint(t *testing.T) {
+	t.Parallel()
+	socketDir, pathCh := startTestUnixSocketServer(t)
+	if err := WaitUntilAPIHealthy(socketDir); err != nil {
+		t.Fatalf("WaitUntilAPIHealthy returned error: %v", err)
+	}
+	if got := <-pathCh; got != MultusHealthAPIEndpoint {
+		t.Fatalf("expected health endpoint %q, got %q", MultusHealthAPIEndpoint, got)
+	}
+}
