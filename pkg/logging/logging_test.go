@@ -20,6 +20,7 @@ package logging
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	testutils "gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/testing"
@@ -170,6 +171,41 @@ var _ = Describe("logging operations", func() {
 		}
 		SetLogOptions(nil)
 		Expect(logger1).To(Equal(logger))
+	})
+
+	It("Check repeated log setup does not leak file descriptors", func() {
+		tmpDir, err := os.MkdirTemp("", "multus_tmp")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func() {
+			if logger != nil {
+				_ = logger.Close()
+			}
+			logger = nil
+			loggingW = nil
+			_ = os.RemoveAll(tmpDir)
+		})
+		logFile := filepath.Join(tmpDir, "log.txt")
+		SetLogLevel("error")
+
+		// Same order as LoadNetConf.
+		setup := func(options *LogOptions) {
+			SetLogOptions(options)
+			SetLogFile(logFile)
+			_ = Errorf("foobar")
+		}
+		openFDs := func() int {
+			entries, err := os.ReadDir("/dev/fd")
+			Expect(err).NotTo(HaveOccurred())
+			return len(entries)
+		}
+
+		setup(nil)
+		before := openFDs()
+		for range 20 {
+			setup(&LogOptions{MaxAge: testutils.Int(1)})
+		}
+		Eventually(openFDs).Should(BeNumerically("<=", before))
+		Expect(logger.MaxAge).To(Equal(1))
 	})
 
 })
