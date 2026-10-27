@@ -431,6 +431,85 @@ spec:
 EOF
 ```
 
+#### Launch pod with json annotation with resourceName
+
+The `k8s.v1.cni.cncf.io/resourceName` annotation on the NetworkAttachmentDefinition
+sets the default resource pool for every attachment to that network. A pod can
+override the default for an attachment by adding `"resourceName": "<resource>"`
+to the network selection element, as long as the NetworkAttachmentDefinition
+allows that pool in its `k8s.v1.cni.cncf.io/allowedResourceNames` annotation.
+This lets attachments backed by different resource pools reference the same
+NetworkAttachmentDefinition, without creating a separate
+NetworkAttachmentDefinition per resource pool.
+
+The following NetworkAttachmentDefinition uses `intel.com/sriov` by default and
+allows pods to pick `nvidia.com/sriov` instead:
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: intel.com/sriov
+    k8s.v1.cni.cncf.io/allowedResourceNames: nvidia.com/sriov
+spec:
+  config: '{
+      "cniVersion": "0.3.1",
+      "type": "sriov",
+      "name": "sriov-net"
+    }'
+EOF
+```
+
+A pod that references `sriov-net` without a `resourceName` in its network
+selection element gets a device from `intel.com/sriov`. The following pod
+overrides the default and gets a device from `nvidia.com/sriov`:
+
+```
+# Execute following command at Kubernetes master
+cat <<EOF | kubectl create -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-case-07
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+            { "name" : "sriov-net",
+              "resourceName": "nvidia.com/sriov" }
+    ]'
+spec:
+  containers:
+  - name: pod-case-07
+    image: docker.io/centos/tools:latest
+    command:
+    - /sbin/init
+    resources:
+      requests:
+        nvidia.com/sriov: '1'
+      limits:
+        nvidia.com/sriov: '1'
+EOF
+```
+
+The resource pool for an attachment is chosen as follows:
+
+* Without a `resourceName` in the network selection element, the
+  NetworkAttachmentDefinition's `k8s.v1.cni.cncf.io/resourceName` annotation is
+  used.
+* A `resourceName` in the network selection element overrides the default when it
+  is listed in the NetworkAttachmentDefinition's
+  `k8s.v1.cni.cncf.io/allowedResourceNames` annotation.
+* Any other `resourceName` in the network selection element is an error: Multus
+  fails the attachment and records a `ResourceNameNotAllowed` event on the pod.
+  Pods cannot pick a pool the NetworkAttachmentDefinition author did not allow.
+
+`k8s.v1.cni.cncf.io/allowedResourceNames` is a comma-separated list. It only
+applies to network selection element requests; the default from
+`k8s.v1.cni.cncf.io/resourceName` does not need to be listed in it.
+
 ### Verifying pod network
 
 Following the example of `ip -d address` output of above pod, "pod-case-06":

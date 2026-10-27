@@ -38,6 +38,7 @@ import (
 	resourcev1api "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/record"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1025,6 +1026,255 @@ users:
 			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
 			Expect(err).To(HaveOccurred())
 		})
+
+		It("fails when the NetworkSelectionElement requests the NAD default resourceName without it being allowed", func() {
+			// NAD annotation is intel.com/sriov with no allow list. Requesting the
+			// same value is still an override and must be listed to be accepted.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"intel.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("is not allowed for network net1")))
+		})
+
+		It("fails when the NetworkSelectionElement requests a resourceName and the NAD allows none", func() {
+			// NewFakeNetAttachDef creates a NAD without resourceName or
+			// allowedResourceNames annotations, so no request is permitted.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"intel.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("is not allowed for network net1")))
+		})
+
+		It("fails when the NetworkSelectionElement requests a pool that is not allowed even if the NAD has a default", func() {
+			// NAD annotation is intel.com/sriov with no allow list; the NSE requests a different one.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"nvidia.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = clientInfo.AddNetAttachDef(
+				testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1))
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("is not allowed for network net1")))
+		})
+
+		It("selects an allowed NetworkSelectionElement resourceName over the NAD annotation", func() {
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"nvidia.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			nad := testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1)
+			nad.Annotations[allowedResourceNamesAnnot] = "nvidia.com/sriov"
+			_, err = clientInfo.AddNetAttachDef(nad)
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			resourceMap := map[string]*types.ResourceInfo{
+				"intel.com/sriov":  {DeviceIDs: []string{"0000:03:02.0"}},
+				"nvidia.com/sriov": {DeviceIDs: []string{"0000:04:02.0"}},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(delegates[0].ResourceName).To(Equal("nvidia.com/sriov"))
+			Expect(delegates[0].DeviceID).To(Equal("0000:04:02.0"))
+		})
+
+		It("uses resourceName requested by the NetworkSelectionElement when it is in allowedResourceNames", func() {
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"nvidia.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			nad := testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1)
+			nad.Annotations = map[string]string{allowedResourceNamesAnnot: "intel.com/sriov, nvidia.com/sriov"}
+			_, err = clientInfo.AddNetAttachDef(nad)
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			resourceMap := map[string]*types.ResourceInfo{
+				"nvidia.com/sriov": {DeviceIDs: []string{"0000:03:02.0"}},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(delegates[0].ResourceName).To(Equal("nvidia.com/sriov"))
+			Expect(delegates[0].DeviceID).To(Equal("0000:03:02.0"))
+		})
+
+		It("fails when the NetworkSelectionElement resourceName is not in allowedResourceNames", func() {
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"nvidia.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			nad := testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1)
+			nad.Annotations = map[string]string{allowedResourceNamesAnnot: "intel.com/sriov"}
+			_, err = clientInfo.AddNetAttachDef(nad)
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("is not allowed for network net1")))
+		})
+
+		It("does not consult allowedResourceNames when the NetworkSelectionElement does not request a resourceName", func() {
+			// The NAD's own resourceName annotation is not subject to the allow list.
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			nad := testutils.NewFakeNetAttachDefAnnotation(fakePod.ObjectMeta.Namespace, "net1", net1)
+			nad.Annotations[allowedResourceNamesAnnot] = "nvidia.com/sriov"
+			_, err = clientInfo.AddNetAttachDef(nad)
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			resourceMap := map[string]*types.ResourceInfo{
+				"intel.com/sriov": {DeviceIDs: []string{"0000:03:02.0"}},
+			}
+			delegates, err := GetNetworkDelegates(clientInfo, fakePod, networks, netConf, resourceMap)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(delegates).To(HaveLen(1))
+			Expect(delegates[0].ResourceName).To(Equal("intel.com/sriov"))
+		})
+
+		It("fails and records a ResourceNameNotAllowed event when allowedResourceNames is present but empty", func() {
+			fakePod := testutils.NewFakePod(fakePodName, `[{"name":"net1","resourceName":"intel.com/sriov"}]`, "")
+			net1 := `{
+		"name": "net1",
+		"type": "mynet",
+		"cniVersion": "0.4.0"
+	}`
+			clientInfo := NewFakeClientInfo()
+			recorder := record.NewFakeRecorder(1)
+			clientInfo.EventRecorder = recorder
+			_, err := clientInfo.AddPod(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+			nad := testutils.NewFakeNetAttachDef(fakePod.ObjectMeta.Namespace, "net1", net1)
+			nad.Annotations = map[string]string{allowedResourceNamesAnnot: ""}
+			_, err = clientInfo.AddNetAttachDef(nad)
+			Expect(err).NotTo(HaveOccurred())
+
+			networks, err := GetPodNetwork(fakePod)
+			Expect(err).NotTo(HaveOccurred())
+
+			netConf, err := types.LoadNetConf([]byte(genericConf))
+			Expect(err).NotTo(HaveOccurred())
+			netConf.ConfDir = tmpDir
+
+			_, err = GetNetworkDelegates(clientInfo, fakePod, networks, netConf, nil)
+			Expect(err).To(MatchError(ContainSubstring("is not allowed for network net1")))
+			Expect(recorder.Events).To(Receive(And(
+				ContainSubstring("Warning"),
+				ContainSubstring("ResourceNameNotAllowed"),
+				ContainSubstring(`"intel.com/sriov"`),
+			)))
+		})
+
+		DescribeTable("isResourceNameAllowed", func(requested, allowed string, expected bool) {
+			Expect(isResourceNameAllowed(requested, allowed)).To(Equal(expected))
+		},
+			Entry("single entry matches", "intel.com/sriov", "intel.com/sriov", true),
+			Entry("one of several entries matches", "nvidia.com/sriov", "intel.com/sriov,nvidia.com/sriov", true),
+			Entry("whitespace around entries is ignored", "nvidia.com/sriov", " intel.com/sriov , nvidia.com/sriov ", true),
+			Entry("empty entries are ignored", "nvidia.com/sriov", ",,nvidia.com/sriov,", true),
+			Entry("not listed", "mellanox.com/sriov", "intel.com/sriov,nvidia.com/sriov", false),
+			Entry("prefix of an entry does not match", "intel.com/sriov", "intel.com/sriov_net_A", false),
+			Entry("unset list allows nothing", "intel.com/sriov", "", false),
+			Entry("whitespace-only list allows nothing", "intel.com/sriov", " , ", false),
+		)
 	})
 
 	Context("parsePodNetworkObjectName", func() {

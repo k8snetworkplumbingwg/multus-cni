@@ -157,6 +157,12 @@ type NetworkSelectionElement struct {
 	BandwidthRequest *BandwidthEntry `json:"bandwidth,omitempty"`
 	// DeviceID contains an optional requested deviceID the network
 	DeviceID string `json:"deviceID,omitempty"`
+	// ResourceNameRequest optionally overrides the device pool set by the
+	// NetworkAttachmentDefinition's k8s.v1.cni.cncf.io/resourceName annotation
+	// for this attachment. The NAD must list the requested pool in
+	// k8s.v1.cni.cncf.io/allowedResourceNames. This allows different device
+	// types to attach to the same network without duplicating the NAD.
+	ResourceNameRequest string `json:"resourceName,omitempty"`
 	// CNIArgs contains additional CNI arguments for the network interface
 	CNIArgs *map[string]interface{} `json:"cni-args"`
 	// GatewayRequest contains default route IP address for the pod
