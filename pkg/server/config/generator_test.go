@@ -254,6 +254,7 @@ var _ = Describe("Configuration Generator", func() {
 			}`, primaryCNIFile)
 		Expect(multusConfig.Generate()).Should(MatchJSON(expectedResult))
 	})
+
 })
 
 func documentHelper(pluginInfo string) interface{} {

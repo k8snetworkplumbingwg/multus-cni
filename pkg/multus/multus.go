@@ -778,6 +778,13 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	if err != nil {
 		return nil, cmdErr(nil, "error getting k8s client: %v", err)
 	}
+	if kubeClient != nil {
+		// ADD must observe Pod patches and NADs created before sandbox creation.
+		liveClient := *kubeClient
+		liveClient.PodInformer = nil
+		liveClient.NetDefInformer = nil
+		kubeClient = &liveClient
+	}
 
 	k8sArgs, err := k8s.GetK8sArgs(args)
 	if err != nil {
