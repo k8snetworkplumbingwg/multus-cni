@@ -88,6 +88,7 @@ type requestExec struct {
 	ctx context.Context
 }
 
+// newRequestExec binds plugin execution to ctx, supplying the default executor when needed.
 func newRequestExec(ctx context.Context, exec invoke.Exec) *requestExec {
 	// libcni normally supplies the default executor when exec is nil. Wrapping
 	// nil would hide it from libcni and panic when a plugin is invoked.
@@ -97,6 +98,8 @@ func newRequestExec(ctx context.Context, exec invoke.Exec) *requestExec {
 	return &requestExec{Exec: exec, ctx: ctx}
 }
 
+// ExecPlugin uses the request context for plugin execution while preserving the
+// caller context for DEL so cleanup can finish after a shim disconnect.
 func (e *requestExec) ExecPlugin(ctx context.Context, path string, stdin []byte, env []string) ([]byte, error) {
 	if cniCommand(env) != "DEL" {
 		ctx = e.ctx
@@ -121,6 +124,7 @@ func (s *Server) HandleCNIRequest(cmd string, k8sArgs *types.K8sArgs, cniCmdArgs
 	return s.handleCNICommand(context.Background(), cmd, k8sArgs, cniCmdArgs)
 }
 
+// handleCNICommand dispatches CNI commands, binding ADD and CHECK execution to ctx.
 func (s *Server) handleCNICommand(ctx context.Context, cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs) ([]byte, error) {
 	var result []byte
 	var err error
@@ -151,6 +155,7 @@ func (s *Server) HandleDelegateRequest(cmd string, k8sArgs *types.K8sArgs, cniCm
 	return s.handleDelegateCommand(context.Background(), cmd, k8sArgs, cniCmdArgs, interfaceAttributes)
 }
 
+// handleDelegateCommand dispatches delegate commands, binding ADD and CHECK execution to ctx.
 func (s *Server) handleDelegateCommand(ctx context.Context, cmd string, k8sArgs *types.K8sArgs, cniCmdArgs *skel.CmdArgs, interfaceAttributes *api.DelegateInterfaceAttributes) ([]byte, error) {
 	var result []byte
 	var err error
@@ -483,6 +488,7 @@ func (s *Server) wrapCNIRequestError(cmdArgs *skel.CmdArgs, err error) error {
 	return fmt.Errorf("%s ERRORED: %v", printCmdArgs(cmdArgs), err)
 }
 
+// handleCNIRequest decodes a shim request and dispatches it with the HTTP request context.
 func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	var cr api.Request
 	b, err := io.ReadAll(r.Body)
@@ -514,6 +520,7 @@ func (s *Server) handleCNIRequest(r *http.Request) ([]byte, error) {
 	return result, nil
 }
 
+// handleDelegateRequest decodes a delegate request and dispatches it with the HTTP request context.
 func (s *Server) handleDelegateRequest(r *http.Request) ([]byte, error) {
 	var cr api.Request
 	b, err := io.ReadAll(r.Body)
@@ -696,6 +703,7 @@ func podUID(kubeclient *k8s.ClientInfo, cniArgs map[string]string, podNamespace,
 	return uid, nil
 }
 
+// cmdAdd validates the pod identity and configures its networks using the supplied executor.
 func (s *Server) cmdAdd(exec invoke.Exec, cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) ([]byte, error) {
 	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podName := string(k8sArgs.K8S_POD_NAME)
@@ -722,6 +730,7 @@ func (s *Server) cmdDel(cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
 	return multus.CmdDel(cmdArgs, s.exec, s.kubeclient)
 }
 
+// cmdCheck validates the pod identity and checks its networks using the supplied executor.
 func (s *Server) cmdCheck(exec invoke.Exec, cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs) error {
 	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podName := string(k8sArgs.K8S_POD_NAME)
@@ -757,6 +766,8 @@ func serializeResult(result cnitypes.Result) ([]byte, error) {
 	return responseBytes, nil
 }
 
+// cmdDelegateAdd loads the pod and delegate configuration, then adds the network
+// using the supplied executor and returns the serialized CNI result.
 func (s *Server) cmdDelegateAdd(exec invoke.Exec, cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, multusConfig *types.NetConf, interfaceAttributes *api.DelegateInterfaceAttributes) ([]byte, error) {
 	namespace := string(k8sArgs.K8S_POD_NAMESPACE)
 	podName := string(k8sArgs.K8S_POD_NAME)
@@ -798,6 +809,7 @@ func (s *Server) cmdDelegateAdd(exec invoke.Exec, cmdArgs *skel.CmdArgs, k8sArgs
 	return serializeResult(result)
 }
 
+// cmdDelegateCheck parses the delegate configuration and checks the network using the supplied executor.
 func (s *Server) cmdDelegateCheck(exec invoke.Exec, cmdArgs *skel.CmdArgs, k8sArgs *types.K8sArgs, multusConfig *types.NetConf) error {
 	delegateCNIConf := &types.DelegateNetConf{}
 	if err := json.Unmarshal(cmdArgs.StdinData, delegateCNIConf); err != nil {

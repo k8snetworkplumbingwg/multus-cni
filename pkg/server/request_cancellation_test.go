@@ -46,6 +46,8 @@ type cancellationTestExec struct {
 	rollbackDone chan struct{}
 }
 
+// ExecPlugin runs the plugin and signals first-plugin completion and rollback
+// so cancellation tests can synchronize with delegate execution.
 func (e *cancellationTestExec) ExecPlugin(ctx context.Context, path string, stdin []byte, env []string) ([]byte, error) {
 	result, err := e.Exec.ExecPlugin(ctx, path, stdin, env)
 	if filepath.Base(path) == "first" {
