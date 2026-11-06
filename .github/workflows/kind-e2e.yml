@@ -73,6 +73,11 @@ jobs:
         working-directory: ./e2e
         run: ./test-simple-pod.sh
 
+      - name: Test shim cancellation
+        if: matrix.multus-manifest == 'multus-daemonset-thick.yml'
+        working-directory: ./e2e
+        run: ./test-shim-cancellation.sh
+
       - name: Test macvlan1
         working-directory: ./e2e
         run: ./test-simple-macvlan1.sh
