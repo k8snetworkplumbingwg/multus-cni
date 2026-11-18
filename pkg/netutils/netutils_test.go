@@ -569,6 +569,64 @@ var _ = Describe("netutil cnicache function testing", func() {
 			Expect(len(result.Result.Routes)).To(Equal(5))
 		})
 
+		It("verify ipv6 default gateway in canonical ::/0 form is removed from CNI 1.0.0 results", func() {
+			// Real CNI results serialize the IPv6 default route in its canonical
+			// form "::/0" (net.IPNet.String()), not "::0/0". This exercises that
+			// a cached default route written by an actual delegate is stripped.
+			origResult := []byte(`{
+  "kind": "cniCacheV1",
+  "result": {
+    "cniVersion": "1.0.0",
+    "dns": {},
+    "interfaces": [
+      {
+        "mac": "0a:c2:e6:3d:45:17",
+        "name": "net1",
+        "sandbox": "/run/netns/bb74fcb9-989a-4589-b2df-ddd0384a8ee5"
+      }
+    ],
+    "ips": [
+      {
+        "address": "10::1:1:103/64",
+        "interface": 0
+      }
+    ],
+    "routes": [
+      {
+        "dst": "20::0:0:0/56",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "::/0",
+        "gw": "10::1:1:1"
+      },
+      {
+        "dst": "30::0:0:0/64",
+        "gw": "10::1:1:1"
+      }
+    ]
+  }
+}`)
+			newResult, err := deleteDefaultGWCacheBytes(origResult, false, true)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(test100ResultHasIPv6DefaultRoute(testGetResultFromCache(newResult))).To(BeFalse())
+
+			// Simplified CNI Cache with 1.0.0 Result
+			type CNICacheResult100 struct {
+				Kind   string `json:"kind"`
+				Result struct {
+					Routes []struct {
+						Dst string `json:"dst"`
+						Gw  string `json:"gw"`
+					} `json:"routes"`
+				} `json:"result"`
+			}
+			result := CNICacheResult100{}
+			Expect(json.Unmarshal(newResult, &result)).NotTo(HaveOccurred())
+			Expect(len(result.Result.Routes)).To(Equal(2))
+		})
+
 		It("verify ipv4 default gateway is removed from CNI 1.0.0 results", func() {
 			origResult := []byte(`{
   "kind": "cniCacheV1",
