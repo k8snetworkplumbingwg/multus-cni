@@ -144,6 +144,10 @@ Only one option is necessary to configure this functionality:
 
 *NOTE*: If `readinessindicatorfile` is unset, or is an empty string, this functionality will be disabled, and is disabled by default.
 
+### Live Network Configuration on ADD
+
+ADD reads the Pod and selected NetworkAttachmentDefinitions directly from the API so it observes Pod network selections and NADs created before sandbox creation. No configuration option is required. In thick mode, this adds API requests during ADD; other requests continue to use informer caches where applicable.
+
 
 ### Logging
 
