@@ -358,6 +358,9 @@ func startCNIServer(ctx context.Context, runDir string, k8sClient *k8s.ClientInf
 // in unit-testing.
 func unregisterMetrics(server *Server) {
 	ExpectWithOffset(1, prometheus.Unregister(server.metrics.requestCounter)).To(BeTrue())
+	ExpectWithOffset(1, prometheus.Unregister(server.metrics.cniLookupCounter)).To(BeTrue())
+	ExpectWithOffset(1, prometheus.Unregister(server.metrics.cniExecCounter)).To(BeTrue())
+	ExpectWithOffset(1, prometheus.Unregister(server.metrics.cniExecDuration)).To(BeTrue())
 }
 
 func referenceConfig(thickPluginSocketDir string) string {

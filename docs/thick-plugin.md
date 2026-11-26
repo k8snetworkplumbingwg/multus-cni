@@ -67,7 +67,8 @@ The server configuration is encoded in JSON, and allows the following keys:
 for client/server communication will be located. This is the location where the
 **Daemon** will read the configuration from. Defaults to `"/run/multus"`.
 - `"metricsPort"`: Metrics port (of multus' metric exporter); by default, no port
-is provided.
+is provided. See [metrics](metrics.md).
+
 - `"logFile"`: the path to where the daemon logs will be persisted.
 - `"logLevel"`: the logging level for the multus daemon logs.
 - `"logToStderr"`: enable this to have the daemon multus logs echoed to stderr

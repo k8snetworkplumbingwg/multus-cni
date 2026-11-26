@@ -42,7 +42,10 @@ const (
 
 // Metrics represents server's metrics.
 type Metrics struct {
-	requestCounter *prometheus.CounterVec
+	requestCounter   *prometheus.CounterVec
+	cniLookupCounter *prometheus.CounterVec
+	cniExecCounter   *prometheus.CounterVec
+	cniExecDuration  *prometheus.HistogramVec
 }
 
 // Server represents an HTTP server listening to a unix socket. It will handle
