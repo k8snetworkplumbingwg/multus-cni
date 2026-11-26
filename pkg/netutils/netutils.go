@@ -146,6 +146,10 @@ func deleteDefaultGWCacheBytes(cacheFile []byte, ipv4, ipv6 bool) ([]byte, error
 }
 
 func deleteDefaultGWResultRoutes(routes []interface{}, dstGW string) ([]interface{}, error) {
+	_, defaultNet, err := net.ParseCIDR(dstGW)
+	if err != nil {
+		return nil, fmt.Errorf("invalid default route %q: %v", dstGW, err)
+	}
 	var newRoutes []interface{}
 	for i, r := range routes {
 		route, ok := r.(map[string]interface{})
@@ -158,7 +162,14 @@ func deleteDefaultGWResultRoutes(routes []interface{}, dstGW string) ([]interfac
 			if !ok {
 				return nil, fmt.Errorf("wrong dst format: %v", route["dst"])
 			}
-			if dst != dstGW {
+			// Compare the parsed networks instead of the raw strings so that
+			// equivalent textual forms of the same default route are matched.
+			// Real CNI results serialize the IPv6 default route in its canonical
+			// form "::/0" (net.IPNet.String()), while this code historically
+			// looked for "::0/0"; both denote the same network, so a raw string
+			// comparison failed to strip the IPv6 default route from the cache.
+			_, dstNet, perr := net.ParseCIDR(dst)
+			if perr != nil || dstNet.String() != defaultNet.String() {
 				newRoutes = append(newRoutes, routes[i])
 			}
 		}
@@ -208,7 +219,7 @@ func deleteDefaultGWResult(result map[string]interface{}, ipv4, ipv6 bool) (map[
 	}
 
 	if ipv6 {
-		routes, err = deleteDefaultGWResultRoutes(routes, "::0/0")
+		routes, err = deleteDefaultGWResultRoutes(routes, "::/0")
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +275,7 @@ func deleteDefaultGWResult020(result map[string]interface{}, ipv4, ipv6 bool) (m
 					return nil, fmt.Errorf("wrong ip6 routes format: %v", ip6["routes"])
 				}
 
-				routes, err = deleteDefaultGWResultRoutes(routes, "::0/0")
+				routes, err = deleteDefaultGWResultRoutes(routes, "::/0")
 				if err != nil {
 					return nil, err
 				}
