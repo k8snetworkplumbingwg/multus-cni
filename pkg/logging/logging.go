@@ -84,8 +84,7 @@ func SetLogOptions(options *LogOptions) {
 			updatedLogger.Compress = *options.Compress
 		}
 	}
-	logger = &updatedLogger
-	loggingW = logger
+	replaceLogger(&updatedLogger)
 }
 
 func (l Level) String() string {
@@ -205,8 +204,25 @@ func SetLogFile(filename string) {
 		updatedLogger.Compress = logger.Compress
 		updatedLogger.MaxSize = logger.MaxSize
 	}
-	logger = &updatedLogger
+	replaceLogger(&updatedLogger)
+}
+
+// replaceLogger reuses the current logger if its settings are unchanged and
+// otherwise closes it, so the per-request setters in LoadNetConf leak no file.
+func replaceLogger(updated *lumberjack.Logger) {
+	if logger != nil && logger.Filename == updated.Filename &&
+		logger.MaxSize == updated.MaxSize && logger.MaxAge == updated.MaxAge &&
+		logger.MaxBackups == updated.MaxBackups && logger.LocalTime == updated.LocalTime &&
+		logger.Compress == updated.Compress {
+		loggingW = logger
+		return
+	}
+	previous := logger
+	logger = updated
 	loggingW = logger
+	if previous != nil {
+		_ = previous.Close()
+	}
 }
 
 func init() {
