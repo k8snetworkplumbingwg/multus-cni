@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -85,6 +86,64 @@ var _ = Describe("Configuration Manager", func() {
 		config, err := configManager.GenerateConfig()
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config).To(Equal(expectedResult))
+	})
+
+	DescribeTable("Rejects unavailable primary CNI configuration", func(primaryConfig string, remove bool) {
+		defer func() {
+			Expect(configManager.configWatcher.Close()).To(Succeed(), "close config watcher")
+		}()
+		if remove {
+			Expect(os.Remove(defaultCniConfig)).To(Succeed())
+		} else {
+			Expect(os.WriteFile(defaultCniConfig, []byte(primaryConfig), UserRWPermission)).To(Succeed())
+		}
+
+		config, err := configManager.GenerateConfig()
+		Expect(err).To(HaveOccurred())
+		Expect(config).To(BeEmpty())
+	},
+		Entry("when the file is missing", "", true),
+		Entry("when the file is empty", "", false),
+		Entry("when the JSON is incomplete", "{", false),
+		Entry("when the CNI version is incompatible", `{"cniVersion":"0.3.1","name":"mycni-name","type":"mycni"}`, false),
+	)
+
+	It("Rejects startup without overwriting an existing config when primary config generation fails", func() {
+		defer func() {
+			Expect(configManager.configWatcher.Close()).To(Succeed(), "close config watcher")
+		}()
+		config, err := configManager.GenerateConfig()
+		Expect(err).NotTo(HaveOccurred())
+		_, err = configManager.PersistMultusConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(os.WriteFile(defaultCniConfig, nil, UserRWPermission)).To(Succeed())
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		Expect(configManager.Start(ctx, wg)).NotTo(Succeed())
+		contents, err := os.ReadFile(configManager.multusConfigFilePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(contents)).To(Equal(config))
+	})
+
+	It("Preserves the last valid config during a failed reload and accepts the next valid update", func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		Expect(configManager.Start(ctx, wg)).To(Succeed())
+		config, err := os.ReadFile(configManager.multusConfigFilePath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(config).NotTo(BeEmpty())
+
+		Expect(os.WriteFile(defaultCniConfig, nil, UserRWPermission)).To(Succeed())
+		Consistently(func() ([]byte, error) {
+			return os.ReadFile(configManager.multusConfigFilePath)
+		}, 500*time.Millisecond).Should(Equal(config))
+
+		updatedCNIConfig := `{"cniVersion":"0.4.0","name":"mycni-name","type":"mycni","capabilities":{"portMappings":true}}`
+		Expect(os.WriteFile(defaultCniConfig, []byte(updatedCNIConfig), UserRWPermission)).To(Succeed())
+		Eventually(func() ([]byte, error) {
+			return os.ReadFile(configManager.multusConfigFilePath)
+		}, 2*time.Second).Should(ContainSubstring("portMappings"))
 	})
 
 	It("Check overrideCNIVersion is worked", func() {

@@ -224,7 +224,7 @@ func (m *Manager) loadPrimaryCNIConfigurationData(primaryCNIConfigData interface
 func (m *Manager) GenerateConfig() (string, error) {
 	if err := m.loadPrimaryCNIConfigFromFile(); err != nil {
 		_ = logging.Errorf("failed to read the primary CNI plugin config from %s", m.primaryCNIConfigPath)
-		return "", nil
+		return "", err
 	}
 	return m.multusConfig.Generate()
 }
@@ -253,6 +253,7 @@ func (m *Manager) monitorPluginConfiguration(ctx context.Context) error {
 			updatedConfig, err := m.GenerateConfig()
 			if err != nil {
 				_ = logging.Errorf("failed to regenerate the multus configuration: %v", err)
+				continue
 			}
 
 			logging.Debugf("Re-generated MultusCNI config: %s", updatedConfig)
