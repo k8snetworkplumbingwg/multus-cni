@@ -33,16 +33,23 @@ metadata:
 rules:
   - apiGroups: ["k8s.cni.cncf.io"]
     resources:
-      - '*'
+      - network-attachment-definitions
     verbs:
-      - '*'
+      - get
+      - list
+      - watch
   - apiGroups:
       - ""
     resources:
       - pods
-      - pods/status
     verbs:
       - get
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - patch
       - update
 ---
 kind: ClusterRoleBinding
