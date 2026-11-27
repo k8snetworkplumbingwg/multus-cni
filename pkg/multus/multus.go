@@ -793,7 +793,10 @@ func CmdAdd(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) (c
 	pod, err := GetPod(kubeClient, k8sArgs, false)
 	if err != nil {
 		if stderrors.Is(err, errPodNotFound) {
-			emptyResult := emptyCNIResult(args, n.CNIVersion)
+			emptyResult, err := emptyCNIResult(args, n.CNIVersion)
+			if err != nil {
+				return nil, cmdErr(k8sArgs, "failed to build empty CNI result: %v", err)
+			}
 			logging.Verbosef("CmdAdd: Warning: pod [%s/%s] not found, exiting with empty CNI result: %v", k8sArgs.K8S_POD_NAMESPACE, k8sArgs.K8S_POD_NAME, emptyResult)
 			return emptyResult, nil
 		}
@@ -1297,9 +1300,12 @@ func CmdGC(args *skel.CmdArgs, exec invoke.Exec, kubeClient *k8s.ClientInfo) err
 	return nil
 }
 
-func emptyCNIResult(args *skel.CmdArgs, cniVersion string) *cni100.Result {
-	return &cni100.Result{
-		CNIVersion: cniVersion,
+// emptyCNIResult returns a minimal CNI ADD result for the given CNI version.
+// It is built at the latest spec version and then converted, so the concrete
+// type always matches the reported CNIVersion. See issue #1497.
+func emptyCNIResult(args *skel.CmdArgs, cniVersion string) (cnitypes.Result, error) {
+	result := &cni100.Result{
+		CNIVersion: cni100.ImplementedSpecVersion,
 		Interfaces: []*cni100.Interface{
 			{
 				Name:    args.IfName,
@@ -1316,4 +1322,5 @@ func emptyCNIResult(args *skel.CmdArgs, cniVersion string) *cni100.Result {
 			},
 		},
 	}
+	return result.GetAsVersion(cniVersion)
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/containernetworking/cni/pkg/skel"
 	cni040 "github.com/containernetworking/cni/pkg/types/040"
+	cni100 "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	"gopkg.in/k8snetworkplumbingwg/multus-cni.v4/pkg/logging"
@@ -1499,5 +1500,49 @@ var _ = Describe("multus operations cniVersion 0.4.0 config", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(fExec.delIndex).To(Equal(len(fExec.plugins)))
 	})
+
+	// Regression test for issue #1497: the empty result returned when the pod
+	// is not found must have a concrete type matching its CNIVersion.
+	DescribeTable("returns a convertible empty add result when the pod is not found",
+		func(cniVersion string) {
+			args := &skel.CmdArgs{
+				ContainerID: "123456789",
+				Netns:       testNS.Path(),
+				IfName:      "eth0",
+				Args:        "K8S_POD_NAME=missing-pod;K8S_POD_NAMESPACE=default",
+				StdinData: []byte(fmt.Sprintf(`{
+	    "name": "node-cni-network",
+	    "type": "multus",
+	    "kubeconfig": "/etc/kubernetes/node-kubeconfig.yaml",
+	    "cniVersion": "%s",
+	    "delegates": [{
+	        "name": "weave1",
+	        "cniVersion": "%s",
+	        "type": "weave-net"
+	    }]
+	}`, cniVersion, cniVersion)),
+			}
+
+			fExec := newFakeExec()
+			fKubeClient := NewFakeClientInfo()
+
+			result, err := CmdAdd(args, fExec, fKubeClient)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result).NotTo(BeNil())
+
+			r, ok := result.(*cni040.Result)
+			Expect(ok).To(BeTrue())
+			Expect(r.CNIVersion).To(Equal(cniVersion))
+			Expect(fExec.addIndex).To(Equal(0))
+
+			// multus-daemon converts the result before replying; this panicked
+			// before the fix.
+			_, err = cni100.NewResultFromResult(result)
+			Expect(err).NotTo(HaveOccurred())
+		},
+		Entry("with cniVersion 0.3.0", "0.3.0"),
+		Entry("with cniVersion 0.3.1", "0.3.1"),
+		Entry("with cniVersion 0.4.0", "0.4.0"),
+	)
 
 })
