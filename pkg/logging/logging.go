@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	strings"
 	"time"
 
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
@@ -204,6 +204,9 @@ func SetLogFile(filename string) {
 		updatedLogger.MaxBackups = logger.MaxBackups
 		updatedLogger.Compress = logger.Compress
 		updatedLogger.MaxSize = logger.MaxSize
+	}
+	if logger != nil {
+		logger.Close()
 	}
 	logger = &updatedLogger
 	loggingW = logger
