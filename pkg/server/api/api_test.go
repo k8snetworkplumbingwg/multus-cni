@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// startTestUnixSocketServer starts a Unix HTTP server that records request paths.
 func startTestUnixSocketServer(t *testing.T) (string, <-chan string) {
 	t.Helper()
 
@@ -54,6 +55,7 @@ func startTestUnixSocketServer(t *testing.T) (string, <-chan string) {
 	return tmpDir, pathCh
 }
 
+// TestWaitUntilAPIReadyUsesReadyzEndpoint verifies readiness checks use readyz.
 func TestWaitUntilAPIReadyUsesReadyzEndpoint(t *testing.T) {
 	t.Parallel()
 
@@ -69,6 +71,7 @@ func TestWaitUntilAPIReadyUsesReadyzEndpoint(t *testing.T) {
 	}
 }
 
+// TestCheckAPIReadyNowUsesHealthzEndpoint verifies the single health check uses healthz.
 func TestCheckAPIReadyNowUsesHealthzEndpoint(t *testing.T) {
 	t.Parallel()
 
@@ -81,5 +84,17 @@ func TestCheckAPIReadyNowUsesHealthzEndpoint(t *testing.T) {
 	gotPath := <-pathCh
 	if gotPath != MultusHealthAPIEndpoint {
 		t.Fatalf("expected health endpoint %q, got %q", MultusHealthAPIEndpoint, gotPath)
+	}
+}
+
+// TestWaitUntilAPIHealthyUsesHealthzEndpoint verifies health polling uses healthz.
+func TestWaitUntilAPIHealthyUsesHealthzEndpoint(t *testing.T) {
+	t.Parallel()
+	socketDir, pathCh := startTestUnixSocketServer(t)
+	if err := WaitUntilAPIHealthy(socketDir); err != nil {
+		t.Fatalf("WaitUntilAPIHealthy returned error: %v", err)
+	}
+	if got := <-pathCh; got != MultusHealthAPIEndpoint {
+		t.Fatalf("expected health endpoint %q, got %q", MultusHealthAPIEndpoint, got)
 	}
 }

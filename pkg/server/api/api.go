@@ -16,7 +16,9 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -48,9 +50,18 @@ const (
 	MultusReadyAPIEndpoint = "/readyz"
 )
 
+// errDaemonUnavailable distinguishes communication failures from daemon-reported
+// CNI errors. Returning the latter on DEL can prevent sandbox teardown indefinitely.
+var errDaemonUnavailable = errors.New("communication with multus daemon failed")
+
 // DoCNI sends a CNI request to the CNI server via JSON + HTTP over a root-owned unix socket,
 // and returns the result
 func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
+	return doCNI(context.Background(), url, req, socketPath)
+}
+
+// doCNI sends a CNI request over the Unix socket using the supplied context.
+func doCNI(ctx context.Context, url string, req interface{}, socketPath string) ([]byte, error) {
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal CNI request %v: %v", req, err)
@@ -58,21 +69,27 @@ func DoCNI(url string, req interface{}, socketPath string) ([]byte, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			Dial: func(_, _ string) (net.Conn, error) {
-				return net.Dial("unix", socketPath)
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", socketPath)
 			},
 		},
 	}
+	defer client.CloseIdleConnections()
 
-	resp, err := client.Post(url, "application/json", bytes.NewReader(data))
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to send CNI request: %v", err)
+		return nil, fmt.Errorf("failed to create CNI request: %v", err)
+	}
+	httpRequest.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(httpRequest)
+	if err != nil {
+		return nil, fmt.Errorf("%w: failed to send CNI request: %w", errDaemonUnavailable, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read CNI result: %v", err)
+		return nil, fmt.Errorf("%w: failed to read CNI result: %w", errDaemonUnavailable, err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -112,6 +129,18 @@ func WaitUntilAPIReady(socketPath string) error {
 		_, err := DoCNI(GetAPIEndpoint(MultusReadyAPIEndpoint), nil, SocketPath(socketPath))
 		return err == nil, nil
 	})
+}
+
+// WaitUntilAPIHealthy checks API health before DEL.
+func WaitUntilAPIHealthy(socketPath string) error {
+	err := utilwait.PollUntilContextTimeout(context.Background(), APIReadyPollDuration, APIReadyPollTimeout, true, func(ctx context.Context) (bool, error) {
+		_, err := doCNI(ctx, GetAPIEndpoint(MultusHealthAPIEndpoint), nil, SocketPath(socketPath))
+		return err == nil, nil
+	})
+	if err != nil {
+		return fmt.Errorf("%w: %w", errDaemonUnavailable, err)
+	}
+	return nil
 }
 
 // CheckAPIReadyNow checks API readiness once
