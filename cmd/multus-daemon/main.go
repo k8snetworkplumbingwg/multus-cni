@@ -150,7 +150,9 @@ func main() {
 		}
 	}
 
+	<-ctx.Done()
 	wg.Wait()
+
 	logging.Verbosef("multus daemon is exited")
 }
 
